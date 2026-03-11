@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>תוכנית עבודה - ManageR²</title>
+  <link rel="stylesheet" href="../styles/tokens.css">
+  <link rel="stylesheet" href="../styles/base.css">
+  <link rel="stylesheet" href="../styles/layout.css">
+  <link rel="stylesheet" href="../styles/components.css">
+  <link rel="stylesheet" href="../styles/utilities.css">
+  <link rel="stylesheet" href="../styles/workplan.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <nav class="sidebar-nav">
+        <div class="sidebar-user">
+          <div class="sidebar-user-main">
+            <div class="sidebar-user-name">רביב מעיני</div>
+            <div class="sidebar-user-role">מנכ״ל</div>
+          </div>
+          <div class="sidebar-user-status">
+            <span class="status-dot status-dot-online" aria-hidden="true"></span>
+            <span>מחובר</span>
+          </div>
+          <div class="dropdown sidebar-user-dropdown">
+            <button type="button" class="dropdown-toggle" aria-label="תפריט משתמש">⋯</button>
+            <div class="dropdown-menu">
+              <div class="dropdown-item">החלף משתמש</div>
+              <div class="dropdown-item">התנתק</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="sidebar-nav-main">
+          <a href="../index.html" class="sidebar-nav-link">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M4 13h7V4H4v9zm0 7h7v-5H4v5zm9 0h7V11h-7v9zm0-18v7h7V2h-7z"/></svg>
+            </span>
+            <span class="nav-label">לוח בקרה</span>
+          </a>
+          <a href="workplan.html" class="sidebar-nav-link active">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M7 11h10v2H7v-2zm0 4h7v2H7v-2zM19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg>
+            </span>
+            <span class="nav-label">תוכנית עבודה</span>
+          </a>
+          <a href="projects.html" class="sidebar-nav-link">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg>
+            </span>
+            <span class="nav-label">פרויקטים</span>
+          </a>
+          <a href="service-calls.html" class="sidebar-nav-link">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M22 19l-8-8v-2.5c1.2-.7 2-2 2-3.5C16 2.8 14.2 1 12 1S8 2.8 8 5c0 1.5.8 2.8 2 3.5V11L2 19v2h20v-2z"/></svg>
+            </span>
+            <span class="nav-label">שירות</span>
+          </a>
+          <a href="customers.html" class="sidebar-nav-link">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M16 11c1.7 0 3-1.3 3-3s-1.3-3-3-3-3 1.3-3 3 1.3 3 3 3zm-8 0c1.7 0 3-1.3 3-3S9.7 5 8 5 5 6.3 5 8s1.3 3 3 3zm0 2c-2.3 0-7 1.2-7 3.5V20h14v-3.5C15 14.2 10.3 13 8 13zm8 0c-.3 0-.7 0-1.1.1 1.2.9 2.1 2 2.1 3.4V20h7v-3.5c0-2.3-4.7-3.5-7-3.5z"/></svg>
+            </span>
+            <span class="nav-label">לקוחות</span>
+          </a>
+          <a href="contacts.html" class="sidebar-nav-link">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M20 0H4c-1.1 0-2 .9-2 2v20l4-4h14c1.1 0 2-.9 2-2V2c0-1.1-.9-2-2-2zm0 16H6l-2 2V2h16v14z"/></svg>
+            </span>
+            <span class="nav-label">אנשי קשר</span>
+          </a>
+          <a href="quotes.html" class="sidebar-nav-link">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm1 7V3.5L19.5 9H15zM8 13h8v2H8v-2zm0 4h8v2H8v-2z"/></svg>
+            </span>
+            <span class="nav-label">הצעות מחיר</span>
+          </a>
+          <a href="inventory.html" class="sidebar-nav-link">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M21 8V7l-3-3H6L3 7v1h18zM3 10v10c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V10H3zm6 3h6v2H9v-2z"/></svg>
+            </span>
+            <span class="nav-label">מוצרים ומלאי</span>
+          </a>
+          <a href="reports.html" class="sidebar-nav-link">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M3 3h18v2H3V3zm2 4h14v14H5V7zm2 2v10h10V9H7zm2 2h2v6H9v-6zm4 2h2v4h-2v-4z"/></svg>
+            </span>
+            <span class="nav-label">דיווחי ביצוע</span>
+          </a>
+          <a href="employees.html" class="sidebar-nav-link">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 12c2.2 0 4-1.8 4-4S14.2 4 12 4 8 5.8 8 8s1.8 4 4 4zm0 2c-3.3 0-10 1.7-10 5v1h20v-1c0-3.3-6.7-5-10-5z"/></svg>
+            </span>
+            <span class="nav-label">עובדים</span>
+          </a>
+          <a href="cashflow.html" class="sidebar-nav-link">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M12 3C7.6 3 4 4.8 4 7v10c0 2.2 3.6 4 8 4s8-1.8 8-4V7c0-2.2-3.6-4-8-4zm0 2c3.3 0 6 .9 6 2s-2.7 2-6 2-6-.9-6-2 2.7-2 6-2zm0 14c-3.3 0-6-.9-6-2V9.8c1.5.9 3.8 1.2 6 1.2s4.5-.3 6-1.2V17c0 1.1-2.7 2-6 2z"/></svg>
+            </span>
+            <span class="nav-label">תזרים מזומנים</span>
+          </a>
+        </div>
+        <div class="sidebar-nav-bottom">
+          <a href="settings.html" class="sidebar-nav-link">
+            <span class="nav-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24"><path d="M19.4 13c.04-.33.06-.66.06-1s-.02-.67-.06-1l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1a7.5 7.5 0 0 0-1.73-1l-.38-2.65A.5.5 0 0 0 14 1h-4a.5.5 0 0 0-.49.42L9.13 4.07c-.63.25-1.2.58-1.73 1l-2.49-1a.5.5 0 0 0-.61.22l-2 3.46c-.12.22-.07.49.12.64L4.6 11c-.04.33-.06.66-.06 1s.02.67.06 1L2.49 14.65a.5.5 0 0 0-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.53.42 1.1.75 1.73 1l.38 2.65A.5.5 0 0 0 10 23h4a.5.5 0 0 0 .49-.42l.38-2.65c.63-.25 1.2-.58 1.73-1l2.49 1c.23.09.49 0 .61-.22l2-3.46a.5.5 0 0 0-.12-.64L19.4 13zM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5z"/></svg>
+            </span>
+            <span class="nav-label">הגדרות</span>
+          </a>
+        </div>
+      </nav>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar-brand">
+          <img class="topbar-logo" src="../assets/manager2-logo.png" alt="ManageR²">
+          <div class="topbar-title-wrap">
+            <h1 class="topbar-title">תוכנית עבודה</h1>
+          </div>
+        </div>
+      </header>
+
+      <div class="content-wide">
+        <section class="section">
+          <div class="workplan-toolbar card">
+            <div class="workplan-toolbar-layout">
+              <!-- Left column: Primary action -->
+              <div class="workplan-toolbar-left">
+                <button type="button" class="btn btn-primary" id="btn-new-task">
+                  <i data-lucide="plus-circle" class="icon" aria-hidden="true"></i>
+                  משימה חדשה
+                </button>
+              </div>
+
+              <!-- Right column: Stacked tabs -->
+              <div class="workplan-toolbar-right">
+                <!-- Scope tabs row -->
+                <div class="workplan-tabs-row">
+                  <div class="tab-group tab-group-scope" role="tablist" aria-label="היקף תצוגה">
+                    <button type="button" class="btn btn-seg tab-scope active" data-scope="company" aria-selected="true">כללי</button>
+                    <button type="button" class="btn btn-seg tab-scope" data-scope="personal" aria-selected="false">אישי</button>
+                    <button type="button" class="btn btn-seg tab-scope" data-scope="employee" aria-selected="false">לפי עובד</button>
+                    <button type="button" class="btn btn-seg tab-scope" data-scope="project" aria-selected="false">לפי פרויקט</button>
+                  </div>
+                  <!-- Conditional dropdowns (right-aligned with tabs) -->
+                  <div class="workplan-conditional-controls">
+                    <div class="filter-dropdown workplan-view-mode" id="workplan-view-mode" style="display: none;">
+                      <button type="button" class="filter-dropdown-toggle">
+                        <strong id="role-label">הצג לפי עובד: מנהל</strong>
+                        <span>▼</span>
+                      </button>
+                      <div class="filter-dropdown-menu" id="role-menu">
+                        <div class="filter-dropdown-item" data-role="employee">עובד</div>
+                        <div class="filter-dropdown-item" data-role="manager">מנהל</div>
+                        <div class="filter-dropdown-item" data-role="ceo">רביב (מנכ״ל)</div>
+                      </div>
+                    </div>
+                    <div class="filter-dropdown workplan-project-filter" id="workplan-project-filter" style="display: none;">
+                      <button type="button" class="filter-dropdown-toggle">
+                        סינון לפי פרויקט
+                        <span>▼</span>
+                      </button>
+                      <div class="filter-dropdown-menu">
+                        <div class="filter-dropdown-item">וילה רמת אביב</div>
+                        <div class="filter-dropdown-item">משרדי חברת ABC</div>
+                        <div class="filter-dropdown-item">בית פרטי חיפה</div>
+                        <div class="filter-dropdown-item">משימות פנימיות</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Time tabs row -->
+                <div class="workplan-tabs-row">
+                  <div class="tab-group tab-group-range" role="tablist" aria-label="טווח זמן">
+                    <button type="button" class="btn btn-seg tab-range active" data-range="daily" aria-selected="true">יומי</button>
+                    <button type="button" class="btn btn-seg tab-range" data-range="weekly" aria-selected="false">שבועי</button>
+                    <button type="button" class="btn btn-seg tab-range" data-range="monthly" aria-selected="false">חודשי</button>
+                    <button type="button" class="btn btn-seg tab-range" data-range="yearly" aria-selected="false">שנתי</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- Row 3: Filters + legend -->
+            <div class="workplan-toolbar-row workplan-toolbar-row-filters">
+              <div class="filters">
+                <div class="filter-dropdown">
+                  <button type="button" class="filter-dropdown-toggle">
+                    סינון לפי סטטוס
+                    <span>▼</span>
+                  </button>
+                  <div class="filter-dropdown-menu">
+                    <div class="filter-dropdown-item">מתוכנן</div>
+                    <div class="filter-dropdown-item">בביצוע</div>
+                    <div class="filter-dropdown-item">הושלם</div>
+                    <div class="filter-dropdown-item">תקוע</div>
+                  </div>
+                </div>
+                <div class="workplan-legend">
+                  <span class="legend-item"><span class="legend-chip legend-locked"></span>נעול</span>
+                  <span class="legend-item"><span class="legend-chip legend-personal"></span>אישי</span>
+                  <span class="legend-item"><span class="legend-chip legend-normal"></span>פרויקט</span>
+                  <span class="legend-item"><span class="legend-chip legend-internal"></span>פנימי</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div class="workplan-title" id="workplan-title">תוכנית עבודה – חתך: כללי | תצוגה: יומית</div>
+
+        <!-- DAILY VIEW -->
+        <section class="section workplan-view active" data-range="daily">
+          <div class="workplan-shell" aria-label="גאנט יומי">
+            <!-- Employees-focused view (default for כללי / אישי / לפי עובד) -->
+            <div class="workplan-mode workplan-mode-employees active" data-scope-mode="employees">
+              <div class="workplan-grid">
+              <div class="workplan-header">
+                <div class="workplan-sticky-col header-cell">עובד / פרויקט</div>
+                <div class="workplan-hours" aria-label="שעות היום">
+                  <div class="hour">00</div><div class="hour">01</div><div class="hour">02</div><div class="hour">03</div>
+                  <div class="hour">04</div><div class="hour">05</div><div class="hour">06</div><div class="hour">07</div>
+                  <div class="hour">08</div><div class="hour">09</div><div class="hour">10</div><div class="hour">11</div>
+                  <div class="hour">12</div><div class="hour">13</div><div class="hour">14</div><div class="hour">15</div>
+                  <div class="hour">16</div><div class="hour">17</div><div class="hour">18</div><div class="hour">19</div>
+                  <div class="hour">20</div><div class="hour">21</div><div class="hour">22</div><div class="hour">23</div>
+                </div>
+              </div>
+
+              <div class="workplan-row" data-row-type="employee" data-row-key="yossi">
+                <div class="workplan-sticky-col row-cell">
+                  <div class="row-title">יוסי כהן</div>
+                  <div class="row-subtitle">טכנאי בכיר</div>
+                </div>
+                <div class="workplan-track" data-drop-row="yossi">
+                  <button type="button" class="task task-locked" data-task-id="t1" data-kind="project" data-owner="manager" data-locked="true" data-project-id="PRJ-001" style="left: calc((8 / 24) * 100%); width: calc((2 / 24) * 100%);">
+                    <div class="task-name">וילה רמת אביב – התקנת לוח בקרה</div>
+                    <div class="task-meta">08:00–10:00 • מתוכנן • גבוה • עודכן: היום 07:40</div>
+                  </button>
+                  <button type="button" class="task task-project" data-task-id="t2" data-kind="service" data-owner="manager" data-locked="false" data-project-id="PRJ-004" data-service-call-id="2456" style="left: calc((12 / 24) * 100%); width: calc((2 / 24) * 100%);">
+                    <div class="task-name">שירות #2456 – משרדי ABC</div>
+                    <div class="task-meta">12:00–14:00 • בביצוע • דחוף • עודכן: היום 11:15</div>
+                  </button>
+                  <button type="button" class="task task-personal" data-task-id="t3" data-kind="internal" data-owner="employee" data-locked="false" data-personal="true" style="left: calc((16 / 24) * 100%); width: calc((1 / 24) * 100%);">
+                    <div class="task-name">עדכון דו״חות</div>
+                    <div class="task-meta">16:00–17:00 • מתוכנן • רגיל • עודכן: היום 10:05</div>
+                    <span class="task-handle" aria-hidden="true"></span>
+                  </button>
+                </div>
+              </div>
+
+              <div class="workplan-row" data-row-type="employee" data-row-key="sara">
+                <div class="workplan-sticky-col row-cell">
+                  <div class="row-title">שרה לוי</div>
+                  <div class="row-subtitle">מנהלת פרויקטים</div>
+                </div>
+                <div class="workplan-track" data-drop-row="sara">
+                  <button type="button" class="task task-project" data-task-id="t4" data-kind="project" data-owner="manager" data-locked="false" style="left: calc((9 / 24) * 100%); width: calc((2 / 24) * 100%);">
+                    <div class="task-name">בית פרטי חיפה – פגישת סטטוס</div>
+                    <div class="task-meta">09:00–11:00 • מתוכנן • רגיל • עודכן: אתמול 16:20</div>
+                  </button>
+                  <button type="button" class="task task-locked" data-task-id="t5" data-kind="internal" data-owner="ceo" data-locked="true" style="left: calc((13 / 24) * 100%); width: calc((2 / 24) * 100%);">
+                    <div class="task-name">ישיבת הנהלה – תזרים</div>
+                    <div class="task-meta">13:00–15:00 • מתוכנן • גבוה • עודכן: היום 08:10</div>
+                  </button>
+                </div>
+              </div>
+
+              <div class="workplan-row" data-row-type="employee" data-row-key="david">
+                <div class="workplan-sticky-col row-cell">
+                  <div class="row-title">דוד ישראל</div>
+                  <div class="row-subtitle">טכנאי שטח</div>
+                </div>
+                <div class="workplan-track" data-drop-row="david">
+                  <button type="button" class="task task-project" data-task-id="t6" data-kind="service" data-owner="manager" data-locked="false" data-project-id="PRJ-001" data-service-call-id="2455" style="left: calc((7 / 24) * 100%); width: calc((2 / 24) * 100%);">
+                    <div class="task-name">שירות #2455 – וילה רמת אביב</div>
+                    <div class="task-meta">07:00–09:00 • פתוח • גבוה • עודכן: היום 07:05</div>
+                  </button>
+                  <button type="button" class="task task-project" data-task-id="t7" data-kind="project" data-owner="manager" data-locked="false" data-project-id="PRJ-002" style="left: calc((11 / 24) * 100%); width: calc((2 / 24) * 100%);">
+                    <div class="task-name">מלון דן – תחזוקה</div>
+                    <div class="task-meta">11:00–13:00 • מתוכנן • רגיל • עודכן: אתמול 16:20</div>
+                  </button>
+                  <button type="button" class="task task-personal" data-task-id="t8" data-kind="internal" data-owner="employee" data-locked="false" data-personal="true" style="left: calc((17 / 24) * 100%); width: calc((1 / 24) * 100%);">
+                    <div class="task-name">נסיעה למחסן</div>
+                    <div class="task-meta">17:00–18:00 • מתוכנן • רגיל • עודכן: היום 09:30</div>
+                    <span class="task-handle" aria-hidden="true"></span>
+                  </button>
+                </div>
+              </div>
+              </div>
+            </div>
+
+            <!-- Projects-focused view (לפי פרויקט) -->
+            <div class="workplan-mode workplan-mode-projects" data-scope-mode="projects">
+              <div class="workplan-grid workplan-grid-projects">
+                <div class="workplan-header">
+                  <div class="workplan-sticky-col header-cell">פרויקט</div>
+                  <div class="workplan-hours" aria-label="שעות היום">
+                    <div class="hour">00</div><div class="hour">01</div><div class="hour">02</div><div class="hour">03</div>
+                    <div class="hour">04</div><div class="hour">05</div><div class="hour">06</div><div class="hour">07</div>
+                    <div class="hour">08</div><div class="hour">09</div><div class="hour">10</div><div class="hour">11</div>
+                    <div class="hour">12</div><div class="hour">13</div><div class="hour">14</div><div class="hour">15</div>
+                    <div class="hour">16</div><div class="hour">17</div><div class="hour">18</div><div class="hour">19</div>
+                    <div class="hour">20</div><div class="hour">21</div><div class="hour">22</div><div class="hour">23</div>
+                  </div>
+                </div>
+
+                <div class="workplan-row" data-project="villa">
+                  <div class="workplan-sticky-col row-cell">
+                    <div class="row-title">וילה רמת אביב</div>
+                    <div class="row-subtitle">מערכת בית חכם</div>
+                  </div>
+                  <div class="workplan-track workplan-track-projects">
+                    <button type="button" class="task task-project" data-task-id="p1" data-start-hour="8" data-end-hour="10" data-project-id="PRJ-001" style="left: calc((8 / 24) * 100%); width: calc((2 / 24) * 100%);">
+                      <div class="task-name">סיכום דרישות</div>
+                      <div class="task-meta">08:00–10:00 • תכנון • מתוכנן • עודכן: אתמול</div>
+                    </button>
+                    <button type="button" class="task task-project" data-task-id="p2" data-start-hour="10" data-end-hour="14" data-project-id="PRJ-001" style="left: calc((10 / 24) * 100%); width: calc((4 / 24) * 100%);">
+                      <div class="task-name">התקנת לוחות בקרה</div>
+                      <div class="task-meta">10:00–14:00 • התקנות • בביצוע • עודכן: היום</div>
+                    </button>
+                  </div>
+                </div>
+
+                <div class="workplan-row" data-project="abc">
+                  <div class="workplan-sticky-col row-cell">
+                    <div class="row-title">משרדי חברת ABC</div>
+                    <div class="row-subtitle">שדרוג תשתיות</div>
+                  </div>
+                  <div class="workplan-track workplan-track-projects">
+                    <button type="button" class="task task-project" data-task-id="p3" data-start-hour="9" data-end-hour="12" data-project-id="PRJ-004" style="left: calc((9 / 24) * 100%); width: calc((3 / 24) * 100%);">
+                      <div class="task-name">בדיקת ציוד ותיוג</div>
+                      <div class="task-meta">09:00–12:00 • התקנות • מתוכנן • עודכן: היום</div>
+                    </button>
+                    <button type="button" class="task task-project" data-task-id="p4" data-start-hour="13" data-end-hour="16" data-project-id="PRJ-004" style="left: calc((13 / 24) * 100%); width: calc((3 / 24) * 100%);">
+                      <div class="task-name">בדיקות קבלה</div>
+                      <div class="task-meta">13:00–16:00 • בדיקות • מתוכנן • עודכן: היום</div>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- WEEKLY VIEW -->
+        <section class="section workplan-view" data-range="weekly">
+          <div class="workplan-weekly-container">
+            <div class="workplan-nav-controls">
+              <button type="button" class="btn btn-outline btn-sm" id="week-prev">שבוע קודם</button>
+              <h2 class="workplan-nav-title" id="week-title">שבוע נוכחי</h2>
+              <button type="button" class="btn btn-outline btn-sm" id="week-next">שבוע הבא</button>
+            </div>
+            <div class="workplan-weekly-grid" id="weekly-grid">
+              <!-- Will be populated by JS -->
+            </div>
+          </div>
+        </section>
+
+        <!-- MONTHLY VIEW -->
+        <section class="section workplan-view" data-range="monthly">
+          <div class="workplan-monthly-container">
+            <div class="workplan-nav-controls">
+              <button type="button" class="btn btn-outline btn-sm" id="month-prev">חודש קודם</button>
+              <h2 class="workplan-nav-title" id="month-title">חודש נוכחי</h2>
+              <button type="button" class="btn btn-outline btn-sm" id="month-next">חודש הבא</button>
+            </div>
+            <div class="workplan-monthly-grid" id="monthly-grid">
+              <!-- Will be populated by JS -->
+            </div>
+          </div>
+        </section>
+
+        <!-- YEARLY VIEW -->
+        <section class="section workplan-view" data-range="yearly">
+          <div class="workplan-yearly-container">
+            <div class="workplan-nav-controls">
+              <button type="button" class="btn btn-outline btn-sm year-nav-btn" id="year-next">שנה הבאה</button>
+              <h2 class="workplan-nav-title" id="year-title">שנה נוכחית</h2>
+              <button type="button" class="btn btn-outline btn-sm year-nav-btn" id="year-prev">שנה קודמת</button>
+            </div>
+            <div class="workplan-yearly-grid" id="yearly-grid">
+              <!-- Will be populated by JS -->
+            </div>
+          </div>
+        </section>
+
+        <!-- TASK DETAILS MODAL -->
+        <div class="wp-modal-overlay" id="wp-modal-overlay">
+          <div class="wp-modal-backdrop"></div>
+          <aside class="wp-modal" id="workplan-details" aria-label="פרטי משימה">
+          <div class="details-panel-header">
+            <h2 class="details-panel-title" id="wp-modal-main-title">פרטי משימה</h2>
+            <button type="button" class="details-panel-close" id="wp-close" aria-label="סגירה">×</button>
+          </div>
+          <div class="details-panel-body">
+            <!-- Project context elements (shown only when scope = לפי פרויקט) -->
+            <div class="details-section" id="wp-project-context" style="display: none;">
+              <h3 class="wp-project-name" id="wp-project-name">-</h3>
+              <div class="wp-project-actions">
+                <a href="#" class="btn btn-outline btn-sm" id="wp-project-link">מעבר לתיק הפרויקט</a>
+              </div>
+            </div>
+            
+            <div class="details-section" id="wp-view-mode">
+              <div class="details-field">
+                <div class="details-field-label">כותרת</div>
+                <div class="details-field-value" id="wp-title">-</div>
+              </div>
+              <div class="details-field">
+                <div class="details-field-label">אחראי</div>
+                <div class="details-field-value" id="wp-assignee">-</div>
+              </div>
+              <div class="details-field">
+                <div class="details-field-label">טווח זמן</div>
+                <div class="details-field-value" id="wp-time">-</div>
+              </div>
+              <div class="details-field">
+                <div class="details-field-label">סטטוס</div>
+                <div class="details-field-value" id="wp-status">
+                  <span class="badge" id="wp-status-badge">-</span>
+                </div>
+              </div>
+              <div class="details-field">
+                <div class="details-field-label">דחיפות</div>
+                <div class="details-field-value" id="wp-urgency">-</div>
+              </div>
+              <div class="details-field">
+                <div class="details-field-label">מקושר</div>
+                <div class="details-field-value" id="wp-linked">-</div>
+              </div>
+              <div class="details-field">
+                <div class="details-field-label">עובדים משויכים</div>
+                <div class="details-field-value wp-assigned-workers-wrap" id="wp-assigned-workers">—</div>
+              </div>
+              <div class="details-field">
+                <div class="details-field-label">תפקיד</div>
+                <div class="details-field-value" id="wp-role">—</div>
+              </div>
+            </div>
+
+            <div class="details-section" id="wp-edit-mode" style="display: none;">
+              <div class="details-field">
+                <div class="details-field-label">כותרת</div>
+                <input type="text" class="input" id="wp-edit-title" placeholder="כותרת משימה">
+              </div>
+              <div class="details-field">
+                <div class="details-field-label">אחראי</div>
+                <input type="text" class="input" id="wp-edit-assignee" placeholder="אחראי">
+              </div>
+              <div class="details-field">
+                <div class="details-field-label">טווח זמן</div>
+                <input type="text" class="input" id="wp-edit-time" placeholder="08:00–10:00">
+              </div>
+              <div class="details-field">
+                <div class="details-field-label">סטטוס</div>
+                <select class="input" id="wp-edit-status">
+                  <option value="מתוכנן">מתוכנן</option>
+                  <option value="בביצוע">בביצוע</option>
+                  <option value="הושלם">הושלם</option>
+                  <option value="תקוע">תקוע</option>
+                </select>
+              </div>
+              <div class="details-field">
+                <div class="details-field-label">דחיפות</div>
+                <select class="input" id="wp-edit-urgency">
+                  <option value="רגיל">רגיל</option>
+                  <option value="גבוה">גבוה</option>
+                  <option value="דחוף">דחוף</option>
+                </select>
+              </div>
+              <div class="details-field">
+                <div class="details-field-label">מקושר</div>
+                <input type="text" class="input" id="wp-edit-linked" placeholder="מקושר לפרויקט/לקוח">
+              </div>
+              <div class="details-field">
+                <div class="details-field-label">עובדים משויכים</div>
+                <div class="wp-edit-assigned-add-wrap flex gap-sm" style="flex-wrap: wrap;">
+                  <select class="input wp-edit-assigned-select" id="wp-edit-assigned-select" aria-label="בחר עובד">
+                    <option value="">בחר עובד</option>
+                  </select>
+                  <button type="button" class="btn btn-outline btn-sm" id="wp-edit-assigned-add">הוסף</button>
+                </div>
+                <div class="wp-edit-assigned-chips" id="wp-edit-assigned-chips"></div>
+              </div>
+              <div class="details-field">
+                <div class="details-field-label">תפקיד</div>
+                <select class="input" id="wp-edit-role" aria-label="תפקיד">
+                  <option value="">בחר תפקיד</option>
+                  <option value="מתקין">מתקין</option>
+                  <option value="מנהל פרויקט">מנהל פרויקט</option>
+                  <option value="טכנאי">טכנאי</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="details-section">
+              <div class="details-section-title">הרשאות</div>
+              <div class="details-field-value" id="wp-perms">-</div>
+            </div>
+
+            <div class="details-section" id="wp-actions-view">
+              <div class="details-section-title">פעולות</div>
+              <div class="flex gap-md">
+                <button type="button" class="btn btn-primary btn-sm" id="wp-action-edit">עריכה</button>
+                <button type="button" class="btn btn-outline btn-sm" id="wp-action-lock">נעילה</button>
+                <button type="button" class="btn btn-outline btn-sm" id="wp-action-quick-report">דיווח ביצוע מהיר</button>
+              </div>
+              <p class="text-sm text-neutral-600 mt-md mb-0" id="wp-action-hint"></p>
+            </div>
+
+            <div class="details-section" id="wp-actions-edit" style="display: none;">
+              <div class="details-section-title">פעולות</div>
+              <div class="flex gap-md">
+                <button type="button" class="btn btn-primary btn-sm" id="wp-action-save">שמור</button>
+                <button type="button" class="btn btn-outline btn-sm" id="wp-action-cancel">בטל</button>
+              </div>
+            </div>
+          </div>
+          </aside>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="../scripts/mock-data.js"></script>
+  <script src="../scripts/ui.js"></script>
+  <script src="../scripts/workplan.js"></script>
+  <script src="../scripts/sidebar-active.js"></script>
+  <script>
+    lucide.createIcons();
+  </script>
+</body>
+</html>

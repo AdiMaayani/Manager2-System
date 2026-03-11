@@ -1,0 +1,49 @@
+/* Cashflow page specific styles */
+
+.cashflow-content-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-lg);
+  padding-bottom: var(--spacing-md);
+}
+
+.cashflow-content-header-right {
+  flex: 1;
+}
+
+.cashflow-content-header-left {
+  display: flex;
+  align-items: center;
+}
+
+.cashflow-export-btn {
+  height: 38px;
+  padding: var(--spacing-sm) var(--spacing-lg);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  background-color: var(--color-primary-600);
+  color: white;
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.cashflow-export-btn:hover:not(:disabled) {
+  background-color: var(--color-primary-700);
+}
+
+.cashflow-export-btn:active:not(:disabled) {
+  background-color: var(--color-primary-800);
+}
+
+.cashflow-export-btn svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  stroke: currentColor;
+}

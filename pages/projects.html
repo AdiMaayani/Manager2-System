@@ -1,0 +1,2246 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>פרויקטים - ManageR²</title>
+  <link rel="stylesheet" href="../styles/tokens.css">
+  <link rel="stylesheet" href="../styles/base.css">
+  <link rel="stylesheet" href="../styles/layout.css">
+  <link rel="stylesheet" href="../styles/components.css">
+  <link rel="stylesheet" href="../styles/utilities.css">
+  <link rel="stylesheet" href="../styles/projects.css">
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <nav class="sidebar-nav">
+        <div class="sidebar-user">
+          <div class="sidebar-user-main">
+            <div class="sidebar-user-name">רביב מעיני</div>
+            <div class="sidebar-user-role">מנכ״ל</div>
+          </div>
+          <div class="sidebar-user-status">
+            <span class="status-dot status-dot-online" aria-hidden="true"></span>
+            <span>מחובר</span>
+          </div>
+          <div class="dropdown sidebar-user-dropdown">
+            <button type="button" class="dropdown-toggle" aria-label="תפריט משתמש">⋯</button>
+            <div class="dropdown-menu">
+              <div class="dropdown-item">החלף משתמש</div>
+              <div class="dropdown-item">התנתק</div>
+            </div>
+          </div>
+        </div>
+
+        <div class="sidebar-nav-main">
+          <a href="../index.html" class="sidebar-nav-link">
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M4 13h7V4H4v9zm0 7h7v-5H4v5zm9 0h7V11h-7v9zm0-18v7h7V2h-7z"/></svg></span>
+            <span class="nav-label">לוח בקרה</span>
+          </a>
+          <a href="workplan.html" class="sidebar-nav-link">
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M7 11h10v2H7v-2zm0 4h7v2H7v-2zM19 4h-1V2h-2v2H8V2H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg></span>
+            <span class="nav-label">תוכנית עבודה</span>
+          </a>
+          <a href="projects.html" class="sidebar-nav-link active">
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M10 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"/></svg></span>
+            <span class="nav-label">פרויקטים</span>
+          </a>
+          <a href="service-calls.html" class="sidebar-nav-link">
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M22 19l-8-8v-2.5c1.2-.7 2-2 2-3.5C16 2.8 14.2 1 12 1S8 2.8 8 5c0 1.5.8 2.8 2 3.5V11L2 19v2h20v-2z"/></svg></span>
+            <span class="nav-label">שירות</span>
+          </a>
+          <a href="customers.html" class="sidebar-nav-link">
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M16 11c1.7 0 3-1.3 3-3s-1.3-3-3-3-3 1.3-3 3 1.3 3 3 3zm-8 0c1.7 0 3-1.3 3-3S9.7 5 8 5 5 6.3 5 8s1.3 3 3 3zm0 2c-2.3 0-7 1.2-7 3.5V20h14v-3.5C15 14.2 10.3 13 8 13zm8 0c-.3 0-.7 0-1.1.1 1.2.9 2.1 2 2.1 3.4V20h7v-3.5c0-2.3-4.7-3.5-7-3.5z"/></svg></span>
+            <span class="nav-label">לקוחות</span>
+          </a>
+          <a href="contacts.html" class="sidebar-nav-link">
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M20 0H4c-1.1 0-2 .9-2 2v20l4-4h14c1.1 0 2-.9 2-2V2c0-1.1-.9-2-2-2zm0 16H6l-2 2V2h16v14z"/></svg></span>
+            <span class="nav-label">אנשי קשר</span>
+          </a>
+          <a href="quotes.html" class="sidebar-nav-link">
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M14 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V8l-6-6zm1 7V3.5L19.5 9H15zM8 13h8v2H8v-2zm0 4h8v2H8v-2z"/></svg></span>
+            <span class="nav-label">הצעות מחיר</span>
+          </a>
+          <a href="inventory.html" class="sidebar-nav-link">
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M21 8V7l-3-3H6L3 7v1h18zM3 10v10c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V10H3zm6 3h6v2H9v-2z"/></svg></span>
+            <span class="nav-label">מוצרים ומלאי</span>
+          </a>
+          <a href="reports.html" class="sidebar-nav-link">
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M3 3h18v2H3V3zm2 4h14v14H5V7zm2 2v10h10V9H7zm2 2h2v6H9v-6zm4 2h2v4h-2v-4z"/></svg></span>
+            <span class="nav-label">דיווחי ביצוע</span>
+          </a>
+          <a href="employees.html" class="sidebar-nav-link">
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 12c2.2 0 4-1.8 4-4S14.2 4 12 4 8 5.8 8 8s1.8 4 4 4zm0 2c-3.3 0-10 1.7-10 5v1h20v-1c0-3.3-6.7-5-10-5z"/></svg></span>
+            <span class="nav-label">עובדים</span>
+          </a>
+          <a href="cashflow.html" class="sidebar-nav-link">
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 3C7.6 3 4 4.8 4 7v10c0 2.2 3.6 4 8 4s8-1.8 8-4V7c0-2.2-3.6-4-8-4zm0 2c3.3 0 6 .9 6 2s-2.7 2-6 2-6-.9-6-2 2.7-2 6-2zm0 14c-3.3 0-6-.9-6-2V9.8c1.5.9 3.8 1.2 6 1.2s4.5-.3 6-1.2V17c0 1.1-2.7 2-6 2z"/></svg></span>
+            <span class="nav-label">תזרים מזומנים</span>
+          </a>
+        </div>
+        <div class="sidebar-nav-bottom">
+          <a href="settings.html" class="sidebar-nav-link">
+            <span class="nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M19.4 13c.04-.33.06-.66.06-1s-.02-.67-.06-1l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1a7.5 7.5 0 0 0-1.73-1l-.38-2.65A.5.5 0 0 0 14 1h-4a.5.5 0 0 0-.49.42L9.13 4.07c-.63.25-1.2.58-1.73 1l-2.49-1a.5.5 0 0 0-.61.22l-2 3.46c-.12.22-.07.49.12.64L4.6 11c-.04.33-.06.66-.06 1s.02.67.06 1L2.49 14.65a.5.5 0 0 0-.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.53.42 1.1.75 1.73 1l.38 2.65A.5.5 0 0 0 10 23h4a.5.5 0 0 0 .49-.42l.38-2.65c.63-.25 1.2-.58 1.73-1l2.49 1c.23.09.49 0 .61-.22l2-3.46a.5.5 0 0 0-.12-.64L19.4 13zM12 15.5A3.5 3.5 0 1 1 12 8a3.5 3.5 0 0 1 0 7.5z"/></svg></span>
+            <span class="nav-label">הגדרות</span>
+          </a>
+        </div>
+      </nav>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div class="topbar-brand">
+          <img class="topbar-logo" src="../assets/manager2-logo.png" alt="ManageR²">
+          <div class="topbar-title-wrap"><h1 class="topbar-title">פרויקטים</h1></div>
+        </div>
+      </header>
+
+      <div class="content">
+        <section class="section">
+          <div class="card projects-controls">
+            <div class="projects-controls-layout">
+              <!-- Left: Primary action -->
+              <div class="projects-controls-left">
+                <button type="button" class="btn btn-primary btn-compact" id="btn-new-project">
+                  <i data-lucide="plus-circle" class="icon" aria-hidden="true"></i>
+                  פרויקט חדש
+                </button>
+              </div>
+
+              <!-- Right: Filters and controls -->
+              <div class="projects-controls-right">
+                <div class="filters">
+                  <div class="filter-dropdown" id="stage-filter">
+                    <button type="button" class="filter-dropdown-toggle">
+                      <i data-lucide="filter" class="icon" aria-hidden="true"></i>
+                      <strong id="stage-label">שלב פרויקט: הכל</strong>
+                      <span>▼</span>
+                    </button>
+                    <div class="filter-dropdown-menu">
+                      <div class="filter-dropdown-item" data-stage="all">הכל</div>
+                      <div class="filter-dropdown-item" data-stage="תכנון">תכנון</div>
+                      <div class="filter-dropdown-item" data-stage="תוכניות">תוכניות</div>
+                      <div class="filter-dropdown-item" data-stage="השחלה">השחלה</div>
+                      <div class="filter-dropdown-item" data-stage="ביצוע">ביצוע</div>
+                      <div class="filter-dropdown-item" data-stage="סיום">סיום</div>
+                    </div>
+                  </div>
+
+                  <div class="filter-dropdown">
+                    <button type="button" class="filter-dropdown-toggle">
+                      <i data-lucide="filter" class="icon" aria-hidden="true"></i>
+                      לקוח
+                      <span>▼</span>
+                    </button>
+                    <div class="filter-dropdown-menu">
+                      <div class="filter-dropdown-item">וילה רמת אביב</div>
+                      <div class="filter-dropdown-item">חברת ABC בע״מ</div>
+                      <div class="filter-dropdown-item">מלון דן תל אביב</div>
+                    </div>
+                  </div>
+                  <div class="filter-dropdown">
+                    <button type="button" class="filter-dropdown-toggle">
+                      <i data-lucide="filter" class="icon" aria-hidden="true"></i>
+                      עובד
+                      <span>▼</span>
+                    </button>
+                    <div class="filter-dropdown-menu">
+                      <div class="filter-dropdown-item">שרה לוי</div>
+                      <div class="filter-dropdown-item">רביב מעיני</div>
+                      <div class="filter-dropdown-item">יוסי כהן</div>
+                    </div>
+                  </div>
+                  <div class="filter-dropdown">
+                    <button type="button" class="filter-dropdown-toggle">
+                      <i data-lucide="filter" class="icon" aria-hidden="true"></i>
+                      אזור
+                      <span>▼</span>
+                    </button>
+                    <div class="filter-dropdown-menu">
+                      <div class="filter-dropdown-item">מרכז</div>
+                      <div class="filter-dropdown-item">שרון</div>
+                      <div class="filter-dropdown-item">צפון</div>
+                      <div class="filter-dropdown-item">ירושלים</div>
+                    </div>
+                  </div>
+
+                  <div class="search-input input-with-icon">
+                    <input id="proj-search" type="text" class="input" placeholder="חיפוש פרויקט לפי שם/לקוח/מזהה...">
+                    <i data-lucide="search" class="icon" aria-hidden="true"></i>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section class="section">
+          <div class="table-container">
+            <table class="table" id="projects-table">
+              <thead>
+                <tr>
+                  <th>מספר פרויקט</th>
+                  <th>שם פרויקט</th>
+                  <th>לקוח</th>
+                  <th>מנהל פרויקט</th>
+                  <th>סטטוס</th>
+                  <th>תאריך פתיחה</th>
+                  <th>אזור</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr data-project-id="p1">
+                  <td>P-24031</td>
+                  <td>וילה רמת אביב</td>
+                  <td>וילה רמת אביב</td>
+                  <td>שרה לוי</td>
+                  <td><span class="badge badge-primary">ביצוע</span></td>
+                  <td>01/01/2025</td>
+                  <td>מרכז</td>
+                </tr>
+                <tr data-project-id="p2">
+                  <td>P-24018</td>
+                  <td>משרדי חברת ABC</td>
+                  <td>חברת ABC בע״מ</td>
+                  <td>רביב</td>
+                  <td><span class="badge badge-warning">תכניות</span></td>
+                  <td>15/12/2024</td>
+                  <td>מרכז</td>
+                </tr>
+                <tr data-project-id="p3">
+                  <td>P-24022</td>
+                  <td>בית פרטי חיפה</td>
+                  <td>שרה לוי</td>
+                  <td>שרה לוי</td>
+                  <td><span class="badge badge-primary">בתכנון</span></td>
+                  <td>10/01/2025</td>
+                  <td>צפון</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
+        <div class="project-drawer-overlay" id="project-drawer-overlay">
+          <div class="project-drawer-backdrop"></div>
+          <aside class="project-drawer" id="project-details" aria-label="פרטי פרויקט">
+            <div class="details-panel-header">
+              <div class="details-panel-header-left">
+                <h2 class="details-panel-title">תיק פרויקט</h2>
+                <span class="edit-mode-indicator" id="edit-mode-indicator" style="display: none;">מצב עריכה פעיל</span>
+              </div>
+              <div class="details-panel-header-actions">
+                <button type="button" class="btn btn-outline btn-sm" id="proj-edit-toggle">
+                  <i data-lucide="edit-2" class="icon" aria-hidden="true"></i>
+                  עריכת תיק
+                </button>
+                <div class="header-actions-edit" id="header-actions-edit" style="display: none;">
+                  <button type="button" class="btn btn-primary btn-sm" id="proj-save">שמור שינויים</button>
+                  <button type="button" class="btn btn-outline btn-sm" id="proj-cancel">בטל</button>
+                </div>
+                <button type="button" class="btn btn-outline btn-sm modal-max-btn" id="proj-maximize" aria-label="הגדל מסך" title="הגדל מסך">
+                  <span class="modal-max-icon">
+                    <svg class="icon icon-expand" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                      <path d="M8 3H5C3.89543 3 3 3.89543 3 5V8M21 8V5C21 3.89543 20.1046 3 19 3H16M16 21H19C20.1046 21 21 20.1046 21 19V16M3 16V19C3 20.1046 3.89543 21 5 21H8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                    <svg class="icon icon-restore" width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                      <path d="M8 8V5C8 3.89543 8.89543 3 10 3H19C20.1046 3 21 3.89543 21 5V14C21 15.1046 20.1046 16 19 16H16M16 16V19C16 20.1046 15.1046 21 14 21H5C3.89543 21 3 20.1046 3 19V10C3 8.89543 3.89543 8 5 8H8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                  </span>
+                  <span class="modal-max-label">הגדל מסך</span>
+                </button>
+                <button type="button" class="details-panel-close" id="proj-close" aria-label="סגירה">×</button>
+              </div>
+            </div>
+
+            <div class="tabbar">
+              <button type="button" class="tabbar__arrow tabbar__arrow--start" aria-label="גלילה שמאלה" id="tabbar-arrow-start">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M15 18L9 12L15 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+              <div class="tabbar__scroller" id="tabbar-scroller">
+                <div class="project-drawer-tabs">
+                  <button type="button" class="tab active" data-tab="overview">
+                    <i data-lucide="layout-list" class="icon" aria-hidden="true"></i>
+                    סקירה
+                  </button>
+                  <button type="button" class="tab" data-tab="milestones">אבני דרך</button>
+                  <button type="button" class="tab" data-tab="quote">
+                    <i data-lucide="file-text" class="icon" aria-hidden="true"></i>
+                    הצעת מחיר
+                  </button>
+                  <button type="button" class="tab" data-tab="boq">
+                    <i data-lucide="list-ordered" class="icon" aria-hidden="true"></i>
+                    כתב כמויות
+                  </button>
+                  <button type="button" class="tab" data-tab="drawings">
+                    <i data-lucide="file-pen" class="icon" aria-hidden="true"></i>
+                    שרטוטים (תכניות)
+                  </button>
+                  <button type="button" class="tab" data-tab="equipment">
+                    <i data-lucide="boxes" class="icon" aria-hidden="true"></i>
+                    מוצרים / מערכות
+                  </button>
+                </div>
+              </div>
+              <button type="button" class="tabbar__arrow tabbar__arrow--end" aria-label="גלילה ימינה" id="tabbar-arrow-end">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path d="M9 18L15 12L9 6" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+                </svg>
+              </button>
+            </div>
+
+            <div class="details-panel-body" id="project-drawer-body">
+              <div class="tab-content active" id="overview-content">
+                <div class="details-section">
+                  <div class="details-field">
+                    <div class="details-field-label">שם הפרויקט</div>
+                    <div class="details-field-value" id="proj-name">-</div>
+                  </div>
+                  <div class="details-field">
+                    <div class="details-field-label">שם הלקוח</div>
+                    <div class="details-field-value" id="proj-customer">-</div>
+                  </div>
+                  <div class="details-field">
+                    <div class="details-field-label">סטטוס</div>
+                    <div class="details-field-value" id="proj-status">-</div>
+                  </div>
+                  <div class="details-field">
+                    <div class="details-field-label">תאריך פתיחה</div>
+                    <div class="details-field-value" id="proj-open-date">-</div>
+                  </div>
+                  <div class="details-field">
+                    <div class="details-field-label">תאריך סגירת העסקה</div>
+                    <div class="details-field-value" id="proj-close-date">-</div>
+                  </div>
+                  <div class="details-field">
+                    <div class="details-field-label">מספר פרויקט</div>
+                    <div class="details-field-value" id="proj-number">-</div>
+                  </div>
+                  <div class="details-field">
+                    <div class="details-field-label">מספר פרויקט בהנהלת חשבונות</div>
+                    <div class="details-field-value" id="proj-finance-number">-</div>
+                  </div>
+                  
+                  <!-- צוות הפרויקט section -->
+                  <div class="project-team-section mt-lg">
+                    <h3 class="section-title">צוות הפרויקט</h3>
+                    
+                    <!-- Project Manager -->
+                    <div class="details-field">
+                      <div class="details-field-label">מנהל פרויקט</div>
+                      <div class="details-field-value" id="proj-manager-view">-</div>
+                      <div class="details-field-edit" id="proj-manager-edit" style="display: none;">
+                        <select class="input" id="proj-manager-select">
+                          <option value="">בחר מנהל פרויקט</option>
+                          <option value="שרה לוי">שרה לוי</option>
+                          <option value="רביב מעיני">רביב מעיני</option>
+                          <option value="יוסי כהן">יוסי כהן</option>
+                          <option value="דוד ישראלי">דוד ישראלי</option>
+                          <option value="מיכל דוד">מיכל דוד</option>
+                        </select>
+                      </div>
+                    </div>
+                    
+                    <!-- Linked Team Members -->
+                    <div class="details-field">
+                      <div class="details-field-label">עובדים משויכים</div>
+                      <div class="details-field-value" id="proj-team-view">-</div>
+                      <div class="details-field-edit" id="proj-team-edit" style="display: none;">
+                        <div class="flex flex-wrap gap-sm mb-sm" id="proj-team-chips">
+                        </div>
+                        <div class="flex gap-sm align-items-center">
+                          <select class="input" id="proj-team-add-select">
+                            <option value="">בחר עובד</option>
+                            <option value="שרה לוי">שרה לוי</option>
+                            <option value="רביב מעיני">רביב מעיני</option>
+                            <option value="יוסי כהן">יוסי כהן</option>
+                            <option value="דוד ישראלי">דוד ישראלי</option>
+                            <option value="מיכל דוד">מיכל דוד</option>
+                          </select>
+                          <button type="button" class="btn btn-outline btn-sm" id="proj-team-add-btn">
+                            <i data-lucide="plus" class="icon" aria-hidden="true"></i>
+                            הוסף עובד
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="tab-content" id="milestones-content">
+                <div class="details-section">
+                  <div class="flex flex-col gap-md">
+                    <div class="card">
+                      <div class="font-semibold mb-sm">אבן דרך: תשתיות</div>
+                      <div class="text-sm text-neutral-600">יעד: 30/11/2024</div>
+                      <div class="badge badge-success mt-sm">הושלם</div>
+                    </div>
+                    <div class="card">
+                      <div class="font-semibold mb-sm">אבן דרך: התקנות עיקריות</div>
+                      <div class="text-sm text-neutral-600">יעד: 15/02/2025</div>
+                      <div class="badge badge-primary mt-sm">בביצוע</div>
+                    </div>
+                    <div class="card">
+                      <div class="font-semibold mb-sm">אבן דרך: בדיקות ומסירה</div>
+                      <div class="text-sm text-neutral-600">יעד: 30/03/2025</div>
+                      <div class="badge badge-warning mt-sm">בתכנון</div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="tab-content" id="quote-content">
+                <div class="details-section">
+                  <div class="card">
+                    <div class="font-semibold mb-sm">הצעת מחיר ראשית</div>
+                    <div class="text-sm text-neutral-600 mb-sm">סכום כולל מע״מ: ₪250,000 • עודכן: 10/01/2025</div>
+                    <button type="button" class="btn btn-outline btn-sm">
+                      <i data-lucide="eye" class="icon" aria-hidden="true"></i>
+                      צפייה בהצעת מחיר
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="tab-content" id="boq-content">
+                <div class="details-section">
+                  <div class="boq-view" id="boq-view">
+                    <div class="table-container">
+                      <table class="table" id="boq-table-view">
+                        <thead>
+                          <tr>
+                            <th>מערכת</th>
+                            <th>פריט</th>
+                            <th>כמות</th>
+                            <th>יחידה</th>
+                          </tr>
+                        </thead>
+                        <tbody id="boq-tbody-view">
+                          <tr>
+                            <td rowspan="3"><strong>חשמל חכם</strong></td>
+                            <td>בקר מרכזי</td>
+                            <td>1</td>
+                            <td>יח׳</td>
+                          </tr>
+                          <tr>
+                            <td>מתגים חכמים</td>
+                            <td>28</td>
+                            <td>יח׳</td>
+                          </tr>
+                          <tr>
+                            <td>חיישני תאורה</td>
+                            <td>12</td>
+                            <td>יח׳</td>
+                          </tr>
+                          <tr>
+                            <td rowspan="2"><strong>בקרה</strong></td>
+                            <td>מצלמות IP</td>
+                            <td>8</td>
+                            <td>יח׳</td>
+                          </tr>
+                          <tr>
+                            <td>ארון תקשורת</td>
+                            <td>1</td>
+                            <td>יח׳</td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  <div class="boq-edit" id="boq-edit" style="display: none;">
+                    <div class="table-container">
+                      <table class="table" id="boq-table-edit">
+                        <thead>
+                          <tr>
+                            <th>פריט</th>
+                            <th>כמות</th>
+                            <th>יחידה</th>
+                            <th class="edit-actions-col"></th>
+                          </tr>
+                        </thead>
+                        <tbody id="boq-tbody-edit">
+                        </tbody>
+                      </table>
+                    </div>
+                    <button type="button" class="btn btn-outline btn-sm mt-md" id="boq-add-row">
+                      <i data-lucide="plus" class="icon" aria-hidden="true"></i>
+                      הוסף פריט
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div class="tab-content" id="drawings-content">
+                <div class="details-section">
+                  <div class="drawings-view" id="drawings-view">
+                    <div class="grid grid-cols-2 gap-md" id="drawings-list-view">
+                      <div class="file-card" data-drawing-id="draw-1">
+                        <div class="file-name">
+                          <i data-lucide="file-text" class="icon" aria-hidden="true"></i>
+                          תכנון כללי – Rev B.pdf
+                        </div>
+                        <div class="file-meta">סוג: PDF • עודכן: 15/01/2025</div>
+                      </div>
+                      <div class="file-card" data-drawing-id="draw-2">
+                        <div class="file-name">
+                          <i data-lucide="file-text" class="icon" aria-hidden="true"></i>
+                          חיווט – Rev A.pdf
+                        </div>
+                        <div class="file-meta">סוג: PDF • עודכן: 10/01/2025</div>
+                      </div>
+                      <div class="file-card" data-drawing-id="draw-3">
+                        <div class="file-name">
+                          <i data-lucide="drafting-compass" class="icon" aria-hidden="true"></i>
+                          מיקום ציוד.dwg
+                        </div>
+                        <div class="file-meta">סוג: DWG • עודכן: 08/01/2025</div>
+                      </div>
+                    </div>
+                  </div>
+                  <div class="drawings-edit" id="drawings-edit" style="display: none;">
+                    <div class="grid grid-cols-2 gap-md mb-md" id="drawings-list-edit">
+                    </div>
+                    <button type="button" class="btn btn-outline btn-sm" id="drawing-add-btn">
+                      <i data-lucide="plus" class="icon" aria-hidden="true"></i>
+                      הוסף שרטוט
+                    </button>
+                    <div class="drawing-add-form" id="drawing-add-form" style="display: none;">
+                      <div class="card mt-md">
+                        <div class="details-field">
+                          <div class="details-field-label">שם קובץ</div>
+                          <input type="text" class="input" id="drawing-name-input" placeholder="שם קובץ">
+                        </div>
+                        <div class="details-field">
+                          <div class="details-field-label">סוג קובץ</div>
+                          <select class="input" id="drawing-type-input">
+                            <option value="PDF">PDF</option>
+                            <option value="DWG">DWG</option>
+                          </select>
+                        </div>
+                        <div class="details-field">
+                          <div class="details-field-label">תאריך עדכון</div>
+                          <input type="date" class="input" id="drawing-date-input">
+                        </div>
+                        <div class="details-field">
+                          <div class="details-field-label">הערה קצרה (אופציונלי)</div>
+                          <input type="text" class="input" id="drawing-note-input" placeholder="הערה קצרה">
+                        </div>
+                        <div class="flex gap-sm mt-md">
+                          <button type="button" class="btn btn-primary btn-sm" id="drawing-add-confirm">הוסף</button>
+                          <button type="button" class="btn btn-outline btn-sm" id="drawing-add-cancel">בטל</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="tab-content" id="equipment-content">
+                <div class="details-section">
+                  <div class="equipment-view" id="equipment-view">
+                    <div class="table-container">
+                      <table class="table" id="equipment-table-view">
+                        <thead>
+                          <tr>
+                            <th>מערכת</th>
+                            <th>פריט</th>
+                            <th>מיקום</th>
+                            <th>סטטוס</th>
+                          </tr>
+                        </thead>
+                        <tbody id="equipment-tbody-view">
+                          <tr data-equipment-id="eq-1">
+                            <td>חשמל חכם</td>
+                            <td>בקר מרכזי</td>
+                            <td>ארון חשמל</td>
+                            <td><span class="badge badge-primary">בהתקנה</span></td>
+                          </tr>
+                          <tr data-equipment-id="eq-2">
+                            <td>בקרה</td>
+                            <td>מצלמות IP</td>
+                            <td>חצר + כניסה</td>
+                            <td><span class="badge badge-warning">בהכנה</span></td>
+                          </tr>
+                          <tr data-equipment-id="eq-3">
+                            <td>תקשורת</td>
+                            <td>ארון תקשורת</td>
+                            <td>מחסן</td>
+                            <td><span class="badge badge-success">הותקן</span></td>
+                          </tr>
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                  <div class="equipment-edit" id="equipment-edit" style="display: none;">
+                    <div class="flex flex-col gap-md" id="equipment-cards-edit">
+                    </div>
+                    <button type="button" class="btn btn-outline btn-sm mt-md" id="equipment-add-btn">
+                      <i data-lucide="plus" class="icon" aria-hidden="true"></i>
+                      הוסף מוצר / מערכת
+                    </button>
+                    <div class="equipment-add-form" id="equipment-add-form" style="display: none;">
+                      <div class="card mt-md">
+                        <div class="details-field">
+                          <div class="details-field-label">שם</div>
+                          <input type="text" class="input" id="equipment-name-input" placeholder="שם מוצר/מערכת">
+                        </div>
+                        <div class="details-field">
+                          <div class="details-field-label">סטטוס</div>
+                          <select class="input" id="equipment-status-input">
+                            <option value="מותקן">מותקן</option>
+                            <option value="בהתקנה">בהתקנה</option>
+                            <option value="בהזמנה">בהזמנה</option>
+                            <option value="ממתין" selected>ממתין</option>
+                          </select>
+                        </div>
+                        <div class="details-field">
+                          <div class="details-field-label">מיקום (אופציונלי)</div>
+                          <input type="text" class="input" id="equipment-location-input" placeholder="מיקום">
+                        </div>
+                        <div class="flex gap-sm mt-md">
+                          <button type="button" class="btn btn-primary btn-sm" id="equipment-add-confirm">הוסף</button>
+                          <button type="button" class="btn btn-outline btn-sm" id="equipment-add-cancel">בטל</button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="project-drawer-scroll-indicator" id="project-scroll-indicator" aria-hidden="true">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <path d="M7 10L12 15L17 10" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+              </svg>
+            </div>
+
+          </aside>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <script src="https://unpkg.com/lucide@latest"></script>
+  <script src="../scripts/ui.js"></script>
+  <script>
+    // נתוני הפרויקטים
+const projectRows = {
+    p1: { name: 'וילה רמת אביב', customer: 'וילה רמת אביב', manager: 'שרה לוי', status: 'ביצוע', openDate: '01/01/2025', closeDate: '', number: 'P-24031', financeNumber: 'FIN-1001', team: ['יוסי כהן', 'דוד ישראלי'] },
+    p2: { name: 'משרדי חברת ABC', customer: 'חברת ABC בע״מ', manager: 'רביב מעיני', status: 'תכניות', openDate: '15/12/2024', closeDate: '', number: 'P-24018', financeNumber: 'FIN-1002', team: ['שרה לוי'] },
+    p3: { name: 'בית פרטי חיפה', customer: 'שרה לוי', manager: 'שרה לוי', status: 'בתכנון', openDate: '10/01/2025', closeDate: '', number: 'P-24022', financeNumber: 'FIN-1003', team: [] }
+};
+
+const projOverlay = document.getElementById('project-drawer-overlay');
+const projCloseBtn = document.getElementById('proj-close');
+const projBackdrop = projOverlay.querySelector('.project-drawer-backdrop');
+const tabbarScroller = document.getElementById('tabbar-scroller');
+const tabbarArrowStart = document.getElementById('tabbar-arrow-start'); // חץ ימני
+const tabbarArrowEnd = document.getElementById('tabbar-arrow-end');     // חץ שמאלי
+
+// Edit mode state
+let isEditMode = false;
+let projectSnapshot = null;
+let currentProjectId = null;
+
+// פונקציות פתיחה וסגירה
+function openProject(id) {
+    const p = projectRows[id];
+    if (!p) return;
+    
+    currentProjectId = id;
+    isEditMode = false;
+    projectSnapshot = null;
+    
+    // Initialize team array if missing
+    if (!p.team) {
+        p.team = [];
+    }
+    
+    document.getElementById('proj-name').textContent = p.name;
+    document.getElementById('proj-customer').textContent = p.customer;
+    document.getElementById('proj-status').textContent = p.status;
+    document.getElementById('proj-open-date').textContent = p.openDate || '-';
+    document.getElementById('proj-close-date').textContent = p.closeDate || '-';
+    document.getElementById('proj-number').textContent = p.number || '-';
+    document.getElementById('proj-finance-number').textContent = p.financeNumber || '-';
+    
+    // Update team section
+    updateTeamView(p.manager, p.team);
+    
+    // Reset edit mode UI
+    exitEditMode();
+    
+    // Initialize maximize button state
+    updateMaximizeButtonState();
+    
+    projOverlay.classList.add('is-open');
+    document.body.classList.add('drawer-open');
+    setTimeout(updateTabbarArrows, 150);
+}
+
+function closeProjectDrawer() {
+    // If in edit mode, cancel changes first
+    if (isEditMode) {
+        cancelEdit();
+    }
+    projOverlay.classList.remove('is-open');
+    document.body.classList.remove('drawer-open');
+    isEditMode = false;
+    projectSnapshot = null;
+    currentProjectId = null;
+}
+
+// אירועי לחיצה על טבלה
+document.querySelectorAll('#projects-table tbody tr').forEach(tr => {
+    tr.addEventListener('click', () => openProject(tr.dataset.projectId));
+});
+
+projCloseBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    closeProjectDrawer();
+});
+projBackdrop.addEventListener('click', closeProjectDrawer);
+
+// ESC key handler
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && projOverlay.classList.contains('is-open')) {
+        closeProjectDrawer();
+    }
+});
+
+// Edit mode functions
+function createSnapshot() {
+    const p = projectRows[currentProjectId];
+    if (!p) return null;
+    
+    // Get BOQ data from view table
+    const boqData = [];
+    const tbody = document.getElementById('boq-tbody-view');
+    if (tbody) {
+        const rows = tbody.querySelectorAll('tr');
+        rows.forEach((row, idx) => {
+            const cells = row.querySelectorAll('td');
+            if (cells.length >= 3) {
+                // Find the item, quantity, and unit cells (skip system cell if it's a rowspan)
+                let itemCell, qtyCell, unitCell;
+                if (cells.length === 3) {
+                    itemCell = cells[0];
+                    qtyCell = cells[1];
+                    unitCell = cells[2];
+                } else if (cells.length === 4) {
+                    // Has system cell
+                    itemCell = cells[1];
+                    qtyCell = cells[2];
+                    unitCell = cells[3];
+                }
+                if (itemCell && qtyCell && unitCell) {
+                    boqData.push({
+                        id: `boq-${idx}`,
+                        item: itemCell.textContent.trim(),
+                        quantity: qtyCell.textContent.trim(),
+                        unit: unitCell.textContent.trim()
+                    });
+                }
+            }
+        });
+    }
+    
+    // Get Drawings data from view
+    const drawingsData = [];
+    const drawingsList = document.getElementById('drawings-list-view');
+    if (drawingsList) {
+        const cards = drawingsList.querySelectorAll('.file-card');
+        cards.forEach(card => {
+            const nameEl = card.querySelector('.file-name');
+            const metaEl = card.querySelector('.file-meta');
+            if (nameEl && metaEl) {
+                // Extract name - get all text nodes, skip icon
+                const nameText = Array.from(nameEl.childNodes)
+                    .filter(node => node.nodeType === Node.TEXT_NODE)
+                    .map(node => node.textContent.trim())
+                    .join(' ')
+                    .trim();
+                const meta = metaEl.textContent.trim();
+                const typeMatch = meta.match(/סוג:\s*(\w+)/);
+                const dateMatch = meta.match(/עודכן:\s*(\d{2}\/\d{2}\/\d{4})/);
+                drawingsData.push({
+                    id: card.dataset.drawingId || `draw-${Date.now()}`,
+                    name: nameText || 'ללא שם',
+                    type: typeMatch ? typeMatch[1] : 'PDF',
+                    date: dateMatch ? dateMatch[1] : '',
+                    note: '' // Notes not shown in view, will be empty
+                });
+            }
+        });
+    }
+    
+    // Get Equipment/Products data from view table
+    const equipmentData = [];
+    const equipmentTbody = document.getElementById('equipment-tbody-view');
+    if (equipmentTbody) {
+        const rows = equipmentTbody.querySelectorAll('tr');
+        rows.forEach((row, idx) => {
+            const cells = row.querySelectorAll('td');
+            if (cells.length >= 4) {
+                const system = cells[0]?.textContent.trim() || '';
+                const item = cells[1]?.textContent.trim() || '';
+                const location = cells[2]?.textContent.trim() || '';
+                const statusBadge = cells[3]?.querySelector('.badge');
+                let status = statusBadge ? statusBadge.textContent.trim() : '';
+                // Map view status to edit status values
+                if (status.includes('הותקן') || status.includes('מותקן')) {
+                    status = 'מותקן';
+                } else if (status.includes('בהתקנה')) {
+                    status = 'בהתקנה';
+                } else if (status.includes('בהזמנה')) {
+                    status = 'בהזמנה';
+                } else {
+                    status = 'ממתין';
+                }
+                equipmentData.push({
+                    id: row.dataset.equipmentId || `eq-${idx}`,
+                    system: system,
+                    item: item,
+                    location: location,
+                    status: status
+                });
+            }
+        });
+    }
+    
+    // Get team data
+    const managerView = document.getElementById('proj-manager-view');
+    const teamView = document.getElementById('proj-team-view');
+    const manager = managerView ? managerView.textContent.trim() : (p.manager || '');
+    const team = p.team ? [...p.team] : [];
+    
+    // Create deep copy of current project data
+    return {
+        name: p.name,
+        customer: p.customer,
+        manager: manager,
+        status: p.status,
+        openDate: p.openDate,
+        closeDate: p.closeDate,
+        number: p.number,
+        financeNumber: p.financeNumber,
+        team: team,
+        boq: boqData,
+        drawings: drawingsData,
+        equipment: equipmentData
+    };
+}
+
+function enterEditMode() {
+    if (!currentProjectId) return;
+    
+    isEditMode = true;
+    projectSnapshot = createSnapshot();
+    
+    // Update UI
+    document.getElementById('header-actions-edit').style.display = 'flex';
+    document.getElementById('edit-mode-indicator').style.display = 'inline';
+    updateEditToggleButton();
+    
+    // Switch team section to edit mode
+    switchTeamToEdit();
+    
+    // Switch BOQ to edit mode
+    switchBOQToEdit();
+    
+    // Switch Drawings to edit mode
+    switchDrawingsToEdit();
+    
+    // Switch Equipment to edit mode
+    switchEquipmentToEdit();
+}
+
+function exitEditMode() {
+    isEditMode = false;
+    
+    // Update UI
+    document.getElementById('header-actions-edit').style.display = 'none';
+    document.getElementById('edit-mode-indicator').style.display = 'none';
+    updateEditToggleButton();
+    
+    // Switch team section to view mode
+    switchTeamToView();
+    
+    // Switch BOQ to view mode
+    switchBOQToView();
+    
+    // Switch Drawings to view mode
+    switchDrawingsToView();
+    
+    // Switch Equipment to view mode
+    switchEquipmentToView();
+}
+
+function updateEditToggleButton() {
+    const toggleBtn = document.getElementById('proj-edit-toggle');
+    if (!toggleBtn) return;
+    
+    const icon = toggleBtn.querySelector('i[data-lucide]');
+    if (isEditMode) {
+        toggleBtn.innerHTML = '<i data-lucide="x" class="icon" aria-hidden="true"></i> סיום עריכה';
+        if (icon) icon.setAttribute('data-lucide', 'x');
+    } else {
+        toggleBtn.innerHTML = '<i data-lucide="edit-2" class="icon" aria-hidden="true"></i> עריכת תיק';
+        if (icon) icon.setAttribute('data-lucide', 'edit-2');
+    }
+    if (window.lucide) lucide.createIcons();
+}
+
+function saveEdit() {
+    if (!currentProjectId || !projectSnapshot) return;
+    
+    // Validate BOQ
+    if (!validateBOQ()) {
+        return;
+    }
+    
+    // Commit team changes
+    commitTeamChanges();
+    
+    // Commit BOQ changes
+    commitBOQChanges();
+    
+    // Commit Drawings changes
+    commitDrawingsChanges();
+    
+    // Commit Equipment changes
+    commitEquipmentChanges();
+    
+    exitEditMode();
+    projectSnapshot = null;
+}
+
+function cancelEdit() {
+    if (!projectSnapshot || !currentProjectId) return;
+    
+    const p = projectRows[currentProjectId];
+    
+    // Restore from snapshot
+    p.name = projectSnapshot.name;
+    p.customer = projectSnapshot.customer;
+    p.manager = projectSnapshot.manager;
+    p.status = projectSnapshot.status;
+    p.openDate = projectSnapshot.openDate;
+    p.closeDate = projectSnapshot.closeDate;
+    p.number = projectSnapshot.number;
+    p.financeNumber = projectSnapshot.financeNumber;
+    
+    // Update UI
+    document.getElementById('proj-name').textContent = p.name;
+    document.getElementById('proj-customer').textContent = p.customer;
+    document.getElementById('proj-status').textContent = p.status;
+    document.getElementById('proj-open-date').textContent = p.openDate || '-';
+    document.getElementById('proj-close-date').textContent = p.closeDate || '-';
+    document.getElementById('proj-number').textContent = p.number || '-';
+    document.getElementById('proj-finance-number').textContent = p.financeNumber || '-';
+    
+    // Restore team from snapshot
+    p.manager = projectSnapshot.manager;
+    p.team = projectSnapshot.team ? [...projectSnapshot.team] : [];
+    updateTeamView(p.manager, p.team);
+    
+    // Restore BOQ from snapshot
+    restoreBOQFromSnapshot();
+    
+    // Restore Drawings from snapshot
+    restoreDrawingsFromSnapshot();
+    
+    // Restore Equipment from snapshot
+    restoreEquipmentFromSnapshot();
+    
+    exitEditMode();
+    projectSnapshot = null;
+}
+
+// Team management functions
+function updateTeamView(manager, team) {
+    const managerView = document.getElementById('proj-manager-view');
+    const teamView = document.getElementById('proj-team-view');
+    
+    if (managerView) {
+        managerView.textContent = manager || '-';
+    }
+    
+    if (teamView) {
+        if (team && team.length > 0) {
+            teamView.textContent = team.join(', ');
+        } else {
+            teamView.textContent = '-';
+        }
+    }
+}
+
+function switchTeamToEdit() {
+    const p = projectRows[currentProjectId];
+    if (!p) return;
+    
+    // Show edit controls
+    document.getElementById('proj-manager-view').style.display = 'none';
+    document.getElementById('proj-manager-edit').style.display = 'block';
+    document.getElementById('proj-team-view').style.display = 'none';
+    document.getElementById('proj-team-edit').style.display = 'block';
+    
+    // Set manager dropdown value
+    const managerSelect = document.getElementById('proj-manager-select');
+    if (managerSelect) {
+        managerSelect.value = p.manager || '';
+    }
+    
+    // Populate team chips
+    updateTeamChips(p.team || []);
+    
+    // Attach handlers
+    attachTeamHandlers();
+    
+    if (window.lucide) lucide.createIcons();
+}
+
+function switchTeamToView() {
+    // Hide edit controls
+    document.getElementById('proj-manager-view').style.display = 'block';
+    document.getElementById('proj-manager-edit').style.display = 'none';
+    document.getElementById('proj-team-view').style.display = 'block';
+    document.getElementById('proj-team-edit').style.display = 'none';
+    
+    // Reset handler flag for next edit mode entry
+    managerChangeHandlerAttached = false;
+}
+
+function updateTeamChips(team) {
+    const chipsContainer = document.getElementById('proj-team-chips');
+    if (!chipsContainer) return;
+    
+    chipsContainer.innerHTML = '';
+    team.forEach(member => {
+        const chip = document.createElement('span');
+        chip.className = 'badge badge-neutral team-chip';
+        chip.dataset.teamMember = member;
+        chip.innerHTML = `${escapeHtml(member)}<button type="button" class="chip-remove" data-remove-team="${member}" aria-label="הסר">×</button>`;
+        chipsContainer.appendChild(chip);
+    });
+}
+
+function commitTeamChanges() {
+    const p = projectRows[currentProjectId];
+    if (!p) return;
+    
+    // Get manager from dropdown
+    const managerSelect = document.getElementById('proj-manager-select');
+    if (managerSelect) {
+        p.manager = managerSelect.value || '';
+    }
+    
+    // Get team from chips
+    const chips = document.querySelectorAll('#proj-team-chips .team-chip');
+    p.team = Array.from(chips).map(chip => chip.dataset.teamMember).filter(m => m);
+    
+    // Update view
+    updateTeamView(p.manager, p.team);
+}
+
+let managerChangeHandlerAttached = false;
+
+function attachTeamHandlers() {
+    // Remove team member handlers
+    document.querySelectorAll('.chip-remove').forEach(btn => {
+        // Remove existing listeners to avoid duplicates
+        const newBtn = btn.cloneNode(true);
+        btn.parentNode.replaceChild(newBtn, btn);
+        
+        newBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const member = newBtn.dataset.removeTeam;
+            const chip = newBtn.closest('.team-chip');
+            if (chip) chip.remove();
+        });
+    });
+    
+    // Manager change handler - remove manager from team if present (attach only once)
+    if (!managerChangeHandlerAttached) {
+        const managerSelect = document.getElementById('proj-manager-select');
+        if (managerSelect) {
+            managerSelect.addEventListener('change', () => {
+                const newManager = managerSelect.value;
+                if (!newManager) return;
+                
+                // Remove manager from team chips if present
+                const chips = document.querySelectorAll('#proj-team-chips .team-chip');
+                chips.forEach(chip => {
+                    if (chip.dataset.teamMember === newManager) {
+                        chip.remove();
+                    }
+                });
+            });
+            managerChangeHandlerAttached = true;
+        }
+    }
+}
+
+// Team add handler
+const teamAddBtn = document.getElementById('proj-team-add-btn');
+const teamAddSelect = document.getElementById('proj-team-add-select');
+if (teamAddBtn && teamAddSelect) {
+    teamAddBtn.addEventListener('click', () => {
+        const selected = teamAddSelect.value;
+        if (!selected) return;
+        
+        // Get current manager
+        const managerSelect = document.getElementById('proj-manager-select');
+        const currentManager = managerSelect ? managerSelect.value : '';
+        
+        // Prevent adding manager to team
+        if (selected === currentManager) {
+            alert('מנהל הפרויקט לא יכול להיות גם בעובדים המשויכים');
+            return;
+        }
+        
+        // Check if already in team
+        const existing = Array.from(document.querySelectorAll('#proj-team-chips .team-chip')).map(c => c.dataset.teamMember);
+        if (existing.includes(selected)) {
+            alert('העובד כבר קיים בצוות');
+            return;
+        }
+        
+        // Add chip
+        const chipsContainer = document.getElementById('proj-team-chips');
+        const chip = document.createElement('span');
+        chip.className = 'badge badge-neutral team-chip';
+        chip.dataset.teamMember = selected;
+        chip.innerHTML = `${escapeHtml(selected)}<button type="button" class="chip-remove" data-remove-team="${selected}" aria-label="הסר">×</button>`;
+        chipsContainer.appendChild(chip);
+        teamAddSelect.value = '';
+        attachTeamHandlers();
+    });
+}
+
+// BOQ editing functions
+function switchBOQToEdit() {
+    document.getElementById('boq-view').style.display = 'none';
+    document.getElementById('boq-edit').style.display = 'block';
+    
+    // Populate edit table from view table
+    const tbodyView = document.getElementById('boq-tbody-view');
+    const tbodyEdit = document.getElementById('boq-tbody-edit');
+    if (!tbodyView || !tbodyEdit) return;
+    
+    tbodyEdit.innerHTML = '';
+    const rows = tbodyView.querySelectorAll('tr');
+    let rowId = 0;
+    
+    rows.forEach(row => {
+        const cells = row.querySelectorAll('td');
+        if (cells.length >= 3) {
+            let itemCell, qtyCell, unitCell;
+            if (cells.length === 3) {
+                itemCell = cells[0];
+                qtyCell = cells[1];
+                unitCell = cells[2];
+            } else if (cells.length === 4) {
+                itemCell = cells[1];
+                qtyCell = cells[2];
+                unitCell = cells[3];
+            }
+            
+            if (itemCell && qtyCell && unitCell) {
+                const tr = document.createElement('tr');
+                tr.dataset.boqId = `boq-${rowId++}`;
+                const item = itemCell.textContent.trim();
+                const qty = qtyCell.textContent.trim();
+                const unit = unitCell.textContent.trim();
+                
+                tr.innerHTML = `
+                    <td>
+                        <input type="text" class="input input-sm boq-item-input" value="${escapeHtml(item)}" placeholder="שם פריט">
+                    </td>
+                    <td>
+                        <input type="number" class="input input-sm boq-qty-input" value="${qty}" min="0" placeholder="0">
+                    </td>
+                    <td>
+                        <select class="input input-sm boq-unit-input">
+                            <option value="יח׳" ${unit === 'יח׳' ? 'selected' : ''}>יח׳</option>
+                            <option value="מ׳" ${unit === 'מ׳' ? 'selected' : ''}>מ׳</option>
+                            <option value="מ״ר" ${unit === 'מ״ר' ? 'selected' : ''}>מ״ר</option>
+                            <option value="סט" ${unit === 'סט' ? 'selected' : ''}>סט</option>
+                        </select>
+                    </td>
+                    <td>
+                        <button type="button" class="btn-icon-only btn-sm boq-remove-btn" data-remove-boq="${tr.dataset.boqId}" aria-label="הסר">
+                            <i data-lucide="trash-2" class="icon" aria-hidden="true"></i>
+                        </button>
+                    </td>
+                `;
+                tbodyEdit.appendChild(tr);
+            }
+        }
+    });
+    
+    attachBOQHandlers();
+    if (window.lucide) lucide.createIcons();
+}
+
+function switchBOQToView() {
+    document.getElementById('boq-view').style.display = 'block';
+    document.getElementById('boq-edit').style.display = 'none';
+}
+
+function commitBOQChanges() {
+    const tbodyEdit = document.getElementById('boq-tbody-edit');
+    const tbodyView = document.getElementById('boq-tbody-view');
+    if (!tbodyEdit || !tbodyView) return;
+    
+    // Rebuild view table from edit table
+    tbodyView.innerHTML = '';
+    const rows = tbodyEdit.querySelectorAll('tr');
+    const systems = {};
+    
+    rows.forEach((row, idx) => {
+        const itemInput = row.querySelector('.boq-item-input');
+        const qtyInput = row.querySelector('.boq-qty-input');
+        const unitSelect = row.querySelector('.boq-unit-input');
+        
+        if (!itemInput || !qtyInput || !unitSelect) return;
+        
+        const item = itemInput.value.trim();
+        const qty = qtyInput.value.trim();
+        const unit = unitSelect.value;
+        
+        if (!item) return; // Skip empty items
+        
+        // Simple grouping: first 3 items = חשמל חכם, rest = בקרה
+        let system = '';
+        if (idx < 3) {
+            system = 'חשמל חכם';
+        } else {
+            system = 'בקרה';
+        }
+        
+        if (!systems[system]) {
+            systems[system] = [];
+        }
+        
+        systems[system].push({ item, qty, unit });
+    });
+    
+    // Build table rows grouped by system
+    Object.keys(systems).forEach(system => {
+        const items = systems[system];
+        items.forEach((item, itemIdx) => {
+            const tr = document.createElement('tr');
+            if (itemIdx === 0) {
+                tr.innerHTML = `
+                    <td rowspan="${items.length}"><strong>${system}</strong></td>
+                    <td>${escapeHtml(item.item)}</td>
+                    <td>${escapeHtml(item.qty)}</td>
+                    <td>${escapeHtml(item.unit)}</td>
+                `;
+            } else {
+                tr.innerHTML = `
+                    <td>${escapeHtml(item.item)}</td>
+                    <td>${escapeHtml(item.qty)}</td>
+                    <td>${escapeHtml(item.unit)}</td>
+                `;
+            }
+            tbodyView.appendChild(tr);
+        });
+    });
+}
+
+function restoreBOQFromSnapshot() {
+    if (!projectSnapshot || !projectSnapshot.boq) {
+        // If no snapshot, restore to default
+        const tbodyView = document.getElementById('boq-tbody-view');
+        if (tbodyView) {
+            tbodyView.innerHTML = `
+                <tr>
+                    <td rowspan="3"><strong>חשמל חכם</strong></td>
+                    <td>בקר מרכזי</td>
+                    <td>1</td>
+                    <td>יח׳</td>
+                </tr>
+                <tr>
+                    <td>מתגים חכמים</td>
+                    <td>28</td>
+                    <td>יח׳</td>
+                </tr>
+                <tr>
+                    <td>חיישני תאורה</td>
+                    <td>12</td>
+                    <td>יח׳</td>
+                </tr>
+                <tr>
+                    <td rowspan="2"><strong>בקרה</strong></td>
+                    <td>מצלמות IP</td>
+                    <td>8</td>
+                    <td>יח׳</td>
+                </tr>
+                <tr>
+                    <td>ארון תקשורת</td>
+                    <td>1</td>
+                    <td>יח׳</td>
+                </tr>
+            `;
+        }
+        return;
+    }
+    
+    const tbodyView = document.getElementById('boq-tbody-view');
+    if (!tbodyView) return;
+    
+    tbodyView.innerHTML = '';
+    
+    // Group items by system (simple: first 3 = חשמל חכם, next 2 = בקרה)
+    const boqData = projectSnapshot.boq;
+    const systems = {};
+    
+    boqData.forEach((item, idx) => {
+        let system = '';
+        if (idx < 3) {
+            system = 'חשמל חכם';
+        } else {
+            system = 'בקרה';
+        }
+        
+        if (!systems[system]) {
+            systems[system] = [];
+        }
+        systems[system].push(item);
+    });
+    
+    // Build table rows
+    Object.keys(systems).forEach(system => {
+        const items = systems[system];
+        items.forEach((item, itemIdx) => {
+            const tr = document.createElement('tr');
+            if (itemIdx === 0) {
+                tr.innerHTML = `
+                    <td rowspan="${items.length}"><strong>${system}</strong></td>
+                    <td>${escapeHtml(item.item)}</td>
+                    <td>${escapeHtml(item.quantity)}</td>
+                    <td>${escapeHtml(item.unit)}</td>
+                `;
+            } else {
+                tr.innerHTML = `
+                    <td>${escapeHtml(item.item)}</td>
+                    <td>${escapeHtml(item.quantity)}</td>
+                    <td>${escapeHtml(item.unit)}</td>
+                `;
+            }
+            tbodyView.appendChild(tr);
+        });
+    });
+}
+
+function validateBOQ() {
+    const tbodyEdit = document.getElementById('boq-tbody-edit');
+    if (!tbodyEdit) return true;
+    
+    const rows = tbodyEdit.querySelectorAll('tr');
+    let isValid = true;
+    
+    rows.forEach(row => {
+        const itemInput = row.querySelector('.boq-item-input');
+        const qtyInput = row.querySelector('.boq-qty-input');
+        
+        // Remove previous error states
+        if (itemInput) itemInput.classList.remove('error');
+        if (qtyInput) qtyInput.classList.remove('error');
+        
+        const item = itemInput?.value.trim();
+        const qty = qtyInput?.value.trim();
+        
+        // Validate item name (required)
+        if (!item) {
+            if (itemInput) {
+                itemInput.classList.add('error');
+                isValid = false;
+            }
+        }
+        
+        // Validate quantity (must be numeric >= 0)
+        if (qty && (isNaN(parseFloat(qty)) || parseFloat(qty) < 0)) {
+            if (qtyInput) {
+                qtyInput.classList.add('error');
+                isValid = false;
+            }
+        }
+    });
+    
+    if (!isValid) {
+        alert('יש לתקן שגיאות בטבלה לפני שמירה');
+    }
+    
+    return isValid;
+}
+
+function attachBOQHandlers() {
+    // Remove row handlers
+    document.querySelectorAll('.boq-remove-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const rowId = btn.dataset.removeBoq;
+            const row = document.querySelector(`[data-boq-id="${rowId}"]`);
+            if (row) row.remove();
+        });
+    });
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+// BOQ add row
+const boqAddRowBtn = document.getElementById('boq-add-row');
+if (boqAddRowBtn) {
+    boqAddRowBtn.addEventListener('click', () => {
+        const tbodyEdit = document.getElementById('boq-tbody-edit');
+        if (!tbodyEdit) return;
+        
+        const newId = `boq-${Date.now()}`;
+        const tr = document.createElement('tr');
+        tr.dataset.boqId = newId;
+        tr.innerHTML = `
+            <td>
+                <input type="text" class="input input-sm boq-item-input" placeholder="שם פריט">
+            </td>
+            <td>
+                <input type="number" class="input input-sm boq-qty-input" value="0" min="0" placeholder="0">
+            </td>
+            <td>
+                <select class="input input-sm boq-unit-input">
+                    <option value="יח׳" selected>יח׳</option>
+                    <option value="מ׳">מ׳</option>
+                    <option value="מ״ר">מ״ר</option>
+                    <option value="סט">סט</option>
+                </select>
+            </td>
+            <td>
+                <button type="button" class="btn-icon-only btn-sm boq-remove-btn" data-remove-boq="${newId}" aria-label="הסר">
+                    <i data-lucide="trash-2" class="icon" aria-hidden="true"></i>
+                </button>
+            </td>
+        `;
+        tbodyEdit.appendChild(tr);
+        attachBOQHandlers();
+        if (window.lucide) lucide.createIcons();
+    });
+}
+
+// Drawings editing functions
+function switchDrawingsToEdit() {
+    document.getElementById('drawings-view').style.display = 'none';
+    document.getElementById('drawings-edit').style.display = 'block';
+    
+    // Populate edit list from view list
+    const listView = document.getElementById('drawings-list-view');
+    const listEdit = document.getElementById('drawings-list-edit');
+    if (!listView || !listEdit) return;
+    
+    listEdit.innerHTML = '';
+    const cards = listView.querySelectorAll('.file-card');
+    
+    cards.forEach(card => {
+        const nameEl = card.querySelector('.file-name');
+        const metaEl = card.querySelector('.file-meta');
+        if (!nameEl || !metaEl) return;
+        
+        // Extract name - get all text nodes, skip icon
+        const nameText = Array.from(nameEl.childNodes)
+            .filter(node => node.nodeType === Node.TEXT_NODE)
+            .map(node => node.textContent.trim())
+            .join(' ')
+            .trim();
+        const meta = metaEl.textContent.trim();
+        const typeMatch = meta.match(/סוג:\s*(\w+)/);
+        const dateMatch = meta.match(/עודכן:\s*(\d{2}\/\d{2}\/\d{4})/);
+        const type = typeMatch ? typeMatch[1] : 'PDF';
+        const date = dateMatch ? dateMatch[1] : '';
+        const icon = type === 'PDF' ? 'file-text' : 'drafting-compass';
+        const drawingId = card.dataset.drawingId || `draw-${Date.now()}`;
+        
+        const newCard = document.createElement('div');
+        newCard.className = 'file-card';
+        newCard.dataset.drawingId = drawingId;
+        newCard.innerHTML = `
+            <div class="file-name">
+                <i data-lucide="${icon}" class="icon" aria-hidden="true"></i>
+                ${escapeHtml(nameText || 'ללא שם')}
+            </div>
+            <div class="file-meta">סוג: ${type} • עודכן: ${date}</div>
+            <button type="button" class="file-remove" data-remove-drawing="${drawingId}" aria-label="הסר">×</button>
+        `;
+        listEdit.appendChild(newCard);
+    });
+    
+    attachDrawingsHandlers();
+    if (window.lucide) lucide.createIcons();
+}
+
+function switchDrawingsToView() {
+    document.getElementById('drawings-view').style.display = 'block';
+    document.getElementById('drawings-edit').style.display = 'none';
+    document.getElementById('drawing-add-form').style.display = 'none';
+}
+
+function commitDrawingsChanges() {
+    const listEdit = document.getElementById('drawings-list-edit');
+    const listView = document.getElementById('drawings-list-view');
+    if (!listEdit || !listView) return;
+    
+    // Rebuild view list from edit list
+    listView.innerHTML = '';
+    const cards = listEdit.querySelectorAll('.file-card');
+    
+    cards.forEach(card => {
+        const nameEl = card.querySelector('.file-name');
+        const metaEl = card.querySelector('.file-meta');
+        if (!nameEl || !metaEl) return;
+        
+        // Extract name - get all text nodes, skip icon
+        const nameText = Array.from(nameEl.childNodes)
+            .filter(node => node.nodeType === Node.TEXT_NODE)
+            .map(node => node.textContent.trim())
+            .join(' ')
+            .trim();
+        const meta = metaEl.textContent.trim();
+        const typeMatch = meta.match(/סוג:\s*(\w+)/);
+        const dateMatch = meta.match(/עודכן:\s*(\d{2}\/\d{2}\/\d{4})/);
+        const type = typeMatch ? typeMatch[1] : 'PDF';
+        const date = dateMatch ? dateMatch[1] : '';
+        const icon = type === 'PDF' ? 'file-text' : 'drafting-compass';
+        const drawingId = card.dataset.drawingId;
+        
+        const newCard = document.createElement('div');
+        newCard.className = 'file-card';
+        newCard.dataset.drawingId = drawingId;
+        newCard.innerHTML = `
+            <div class="file-name">
+                <i data-lucide="${icon}" class="icon" aria-hidden="true"></i>
+                ${escapeHtml(nameText || 'ללא שם')}
+            </div>
+            <div class="file-meta">סוג: ${type} • עודכן: ${date}</div>
+        `;
+        listView.appendChild(newCard);
+    });
+    
+    if (window.lucide) lucide.createIcons();
+}
+
+function restoreDrawingsFromSnapshot() {
+    if (!projectSnapshot || !projectSnapshot.drawings) {
+        // If no snapshot, restore to default
+        const listView = document.getElementById('drawings-list-view');
+        if (listView) {
+            listView.innerHTML = `
+                <div class="file-card" data-drawing-id="draw-1">
+                    <div class="file-name">
+                        <i data-lucide="file-text" class="icon" aria-hidden="true"></i>
+                        תכנון כללי – Rev B.pdf
+                    </div>
+                    <div class="file-meta">סוג: PDF • עודכן: 15/01/2025</div>
+                </div>
+                <div class="file-card" data-drawing-id="draw-2">
+                    <div class="file-name">
+                        <i data-lucide="file-text" class="icon" aria-hidden="true"></i>
+                        חיווט – Rev A.pdf
+                    </div>
+                    <div class="file-meta">סוג: PDF • עודכן: 10/01/2025</div>
+                </div>
+                <div class="file-card" data-drawing-id="draw-3">
+                    <div class="file-name">
+                        <i data-lucide="drafting-compass" class="icon" aria-hidden="true"></i>
+                        מיקום ציוד.dwg
+                    </div>
+                    <div class="file-meta">סוג: DWG • עודכן: 08/01/2025</div>
+                </div>
+            `;
+            if (window.lucide) lucide.createIcons();
+        }
+        return;
+    }
+    
+    const listView = document.getElementById('drawings-list-view');
+    if (!listView) return;
+    
+    listView.innerHTML = '';
+    projectSnapshot.drawings.forEach(drawing => {
+        const icon = drawing.type === 'PDF' ? 'file-text' : 'drafting-compass';
+        const card = document.createElement('div');
+        card.className = 'file-card';
+        card.dataset.drawingId = drawing.id;
+        card.innerHTML = `
+            <div class="file-name">
+                <i data-lucide="${icon}" class="icon" aria-hidden="true"></i>
+                ${escapeHtml(drawing.name)}
+            </div>
+            <div class="file-meta">סוג: ${drawing.type} • עודכן: ${drawing.date || ''}</div>
+        `;
+        listView.appendChild(card);
+    });
+    
+    if (window.lucide) lucide.createIcons();
+}
+
+function attachDrawingsHandlers() {
+    // Remove drawing handlers
+    document.querySelectorAll('.file-remove').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const drawingId = btn.dataset.removeDrawing;
+            const card = document.querySelector(`[data-drawing-id="${drawingId}"]`);
+            if (card) card.remove();
+        });
+    });
+}
+
+// Drawing add form handlers
+const drawingAddBtn = document.getElementById('drawing-add-btn');
+const drawingAddForm = document.getElementById('drawing-add-form');
+const drawingAddConfirm = document.getElementById('drawing-add-confirm');
+const drawingAddCancel = document.getElementById('drawing-add-cancel');
+
+if (drawingAddBtn) {
+    drawingAddBtn.addEventListener('click', () => {
+        drawingAddForm.style.display = 'block';
+    });
+}
+
+if (drawingAddCancel) {
+    drawingAddCancel.addEventListener('click', () => {
+        drawingAddForm.style.display = 'none';
+        document.getElementById('drawing-name-input').value = '';
+        document.getElementById('drawing-type-input').value = 'PDF';
+        document.getElementById('drawing-date-input').value = '';
+        document.getElementById('drawing-note-input').value = '';
+    });
+}
+
+if (drawingAddConfirm) {
+    drawingAddConfirm.addEventListener('click', () => {
+        const name = document.getElementById('drawing-name-input').value.trim();
+        const type = document.getElementById('drawing-type-input').value;
+        const date = document.getElementById('drawing-date-input').value;
+        const note = document.getElementById('drawing-note-input').value.trim();
+        
+        if (!name) {
+            alert('יש להזין שם קובץ');
+            return;
+        }
+        
+        const dateStr = date ? formatDateForDisplay(date) : new Date().toLocaleDateString('he-IL');
+        const icon = type === 'PDF' ? 'file-text' : 'drafting-compass';
+        const newId = `draw-${Date.now()}`;
+        
+        const listEdit = document.getElementById('drawings-list-edit');
+        const card = document.createElement('div');
+        card.className = 'file-card';
+        card.dataset.drawingId = newId;
+        card.innerHTML = `
+            <div class="file-name">
+                <i data-lucide="${icon}" class="icon" aria-hidden="true"></i>
+                ${escapeHtml(name)}
+            </div>
+            <div class="file-meta">סוג: ${type} • עודכן: ${dateStr}</div>
+            <button type="button" class="file-remove" data-remove-drawing="${newId}" aria-label="הסר">×</button>
+        `;
+        listEdit.appendChild(card);
+        attachDrawingsHandlers();
+        if (window.lucide) lucide.createIcons();
+        
+        drawingAddForm.style.display = 'none';
+        document.getElementById('drawing-name-input').value = '';
+        document.getElementById('drawing-type-input').value = 'PDF';
+        document.getElementById('drawing-date-input').value = '';
+        document.getElementById('drawing-note-input').value = '';
+    });
+}
+
+function formatDateForDisplay(dateStr) {
+    // Convert YYYY-MM-DD to DD/MM/YYYY
+    const date = new Date(dateStr);
+    const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear();
+    return `${day}/${month}/${year}`;
+}
+
+// Equipment/Products editing functions
+function switchEquipmentToEdit() {
+    document.getElementById('equipment-view').style.display = 'none';
+    document.getElementById('equipment-edit').style.display = 'block';
+    
+    // Populate edit cards from view table
+    const tbodyView = document.getElementById('equipment-tbody-view');
+    const cardsEdit = document.getElementById('equipment-cards-edit');
+    if (!tbodyView || !cardsEdit) return;
+    
+    cardsEdit.innerHTML = '';
+    const rows = tbodyView.querySelectorAll('tr');
+    
+    rows.forEach((row, idx) => {
+        const cells = row.querySelectorAll('td');
+        if (cells.length >= 4) {
+            const system = cells[0]?.textContent.trim() || '';
+            const item = cells[1]?.textContent.trim() || '';
+            const location = cells[2]?.textContent.trim() || '';
+            const statusBadge = cells[3]?.querySelector('.badge');
+            const status = statusBadge ? statusBadge.textContent.trim() : 'ממתין';
+            const equipmentId = row.dataset.equipmentId || `eq-${idx}`;
+            
+            const card = document.createElement('div');
+            card.className = 'card equipment-card';
+            card.dataset.equipmentId = equipmentId;
+            card.dataset.equipmentSystem = system;
+            const statusValue = status.includes('מותקן') || status.includes('הותקן') ? 'מותקן' :
+                              status.includes('בהתקנה') ? 'בהתקנה' :
+                              status.includes('בהזמנה') ? 'בהזמנה' : 'ממתין';
+            card.innerHTML = `
+                <div class="flex justify-content-between align-items-start mb-sm">
+                    <div class="flex-1">
+                        <div class="details-field">
+                            <div class="details-field-label">שם</div>
+                            <input type="text" class="input input-sm equipment-name-input" value="${escapeHtml(item)}" data-equipment-name="${equipmentId}" placeholder="שם מוצר/מערכת">
+                        </div>
+                    </div>
+                    <div class="flex gap-xs">
+                        <button type="button" class="btn-icon-only btn-sm equipment-move-up" data-move-up="${equipmentId}" aria-label="למעלה">↑</button>
+                        <button type="button" class="btn-icon-only btn-sm equipment-move-down" data-move-down="${equipmentId}" aria-label="למטה">↓</button>
+                    </div>
+                </div>
+                <div class="details-field">
+                    <div class="details-field-label">סטטוס</div>
+                    <select class="input input-sm equipment-status-select" data-equipment-status="${equipmentId}">
+                        <option value="מותקן" ${statusValue === 'מותקן' ? 'selected' : ''}>מותקן</option>
+                        <option value="בהתקנה" ${statusValue === 'בהתקנה' ? 'selected' : ''}>בהתקנה</option>
+                        <option value="בהזמנה" ${statusValue === 'בהזמנה' ? 'selected' : ''}>בהזמנה</option>
+                        <option value="ממתין" ${statusValue === 'ממתין' ? 'selected' : ''}>ממתין</option>
+                    </select>
+                </div>
+                <div class="details-field">
+                    <div class="details-field-label">מיקום (אופציונלי)</div>
+                    <input type="text" class="input input-sm equipment-location-input" value="${escapeHtml(location)}" data-equipment-location="${equipmentId}" placeholder="מיקום">
+                </div>
+            `;
+            cardsEdit.appendChild(card);
+        }
+    });
+    
+    attachEquipmentHandlers();
+}
+
+function switchEquipmentToView() {
+    document.getElementById('equipment-view').style.display = 'block';
+    document.getElementById('equipment-edit').style.display = 'none';
+    document.getElementById('equipment-add-form').style.display = 'none';
+}
+
+function commitEquipmentChanges() {
+    const cardsEdit = document.getElementById('equipment-cards-edit');
+    const tbodyView = document.getElementById('equipment-tbody-view');
+    if (!cardsEdit || !tbodyView) return;
+    
+    // Rebuild view table from edit cards
+    tbodyView.innerHTML = '';
+    const cards = cardsEdit.querySelectorAll('.equipment-card');
+    
+    cards.forEach(card => {
+        const nameInput = card.querySelector('.equipment-name-input');
+        const locationInput = card.querySelector('.equipment-location-input');
+        const statusSelect = card.querySelector('.equipment-status-select');
+        
+        if (!nameInput || !statusSelect) return;
+        
+        const item = nameInput.value.trim();
+        if (!item) return; // Skip empty items
+        
+        const system = card.dataset.equipmentSystem || 'מערכת';
+        const location = locationInput ? locationInput.value.trim() : '';
+        const status = statusSelect.value;
+        const equipmentId = card.dataset.equipmentId;
+        
+        const tr = document.createElement('tr');
+        tr.dataset.equipmentId = equipmentId;
+        const statusClass = getEquipmentStatusBadgeClass(status);
+        // Map edit status values to display text
+        let statusDisplay = status;
+        if (status === 'מותקן') {
+            statusDisplay = 'הותקן';
+        } else if (status === 'בהתקנה') {
+            statusDisplay = 'בהתקנה';
+        } else if (status === 'בהזמנה') {
+            statusDisplay = 'בהזמנה';
+        } else if (status === 'ממתין') {
+            statusDisplay = 'בהכנה';
+        }
+        tr.innerHTML = `
+            <td>${escapeHtml(system)}</td>
+            <td>${escapeHtml(item)}</td>
+            <td>${escapeHtml(location || '')}</td>
+            <td><span class="badge ${statusClass}">${escapeHtml(statusDisplay)}</span></td>
+        `;
+        tbodyView.appendChild(tr);
+    });
+}
+
+function restoreEquipmentFromSnapshot() {
+    if (!projectSnapshot || !projectSnapshot.equipment) {
+        // If no snapshot, restore to default
+        const tbodyView = document.getElementById('equipment-tbody-view');
+        if (tbodyView) {
+            tbodyView.innerHTML = `
+                <tr data-equipment-id="eq-1">
+                    <td>חשמל חכם</td>
+                    <td>בקר מרכזי</td>
+                    <td>ארון חשמל</td>
+                    <td><span class="badge badge-primary">בהתקנה</span></td>
+                </tr>
+                <tr data-equipment-id="eq-2">
+                    <td>בקרה</td>
+                    <td>מצלמות IP</td>
+                    <td>חצר + כניסה</td>
+                    <td><span class="badge badge-warning">בהכנה</span></td>
+                </tr>
+                <tr data-equipment-id="eq-3">
+                    <td>תקשורת</td>
+                    <td>ארון תקשורת</td>
+                    <td>מחסן</td>
+                    <td><span class="badge badge-success">הותקן</span></td>
+                </tr>
+            `;
+        }
+        return;
+    }
+    
+    const tbodyView = document.getElementById('equipment-tbody-view');
+    if (!tbodyView) return;
+    
+    tbodyView.innerHTML = '';
+    projectSnapshot.equipment.forEach(eq => {
+        const tr = document.createElement('tr');
+        tr.dataset.equipmentId = eq.id;
+        const statusClass = getEquipmentStatusBadgeClass(eq.status);
+        // Map edit status values back to display text
+        let statusDisplay = eq.status;
+        if (eq.status === 'מותקן') {
+            statusDisplay = 'הותקן';
+        } else if (eq.status === 'בהתקנה') {
+            statusDisplay = 'בהתקנה';
+        } else if (eq.status === 'בהזמנה') {
+            statusDisplay = 'בהזמנה';
+        } else if (eq.status === 'ממתין') {
+            statusDisplay = 'בהכנה';
+        }
+        tr.innerHTML = `
+            <td>${escapeHtml(eq.system)}</td>
+            <td>${escapeHtml(eq.item)}</td>
+            <td>${escapeHtml(eq.location || '')}</td>
+            <td><span class="badge ${statusClass}">${escapeHtml(statusDisplay)}</span></td>
+        `;
+        tbodyView.appendChild(tr);
+    });
+}
+
+function getEquipmentStatusBadgeClass(status) {
+    if (!status) return 'badge-neutral';
+    if (status.includes('מותקן') || status.includes('הותקן')) return 'badge-success';
+    if (status.includes('בהתקנה')) return 'badge-primary';
+    if (status.includes('בהזמנה')) return 'badge-warning';
+    if (status.includes('ממתין') || status.includes('בהכנה')) return 'badge-warning';
+    return 'badge-neutral';
+}
+
+function attachEquipmentHandlers() {
+    // Reorder handlers
+    document.querySelectorAll('.equipment-move-up').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const equipmentId = btn.dataset.moveUp;
+            const card = document.querySelector(`[data-equipment-id="${equipmentId}"]`);
+            const prev = card?.previousElementSibling;
+            if (card && prev && prev.classList.contains('equipment-card')) {
+                card.parentNode.insertBefore(card, prev);
+            }
+        });
+    });
+    
+    document.querySelectorAll('.equipment-move-down').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const equipmentId = btn.dataset.moveDown;
+            const card = document.querySelector(`[data-equipment-id="${equipmentId}"]`);
+            const next = card?.nextElementSibling;
+            if (card && next && next.classList.contains('equipment-card')) {
+                card.parentNode.insertBefore(next, card);
+            }
+        });
+    });
+}
+
+// Equipment add form handlers
+const equipmentAddBtn = document.getElementById('equipment-add-btn');
+const equipmentAddForm = document.getElementById('equipment-add-form');
+const equipmentAddConfirm = document.getElementById('equipment-add-confirm');
+const equipmentAddCancel = document.getElementById('equipment-add-cancel');
+
+if (equipmentAddBtn) {
+    equipmentAddBtn.addEventListener('click', () => {
+        equipmentAddForm.style.display = 'block';
+    });
+}
+
+if (equipmentAddCancel) {
+    equipmentAddCancel.addEventListener('click', () => {
+        equipmentAddForm.style.display = 'none';
+        document.getElementById('equipment-name-input').value = '';
+        document.getElementById('equipment-status-input').value = 'ממתין';
+        document.getElementById('equipment-location-input').value = '';
+    });
+}
+
+if (equipmentAddConfirm) {
+    equipmentAddConfirm.addEventListener('click', () => {
+        const name = document.getElementById('equipment-name-input').value.trim();
+        const status = document.getElementById('equipment-status-input').value;
+        const location = document.getElementById('equipment-location-input').value.trim();
+        
+        if (!name) {
+            alert('יש להזין שם מוצר/מערכת');
+            return;
+        }
+        
+        const newId = `eq-${Date.now()}`;
+        const cardsEdit = document.getElementById('equipment-cards-edit');
+        const card = document.createElement('div');
+        card.className = 'card equipment-card';
+        card.dataset.equipmentId = newId;
+        card.dataset.equipmentSystem = 'מערכת חדשה';
+        card.innerHTML = `
+            <div class="flex justify-content-between align-items-start mb-sm">
+                <div class="flex-1">
+                    <div class="details-field">
+                        <div class="details-field-label">שם</div>
+                        <input type="text" class="input input-sm equipment-name-input" value="${escapeHtml(name)}" data-equipment-name="${newId}" placeholder="שם מוצר/מערכת">
+                    </div>
+                </div>
+                <div class="flex gap-xs">
+                    <button type="button" class="btn-icon-only btn-sm equipment-move-up" data-move-up="${newId}" aria-label="למעלה">↑</button>
+                    <button type="button" class="btn-icon-only btn-sm equipment-move-down" data-move-down="${newId}" aria-label="למטה">↓</button>
+                </div>
+            </div>
+            <div class="details-field">
+                <div class="details-field-label">סטטוס</div>
+                <select class="input input-sm equipment-status-select" data-equipment-status="${newId}">
+                    <option value="מותקן">מותקן</option>
+                    <option value="בהתקנה">בהתקנה</option>
+                    <option value="בהזמנה">בהזמנה</option>
+                    <option value="ממתין" ${status === 'ממתין' ? 'selected' : ''}>ממתין</option>
+                </select>
+            </div>
+            <div class="details-field">
+                <div class="details-field-label">מיקום (אופציונלי)</div>
+                <input type="text" class="input input-sm equipment-location-input" value="${escapeHtml(location)}" data-equipment-location="${newId}" placeholder="מיקום">
+            </div>
+        `;
+        cardsEdit.appendChild(card);
+        attachEquipmentHandlers();
+        
+        equipmentAddForm.style.display = 'none';
+        document.getElementById('equipment-name-input').value = '';
+        document.getElementById('equipment-status-input').value = 'ממתין';
+        document.getElementById('equipment-location-input').value = '';
+    });
+}
+
+// Edit mode toggle
+const projEditToggle = document.getElementById('proj-edit-toggle');
+if (projEditToggle) {
+    projEditToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (isEditMode) {
+            // In edit mode, this button acts as "סיום עריכה" - cancel and exit
+            cancelEdit();
+        } else {
+            // In view mode, this button enters edit mode
+            enterEditMode();
+        }
+    });
+}
+
+// Save/Cancel buttons
+const projSaveBtn = document.getElementById('proj-save');
+const projCancelBtn = document.getElementById('proj-cancel');
+if (projSaveBtn) {
+    projSaveBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        saveEdit();
+    });
+}
+if (projCancelBtn) {
+    projCancelBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        cancelEdit();
+    });
+}
+
+// Maximize/Restore
+const projDrawer = document.getElementById('project-details');
+const projMaximizeBtn = document.getElementById('proj-maximize');
+
+// Function to update maximize button label and tooltip based on current state
+function updateMaximizeButtonState() {
+    if (!projMaximizeBtn || !projDrawer) return;
+    
+    const isMaximized = projDrawer.classList.contains('is-maximized');
+    const labelEl = projMaximizeBtn.querySelector('.modal-max-label');
+    
+    if (isMaximized) {
+        // Maximized state - restore/minimize
+        projMaximizeBtn.setAttribute('aria-label', 'הקטן מסך');
+        projMaximizeBtn.setAttribute('title', 'הקטן מסך');
+        if (labelEl) {
+            labelEl.textContent = 'הקטן מסך';
+        }
+    } else {
+        // Normal state - maximize
+        projMaximizeBtn.setAttribute('aria-label', 'הגדל מסך');
+        projMaximizeBtn.setAttribute('title', 'הגדל מסך');
+        if (labelEl) {
+            labelEl.textContent = 'הגדל מסך';
+        }
+    }
+}
+
+if (projMaximizeBtn && projDrawer) {
+    projMaximizeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        projDrawer.classList.toggle('is-maximized');
+        updateMaximizeButtonState();
+    });
+}
+
+// --- תיקון החצים והגלילה ---
+
+function updateTabbarArrows() {
+    if (!tabbarScroller || !tabbarArrowStart || !tabbarArrowEnd) return;
+
+    const { scrollWidth, clientWidth, scrollLeft } = tabbarScroller;
+    const max = scrollWidth - clientWidth;
+    
+    if (max <= 1) {
+        tabbarArrowStart.style.display = 'none';
+        tabbarArrowEnd.style.display = 'none';
+        return;
+    }
+
+    tabbarArrowStart.style.display = 'flex';
+    tabbarArrowEnd.style.display = 'flex';
+
+    // ב-RTL רוב הדפדפנים נותנים ערך 0 כשהסקרובר הכי ימני
+    const pos = Math.abs(scrollLeft);
+    
+    // שליטה על השקיפות כדי לתת אינדיקציה שהגענו לסוף
+    tabbarArrowStart.style.opacity = (pos <= 5) ? "0.3" : "1";
+    tabbarArrowEnd.style.opacity = (pos >= max - 5) ? "0.3" : "1";
+    
+    // מבטל את ה-disabled כדי שהלחיצה תעבוד תמיד ולא יהיה אייקון "אין כניסה"
+    tabbarArrowStart.disabled = false;
+    tabbarArrowEnd.disabled = false;
+}
+
+function scrollTabbar(direction) {
+    if (!tabbarScroller) return;
+    const scrollAmount = 200;
+    
+    /* תיקון הכיוונים:
+       direction === 'start' זה החץ הימני (שמצביע ימינה >). הוא צריך לקחת אותנו שמאלה להמשך הטאבים.
+       direction === 'end' זה החץ השמאלי (שמצביע שמאלה <). הוא צריך לקחת אותנו ימינה לתחילת הטאבים.
+    */
+    const move = (direction === 'start') ? scrollAmount : -scrollAmount;
+
+    tabbarScroller.scrollBy({
+        left: move,
+        behavior: 'smooth'
+    });
+}
+
+// האזנה לגלילה ושינוי גודל חלון
+if (tabbarScroller) {
+    tabbarScroller.addEventListener('scroll', updateTabbarArrows);
+    new ResizeObserver(updateTabbarArrows).observe(tabbarScroller);
+}
+
+// לחיצה על החצים
+tabbarArrowStart.addEventListener('click', (e) => {
+    e.preventDefault();
+    scrollTabbar('start');
+});
+
+tabbarArrowEnd.addEventListener('click', (e) => {
+    e.preventDefault();
+    scrollTabbar('end');
+});
+
+// החלפת טאבים
+document.querySelectorAll('.project-drawer-tabs .tab').forEach(tab => {
+    tab.addEventListener('click', () => {
+        const key = tab.dataset.tab;
+        document.querySelectorAll('.project-drawer-tabs .tab').forEach(t => t.classList.remove('active'));
+        document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        tab.classList.add('active');
+        document.getElementById(key + '-content').classList.add('active');
+    });
+});
+
+// Stage filter dropdown
+const stageFilter = document.getElementById('stage-filter');
+const stageLabel = document.getElementById('stage-label');
+const stageMenu = stageFilter?.querySelector('.filter-dropdown-menu');
+let currentStage = 'all';
+
+// Map table statuses to dropdown stages
+function mapStatusToStage(status) {
+    if (status === 'בתכנון') return 'תכנון';
+    if (status === 'תכניות') return 'תוכניות';
+    if (status === 'ביצוע') return 'ביצוע';
+    if (status === 'סגור') return 'סיום';
+    return null; // Other statuses don't map
+}
+
+function filterByStage(stage) {
+    currentStage = stage;
+    const table = document.getElementById('projects-table');
+    const rows = table.querySelectorAll('tbody tr');
+    
+    rows.forEach(row => {
+        const statusBadge = row.querySelector('.badge');
+        if (!statusBadge) {
+            row.style.display = 'none';
+            return;
+        }
+        
+        const statusText = statusBadge.textContent.trim();
+        const mappedStage = mapStatusToStage(statusText);
+        
+        if (stage === 'all') {
+            row.style.display = '';
+        } else if (mappedStage === stage) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    });
+    
+    // Update label
+    if (stageLabel) {
+        const stageName = stage === 'all' ? 'הכל' : stage;
+        stageLabel.textContent = `שלב פרויקט: ${stageName}`;
+    }
+}
+
+if (stageMenu) {
+    stageMenu.querySelectorAll('.filter-dropdown-item').forEach(item => {
+        item.addEventListener('click', () => {
+            const stage = item.getAttribute('data-stage');
+            filterByStage(stage);
+        });
+    });
+}
+  </script>
+  <script>
+    lucide.createIcons();
+  </script>
+  <script>
+    // Deep-link hook for projectId query parameter
+    (function() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const projectId = urlParams.get('projectId');
+      
+      if (!projectId) return;
+      
+      function tryOpenProject() {
+        // Check if projectRows exists and has the project
+        if (typeof projectRows !== 'undefined' && projectRows[projectId]) {
+          if (typeof openProject === 'function') {
+            openProject(projectId);
+          }
+          return true;
+        }
+        
+        // Try to find the row in the DOM and trigger click
+        const row = document.querySelector(`#projects-table tbody tr[data-project-id="${projectId}"]`);
+        if (row) {
+          row.click();
+          return true;
+        }
+        
+        return false;
+      }
+      
+      // Try immediately
+      if (tryOpenProject()) return;
+      
+      // Retry briefly for async loading (max 1 second, 5 attempts)
+      let attempts = 0;
+      const maxAttempts = 5;
+      const retryInterval = 200;
+      
+      const retryTimer = setInterval(() => {
+        attempts++;
+        if (tryOpenProject() || attempts >= maxAttempts) {
+          clearInterval(retryTimer);
+        }
+      }, retryInterval);
+    })();
+  </script>
+  <script>
+    // Enhanced deep-link: highlight and scroll into view (runs after drawer opens)
+    (function() {
+      const urlParams = new URLSearchParams(window.location.search);
+      const projectId = urlParams.get('projectId');
+      
+      if (!projectId) return;
+      
+      function tryHighlightProject() {
+        const row = document.querySelector(`#projects-table tbody tr[data-project-id="${projectId}"]`);
+        if (row) {
+          // Highlight the row (both classes for compatibility)
+          row.classList.add('is-selected', 'selected');
+          
+          // Scroll into view
+          row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          
+          return true;
+        }
+        return false;
+      }
+      
+      // Wait for drawer to open first, then highlight
+      setTimeout(() => {
+        if (tryHighlightProject()) return;
+        
+        // Retry briefly
+        let attempts = 0;
+        const maxAttempts = 3;
+        const retryInterval = 200;
+        
+        const retryTimer = setInterval(() => {
+          attempts++;
+          if (tryHighlightProject() || attempts >= maxAttempts) {
+            clearInterval(retryTimer);
+          }
+        }, retryInterval);
+      }, 500); // Delay to allow drawer/modal to open first
+    })();
+  </script>
+</body>
+</html>

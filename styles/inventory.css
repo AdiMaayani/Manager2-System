@@ -1,0 +1,230 @@
+/* Inventory specific styles */
+
+/* Inventory toolbar card */
+.inventory-toolbar {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-lg);
+  background: white;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--color-neutral-200);
+  justify-content: space-between;
+}
+
+/* Right column: Pills and search (2-row grid) - order 1 to appear first visually */
+.inventory-toolbar-right {
+  display: grid;
+  grid-template-rows: auto auto;
+  grid-template-columns: 1fr;
+  justify-items: start;
+  align-items: start;
+  row-gap: var(--spacing-md);
+  column-gap: 0;
+  order: 1;
+  flex: 1;
+  min-width: 0;
+}
+
+/* Left column: CTA button - order 2 to appear second visually */
+.inventory-toolbar-left {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  order: 2;
+}
+
+/* Pills row (row 1) */
+.inventory-toolbar-right > .filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  align-items: center;
+  justify-content: flex-start;
+  grid-row: 1;
+  grid-column: 1;
+  width: auto;
+}
+
+/* Search row (row 2) */
+.inventory-toolbar-right > .search-input {
+  position: relative;
+  display: block;
+  flex: none;
+  width: 320px;
+  grid-row: 2;
+  grid-column: 1;
+  justify-self: start;
+  align-self: start;
+  margin-inline-start: 0;
+  margin-inline-end: 0;
+}
+
+/* Aggressive flush-right enforcement for search wrapper */
+.inventory-toolbar input[placeholder*="חיפוש"],
+.inventory-toolbar input#inventory-search {
+  display: block;
+  width: 320px;
+  max-width: 100%;
+}
+
+.inventory-toolbar-right > .search-input .input {
+  padding-inline-end: 40px;
+  padding-inline-start: var(--spacing-md);
+  display: block;
+  width: 320px;
+  max-width: 100%;
+}
+
+.inventory-toolbar-right > .search-input .icon {
+  position: absolute;
+  inset-inline-end: 12px;
+  top: 50%;
+  transform: translateY(-50%);
+  opacity: 0.6;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.table tbody tr {
+  cursor: pointer;
+  transition: background-color var(--transition-fast);
+}
+
+.table tbody tr:hover {
+  background-color: var(--color-neutral-50);
+}
+
+/* Inventory drawer overlay */
+.inventory-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  display: none;
+  pointer-events: none;
+}
+
+.inventory-drawer-overlay.is-open {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.inventory-drawer-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.45);
+  backdrop-filter: blur(2px);
+  animation: backdropFadeIn 0.2s ease-out;
+}
+
+.inventory-drawer {
+  position: relative;
+  width: min(500px, 90vw);
+  max-height: 85vh;
+  background: white;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-xl);
+  border: 1px solid var(--color-neutral-200);
+  display: flex;
+  flex-direction: column;
+  z-index: 1;
+  animation: modalFadeIn 0.2s ease-out;
+  overflow: hidden;
+}
+
+@keyframes backdropFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modalFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.inventory-drawer .details-panel-header {
+  flex-shrink: 0;
+  padding: var(--spacing-lg);
+  border-bottom: 1px solid var(--color-neutral-200);
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+}
+
+.details-panel-header-left {
+  flex: 1;
+  min-width: 0;
+}
+
+.details-panel-subtitle {
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-600);
+  margin-top: var(--spacing-xs);
+}
+
+.details-panel-header-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-shrink: 0;
+}
+
+.inventory-drawer .details-panel-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-lg);
+}
+
+.inventory-actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-lg);
+  padding-top: var(--spacing-lg);
+  border-top: 1px solid var(--color-neutral-200);
+}
+
+.btn-danger {
+  background-color: var(--color-danger-600);
+  color: white;
+  border-color: var(--color-danger-600);
+}
+
+.btn-danger:hover:not(:disabled) {
+  background-color: var(--color-danger-700);
+}
+
+/* Body scroll lock when drawer is open */
+body.drawer-open {
+  overflow: hidden;
+}
+
+/* Edit mode styles */
+.details-field-value input {
+  width: 100%;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-neutral-300);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-base);
+  color: var(--color-neutral-900);
+  background-color: white;
+}
+
+.details-field-value input:focus {
+  border-color: var(--color-primary-500);
+  outline: none;
+}
