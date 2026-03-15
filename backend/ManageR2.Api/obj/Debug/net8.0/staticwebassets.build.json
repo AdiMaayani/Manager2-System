@@ -1,0 +1,11 @@
+{
+  "Version": 1,
+  "Hash": "xzSZXEpsvdUrbatYkKwBSkIH9WFB2wo4Yd0wovZlouI=",
+  "Source": "ManageR2.Api",
+  "BasePath": "_content/ManageR2.Api",
+  "Mode": "Default",
+  "ManifestType": "Build",
+  "ReferencedProjectsConfiguration": [],
+  "DiscoveryPatterns": [],
+  "Assets": []
+}
