@@ -1,26 +1,25 @@
 using System.Data;
 using ManageR2.Domain.Entities;
 using ManageR2.Domain.Repositories;
+using ManageR2.Infrastructure.DAL;
 using Microsoft.Data.SqlClient;
-using Microsoft.Extensions.Configuration;
 
 namespace ManageR2.Infrastructure.Repositories;
 
 public class UserRepository : IUserRepository
 {
-    private readonly string _connectionString;
+    private readonly DBServices _dbServices;
 
-    public UserRepository(IConfiguration configuration)
+    public UserRepository(DBServices dbServices)
     {
-        _connectionString = configuration.GetConnectionString("DefaultConnection")
-            ?? throw new InvalidOperationException("DefaultConnection connection string was not found.");
+        _dbServices = dbServices;
     }
 
     public async Task<IEnumerable<User>> GetUsersAsync()
     {
         var users = new List<User>();
 
-        await using var connection = new SqlConnection(_connectionString);
+        await using var connection = _dbServices.CreateConnection();
         await using var command = new SqlCommand("dbo.sp_GetUsers", connection)
         {
             CommandType = CommandType.StoredProcedure
@@ -39,7 +38,7 @@ public class UserRepository : IUserRepository
 
     public async Task<User?> GetUserByIdAsync(int userId)
     {
-        await using var connection = new SqlConnection(_connectionString);
+        await using var connection = _dbServices.CreateConnection();
         await using var command = new SqlCommand("dbo.sp_GetUserById", connection)
         {
             CommandType = CommandType.StoredProcedure

@@ -1,4 +1,5 @@
 using ManageR2.Domain.Repositories;
+using ManageR2.Infrastructure.DAL;
 using ManageR2.Infrastructure.Repositories;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -8,6 +9,7 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+builder.Services.AddScoped<DBServices>();
 builder.Services.AddScoped<IWorkItemRepository, WorkItemRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 

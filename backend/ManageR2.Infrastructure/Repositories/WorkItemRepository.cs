@@ -1,26 +1,25 @@
 using System.Data;
 using ManageR2.Domain.Entities;
 using ManageR2.Domain.Repositories;
+using ManageR2.Infrastructure.DAL;
 using Microsoft.Data.SqlClient;
-using Microsoft.Extensions.Configuration;
 
 namespace ManageR2.Infrastructure.Repositories;
 
 public class WorkItemRepository : IWorkItemRepository
 {
-    private readonly string _connectionString;
+    private readonly DBServices _dbServices;
 
-    public WorkItemRepository(IConfiguration configuration)
+    public WorkItemRepository(DBServices dbServices)
     {
-        _connectionString = configuration.GetConnectionString("DefaultConnection")
-            ?? throw new InvalidOperationException("DefaultConnection connection string was not found.");
+        _dbServices = dbServices;
     }
 
     public async Task<List<WorkItem>> GetWorkItemsAsync()
     {
         var workItems = new List<WorkItem>();
 
-        await using var connection = new SqlConnection(_connectionString);
+        await using var connection = _dbServices.CreateConnection();
         await using var command = new SqlCommand("sp_GetWorkItems", connection)
         {
             CommandType = CommandType.StoredProcedure
