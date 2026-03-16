@@ -1,3 +1,0 @@
-﻿<Project>
-  <Import Project="..\build\ManageR2.Api.props" />
-</Project>

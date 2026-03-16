@@ -1,0 +1,27 @@
+# Build folders
+bin/
+obj/
+
+# Visual Studio / Rider
+.vs/
+*.user
+*.suo
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Dotnet
+*.dll
+*.exe
+*.pdb
+
+# NuGet
+*.nupkg
+packages/
+
+# Local settings
+appsettings.Development.json
