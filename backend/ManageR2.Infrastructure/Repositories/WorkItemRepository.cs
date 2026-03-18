@@ -1,6 +1,5 @@
 using System.Data;
 using ManageR2.Domain.Entities;
-using ManageR2.Domain.Repositories;
 using ManageR2.Infrastructure.DAL;
 using Microsoft.Data.SqlClient;
 
@@ -26,62 +25,96 @@ public class WorkItemRepository : IWorkItemRepository
         };
 
         await connection.OpenAsync();
-
         await using var reader = await command.ExecuteReaderAsync();
 
         while (await reader.ReadAsync())
         {
-            var workItem = new WorkItem
-            {
-                WorkItemId = HasColumn(reader, "WorkItemId") && reader["WorkItemId"] != DBNull.Value
-                    ? Convert.ToInt32(reader["WorkItemId"])
-                    : 0,
-
-                Title = HasColumn(reader, "Title") && reader["Title"] != DBNull.Value
-                    ? reader["Title"]?.ToString() ?? string.Empty
-                    : string.Empty,
-
-                Description = HasColumn(reader, "Description") && reader["Description"] != DBNull.Value
-                    ? reader["Description"]?.ToString()
-                    : null,
-
-                Status = HasColumn(reader, "Status") && reader["Status"] != DBNull.Value
-                    ? reader["Status"]?.ToString()
-                    : null,
-
-                Priority = HasColumn(reader, "Priority") && reader["Priority"] != DBNull.Value
-                    ? reader["Priority"]?.ToString()
-                    : null,
-
-                CustomerId = HasColumn(reader, "CustomerId") && reader["CustomerId"] != DBNull.Value
-                    ? Convert.ToInt32(reader["CustomerId"])
-                    : 0,
-
-                SiteId = HasColumn(reader, "SiteId") && reader["SiteId"] != DBNull.Value
-                    ? Convert.ToInt32(reader["SiteId"])
-                    : 0,
-
-                CreatedAt = HasColumn(reader, "CreatedAt") && reader["CreatedAt"] != DBNull.Value
-                    ? Convert.ToDateTime(reader["CreatedAt"])
-                    : DateTime.MinValue
-            };
-
-            workItems.Add(workItem);
+            workItems.Add(MapWorkItem(reader));
         }
 
         return workItems;
     }
 
-    private static bool HasColumn(SqlDataReader reader, string columnName)
+    public async Task<List<WorkItem>> GetByTypeAsync(string workType)
     {
-        for (int i = 0; i < reader.FieldCount; i++)
+        var workItems = new List<WorkItem>();
+
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand("sp_GetWorkItemsByType", connection)
         {
-            if (reader.GetName(i).Equals(columnName, StringComparison.OrdinalIgnoreCase))
-            {
-                return true;
-            }
+            CommandType = CommandType.StoredProcedure
+        };
+
+        command.Parameters.AddWithValue("@WorkType", workType);
+
+        await connection.OpenAsync();
+        await using var reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            workItems.Add(MapWorkItem(reader));
         }
 
-        return false;
+        return workItems;
+    }
+
+    public async Task<bool> UpdateAsync(WorkItem workItem)
+    {
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand("sp_UpdateWorkItem", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+
+        command.Parameters.AddWithValue("@WorkItemId", workItem.WorkItemId);
+        command.Parameters.AddWithValue("@Title", workItem.Title ?? (object)DBNull.Value);
+        command.Parameters.AddWithValue("@Description", workItem.Description ?? (object)DBNull.Value);
+        command.Parameters.AddWithValue("@WorkType", workItem.WorkType ?? (object)DBNull.Value);
+        command.Parameters.AddWithValue("@BillingType", workItem.BillingType ?? (object)DBNull.Value);
+        command.Parameters.AddWithValue("@Status", workItem.Status ?? (object)DBNull.Value);
+        command.Parameters.AddWithValue("@CustomerId", workItem.CustomerId);
+        command.Parameters.AddWithValue("@SiteId", workItem.SiteId);
+
+        await connection.OpenAsync();
+
+        var result = await command.ExecuteScalarAsync();
+        var rowsAffected = result != null ? Convert.ToInt32(result) : 0;
+
+        return rowsAffected > 0;
+    }
+
+    public async Task<bool> CloseAsync(int workItemId)
+    {
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand("sp_CloseWorkItem", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+
+        command.Parameters.AddWithValue("@WorkItemId", workItemId);
+
+        await connection.OpenAsync();
+
+        var result = await command.ExecuteScalarAsync();
+        var rowsAffected = result != null ? Convert.ToInt32(result) : 0;
+
+        return rowsAffected > 0;
+    }
+
+    private static WorkItem MapWorkItem(SqlDataReader reader)
+    {
+        return new WorkItem
+        {
+            WorkItemId = reader["WorkItemId"] != DBNull.Value ? Convert.ToInt32(reader["WorkItemId"]) : 0,
+            Title = reader["Title"] != DBNull.Value ? reader["Title"].ToString()! : string.Empty,
+            Description = reader["Description"] != DBNull.Value ? reader["Description"].ToString()! : string.Empty,
+            WorkType = reader["WorkType"] != DBNull.Value ? reader["WorkType"].ToString()! : string.Empty,
+            BillingType = reader["BillingType"] != DBNull.Value ? reader["BillingType"].ToString()! : string.Empty,
+            Status = reader["Status"] != DBNull.Value ? reader["Status"].ToString()! : string.Empty,
+            CustomerId = reader["CustomerId"] != DBNull.Value ? Convert.ToInt32(reader["CustomerId"]) : 0,
+            SiteId = reader["SiteId"] != DBNull.Value ? Convert.ToInt32(reader["SiteId"]) : 0,
+            CreatedAt = reader["CreatedAt"] != DBNull.Value ? Convert.ToDateTime(reader["CreatedAt"]) : DateTime.MinValue,
+            ClosedAt = reader["ClosedAt"] != DBNull.Value ? Convert.ToDateTime(reader["ClosedAt"]) : null
+        };
     }
 }

@@ -8,6 +8,10 @@ public class WorkItem
 
     public string? Description { get; set; }
 
+    public string? WorkType { get; set; }
+
+    public string? BillingType { get; set; }
+
     public string? Status { get; set; }
 
     public string? Priority { get; set; }
@@ -17,4 +21,6 @@ public class WorkItem
     public int SiteId { get; set; }
 
     public DateTime CreatedAt { get; set; }
+
+    public DateTime? ClosedAt { get; set; }
 }
