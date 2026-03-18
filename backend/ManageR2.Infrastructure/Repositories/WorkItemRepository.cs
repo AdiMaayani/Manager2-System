@@ -35,6 +35,27 @@ public class WorkItemRepository : IWorkItemRepository
         return workItems;
     }
 
+    public async Task<WorkItem?> GetByIdAsync(int workItemId)
+    {
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand("sp_GetWorkItemDetails", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+
+        command.Parameters.AddWithValue("@WorkItemId", workItemId);
+
+        await connection.OpenAsync();
+        await using var reader = await command.ExecuteReaderAsync();
+
+        if (await reader.ReadAsync())
+        {
+            return MapWorkItem(reader);
+        }
+
+        return null;
+    }
+
     public async Task<List<WorkItem>> GetByTypeAsync(string workType)
     {
         var workItems = new List<WorkItem>();
@@ -106,11 +127,11 @@ public class WorkItemRepository : IWorkItemRepository
         return new WorkItem
         {
             WorkItemId = reader["WorkItemId"] != DBNull.Value ? Convert.ToInt32(reader["WorkItemId"]) : 0,
-            Title = reader["Title"] != DBNull.Value ? reader["Title"].ToString()! : string.Empty,
-            Description = reader["Description"] != DBNull.Value ? reader["Description"].ToString()! : string.Empty,
-            WorkType = reader["WorkType"] != DBNull.Value ? reader["WorkType"].ToString()! : string.Empty,
-            BillingType = reader["BillingType"] != DBNull.Value ? reader["BillingType"].ToString()! : string.Empty,
-            Status = reader["Status"] != DBNull.Value ? reader["Status"].ToString()! : string.Empty,
+            Title = reader["Title"] != DBNull.Value ? reader["Title"]?.ToString() ?? string.Empty : string.Empty,
+            Description = reader["Description"] != DBNull.Value ? reader["Description"]?.ToString() : null,
+            WorkType = reader["WorkType"] != DBNull.Value ? reader["WorkType"]?.ToString() : null,
+            BillingType = reader["BillingType"] != DBNull.Value ? reader["BillingType"]?.ToString() : null,
+            Status = reader["Status"] != DBNull.Value ? reader["Status"]?.ToString() : null,
             CustomerId = reader["CustomerId"] != DBNull.Value ? Convert.ToInt32(reader["CustomerId"]) : 0,
             SiteId = reader["SiteId"] != DBNull.Value ? Convert.ToInt32(reader["SiteId"]) : 0,
             CreatedAt = reader["CreatedAt"] != DBNull.Value ? Convert.ToDateTime(reader["CreatedAt"]) : DateTime.MinValue,

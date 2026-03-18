@@ -22,6 +22,19 @@ public class WorkItemsController : ControllerBase
         return Ok(workItems);
     }
 
+    [HttpGet("{id}")]
+    public async Task<IActionResult> GetWorkItemById(int id)
+    {
+        var workItem = await _workItemRepository.GetByIdAsync(id);
+
+        if (workItem == null)
+        {
+            return NotFound();
+        }
+
+        return Ok(workItem);
+    }
+
     [HttpGet("type/{workType}")]
     public async Task<IActionResult> GetWorkItemsByType(string workType)
     {

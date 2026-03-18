@@ -6,6 +6,8 @@ public interface IWorkItemRepository
 {
     Task<List<WorkItem>> GetWorkItemsAsync();
 
+    Task<WorkItem?> GetByIdAsync(int workItemId);
+
     Task<List<WorkItem>> GetByTypeAsync(string workType);
 
     Task<bool> UpdateAsync(WorkItem workItem);
