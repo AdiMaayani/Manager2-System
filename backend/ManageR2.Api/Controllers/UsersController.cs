@@ -1,4 +1,4 @@
-using ManageR2.Domain.Repositories;
+using ManageR2.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ManageR2.Api.Controllers;

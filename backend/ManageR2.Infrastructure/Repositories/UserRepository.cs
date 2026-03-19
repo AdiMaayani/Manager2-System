@@ -1,6 +1,5 @@
 using System.Data;
 using ManageR2.Domain.Entities;
-using ManageR2.Domain.Repositories;
 using ManageR2.Infrastructure.DAL;
 using Microsoft.Data.SqlClient;
 
