@@ -14,7 +14,7 @@ public class WorkItemRepository : IWorkItemRepository
         _dbServices = dbServices;
     }
 
-    public async Task<List<WorkItem>> GetWorkItemsAsync()
+    public async Task<List<WorkItem>> GetAllAsync()
     {
         var workItems = new List<WorkItem>();
 
@@ -79,7 +79,7 @@ public class WorkItemRepository : IWorkItemRepository
         return workItems;
     }
 
-    public async Task<bool> UpdateAsync(WorkItem workItem)
+    public async Task<bool> UpdateAsync(int id, WorkItem workItem)
     {
         await using var connection = _dbServices.CreateConnection();
         await using var command = new SqlCommand("sp_UpdateWorkItem", connection)
@@ -87,7 +87,7 @@ public class WorkItemRepository : IWorkItemRepository
             CommandType = CommandType.StoredProcedure
         };
 
-        command.Parameters.AddWithValue("@WorkItemId", workItem.WorkItemId);
+        command.Parameters.AddWithValue("@WorkItemId", id);
         command.Parameters.AddWithValue("@Title", workItem.Title ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("@Description", workItem.Description ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("@WorkType", workItem.WorkType ?? (object)DBNull.Value);
@@ -120,6 +120,82 @@ public class WorkItemRepository : IWorkItemRepository
         var rowsAffected = result != null ? Convert.ToInt32(result) : 0;
 
         return rowsAffected > 0;
+    }
+
+    public async Task<bool> AssignEmployeeToWorkAsync(int workItemId, int employeeId, string assignmentRole)
+    {
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand("sp_AssignEmployeeToWork", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+
+        command.Parameters.AddWithValue("@WorkItemId", workItemId);
+        command.Parameters.AddWithValue("@EmployeeId", employeeId);
+        command.Parameters.AddWithValue("@AssignmentRole", assignmentRole);
+
+        await connection.OpenAsync();
+        await command.ExecuteNonQueryAsync();
+
+        return true;
+    }
+
+    public async Task<bool> AssignContractorToWorkAsync(int workItemId, int contractorId, string assignmentRole)
+    {
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand("sp_AssignContractorToWork", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+
+        command.Parameters.AddWithValue("@WorkItemId", workItemId);
+        command.Parameters.AddWithValue("@ContractorId", contractorId);
+        command.Parameters.AddWithValue("@AssignmentRole", assignmentRole);
+
+        await connection.OpenAsync();
+        await command.ExecuteNonQueryAsync();
+
+        return true;
+    }
+
+    public async Task<bool> EmployeeExistsAsync(int employeeId)
+    {
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand(
+            "SELECT COUNT(1) FROM dbo.Employees WHERE EmployeeId = @EmployeeId",
+            connection)
+        {
+            CommandType = CommandType.Text
+        };
+
+        command.Parameters.AddWithValue("@EmployeeId", employeeId);
+
+        await connection.OpenAsync();
+
+        var result = await command.ExecuteScalarAsync();
+        var count = result != null ? Convert.ToInt32(result) : 0;
+
+        return count > 0;
+    }
+
+    public async Task<bool> ContractorExistsAsync(int contractorId)
+    {
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand(
+            "SELECT COUNT(1) FROM dbo.Contractors WHERE ContractorId = @ContractorId",
+            connection)
+        {
+            CommandType = CommandType.Text
+        };
+
+        command.Parameters.AddWithValue("@ContractorId", contractorId);
+
+        await connection.OpenAsync();
+
+        var result = await command.ExecuteScalarAsync();
+        var count = result != null ? Convert.ToInt32(result) : 0;
+
+        return count > 0;
     }
 
     private static WorkItem MapWorkItem(SqlDataReader reader)
