@@ -7,6 +7,8 @@ namespace ManageR2.Infrastructure.Repositories
         Task<List<WorkItem>> GetAllAsync();
         Task<WorkItem?> GetByIdAsync(int id);
         Task<List<WorkItem>> GetByTypeAsync(string workType);
+        Task<List<WorkItem>> GetTasksByParentIdAsync(int parentWorkItemId);
+        Task<int> CreateAsync(WorkItem workItem);
         Task<bool> UpdateAsync(int id, WorkItem workItem);
         Task<bool> CloseAsync(int id);
 
