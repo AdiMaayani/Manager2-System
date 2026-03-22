@@ -1,6 +1,7 @@
 using System.Data;
 using ManageR2.Domain.Entities;
 using ManageR2.Infrastructure.DAL;
+using ManageR2.Infrastructure.Models;
 using Microsoft.Data.SqlClient;
 
 namespace ManageR2.Infrastructure.Repositories;
@@ -77,6 +78,70 @@ public class WorkItemRepository : IWorkItemRepository
         }
 
         return workItems;
+    }
+
+    public async Task<List<WorkItem>> GetTasksByParentIdAsync(int parentWorkItemId)
+    {
+        var workItems = new List<WorkItem>();
+
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand(
+            @"SELECT 
+                  WorkItemId,
+                  Title,
+                  Description,
+                  WorkType,
+                  BillingType,
+                  Status,
+                  CustomerId,
+                  SiteId,
+                  CreatedAt,
+                  ClosedAt,
+                  ParentWorkItemId
+              FROM dbo.WorkItems
+              WHERE ParentWorkItemId = @ParentWorkItemId
+              ORDER BY CreatedAt DESC",
+            connection)
+        {
+            CommandType = CommandType.Text
+        };
+
+        command.Parameters.AddWithValue("@ParentWorkItemId", parentWorkItemId);
+
+        await connection.OpenAsync();
+        await using var reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            workItems.Add(MapWorkItem(reader));
+        }
+
+        return workItems;
+    }
+
+    public async Task<int> CreateAsync(WorkItem workItem)
+    {
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand("sp_CreateWorkItem", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+
+        command.Parameters.AddWithValue("@Title", workItem.Title ?? string.Empty);
+        command.Parameters.AddWithValue("@WorkType", workItem.WorkType ?? (object)DBNull.Value);
+        command.Parameters.AddWithValue("@Status", workItem.Status ?? (object)DBNull.Value);
+        command.Parameters.AddWithValue("@BillingType", workItem.BillingType ?? (object)DBNull.Value);
+        command.Parameters.AddWithValue("@Description", workItem.Description ?? (object)DBNull.Value);
+        command.Parameters.AddWithValue("@CustomerId", workItem.CustomerId);
+        command.Parameters.AddWithValue("@SiteId", workItem.SiteId);
+        command.Parameters.AddWithValue("@ParentWorkItemId", workItem.ParentWorkItemId ?? (object)DBNull.Value);
+
+        await connection.OpenAsync();
+
+        var result = await command.ExecuteScalarAsync();
+        var newWorkItemId = result != null ? Convert.ToInt32(result) : 0;
+
+        return newWorkItemId;
     }
 
     public async Task<bool> UpdateAsync(int id, WorkItem workItem)
@@ -198,20 +263,211 @@ public class WorkItemRepository : IWorkItemRepository
         return count > 0;
     }
 
+    public async Task<WorkPlanResult?> GetWorkPlanAsync(int projectId)
+    {
+        await using var connection = _dbServices.CreateConnection();
+        await connection.OpenAsync();
+
+        WorkItem? project = null;
+        var tasks = new List<WorkItem>();
+        var assignments = new List<WorkPlanAssignmentResult>();
+
+        await using (var projectCommand = new SqlCommand(
+            @"SELECT 
+                  WorkItemId,
+                  Title,
+                  Description,
+                  WorkType,
+                  BillingType,
+                  Status,
+                  CustomerId,
+                  SiteId,
+                  CreatedAt,
+                  ClosedAt,
+                  ParentWorkItemId
+              FROM dbo.WorkItems
+              WHERE WorkItemId = @ProjectId",
+            connection))
+        {
+            projectCommand.CommandType = CommandType.Text;
+            projectCommand.Parameters.AddWithValue("@ProjectId", projectId);
+
+            await using var projectReader = await projectCommand.ExecuteReaderAsync();
+
+            if (await projectReader.ReadAsync())
+            {
+                project = MapWorkItem(projectReader);
+            }
+        }
+
+        if (project == null)
+        {
+            return null;
+        }
+
+        await using (var tasksCommand = new SqlCommand(
+            @"SELECT 
+                  WorkItemId,
+                  Title,
+                  Description,
+                  WorkType,
+                  BillingType,
+                  Status,
+                  CustomerId,
+                  SiteId,
+                  CreatedAt,
+                  ClosedAt,
+                  ParentWorkItemId
+              FROM dbo.WorkItems
+              WHERE ParentWorkItemId = @ProjectId
+              ORDER BY CreatedAt DESC",
+            connection))
+        {
+            tasksCommand.CommandType = CommandType.Text;
+            tasksCommand.Parameters.AddWithValue("@ProjectId", projectId);
+
+            await using var tasksReader = await tasksCommand.ExecuteReaderAsync();
+
+            while (await tasksReader.ReadAsync())
+            {
+                tasks.Add(MapWorkItem(tasksReader));
+            }
+        }
+
+        await using (var assignmentsCommand = new SqlCommand(
+            @";WITH RelevantWorkItems AS
+              (
+                  SELECT WorkItemId
+                  FROM dbo.WorkItems
+                  WHERE WorkItemId = @ProjectId
+
+                  UNION
+
+                  SELECT WorkItemId
+                  FROM dbo.WorkItems
+                  WHERE ParentWorkItemId = @ProjectId
+              )
+              SELECT 
+                  wea.WorkItemId,
+                  wea.EmployeeId,
+                  CAST(NULL AS INT) AS ContractorId,
+                  CAST('Employee' AS NVARCHAR(50)) AS AssignmentType
+              FROM dbo.WorkEmployeeAssignments wea
+              INNER JOIN RelevantWorkItems rwi
+                  ON wea.WorkItemId = rwi.WorkItemId
+
+              UNION ALL
+
+              SELECT 
+                  wca.WorkItemId,
+                  CAST(NULL AS INT) AS EmployeeId,
+                  wca.ContractorId,
+                  CAST('Contractor' AS NVARCHAR(50)) AS AssignmentType
+              FROM dbo.WorkContractorAssignments wca
+              INNER JOIN RelevantWorkItems rwi
+                  ON wca.WorkItemId = rwi.WorkItemId
+
+              ORDER BY WorkItemId",
+            connection))
+        {
+            assignmentsCommand.CommandType = CommandType.Text;
+            assignmentsCommand.Parameters.AddWithValue("@ProjectId", projectId);
+
+            await using var assignmentsReader = await assignmentsCommand.ExecuteReaderAsync();
+
+            while (await assignmentsReader.ReadAsync())
+            {
+                assignments.Add(MapWorkPlanAssignment(assignmentsReader));
+            }
+        }
+
+        return new WorkPlanResult
+        {
+            Project = project,
+            Tasks = tasks,
+            Assignments = assignments
+        };
+    }
+
     private static WorkItem MapWorkItem(SqlDataReader reader)
     {
         return new WorkItem
         {
-            WorkItemId = reader["WorkItemId"] != DBNull.Value ? Convert.ToInt32(reader["WorkItemId"]) : 0,
-            Title = reader["Title"] != DBNull.Value ? reader["Title"]?.ToString() ?? string.Empty : string.Empty,
-            Description = reader["Description"] != DBNull.Value ? reader["Description"]?.ToString() : null,
-            WorkType = reader["WorkType"] != DBNull.Value ? reader["WorkType"]?.ToString() : null,
-            BillingType = reader["BillingType"] != DBNull.Value ? reader["BillingType"]?.ToString() : null,
-            Status = reader["Status"] != DBNull.Value ? reader["Status"]?.ToString() : null,
-            CustomerId = reader["CustomerId"] != DBNull.Value ? Convert.ToInt32(reader["CustomerId"]) : 0,
-            SiteId = reader["SiteId"] != DBNull.Value ? Convert.ToInt32(reader["SiteId"]) : 0,
-            CreatedAt = reader["CreatedAt"] != DBNull.Value ? Convert.ToDateTime(reader["CreatedAt"]) : DateTime.MinValue,
-            ClosedAt = reader["ClosedAt"] != DBNull.Value ? Convert.ToDateTime(reader["ClosedAt"]) : null
+            WorkItemId = GetIntValue(reader, "WorkItemId"),
+            Title = GetStringValue(reader, "Title") ?? string.Empty,
+            Description = GetStringValue(reader, "Description"),
+            WorkType = GetStringValue(reader, "WorkType"),
+            BillingType = GetStringValue(reader, "BillingType"),
+            Status = GetStringValue(reader, "Status"),
+            CustomerId = GetIntValue(reader, "CustomerId"),
+            SiteId = GetIntValue(reader, "SiteId"),
+            CreatedAt = GetDateTimeValue(reader, "CreatedAt") ?? DateTime.MinValue,
+            ClosedAt = GetDateTimeValue(reader, "ClosedAt"),
+            ParentWorkItemId = GetNullableIntValue(reader, "ParentWorkItemId")
         };
+    }
+
+    private static WorkPlanAssignmentResult MapWorkPlanAssignment(SqlDataReader reader)
+    {
+        return new WorkPlanAssignmentResult
+        {
+            WorkItemId = GetIntValue(reader, "WorkItemId"),
+            EmployeeId = GetNullableIntValue(reader, "EmployeeId"),
+            ContractorId = GetNullableIntValue(reader, "ContractorId"),
+            AssignmentType = GetStringValue(reader, "AssignmentType") ?? string.Empty
+        };
+    }
+
+    private static bool HasColumn(SqlDataReader reader, string columnName)
+    {
+        for (int i = 0; i < reader.FieldCount; i++)
+        {
+            if (string.Equals(reader.GetName(i), columnName, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static string? GetStringValue(SqlDataReader reader, string columnName)
+    {
+        if (!HasColumn(reader, columnName) || reader[columnName] == DBNull.Value)
+        {
+            return null;
+        }
+
+        return reader[columnName]?.ToString();
+    }
+
+    private static int GetIntValue(SqlDataReader reader, string columnName)
+    {
+        if (!HasColumn(reader, columnName) || reader[columnName] == DBNull.Value)
+        {
+            return 0;
+        }
+
+        return Convert.ToInt32(reader[columnName]);
+    }
+
+    private static int? GetNullableIntValue(SqlDataReader reader, string columnName)
+    {
+        if (!HasColumn(reader, columnName) || reader[columnName] == DBNull.Value)
+        {
+            return null;
+        }
+
+        return Convert.ToInt32(reader[columnName]);
+    }
+
+    private static DateTime? GetDateTimeValue(SqlDataReader reader, string columnName)
+    {
+        if (!HasColumn(reader, columnName) || reader[columnName] == DBNull.Value)
+        {
+            return null;
+        }
+
+        return Convert.ToDateTime(reader[columnName]);
     }
 }
