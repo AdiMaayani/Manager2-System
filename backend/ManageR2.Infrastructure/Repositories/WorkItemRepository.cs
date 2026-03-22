@@ -1,6 +1,7 @@
 using System.Data;
 using ManageR2.Domain.Entities;
 using ManageR2.Infrastructure.DAL;
+using ManageR2.Infrastructure.Models;
 using Microsoft.Data.SqlClient;
 
 namespace ManageR2.Infrastructure.Repositories;
@@ -262,6 +263,132 @@ public class WorkItemRepository : IWorkItemRepository
         return count > 0;
     }
 
+    public async Task<WorkPlanResult?> GetWorkPlanAsync(int projectId)
+    {
+        await using var connection = _dbServices.CreateConnection();
+        await connection.OpenAsync();
+
+        WorkItem? project = null;
+        var tasks = new List<WorkItem>();
+        var assignments = new List<WorkPlanAssignmentResult>();
+
+        await using (var projectCommand = new SqlCommand(
+            @"SELECT 
+                  WorkItemId,
+                  Title,
+                  Description,
+                  WorkType,
+                  BillingType,
+                  Status,
+                  CustomerId,
+                  SiteId,
+                  CreatedAt,
+                  ClosedAt,
+                  ParentWorkItemId
+              FROM dbo.WorkItems
+              WHERE WorkItemId = @ProjectId",
+            connection))
+        {
+            projectCommand.CommandType = CommandType.Text;
+            projectCommand.Parameters.AddWithValue("@ProjectId", projectId);
+
+            await using var projectReader = await projectCommand.ExecuteReaderAsync();
+
+            if (await projectReader.ReadAsync())
+            {
+                project = MapWorkItem(projectReader);
+            }
+        }
+
+        if (project == null)
+        {
+            return null;
+        }
+
+        await using (var tasksCommand = new SqlCommand(
+            @"SELECT 
+                  WorkItemId,
+                  Title,
+                  Description,
+                  WorkType,
+                  BillingType,
+                  Status,
+                  CustomerId,
+                  SiteId,
+                  CreatedAt,
+                  ClosedAt,
+                  ParentWorkItemId
+              FROM dbo.WorkItems
+              WHERE ParentWorkItemId = @ProjectId
+              ORDER BY CreatedAt DESC",
+            connection))
+        {
+            tasksCommand.CommandType = CommandType.Text;
+            tasksCommand.Parameters.AddWithValue("@ProjectId", projectId);
+
+            await using var tasksReader = await tasksCommand.ExecuteReaderAsync();
+
+            while (await tasksReader.ReadAsync())
+            {
+                tasks.Add(MapWorkItem(tasksReader));
+            }
+        }
+
+        await using (var assignmentsCommand = new SqlCommand(
+            @";WITH RelevantWorkItems AS
+              (
+                  SELECT WorkItemId
+                  FROM dbo.WorkItems
+                  WHERE WorkItemId = @ProjectId
+
+                  UNION
+
+                  SELECT WorkItemId
+                  FROM dbo.WorkItems
+                  WHERE ParentWorkItemId = @ProjectId
+              )
+              SELECT 
+                  wea.WorkItemId,
+                  wea.EmployeeId,
+                  CAST(NULL AS INT) AS ContractorId,
+                  CAST('Employee' AS NVARCHAR(50)) AS AssignmentType
+              FROM dbo.WorkEmployeeAssignments wea
+              INNER JOIN RelevantWorkItems rwi
+                  ON wea.WorkItemId = rwi.WorkItemId
+
+              UNION ALL
+
+              SELECT 
+                  wca.WorkItemId,
+                  CAST(NULL AS INT) AS EmployeeId,
+                  wca.ContractorId,
+                  CAST('Contractor' AS NVARCHAR(50)) AS AssignmentType
+              FROM dbo.WorkContractorAssignments wca
+              INNER JOIN RelevantWorkItems rwi
+                  ON wca.WorkItemId = rwi.WorkItemId
+
+              ORDER BY WorkItemId",
+            connection))
+        {
+            assignmentsCommand.CommandType = CommandType.Text;
+            assignmentsCommand.Parameters.AddWithValue("@ProjectId", projectId);
+
+            await using var assignmentsReader = await assignmentsCommand.ExecuteReaderAsync();
+
+            while (await assignmentsReader.ReadAsync())
+            {
+                assignments.Add(MapWorkPlanAssignment(assignmentsReader));
+            }
+        }
+
+        return new WorkPlanResult
+        {
+            Project = project,
+            Tasks = tasks,
+            Assignments = assignments
+        };
+    }
+
     private static WorkItem MapWorkItem(SqlDataReader reader)
     {
         return new WorkItem
@@ -277,6 +404,17 @@ public class WorkItemRepository : IWorkItemRepository
             CreatedAt = GetDateTimeValue(reader, "CreatedAt") ?? DateTime.MinValue,
             ClosedAt = GetDateTimeValue(reader, "ClosedAt"),
             ParentWorkItemId = GetNullableIntValue(reader, "ParentWorkItemId")
+        };
+    }
+
+    private static WorkPlanAssignmentResult MapWorkPlanAssignment(SqlDataReader reader)
+    {
+        return new WorkPlanAssignmentResult
+        {
+            WorkItemId = GetIntValue(reader, "WorkItemId"),
+            EmployeeId = GetNullableIntValue(reader, "EmployeeId"),
+            ContractorId = GetNullableIntValue(reader, "ContractorId"),
+            AssignmentType = GetStringValue(reader, "AssignmentType") ?? string.Empty
         };
     }
 

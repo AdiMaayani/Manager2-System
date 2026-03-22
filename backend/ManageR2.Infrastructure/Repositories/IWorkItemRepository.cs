@@ -1,4 +1,5 @@
 using ManageR2.Domain.Entities;
+using ManageR2.Infrastructure.Models;
 
 namespace ManageR2.Infrastructure.Repositories
 {
@@ -17,5 +18,8 @@ namespace ManageR2.Infrastructure.Repositories
 
         Task<bool> EmployeeExistsAsync(int employeeId);
         Task<bool> ContractorExistsAsync(int contractorId);
+
+        // 🆕 Work Plan
+        Task<WorkPlanResult?> GetWorkPlanAsync(int projectId);
     }
 }

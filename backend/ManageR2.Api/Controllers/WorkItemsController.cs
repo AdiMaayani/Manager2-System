@@ -1,3 +1,4 @@
+using ManageR2.Api.DTOs;
 using ManageR2.Domain.Entities;
 using ManageR2.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Mvc;
@@ -53,6 +54,58 @@ public class WorkItemsController : ControllerBase
 
         var tasks = await _workItemRepository.GetTasksByParentIdAsync(id);
         return Ok(tasks);
+    }
+
+    [HttpGet("{id}/work-plan")]
+    public async Task<ActionResult<WorkPlanDto>> GetWorkPlan(int id)
+    {
+        var workPlanResult = await _workItemRepository.GetWorkPlanAsync(id);
+
+        if (workPlanResult == null)
+        {
+            return NotFound($"Project with ID {id} was not found.");
+        }
+
+        var response = new WorkPlanDto
+        {
+            Project = new ProjectSummaryDto
+            {
+                WorkItemId = workPlanResult.Project.WorkItemId,
+                Title = workPlanResult.Project.Title ?? string.Empty,
+                Description = workPlanResult.Project.Description,
+                WorkType = workPlanResult.Project.WorkType ?? string.Empty,
+                Status = workPlanResult.Project.Status ?? string.Empty,
+                BillingType = workPlanResult.Project.BillingType,
+                CustomerId = workPlanResult.Project.CustomerId,
+                SiteId = workPlanResult.Project.SiteId,
+                CreatedAt = workPlanResult.Project.CreatedAt,
+                ClosedAt = workPlanResult.Project.ClosedAt,
+                ParentWorkItemId = workPlanResult.Project.ParentWorkItemId
+            },
+            Tasks = workPlanResult.Tasks.Select(task => new TaskSummaryDto
+            {
+                WorkItemId = task.WorkItemId,
+                Title = task.Title ?? string.Empty,
+                Description = task.Description,
+                WorkType = task.WorkType ?? string.Empty,
+                Status = task.Status ?? string.Empty,
+                BillingType = task.BillingType,
+                CustomerId = task.CustomerId,
+                SiteId = task.SiteId,
+                CreatedAt = task.CreatedAt,
+                ClosedAt = task.ClosedAt,
+                ParentWorkItemId = task.ParentWorkItemId
+            }).ToList(),
+            Assignments = workPlanResult.Assignments.Select(assignment => new WorkAssignmentDto
+            {
+                WorkItemId = assignment.WorkItemId,
+                EmployeeId = assignment.EmployeeId,
+                ContractorId = assignment.ContractorId,
+                AssignmentType = assignment.AssignmentType
+            }).ToList()
+        };
+
+        return Ok(response);
     }
 
     [HttpPost]
