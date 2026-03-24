@@ -56,19 +56,72 @@ public class UserRepository : IUserRepository
         return null;
     }
 
-    public Task<int> CreateUserAsync(User user)
+    public async Task<int> CreateUserAsync(User user)
     {
-        throw new NotImplementedException();
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand("dbo.sp_CreateUser", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+
+        command.Parameters.AddWithValue("@EmployeeId", user.EmployeeId);
+        command.Parameters.AddWithValue("@Username", user.Username);
+        command.Parameters.AddWithValue("@Email", user.Email);
+        command.Parameters.AddWithValue("@PasswordHash", user.PasswordHash);
+        command.Parameters.AddWithValue("@IsActive", user.IsActive);
+
+        await connection.OpenAsync();
+
+        var result = await command.ExecuteScalarAsync();
+
+        return result != null && result != DBNull.Value
+            ? Convert.ToInt32(result)
+            : 0;
     }
 
-    public Task<bool> UpdateUserAsync(User user)
+    public async Task<bool> UpdateUserAsync(User user)
     {
-        throw new NotImplementedException();
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand("dbo.sp_UpdateUser", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+
+        command.Parameters.AddWithValue("@UserId", user.UserId);
+        command.Parameters.AddWithValue("@EmployeeId", user.EmployeeId);
+        command.Parameters.AddWithValue("@Username", user.Username);
+        command.Parameters.AddWithValue("@Email", user.Email);
+        command.Parameters.AddWithValue("@PasswordHash", user.PasswordHash);
+        command.Parameters.AddWithValue("@IsActive", user.IsActive);
+
+        await connection.OpenAsync();
+
+        var result = await command.ExecuteScalarAsync();
+        var rowsAffected = result != null && result != DBNull.Value
+            ? Convert.ToInt32(result)
+            : 0;
+
+        return rowsAffected > 0;
     }
 
-    public Task<bool> DeleteUserAsync(int userId)
+    public async Task<bool> DeleteUserAsync(int userId)
     {
-        throw new NotImplementedException();
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand("dbo.sp_DeleteUser", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+
+        command.Parameters.AddWithValue("@UserId", userId);
+
+        await connection.OpenAsync();
+
+        var result = await command.ExecuteScalarAsync();
+        var rowsAffected = result != null && result != DBNull.Value
+            ? Convert.ToInt32(result)
+            : 0;
+
+        return rowsAffected > 0;
     }
 
     private static User MapUser(SqlDataReader reader)
