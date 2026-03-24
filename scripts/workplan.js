@@ -12,7 +12,6 @@ document.addEventListener("DOMContentLoaded", () => {
     workplanShell.addEventListener(
       "wheel",
       (e) => {
-        // Vertical wheel scrolls the horizontal gantt only inside shell
         if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
           e.preventDefault();
           workplanShell.scrollLeft += e.deltaY;
@@ -22,7 +21,6 @@ document.addEventListener("DOMContentLoaded", () => {
     );
   }
 
-  // Role simulation (employee/manager/ceo) to reflect permissions
   let currentRole = "manager";
   const roleLabel = document.getElementById("role-label");
   const roleMenu = document.getElementById("role-menu");
@@ -51,7 +49,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function toggleConditionalDropdowns(scope) {
-    // View mode dropdown: show ONLY for "employee"
     if (viewModeDropdown) {
       if (scope === "employee") {
         viewModeDropdown.style.display = "block";
@@ -62,7 +59,6 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
-    // Project filter dropdown: show ONLY for "project"
     if (projectFilterDropdown) {
       if (scope === "project") {
         projectFilterDropdown.style.display = "block";
@@ -74,7 +70,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Task data extraction (from daily view)
   function extractTaskData() {
     console.groupCollapsed("🔍 [DATA AUDIT] Tasks data extracted from DOM");
     const tasks = [];
@@ -101,10 +96,9 @@ document.addEventListener("DOMContentLoaded", () => {
         : [];
       const role = task.getAttribute("data-role") || "";
 
-      // Parse time from meta (e.g., "08:00–10:00")
       const timeMatch = meta.time.match(/(\d{2}):(\d{2})–(\d{2}):(\d{2})/);
-      let startHour = 0,
-        endHour = 0;
+      let startHour = 0;
+      let endHour = 0;
       if (timeMatch) {
         startHour = parseInt(timeMatch[1]);
         endHour = parseInt(timeMatch[3]);
@@ -134,11 +128,10 @@ document.addEventListener("DOMContentLoaded", () => {
     return tasks;
   }
 
-  // Weekly view
   let currentWeekStart = new Date();
   currentWeekStart.setDate(
     currentWeekStart.getDate() - currentWeekStart.getDay(),
-  ); // Sunday
+  );
   currentWeekStart.setHours(0, 0, 0, 0);
 
   function renderWeeklyView() {
@@ -159,16 +152,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
     grid.innerHTML = "";
 
-    // Header
     const header = document.createElement("div");
     header.className = "workplan-weekly-header";
 
-    // First column: empty header cell to align with employee names column
     const emptyHeader = document.createElement("div");
     emptyHeader.className = "workplan-weekly-name-header";
     header.appendChild(emptyHeader);
 
-    // Day headers
     days.forEach((day) => {
       const dayEl = document.createElement("div");
       dayEl.className = "workplan-weekly-day-header";
@@ -179,12 +169,10 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     grid.appendChild(header);
 
-    // Get unique employees
     const employees = [
       ...new Set(tasks.map((t) => t.assignee).filter(Boolean)),
     ];
 
-    // Rows for each employee
     employees.forEach((employee) => {
       const row = document.createElement("div");
       row.className = "workplan-weekly-row";
@@ -206,16 +194,21 @@ document.addEventListener("DOMContentLoaded", () => {
           taskEl.type = "button";
           taskEl.className = `workplan-weekly-task task-${task.kind} ${task.locked ? "task-locked" : ""} ${task.personal ? "task-personal" : ""}`;
           taskEl.setAttribute("data-task-id", task.id);
-          if (task.projectId)
+          if (task.projectId) {
             taskEl.setAttribute("data-project-id", task.projectId);
-          if (task.serviceCallId)
+          }
+          if (task.serviceCallId) {
             taskEl.setAttribute("data-service-call-id", task.serviceCallId);
-          if (task.assignedEmployeeIds && task.assignedEmployeeIds.length)
+          }
+          if (task.assignedEmployeeIds && task.assignedEmployeeIds.length) {
             taskEl.setAttribute(
               "data-assigned-ids",
               task.assignedEmployeeIds.join(","),
             );
-          if (task.role) taskEl.setAttribute("data-role", task.role);
+          }
+          if (task.role) {
+            taskEl.setAttribute("data-role", task.role);
+          }
           taskEl.innerHTML = `<div class="task-name">${task.name}</div><div class="task-meta">${task.startHour}:00-${task.endHour}:00</div>`;
           dayCell.appendChild(taskEl);
         });
@@ -227,7 +220,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Monthly view
   let currentMonth = new Date().getMonth();
   let currentYear = new Date().getFullYear();
 
@@ -258,11 +250,10 @@ document.addEventListener("DOMContentLoaded", () => {
     const firstDay = new Date(currentYear, currentMonth, 1);
     const lastDay = new Date(currentYear, currentMonth + 1, 0);
     const startDate = new Date(firstDay);
-    startDate.setDate(startDate.getDate() - startDate.getDay()); // Start from Sunday
+    startDate.setDate(startDate.getDate() - startDate.getDay());
 
     grid.innerHTML = "";
 
-    // Header
     const header = document.createElement("div");
     header.className = "workplan-monthly-header";
     const dayNames = ["א", "ב", "ג", "ד", "ה", "ו", "ש"];
@@ -274,7 +265,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     grid.appendChild(header);
 
-    // Calendar grid
     let currentDate = new Date(startDate);
     const weeks = [];
     let week = [];
@@ -294,6 +284,7 @@ document.addEventListener("DOMContentLoaded", () => {
         break;
       }
     }
+
     if (week.length > 0) {
       while (week.length < 7) {
         week.push(new Date(currentDate));
@@ -324,26 +315,31 @@ document.addEventListener("DOMContentLoaded", () => {
         const dayTasks = document.createElement("div");
         dayTasks.className = "workplan-monthly-day-tasks";
 
-        // Filter tasks for this day (simplified - using day of week from daily view)
         const dayOfWeek = date.getDay();
         const dayTasksList = tasks
           .filter((t, idx) => idx % 7 === dayOfWeek)
           .slice(0, 3);
+
         dayTasksList.forEach((task) => {
           const taskEl = document.createElement("button");
           taskEl.type = "button";
           taskEl.className = `workplan-monthly-task task-${task.kind} ${task.locked ? "task-locked" : ""}`;
           taskEl.setAttribute("data-task-id", task.id);
-          if (task.projectId)
+          if (task.projectId) {
             taskEl.setAttribute("data-project-id", task.projectId);
-          if (task.serviceCallId)
+          }
+          if (task.serviceCallId) {
             taskEl.setAttribute("data-service-call-id", task.serviceCallId);
-          if (task.assignedEmployeeIds && task.assignedEmployeeIds.length)
+          }
+          if (task.assignedEmployeeIds && task.assignedEmployeeIds.length) {
             taskEl.setAttribute(
               "data-assigned-ids",
               task.assignedEmployeeIds.join(","),
             );
-          if (task.role) taskEl.setAttribute("data-role", task.role);
+          }
+          if (task.role) {
+            taskEl.setAttribute("data-role", task.role);
+          }
           taskEl.textContent = task.name;
           dayTasks.appendChild(taskEl);
         });
@@ -363,7 +359,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Yearly view
   let currentYearView = new Date().getFullYear();
 
   function renderYearlyView() {
@@ -416,18 +411,18 @@ document.addEventListener("DOMContentLoaded", () => {
         currentMonth = monthIndex;
         currentYear = currentYearView;
         renderMonthlyView();
-        // Switch to monthly view
         const monthlyBtn = document.querySelector(
           '.tab-range[data-range="monthly"]',
         );
-        if (monthlyBtn) monthlyBtn.click();
+        if (monthlyBtn) {
+          monthlyBtn.click();
+        }
       });
 
       grid.appendChild(monthCard);
     });
   }
 
-  // Range switching (WHEN)
   const rangeButtons = document.querySelectorAll(
     ".tab-group-range [data-range]",
   );
@@ -443,7 +438,6 @@ document.addEventListener("DOMContentLoaded", () => {
       closeDetails();
       updateWorkplanTitle();
 
-      // Render appropriate view
       if (range === "weekly") {
         renderWeeklyView();
       } else if (range === "monthly") {
@@ -454,7 +448,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // Weekly navigation
   const weekPrev = document.getElementById("week-prev");
   const weekNext = document.getElementById("week-next");
   if (weekPrev) {
@@ -470,7 +463,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Monthly navigation
   const monthPrev = document.getElementById("month-prev");
   const monthNext = document.getElementById("month-next");
   if (monthPrev) {
@@ -494,7 +486,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Yearly navigation
   const yearPrev = document.getElementById("year-prev");
   const yearNext = document.getElementById("year-next");
   if (yearPrev) {
@@ -510,7 +501,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Scope switching (WHO)
   const scopeButtons = document.querySelectorAll(
     ".tab-group-scope [data-scope]",
   );
@@ -526,17 +516,26 @@ document.addEventListener("DOMContentLoaded", () => {
     const activeBtn = document.querySelector(
       `.tab-group-scope [data-scope="${scope}"]`,
     );
-    if (activeBtn) activeBtn.classList.add("active");
+    if (activeBtn) {
+      activeBtn.classList.add("active");
+    }
 
-    // Toggle conditional dropdowns visibility
     toggleConditionalDropdowns(scope);
 
     if (scope === "project") {
-      if (employeesMode) employeesMode.classList.remove("active");
-      if (projectsMode) projectsMode.classList.add("active");
+      if (employeesMode) {
+        employeesMode.classList.remove("active");
+      }
+      if (projectsMode) {
+        projectsMode.classList.add("active");
+      }
     } else {
-      if (employeesMode) employeesMode.classList.add("active");
-      if (projectsMode) projectsMode.classList.remove("active");
+      if (employeesMode) {
+        employeesMode.classList.add("active");
+      }
+      if (projectsMode) {
+        projectsMode.classList.remove("active");
+      }
 
       employeeRows.forEach((row) => {
         if (scope === "personal") {
@@ -561,7 +560,6 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   });
 
-  // Details panel (modal)
   const modalOverlay = document.getElementById("wp-modal-overlay");
   const panel = document.getElementById("workplan-details");
   const closeBtn = document.getElementById("wp-close");
@@ -577,7 +575,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const urgencyEl = document.getElementById("wp-urgency");
   const linkedEl = document.getElementById("wp-linked");
 
-  // Project manager mapping (based on project ID)
   const projectManagerMap = {
     villa: "רביב",
     abc: "רביב",
@@ -660,8 +657,9 @@ document.addEventListener("DOMContentLoaded", () => {
           !t ||
           !t.classList ||
           !t.classList.contains("wp-assigned-chip-remove")
-        )
+        ) {
           return;
+        }
         e.preventDefault();
         const i = parseInt(chip.dataset.idx, 10);
         if (!isNaN(i) && i >= 0 && i < editModeAssigned.length) {
@@ -675,11 +673,16 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function closeDetails() {
-    if (modalOverlay) modalOverlay.classList.remove("active");
+    if (modalOverlay) {
+      modalOverlay.classList.remove("active");
+    }
     document.body.classList.remove("modal-open");
     exitEditMode();
   }
-  if (closeBtn) closeBtn.addEventListener("click", closeDetails);
+
+  if (closeBtn) {
+    closeBtn.addEventListener("click", closeDetails);
+  }
   if (modalBackdrop) {
     modalBackdrop.addEventListener("click", closeDetails);
   }
@@ -692,10 +695,15 @@ document.addEventListener("DOMContentLoaded", () => {
   function enterEditMode() {
     if (!viewMode || !editMode || !actionsView || !actionsEdit) return;
 
-    if (editTitle) editTitle.value = titleEl ? titleEl.textContent : "";
-    if (editAssignee)
+    if (editTitle) {
+      editTitle.value = titleEl ? titleEl.textContent : "";
+    }
+    if (editAssignee) {
       editAssignee.value = assigneeEl ? assigneeEl.textContent : "";
-    if (editTime) editTime.value = timeEl ? timeEl.textContent : "";
+    }
+    if (editTime) {
+      editTime.value = timeEl ? timeEl.textContent : "";
+    }
     if (editStatus) {
       const statusText = statusEl ? statusEl.textContent : "";
       editStatus.value = statusText;
@@ -704,7 +712,10 @@ document.addEventListener("DOMContentLoaded", () => {
       const urgencyText = urgencyEl ? urgencyEl.textContent : "";
       editUrgency.value = urgencyText;
     }
-    if (editLinked) editLinked.value = linkedEl ? linkedEl.textContent : "";
+    if (editLinked) {
+      editLinked.value = linkedEl ? linkedEl.textContent : "";
+    }
+
     editModeAssigned = [];
     if (currentTaskElement) {
       const raw = currentTaskElement.getAttribute("data-assigned-ids") || "";
@@ -717,9 +728,11 @@ document.addEventListener("DOMContentLoaded", () => {
       ids.forEach((id) => {
         editModeAssigned.push({ id, name: employeeNameById(id) });
       });
-      if (editRole)
+      if (editRole) {
         editRole.value = currentTaskElement.getAttribute("data-role") || "";
+      }
     }
+
     populateAssignedSelect(editModeAssigned.map((x) => x.id));
     renderEditAssignedChips();
 
@@ -748,11 +761,15 @@ document.addEventListener("DOMContentLoaded", () => {
     if (editTitle && titleEl) {
       titleEl.textContent = editTitle.value;
       const taskNameEl = currentTaskElement.querySelector(".task-name");
-      if (taskNameEl) taskNameEl.textContent = editTitle.value;
+      if (taskNameEl) {
+        taskNameEl.textContent = editTitle.value;
+      }
     }
+
     if (editAssignee && assigneeEl) {
       assigneeEl.textContent = editAssignee.value;
     }
+
     if (editTime && timeEl) {
       timeEl.textContent = editTime.value;
       const taskMetaEl = currentTaskElement.querySelector(".task-meta");
@@ -762,6 +779,7 @@ document.addEventListener("DOMContentLoaded", () => {
         taskMetaEl.textContent = parts.join("•");
       }
     }
+
     if (editStatus && statusEl) {
       statusEl.textContent = editStatus.value;
       const taskMetaEl = currentTaskElement.querySelector(".task-meta");
@@ -773,6 +791,7 @@ document.addEventListener("DOMContentLoaded", () => {
         taskMetaEl.textContent = parts.join("•");
       }
     }
+
     if (editUrgency && urgencyEl) {
       urgencyEl.textContent = editUrgency.value;
       const taskMetaEl = currentTaskElement.querySelector(".task-meta");
@@ -784,31 +803,50 @@ document.addEventListener("DOMContentLoaded", () => {
         taskMetaEl.textContent = parts.join("•");
       }
     }
+
     if (editLinked && linkedEl) {
       linkedEl.textContent = editLinked.value;
     }
+
     const assignedIds = editModeAssigned.map((w) => w.id);
-    if (assignedIds.length)
+    if (assignedIds.length) {
       target.setAttribute("data-assigned-ids", assignedIds.join(","));
-    else target.removeAttribute("data-assigned-ids");
+    } else {
+      target.removeAttribute("data-assigned-ids");
+    }
+
     const roleVal = editRole ? editRole.value : "";
-    if (roleVal) target.setAttribute("data-role", roleVal);
-    else target.removeAttribute("data-role");
+    if (roleVal) {
+      target.setAttribute("data-role", roleVal);
+    } else {
+      target.removeAttribute("data-role");
+    }
+
     if (assignedWorkersEl) {
       assignedWorkersEl.textContent = editModeAssigned.length
         ? editModeAssigned.map((w) => w.name).join(", ")
         : "—";
     }
-    if (roleEl) roleEl.textContent = roleVal || "—";
+
+    if (roleEl) {
+      roleEl.textContent = roleVal || "—";
+    }
+
     if (canonical !== currentTaskElement) {
-      if (assignedIds.length)
+      if (assignedIds.length) {
         currentTaskElement.setAttribute(
           "data-assigned-ids",
           assignedIds.join(","),
         );
-      else currentTaskElement.removeAttribute("data-assigned-ids");
-      if (roleVal) currentTaskElement.setAttribute("data-role", roleVal);
-      else currentTaskElement.removeAttribute("data-role");
+      } else {
+        currentTaskElement.removeAttribute("data-assigned-ids");
+      }
+
+      if (roleVal) {
+        currentTaskElement.setAttribute("data-role", roleVal);
+      } else {
+        currentTaskElement.removeAttribute("data-role");
+      }
     }
 
     exitEditMode();
@@ -835,6 +873,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const v = editAssignedSelect.value;
       if (!v) return;
       if (editModeAssigned.some((w) => w.id === v)) return;
+
       const opt = editAssignedSelect.options[editAssignedSelect.selectedIndex];
       const name =
         opt && opt.dataset.name ? opt.dataset.name : opt ? opt.textContent : "";
@@ -854,6 +893,7 @@ document.addEventListener("DOMContentLoaded", () => {
       console.groupEnd();
       return null;
     }
+
     const row = taskEl.closest(".workplan-row, .workplan-weekly-row");
     const taskNameEl = taskEl.querySelector(".task-name");
     const name = taskNameEl ? taskNameEl.textContent.trim() : "";
@@ -875,6 +915,7 @@ document.addEventListener("DOMContentLoaded", () => {
       String(today.getMonth() + 1).padStart(2, "0") +
       "-" +
       String(today.getDate()).padStart(2, "0");
+
     let projectId = null;
     let customerName = null;
     let site = "";
@@ -946,6 +987,7 @@ document.addEventListener("DOMContentLoaded", () => {
       serviceCallId: serviceCallId || undefined,
       role: role || undefined,
     };
+
     console.log("Source: Task element + DOM extraction");
     console.log("Payload:", payload);
     console.groupEnd();
@@ -977,7 +1019,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function parseMeta(metaText) {
-    // "08:00–10:00 • מתוכנן • גבוה • עודכן: היום 07:40"
     const parts = metaText.split("•").map((p) => p.trim());
     return {
       time: parts[0] || "-",
@@ -993,7 +1034,6 @@ document.addEventListener("DOMContentLoaded", () => {
     if (currentRole === "employee") {
       return personal && !locked;
     }
-    // manager / ceo
     return !locked || currentRole !== "employee";
   }
 
@@ -1013,12 +1053,17 @@ document.addEventListener("DOMContentLoaded", () => {
     const personal = taskEl.getAttribute("data-personal") === "true";
     const editable = canEditTask(taskEl);
 
-    if (actionEdit) actionEdit.disabled = !editable;
-    if (actionLock) actionLock.disabled = !canLockTask();
-    if (actionQuickReport)
+    if (actionEdit) {
+      actionEdit.disabled = !editable;
+    }
+    if (actionLock) {
+      actionLock.disabled = !canLockTask();
+    }
+    if (actionQuickReport) {
       actionQuickReport.style.display = isTaskReportRelevant(taskEl)
         ? ""
         : "none";
+    }
 
     if (permsEl) {
       if (currentRole === "employee") {
@@ -1048,7 +1093,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Get current scope from active tab
   function getCurrentScope() {
     const activeScopeBtn = document.querySelector(".tab-scope.active");
     if (!activeScopeBtn) return "company";
@@ -1056,22 +1100,24 @@ document.addEventListener("DOMContentLoaded", () => {
     return scopeId || "company";
   }
 
-  // Get status badge color class
   function getStatusBadgeClass(status) {
     if (!status) return "badge-neutral";
     const statusLower = status.toLowerCase();
-    if (statusLower.includes("מתוכנן") || statusLower.includes("תכנון"))
+    if (statusLower.includes("מתוכנן") || statusLower.includes("תכנון")) {
       return "badge-neutral";
-    if (statusLower.includes("בביצוע") || statusLower.includes("ביצוע"))
+    }
+    if (statusLower.includes("בביצוע") || statusLower.includes("ביצוע")) {
       return "badge-primary";
-    if (statusLower.includes("הושלם") || statusLower.includes("סיום"))
+    }
+    if (statusLower.includes("הושלם") || statusLower.includes("סיום")) {
       return "badge-success";
-    if (statusLower.includes("תקוע") || statusLower.includes("בעיה"))
+    }
+    if (statusLower.includes("תקוע") || statusLower.includes("בעיה")) {
       return "badge-danger";
+    }
     return "badge-neutral";
   }
 
-  // Unified function to open task panel
   function openTaskPanel(taskEl) {
     if (!taskEl) return;
 
@@ -1084,6 +1130,8 @@ document.addEventListener("DOMContentLoaded", () => {
     let projectName = null;
     let projectManager = null;
 
+    const apiAssigneeName = taskEl.getAttribute("data-assignee-name");
+
     if (row) {
       const rowTitle =
         row.querySelector(".row-title, .workplan-weekly-name")?.textContent ||
@@ -1091,11 +1139,12 @@ document.addEventListener("DOMContentLoaded", () => {
       const projectAttr = row.getAttribute("data-project");
 
       if (isProjectScope && projectAttr) {
-        // In project scope, extract project data
         projectId = projectAttr;
         projectName = rowTitle;
         projectManager = projectManagerMap[projectId] || "לא הוגדר";
         assignee = projectManager;
+      } else if (apiAssigneeName) {
+        assignee = apiAssigneeName;
       } else if (projectAttr) {
         assignee = `פרויקט: ${rowTitle}`;
       } else {
@@ -1111,28 +1160,38 @@ document.addEventListener("DOMContentLoaded", () => {
     const metaText = taskMetaEl ? taskMetaEl.textContent : "";
     const meta = parseMeta(metaText);
 
-    // Update modal title and project context based on scope
     if (isProjectScope && projectName) {
-      // Project context mode
-      if (modalMainTitle) modalMainTitle.textContent = "פרטי הפרויקט";
-      if (projectContext) projectContext.style.display = "block";
-      if (projectNameEl) projectNameEl.textContent = projectName;
+      if (modalMainTitle) {
+        modalMainTitle.textContent = "פרטי הפרויקט";
+      }
+      if (projectContext) {
+        projectContext.style.display = "block";
+      }
+      if (projectNameEl) {
+        projectNameEl.textContent = projectName;
+      }
       if (projectLinkEl && projectId) {
         projectLinkEl.href = `../pages/projects.html?projectId=${projectId}`;
       }
     } else {
-      // Task context mode (default)
-      if (modalMainTitle) modalMainTitle.textContent = "פרטי משימה";
-      if (projectContext) projectContext.style.display = "none";
+      if (modalMainTitle) {
+        modalMainTitle.textContent = "פרטי משימה";
+      }
+      if (projectContext) {
+        projectContext.style.display = "none";
+      }
     }
 
-    if (titleEl) titleEl.textContent = name;
-    if (assigneeEl) assigneeEl.textContent = assignee;
-    if (timeEl) timeEl.textContent = meta.time || "-";
+    if (titleEl) {
+      titleEl.textContent = name;
+    }
+    if (assigneeEl) {
+      assigneeEl.textContent = assignee;
+    }
+    if (timeEl) {
+      timeEl.textContent = meta.time || "-";
+    }
 
-    // Render status as badge (for all scopes, but styled appropriately)
-    // Note: meta.status contains task type (e.g., "התקנות"), meta.urgency contains actual status (e.g., "בביצוע")
-    // Use meta.urgency as the actual status value for the badge
     if (statusEl) {
       const statusBadge = statusEl.querySelector("#wp-status-badge");
       const actualStatus =
@@ -1153,7 +1212,6 @@ document.addEventListener("DOMContentLoaded", () => {
           statusBadge.style.display = "inline-block";
         }
       } else {
-        // Fallback: if badge element doesn't exist, create it
         statusEl.innerHTML = "";
         const badge = document.createElement("span");
         badge.id = "wp-status-badge";
@@ -1166,7 +1224,9 @@ document.addEventListener("DOMContentLoaded", () => {
       }
     }
 
-    if (urgencyEl) urgencyEl.textContent = meta.urgency || "-";
+    if (urgencyEl) {
+      urgencyEl.textContent = meta.urgency || "-";
+    }
 
     if (linkedEl) {
       if (name.includes("וילה רמת אביב")) {
@@ -1182,6 +1242,7 @@ document.addEventListener("DOMContentLoaded", () => {
         linkedEl.textContent = "משימה פנימית/משרדית (ללא קישור לפרויקט).";
       }
     }
+
     const assignedRaw = taskEl.getAttribute("data-assigned-ids") || "";
     const assignedIds = assignedRaw
       ? assignedRaw
@@ -1194,8 +1255,11 @@ document.addEventListener("DOMContentLoaded", () => {
         ? assignedIds.map((id) => employeeNameById(id)).join(", ")
         : "—";
     }
+
     const taskRole = taskEl.getAttribute("data-role") || "";
-    if (roleEl) roleEl.textContent = taskRole || "—";
+    if (roleEl) {
+      roleEl.textContent = taskRole || "—";
+    }
 
     currentTaskElement = taskEl;
     updatePanelActions(taskEl);
@@ -1206,7 +1270,6 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  // Event delegation for task clicks (works for static and dynamic tasks)
   function handleTaskClick(e) {
     if (isDragging) return;
     const taskEl = e.target.closest(
@@ -1228,7 +1291,6 @@ document.addEventListener("DOMContentLoaded", () => {
     view.addEventListener("click", handleTaskClick);
   });
 
-  // Drag/reposition (UX only): enabled by permission rules; snaps to hour cells
   let dragTask = null;
   let dragStartX = 0;
   let dragStartY = 0;
@@ -1283,7 +1345,6 @@ document.addEventListener("DOMContentLoaded", () => {
     const snappedLeft = snappedHour * hourWidth;
     task.style.left = `${snappedLeft}px`;
 
-    // Update visible time text only (no persistence)
     const meta = task.querySelector(".task-meta");
     if (meta) {
       const parts = meta.textContent.split("•").map((p) => p.trim());
@@ -1295,7 +1356,6 @@ document.addEventListener("DOMContentLoaded", () => {
       const end = Math.min(24, start + durationHours);
       const timeText = `${String(start).padStart(2, "0")}:00–${String(end).padStart(2, "0")}:00`;
       parts[0] = timeText;
-      // mark last update as now (UX)
       const updatedIdx = parts.findIndex((p) => p.startsWith("עודכן"));
       if (updatedIdx >= 0) {
         parts[updatedIdx] = "עודכן: עכשיו";
@@ -1306,7 +1366,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  function onMouseUp(e) {
+  function onMouseUp() {
     if (!dragTask) return;
     const wasDragging = isDragging;
     const taskEl = dragTask;
@@ -1324,8 +1384,8 @@ document.addEventListener("DOMContentLoaded", () => {
   document.addEventListener("mousemove", onMouseMove);
   document.addEventListener("mouseup", onMouseUp);
 
-  // Initialize
   setRole("manager");
+
   function updateWorkplanTitle() {
     const titleEl = document.getElementById("workplan-title");
     if (!titleEl) return;
@@ -1371,10 +1431,6 @@ document.addEventListener("DOMContentLoaded", () => {
   updateWorkplanTitle();
   toggleConditionalDropdowns("company");
 
-  // ===============================
-  // 🔌 Backend Integration – Step 1 (SAFE)
-  // ===============================
-
   async function fetchWorkPlan(projectId) {
     try {
       console.groupCollapsed("🌐 [API] Fetch WorkPlan");
@@ -1404,6 +1460,40 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
+  function getResponsibleName(task, workPlan) {
+    if (!workPlan || !workPlan.assignments) return "—";
+
+    let assignment = workPlan.assignments.find(
+      (a) => a.workItemId === task.workItemId,
+    );
+
+    if (!assignment) {
+      assignment = workPlan.assignments.find(
+        (a) => a.workItemId === workPlan.project.workItemId,
+      );
+    }
+
+    if (!assignment) return "—";
+
+    if (assignment.employeeName) {
+      return assignment.employeeName;
+    }
+
+    if (assignment.contractorName) {
+      return assignment.contractorName;
+    }
+
+    if (assignment.employeeId) {
+      return `Employee #${assignment.employeeId}`;
+    }
+
+    if (assignment.contractorId) {
+      return `Contractor #${assignment.contractorId}`;
+    }
+
+    return "—";
+  }
+
   function renderTasksFromAPI(workPlan) {
     if (!workPlan || !workPlan.tasks) return;
 
@@ -1421,6 +1511,7 @@ document.addEventListener("DOMContentLoaded", () => {
     track.querySelectorAll(".task").forEach((task) => task.remove());
 
     workPlan.tasks.forEach((task, index) => {
+      const responsible = getResponsibleName(task, workPlan);
       const startHour = 8 + index * 2;
       const duration = 2;
 
@@ -1428,6 +1519,7 @@ document.addEventListener("DOMContentLoaded", () => {
       taskEl.type = "button";
       taskEl.className = "task task-project";
       taskEl.setAttribute("data-task-id", task.workItemId);
+      taskEl.setAttribute("data-assignee-name", responsible);
 
       taskEl.style.left = `calc((${startHour} / 24) * 100%)`;
       taskEl.style.width = `calc((${duration} / 24) * 100%)`;
@@ -1448,9 +1540,8 @@ document.addEventListener("DOMContentLoaded", () => {
     console.groupEnd();
   }
 
-  // TEMP: run once on load (hardcoded project)
   (async () => {
-    const TEST_PROJECT_ID = 1; // 🔥 תחליף לפרויקט אמיתי אצלך
+    const TEST_PROJECT_ID = 1;
 
     const workPlan = await fetchWorkPlan(TEST_PROJECT_ID);
 
@@ -1467,8 +1558,4 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log("Assignments:", workPlan.assignments);
     console.groupEnd();
   })();
-
-  // Initialize views (render on demand when switching)
-  // Weekly and monthly views will render when their tabs are clicked
-  // Yearly view can be pre-rendered if needed
 });
