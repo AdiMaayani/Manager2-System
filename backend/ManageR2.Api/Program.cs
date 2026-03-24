@@ -8,6 +8,20 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
+// ✅ CORS CONFIGURATION
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowFrontend",
+        policy =>
+        {
+            policy
+                .WithOrigins("http://127.0.0.1:5500", "http://localhost:5500")
+                .AllowAnyHeader()
+                .AllowAnyMethod();
+        });
+});
+
+// DI
 builder.Services.AddScoped<DBServices>();
 builder.Services.AddScoped<IWorkItemRepository, WorkItemRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
@@ -20,6 +34,9 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     app.UseSwaggerUI();
 }
+
+// ✅ USE CORS
+app.UseCors("AllowFrontend");
 
 app.UseHttpsRedirection();
 
