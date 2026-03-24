@@ -22,5 +22,11 @@ namespace ManageR2.Infrastructure.Models
         public int? ContractorId { get; set; }
 
         public string AssignmentType { get; set; } = string.Empty;
+
+        public string? AssignmentRole { get; set; }
+
+        public string? EmployeeName { get; set; }
+
+        public string? ContractorName { get; set; }
     }
 }

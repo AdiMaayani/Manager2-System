@@ -59,20 +59,17 @@ public class WorkItemsController : ControllerBase
     [HttpGet("{id}/work-plan")]
     public async Task<ActionResult<WorkPlanDto>> GetWorkPlan(int id)
     {
-        // 🔹 Step 1: Validate WorkItem exists
         var workItem = await _workItemRepository.GetByIdAsync(id);
         if (workItem == null)
         {
             return NotFound($"Work item with ID {id} was not found.");
         }
 
-        // 🔹 Step 2: Validate WorkType = Project
         if (!string.Equals(workItem.WorkType, "Project", StringComparison.OrdinalIgnoreCase))
         {
             return BadRequest($"Work plan is only available for projects. WorkItem {id} is of type '{workItem.WorkType}'.");
         }
 
-        // 🔹 Step 3: Get WorkPlan
         var workPlanResult = await _workItemRepository.GetWorkPlanAsync(id);
 
         if (workPlanResult == null)
@@ -115,7 +112,10 @@ public class WorkItemsController : ControllerBase
                 WorkItemId = assignment.WorkItemId,
                 EmployeeId = assignment.EmployeeId,
                 ContractorId = assignment.ContractorId,
-                AssignmentType = assignment.AssignmentType
+                AssignmentType = assignment.AssignmentType,
+                AssignmentRole = assignment.AssignmentRole,
+                EmployeeName = assignment.EmployeeName,
+                ContractorName = assignment.ContractorName
             }).ToList()
         };
 

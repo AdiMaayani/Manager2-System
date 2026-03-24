@@ -351,10 +351,15 @@ public class WorkItemRepository : IWorkItemRepository
                   wea.WorkItemId,
                   wea.EmployeeId,
                   CAST(NULL AS INT) AS ContractorId,
-                  CAST('Employee' AS NVARCHAR(50)) AS AssignmentType
+                  CAST('Employee' AS NVARCHAR(50)) AS AssignmentType,
+                  wea.AssignmentRole,
+                  e.FullName AS EmployeeName,
+                  CAST(NULL AS NVARCHAR(255)) AS ContractorName
               FROM dbo.WorkEmployeeAssignments wea
               INNER JOIN RelevantWorkItems rwi
                   ON wea.WorkItemId = rwi.WorkItemId
+              INNER JOIN dbo.Employees e
+                  ON wea.EmployeeId = e.EmployeeId
 
               UNION ALL
 
@@ -362,10 +367,15 @@ public class WorkItemRepository : IWorkItemRepository
                   wca.WorkItemId,
                   CAST(NULL AS INT) AS EmployeeId,
                   wca.ContractorId,
-                  CAST('Contractor' AS NVARCHAR(50)) AS AssignmentType
+                  CAST('Contractor' AS NVARCHAR(50)) AS AssignmentType,
+                  wca.AssignmentRole,
+                  CAST(NULL AS NVARCHAR(255)) AS EmployeeName,
+                  c.FullName AS ContractorName
               FROM dbo.WorkContractorAssignments wca
               INNER JOIN RelevantWorkItems rwi
                   ON wca.WorkItemId = rwi.WorkItemId
+              INNER JOIN dbo.Contractors c
+                  ON wca.ContractorId = c.ContractorId
 
               ORDER BY WorkItemId",
             connection))
@@ -414,7 +424,10 @@ public class WorkItemRepository : IWorkItemRepository
             WorkItemId = GetIntValue(reader, "WorkItemId"),
             EmployeeId = GetNullableIntValue(reader, "EmployeeId"),
             ContractorId = GetNullableIntValue(reader, "ContractorId"),
-            AssignmentType = GetStringValue(reader, "AssignmentType") ?? string.Empty
+            AssignmentType = GetStringValue(reader, "AssignmentType") ?? string.Empty,
+            AssignmentRole = GetStringValue(reader, "AssignmentRole"),
+            EmployeeName = GetStringValue(reader, "EmployeeName"),
+            ContractorName = GetStringValue(reader, "ContractorName")
         };
     }
 
