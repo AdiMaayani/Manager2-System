@@ -3,20 +3,25 @@ using ManageR2.Domain.Entities;
 using ManageR2.Domain.Exceptions;
 using ManageR2.Infrastructure.DAL;
 using Microsoft.Data.SqlClient;
+using Microsoft.Extensions.Logging;
 
 namespace ManageR2.Infrastructure.Repositories;
 
 public class UserRepository : IUserRepository
 {
     private readonly DBServices _dbServices;
+    private readonly ILogger<UserRepository> _logger;
 
-    public UserRepository(DBServices dbServices)
+    public UserRepository(DBServices dbServices, ILogger<UserRepository> logger)
     {
         _dbServices = dbServices;
+        _logger = logger;
     }
 
     public async Task<IEnumerable<User>> GetUsersAsync()
     {
+        _logger.LogInformation("GetUsersAsync started.");
+
         var users = new List<User>();
 
         try
@@ -35,16 +40,22 @@ public class UserRepository : IUserRepository
                 users.Add(MapUser(reader));
             }
 
+            _logger.LogInformation("GetUsersAsync succeeded. Returned {UsersCount} users.", users.Count);
+
             return users;
         }
         catch (SqlException ex)
         {
+            _logger.LogError(ex, "GetUsersAsync failed with SQL error.");
+
             throw new UserValidationException("Failed to retrieve users from the database.", ex);
         }
     }
 
     public async Task<User?> GetUserByIdAsync(int userId)
     {
+        _logger.LogInformation("GetUserByIdAsync started for UserId={UserId}.", userId);
+
         try
         {
             await using var connection = _dbServices.CreateConnection();
@@ -60,19 +71,33 @@ public class UserRepository : IUserRepository
 
             if (await reader.ReadAsync())
             {
-                return MapUser(reader);
+                var user = MapUser(reader);
+
+                _logger.LogInformation("GetUserByIdAsync succeeded for UserId={UserId}.", userId);
+
+                return user;
             }
+
+            _logger.LogWarning("GetUserByIdAsync returned no user for UserId={UserId}.", userId);
 
             return null;
         }
         catch (SqlException ex)
         {
+            _logger.LogError(ex, "GetUserByIdAsync failed with SQL error for UserId={UserId}.", userId);
+
             throw new UserValidationException("Failed to retrieve the requested user from the database.", ex);
         }
     }
 
     public async Task<int> CreateUserAsync(User user)
     {
+        _logger.LogInformation(
+            "CreateUserAsync started for Username={Username}, Email={Email}, EmployeeId={EmployeeId}.",
+            user.Username,
+            user.Email,
+            user.EmployeeId);
+
         try
         {
             await using var connection = _dbServices.CreateConnection();
@@ -90,27 +115,52 @@ public class UserRepository : IUserRepository
             await connection.OpenAsync();
 
             var result = await command.ExecuteScalarAsync();
-
-            return result != null && result != DBNull.Value
+            var newUserId = result != null && result != DBNull.Value
                 ? Convert.ToInt32(result)
                 : 0;
+
+            _logger.LogInformation("CreateUserAsync succeeded. Created UserId={UserId}.", newUserId);
+
+            return newUserId;
         }
         catch (SqlException ex) when (ex.Number == 2627 || ex.Number == 2601)
         {
+            _logger.LogWarning(
+                ex,
+                "CreateUserAsync failed because Email={Email} already exists.",
+                user.Email);
+
             throw new UserValidationException("A user with this email already exists.", ex);
         }
         catch (SqlException ex) when (ex.Number == 547)
         {
+            _logger.LogWarning(
+                ex,
+                "CreateUserAsync failed because EmployeeId={EmployeeId} does not exist.",
+                user.EmployeeId);
+
             throw new UserValidationException("The specified EmployeeId does not exist.", ex);
         }
         catch (SqlException ex)
         {
+            _logger.LogError(
+                ex,
+                "CreateUserAsync failed with SQL error for Email={Email}, EmployeeId={EmployeeId}.",
+                user.Email,
+                user.EmployeeId);
+
             throw new UserValidationException("Failed to create the user.", ex);
         }
     }
 
     public async Task<bool> UpdateUserAsync(User user)
     {
+        _logger.LogInformation(
+            "UpdateUserAsync started for UserId={UserId}, Email={Email}, EmployeeId={EmployeeId}.",
+            user.UserId,
+            user.Email,
+            user.EmployeeId);
+
         try
         {
             await using var connection = _dbServices.CreateConnection();
@@ -133,24 +183,52 @@ public class UserRepository : IUserRepository
                 ? Convert.ToInt32(result)
                 : 0;
 
-            return rowsAffected > 0;
+            var wasUpdated = rowsAffected > 0;
+
+            if (wasUpdated)
+            {
+                _logger.LogInformation("UpdateUserAsync succeeded for UserId={UserId}.", user.UserId);
+            }
+            else
+            {
+                _logger.LogWarning("UpdateUserAsync affected 0 rows for UserId={UserId}.", user.UserId);
+            }
+
+            return wasUpdated;
         }
         catch (SqlException ex) when (ex.Number == 2627 || ex.Number == 2601)
         {
+            _logger.LogWarning(
+                ex,
+                "UpdateUserAsync failed because Email={Email} already exists.",
+                user.Email);
+
             throw new UserValidationException("A user with this email already exists.", ex);
         }
         catch (SqlException ex) when (ex.Number == 547)
         {
+            _logger.LogWarning(
+                ex,
+                "UpdateUserAsync failed because EmployeeId={EmployeeId} does not exist.",
+                user.EmployeeId);
+
             throw new UserValidationException("The specified EmployeeId does not exist.", ex);
         }
         catch (SqlException ex)
         {
+            _logger.LogError(
+                ex,
+                "UpdateUserAsync failed with SQL error for UserId={UserId}.",
+                user.UserId);
+
             throw new UserValidationException("Failed to update the user.", ex);
         }
     }
 
     public async Task<bool> DeleteUserAsync(int userId)
     {
+        _logger.LogInformation("DeleteUserAsync started for UserId={UserId}.", userId);
+
         try
         {
             await using var connection = _dbServices.CreateConnection();
@@ -168,14 +246,32 @@ public class UserRepository : IUserRepository
                 ? Convert.ToInt32(result)
                 : 0;
 
-            return rowsAffected > 0;
+            var wasDeleted = rowsAffected > 0;
+
+            if (wasDeleted)
+            {
+                _logger.LogInformation("DeleteUserAsync succeeded for UserId={UserId}.", userId);
+            }
+            else
+            {
+                _logger.LogWarning("DeleteUserAsync affected 0 rows for UserId={UserId}.", userId);
+            }
+
+            return wasDeleted;
         }
         catch (SqlException ex) when (ex.Number == 547)
         {
+            _logger.LogWarning(
+                ex,
+                "DeleteUserAsync failed because UserId={UserId} is referenced by other records.",
+                userId);
+
             throw new UserValidationException("The user cannot be deleted because it is referenced by other records.", ex);
         }
         catch (SqlException ex)
         {
+            _logger.LogError(ex, "DeleteUserAsync failed with SQL error for UserId={UserId}.", userId);
+
             throw new UserValidationException("Failed to delete the user.", ex);
         }
     }
