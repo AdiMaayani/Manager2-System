@@ -1,4 +1,9 @@
+using ManageR2.Api.DTOs;
+using ManageR2.Domain.Entities;
+using ManageR2.Domain.Exceptions;
 using ManageR2.Infrastructure.Repositories;
+using ManageR2.Infrastructure.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ManageR2.Api.Controllers;
@@ -8,29 +13,153 @@ namespace ManageR2.Api.Controllers;
 public class UsersController : ControllerBase
 {
     private readonly IUserRepository _userRepository;
+    private readonly IJwtTokenService _jwtTokenService;
+    private readonly IPasswordService _passwordService;
+    private readonly ILogger<UsersController> _logger;
 
-    public UsersController(IUserRepository userRepository)
+    public UsersController(
+        IUserRepository userRepository,
+        IJwtTokenService jwtTokenService,
+        IPasswordService passwordService,
+        ILogger<UsersController> logger)
     {
         _userRepository = userRepository;
+        _jwtTokenService = jwtTokenService;
+        _passwordService = passwordService;
+        _logger = logger;
     }
 
+    private static UserResponseDto ToSafeUser(User u)
+    {
+        return new UserResponseDto
+        {
+            UserId = u.UserId,
+            EmployeeId = u.EmployeeId,
+            Username = u.Username,
+            Email = u.Email,
+            IsActive = u.IsActive,
+            LastLoginAt = u.LastLoginAt,
+            CreatedAt = u.CreatedAt
+        };
+    }
+
+    [Authorize]
     [HttpGet]
     public async Task<IActionResult> GetUsers()
     {
         var users = await _userRepository.GetUsersAsync();
-        return Ok(users);
+        return Ok(users.Select(ToSafeUser));
     }
 
+    [Authorize]
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetUserById(int id)
     {
         var user = await _userRepository.GetUserByIdAsync(id);
-
-        if (user is null)
-        {
+        if (user == null)
             return NotFound();
+
+        return Ok(ToSafeUser(user));
+    }
+
+    [Authorize]
+    [HttpPost]
+    public async Task<IActionResult> CreateUser([FromBody] CreateUserDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Password))
+            return BadRequest(new { message = "Password is required." });
+
+        _passwordService.CreatePasswordHash(dto.Password, out var hash, out var salt);
+
+        var user = new User
+        {
+            EmployeeId = dto.EmployeeId,
+            Username = dto.Username,
+            Email = dto.Email,
+            PasswordHash = hash,
+            PasswordSalt = salt,
+            IsActive = dto.IsActive
+        };
+
+        var id = await _userRepository.CreateUserAsync(user);
+        var created = await _userRepository.GetUserByIdAsync(id);
+
+        return CreatedAtAction(nameof(GetUserById), new { id }, ToSafeUser(created!));
+    }
+
+    [Authorize]
+    [HttpPut("{id:int}")]
+    public async Task<IActionResult> UpdateUser(int id, [FromBody] UpdateUserDto dto)
+    {
+        var existing = await _userRepository.GetUserByIdAsync(id);
+        if (existing == null)
+            return NotFound();
+
+        string hash = existing.PasswordHash;
+        string salt = existing.PasswordSalt;
+
+        if (!string.IsNullOrWhiteSpace(dto.Password))
+        {
+            _passwordService.CreatePasswordHash(dto.Password, out hash, out salt);
         }
 
-        return Ok(user);
+        var user = new User
+        {
+            UserId = id,
+            EmployeeId = dto.EmployeeId,
+            Username = dto.Username,
+            Email = dto.Email,
+            PasswordHash = hash,
+            PasswordSalt = salt,
+            IsActive = dto.IsActive
+        };
+
+        await _userRepository.UpdateUserAsync(user);
+
+        var updated = await _userRepository.GetUserByIdAsync(id);
+        return Ok(ToSafeUser(updated!));
+    }
+
+    [Authorize]
+    [HttpDelete("{id:int}")]
+    public async Task<IActionResult> DeleteUser(int id)
+    {
+        var existing = await _userRepository.GetUserByIdAsync(id);
+        if (existing == null)
+            return NotFound();
+
+        await _userRepository.DeleteUserAsync(id);
+        return NoContent();
+    }
+
+    [HttpPost("login")]
+    public async Task<IActionResult> Login([FromBody] LoginRequestDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Email))
+            return BadRequest(new { message = "Email is required." });
+
+        if (string.IsNullOrWhiteSpace(dto.Password))
+            return BadRequest(new { message = "Password is required." });
+
+        var email = dto.Email.Trim().ToLower();
+
+        var user = await _userRepository.GetUserByEmailAsync(email);
+        if (user == null)
+            return Unauthorized(new { message = "Invalid email or password." });
+
+        var isValid = _passwordService.VerifyPassword(dto.Password, user.PasswordHash, user.PasswordSalt);
+        if (!isValid)
+            return Unauthorized(new { message = "Invalid email or password." });
+
+        var token = _jwtTokenService.GenerateToken(user);
+
+        return Ok(new LoginResponseDto
+        {
+            UserId = user.UserId,
+            Username = user.Username,
+            Email = user.Email,
+            IsActive = user.IsActive,
+            Token = token
+        });
     }
 }
