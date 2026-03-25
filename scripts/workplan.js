@@ -75,13 +75,17 @@ document.addEventListener("DOMContentLoaded", () => {
     const tasks = [];
     document.querySelectorAll(".task[data-task-id]").forEach((task) => {
       const row = task.closest(".workplan-row");
-      const assignee = row
+      const taskId = task.getAttribute("data-task-id");
+
+      const resolvedAssignee = getResolvedAssigneeNameByTaskId(taskId);
+      const fallbackAssignee = row
         ? row.querySelector(".row-title")?.textContent || ""
         : "";
+
+      const assignee = resolvedAssignee || fallbackAssignee;
       const name = task.querySelector(".task-name")?.textContent || "";
       const metaText = task.querySelector(".task-meta")?.textContent || "";
       const meta = parseMeta(metaText);
-      const taskId = task.getAttribute("data-task-id");
       const kind = task.getAttribute("data-kind") || "project";
       const locked = task.getAttribute("data-locked") === "true";
       const personal = task.getAttribute("data-personal") === "true";
@@ -134,6 +138,39 @@ document.addEventListener("DOMContentLoaded", () => {
   );
   currentWeekStart.setHours(0, 0, 0, 0);
 
+  function getTasksForWeekly() {
+    if (currentWorkPlanData && currentWorkPlanData.tasks) {
+      return currentWorkPlanData.tasks.map((task, index) => {
+        const assignment = resolveAssignment(task, currentWorkPlanData);
+
+        const startHour = 8 + index * 2;
+        const endHour = startHour + 2;
+
+        return {
+          id: task.workItemId,
+          name: task.title,
+          assignee: assignment.displayName || "",
+          startHour,
+          endHour,
+          status: task.status || "-",
+          urgency: "-",
+          kind: "project",
+          locked: false,
+          personal: false,
+          projectId:
+            task.parentWorkItemId ||
+            currentWorkPlanData.project?.workItemId ||
+            undefined,
+          serviceCallId: undefined,
+          assignedEmployeeIds: [],
+          role: undefined,
+        };
+      });
+    }
+
+    return extractTaskData();
+  }
+
   function renderWeeklyView() {
     const grid = document.getElementById("weekly-grid");
     if (!grid) return;
@@ -147,7 +184,7 @@ document.addEventListener("DOMContentLoaded", () => {
       titleEl.textContent = `${currentWeekStart.toLocaleDateString("he-IL", options)} - ${weekEnd.toLocaleDateString("he-IL", options)}`;
     }
 
-    const tasks = extractTaskData();
+    const tasks = getTasksForWeekly();
     const days = ["ראשון", "שני", "שלישי", "רביעי", "חמישי", "שישי", "שבת"];
 
     grid.innerHTML = "";
@@ -194,6 +231,8 @@ document.addEventListener("DOMContentLoaded", () => {
           taskEl.type = "button";
           taskEl.className = `workplan-weekly-task task-${task.kind} ${task.locked ? "task-locked" : ""} ${task.personal ? "task-personal" : ""}`;
           taskEl.setAttribute("data-task-id", task.id);
+          taskEl.setAttribute("data-start-hour", String(task.startHour));
+          taskEl.setAttribute("data-end-hour", String(task.endHour));
           if (task.projectId) {
             taskEl.setAttribute("data-project-id", task.projectId);
           }
@@ -223,6 +262,44 @@ document.addEventListener("DOMContentLoaded", () => {
   let currentMonth = new Date().getMonth();
   let currentYear = new Date().getFullYear();
 
+  function getTasksForMonthly() {
+    if (currentWorkPlanData && currentWorkPlanData.tasks) {
+      return currentWorkPlanData.tasks.map((task, index) => {
+        const assignment = resolveAssignment(task, currentWorkPlanData);
+
+        const startHour = 8 + (index % 4) * 2;
+        const endHour = startHour + 2;
+        const dayIndex = index % 7;
+
+        return {
+          id: task.workItemId,
+          name: task.title,
+          assignee: assignment.displayName || "",
+          startHour,
+          endHour,
+          status: task.status || "-",
+          urgency: "-",
+          kind: "project",
+          locked: false,
+          personal: false,
+          projectId:
+            task.parentWorkItemId ||
+            currentWorkPlanData.project?.workItemId ||
+            undefined,
+          serviceCallId: undefined,
+          assignedEmployeeIds: [],
+          role: undefined,
+          dayIndex,
+        };
+      });
+    }
+
+    return extractTaskData().map((task, index) => ({
+      ...task,
+      dayIndex: index % 7,
+    }));
+  }
+
   function renderMonthlyView() {
     const grid = document.getElementById("monthly-grid");
     if (!grid) return;
@@ -246,7 +323,7 @@ document.addEventListener("DOMContentLoaded", () => {
       titleEl.textContent = `${monthNames[currentMonth]} ${currentYear}`;
     }
 
-    const tasks = extractTaskData();
+    const tasks = getTasksForMonthly();
     const firstDay = new Date(currentYear, currentMonth, 1);
     const lastDay = new Date(currentYear, currentMonth + 1, 0);
     const startDate = new Date(firstDay);
@@ -317,7 +394,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         const dayOfWeek = date.getDay();
         const dayTasksList = tasks
-          .filter((t, idx) => idx % 7 === dayOfWeek)
+          .filter((t) => t.dayIndex === dayOfWeek)
           .slice(0, 3);
 
         dayTasksList.forEach((task) => {
@@ -325,6 +402,8 @@ document.addEventListener("DOMContentLoaded", () => {
           taskEl.type = "button";
           taskEl.className = `workplan-monthly-task task-${task.kind} ${task.locked ? "task-locked" : ""}`;
           taskEl.setAttribute("data-task-id", task.id);
+          taskEl.setAttribute("data-start-hour", String(task.startHour));
+          taskEl.setAttribute("data-end-hour", String(task.endHour));
           if (task.projectId) {
             taskEl.setAttribute("data-project-id", task.projectId);
           }
@@ -361,6 +440,28 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let currentYearView = new Date().getFullYear();
 
+  function getTasksForYearly() {
+    if (currentWorkPlanData && currentWorkPlanData.tasks) {
+      return currentWorkPlanData.tasks.map((task, index) => {
+        const assignment = resolveAssignment(task, currentWorkPlanData);
+
+        return {
+          id: task.workItemId,
+          name: task.title,
+          assignee: assignment.displayName || "",
+          status: task.status || "-",
+          kind: "project",
+          monthIndex: index % 12,
+        };
+      });
+    }
+
+    return extractTaskData().map((task, index) => ({
+      ...task,
+      monthIndex: index % 12,
+    }));
+  }
+
   function renderYearlyView() {
     const grid = document.getElementById("yearly-grid");
     if (!grid) return;
@@ -370,7 +471,7 @@ document.addEventListener("DOMContentLoaded", () => {
       titleEl.textContent = `שנת ${currentYearView}`;
     }
 
-    const tasks = extractTaskData();
+    const tasks = getTasksForYearly();
     const monthNames = [
       "ינואר",
       "פברואר",
@@ -401,9 +502,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
       const monthCount = document.createElement("div");
       monthCount.className = "workplan-yearly-month-count";
-      const taskCount =
-        Math.floor(tasks.length / 12) +
-        (monthIndex < tasks.length % 12 ? 1 : 0);
+      const taskCount = tasks.filter(
+        (task) => task.monthIndex === monthIndex,
+      ).length;
       monthCount.textContent = `${taskCount} משימות`;
       monthCard.appendChild(monthCount);
 
@@ -895,11 +996,22 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const row = taskEl.closest(".workplan-row, .workplan-weekly-row");
+    const taskId = taskEl.getAttribute("data-task-id");
+    const workPlanTask = getWorkPlanTaskById(taskId);
+
+    const assignment = workPlanTask
+      ? resolveAssignment(workPlanTask, currentWorkPlanData)
+      : { displayName: "" };
+
     const taskNameEl = taskEl.querySelector(".task-name");
-    const name = taskNameEl ? taskNameEl.textContent.trim() : "";
+    const name = taskNameEl
+      ? taskNameEl.textContent.trim()
+      : (taskEl.textContent || "").trim();
+
     const taskMetaEl = taskEl.querySelector(".task-meta");
     const metaText = taskMetaEl ? taskMetaEl.textContent : "";
     const meta = parseMeta(metaText);
+
     const projectAttr = row ? row.getAttribute("data-project") : null;
     const rowTitle = row
       ? (
@@ -916,8 +1028,13 @@ document.addEventListener("DOMContentLoaded", () => {
       "-" +
       String(today.getDate()).padStart(2, "0");
 
-    let projectId = null;
-    let customerName = null;
+    let projectId =
+      taskEl.getAttribute("data-project-id") ||
+      workPlanTask?.parentWorkItemId ||
+      currentWorkPlanData?.project?.workItemId ||
+      null;
+
+    let customerName = currentWorkPlanData?.project?.title || null;
     let site = "";
 
     if (projectAttr === "villa" || name.includes("וילה רמת אביב")) {
@@ -967,12 +1084,13 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     const assignee =
-      row && !projectAttr
+      assignment.displayName ||
+      (row && !projectAttr
         ? (
             row.querySelector(".row-title, .workplan-weekly-name")
               ?.textContent || ""
           ).trim()
-        : "";
+        : "");
     const serviceCallId = taskEl.getAttribute("data-service-call-id") || null;
     const role = taskEl.getAttribute("data-role") || null;
 
@@ -1130,8 +1248,6 @@ document.addEventListener("DOMContentLoaded", () => {
     let projectName = null;
     let projectManager = null;
 
-    const apiAssigneeName = taskEl.getAttribute("data-assignee-name");
-
     if (row) {
       const rowTitle =
         row.querySelector(".row-title, .workplan-weekly-name")?.textContent ||
@@ -1142,15 +1258,28 @@ document.addEventListener("DOMContentLoaded", () => {
         projectId = projectAttr;
         projectName = rowTitle;
         projectManager = projectManagerMap[projectId] || "לא הוגדר";
-        assignee = projectManager;
-      } else if (apiAssigneeName) {
-        assignee = apiAssigneeName;
-      } else if (projectAttr) {
-        assignee = `פרויקט: ${rowTitle}`;
-      } else {
-        assignee = rowTitle;
       }
     }
+
+    let assignment = {
+      displayName: "—",
+      source: "none",
+      type: null,
+    };
+
+    if (currentWorkPlanData && taskEl) {
+      const taskId = taskEl.getAttribute("data-task-id");
+
+      const task = currentWorkPlanData.tasks.find(
+        (t) => String(t.workItemId) === String(taskId),
+      );
+
+      if (task) {
+        assignment = resolveAssignment(task, currentWorkPlanData);
+      }
+    }
+
+    assignee = assignment.displayName || "—";
 
     const taskNameEl = taskEl.querySelector(".task-name");
     const name = taskNameEl
@@ -1186,7 +1315,7 @@ document.addEventListener("DOMContentLoaded", () => {
       titleEl.textContent = name;
     }
     if (assigneeEl) {
-      assigneeEl.textContent = assignee;
+      assigneeEl.textContent = assignee || "—";
     }
     if (timeEl) {
       timeEl.textContent = meta.time || "-";
@@ -1460,39 +1589,107 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  function getResponsibleName(task, workPlan) {
-    if (!workPlan || !workPlan.assignments) return "—";
+  function resolveAssignment(task, workPlan) {
+    if (!workPlan || !workPlan.assignments) {
+      return {
+        displayName: "—",
+        source: "none",
+        type: null,
+      };
+    }
 
+    // 1. חיפוש assignment ברמת המשימה
     let assignment = workPlan.assignments.find(
       (a) => a.workItemId === task.workItemId,
     );
 
+    let source = "task";
+
+    // 2. fallback לפרויקט
     if (!assignment) {
       assignment = workPlan.assignments.find(
         (a) => a.workItemId === workPlan.project.workItemId,
       );
+      source = assignment ? "project" : "none";
     }
 
-    if (!assignment) return "—";
+    if (!assignment) {
+      return {
+        displayName: "—",
+        source: "none",
+        type: null,
+      };
+    }
 
     if (assignment.employeeName) {
-      return assignment.employeeName;
+      return {
+        displayName: assignment.employeeName,
+        source,
+        type: "employee",
+      };
     }
 
     if (assignment.contractorName) {
-      return assignment.contractorName;
+      return {
+        displayName: assignment.contractorName,
+        source,
+        type: "contractor",
+      };
     }
 
     if (assignment.employeeId) {
-      return `Employee #${assignment.employeeId}`;
+      return {
+        displayName: `Employee #${assignment.employeeId}`,
+        source,
+        type: "employee",
+      };
     }
 
     if (assignment.contractorId) {
-      return `Contractor #${assignment.contractorId}`;
+      return {
+        displayName: `Contractor #${assignment.contractorId}`,
+        source,
+        type: "contractor",
+      };
     }
 
-    return "—";
+    return {
+      displayName: "—",
+      source: "none",
+      type: null,
+    };
   }
+
+  function getResolvedAssigneeNameByTaskId(taskId) {
+    if (!currentWorkPlanData || !currentWorkPlanData.tasks || !taskId) {
+      return "";
+    }
+
+    const task = currentWorkPlanData.tasks.find(
+      (t) => String(t.workItemId) === String(taskId),
+    );
+
+    if (!task) {
+      return "";
+    }
+
+    const assignment = resolveAssignment(task, currentWorkPlanData);
+    return assignment.displayName || "";
+  }
+
+  function getWorkPlanTaskById(taskId) {
+    if (!currentWorkPlanData || !currentWorkPlanData.tasks || !taskId) {
+      return null;
+    }
+
+    return (
+      currentWorkPlanData.tasks.find(
+        (t) => String(t.workItemId) === String(taskId),
+      ) || null
+    );
+  }
+
+  let currentWorkPlanData = null;
 
   function renderTasksFromAPI(workPlan) {
     if (!workPlan || !workPlan.tasks) return;
@@ -1511,7 +1708,8 @@ document.addEventListener("DOMContentLoaded", () => {
     track.querySelectorAll(".task").forEach((task) => task.remove());
 
     workPlan.tasks.forEach((task, index) => {
-      const responsible = getResponsibleName(task, workPlan);
+      const assignment = resolveAssignment(task, workPlan);
+      const responsible = assignment.displayName;
       const startHour = 8 + index * 2;
       const duration = 2;
 
@@ -1520,6 +1718,12 @@ document.addEventListener("DOMContentLoaded", () => {
       taskEl.className = "task task-project";
       taskEl.setAttribute("data-task-id", task.workItemId);
       taskEl.setAttribute("data-assignee-name", responsible);
+
+      taskEl.setAttribute("data-assignment-source", assignment.source);
+      taskEl.setAttribute("data-assignment-type", assignment.type || "");
+
+      taskEl.setAttribute("data-start-hour", String(startHour));
+      taskEl.setAttribute("data-end-hour", String(startHour + duration));
 
       taskEl.style.left = `calc((${startHour} / 24) * 100%)`;
       taskEl.style.width = `calc((${duration} / 24) * 100%)`;
@@ -1544,6 +1748,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const TEST_PROJECT_ID = 1;
 
     const workPlan = await fetchWorkPlan(TEST_PROJECT_ID);
+    currentWorkPlanData = workPlan;
 
     if (!workPlan) {
       console.warn("No WorkPlan data received");
