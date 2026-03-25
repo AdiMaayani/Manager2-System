@@ -90,6 +90,44 @@ public class UserRepository : IUserRepository
         }
     }
 
+    public async Task<User?> GetUserByEmailAsync(string email)
+    {
+        _logger.LogInformation("GetUserByEmailAsync started for Email={Email}.", email);
+
+        try
+        {
+            await using var connection = _dbServices.CreateConnection();
+            await using var command = new SqlCommand("dbo.sp_GetUserByEmail", connection)
+            {
+                CommandType = CommandType.StoredProcedure
+            };
+
+            command.Parameters.AddWithValue("@Email", email);
+
+            await connection.OpenAsync();
+            await using var reader = await command.ExecuteReaderAsync();
+
+            if (await reader.ReadAsync())
+            {
+                var user = MapUser(reader);
+
+                _logger.LogInformation("GetUserByEmailAsync succeeded for Email={Email}.", email);
+
+                return user;
+            }
+
+            _logger.LogWarning("GetUserByEmailAsync returned no user for Email={Email}.", email);
+
+            return null;
+        }
+        catch (SqlException ex)
+        {
+            _logger.LogError(ex, "GetUserByEmailAsync failed with SQL error for Email={Email}.", email);
+
+            throw new UserValidationException("Failed to retrieve user by email.", ex);
+        }
+    }
+
     public async Task<int> CreateUserAsync(User user)
     {
         _logger.LogInformation(
@@ -110,6 +148,7 @@ public class UserRepository : IUserRepository
             command.Parameters.AddWithValue("@Username", user.Username);
             command.Parameters.AddWithValue("@Email", user.Email);
             command.Parameters.AddWithValue("@PasswordHash", user.PasswordHash);
+            command.Parameters.AddWithValue("@PasswordSalt", user.PasswordSalt);
             command.Parameters.AddWithValue("@IsActive", user.IsActive);
 
             await connection.OpenAsync();
@@ -174,6 +213,7 @@ public class UserRepository : IUserRepository
             command.Parameters.AddWithValue("@Username", user.Username);
             command.Parameters.AddWithValue("@Email", user.Email);
             command.Parameters.AddWithValue("@PasswordHash", user.PasswordHash);
+            command.Parameters.AddWithValue("@PasswordSalt", user.PasswordSalt);
             command.Parameters.AddWithValue("@IsActive", user.IsActive);
 
             await connection.OpenAsync();
@@ -285,6 +325,7 @@ public class UserRepository : IUserRepository
             Username = reader["Username"]?.ToString() ?? string.Empty,
             Email = reader["Email"] != DBNull.Value ? reader["Email"]?.ToString() ?? string.Empty : string.Empty,
             PasswordHash = reader["PasswordHash"] != DBNull.Value ? reader["PasswordHash"]?.ToString() ?? string.Empty : string.Empty,
+            PasswordSalt = reader["PasswordSalt"] != DBNull.Value ? reader["PasswordSalt"]?.ToString() ?? string.Empty : string.Empty,
             IsActive = reader["IsActive"] != DBNull.Value && Convert.ToBoolean(reader["IsActive"]),
             LastLoginAt = reader["LastLoginAt"] != DBNull.Value ? Convert.ToDateTime(reader["LastLoginAt"]) : null,
             CreatedAt = reader["CreatedAt"] != DBNull.Value ? Convert.ToDateTime(reader["CreatedAt"]) : DateTime.MinValue
