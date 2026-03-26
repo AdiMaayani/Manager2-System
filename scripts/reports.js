@@ -165,6 +165,96 @@
     console.groupEnd();
   }
 
+  function normalizeText(value) {
+    return String(value || "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .replace(/["״']/g, "")
+      .toLowerCase();
+  }
+
+  function setSelectByCandidates(selectEl, candidates, useTextFallback) {
+    if (!selectEl || !candidates || !candidates.length) return false;
+
+    var normalizedCandidates = candidates
+      .filter(function (x) {
+        return x != null && String(x).trim();
+      })
+      .map(function (x) {
+        return String(x).trim();
+      });
+
+    if (!normalizedCandidates.length) return false;
+
+    for (var i = 0; i < normalizedCandidates.length; i++) {
+      var candidate = normalizedCandidates[i];
+      selectEl.value = candidate;
+      if (String(selectEl.value) === String(candidate)) {
+        return true;
+      }
+    }
+
+    if (useTextFallback) {
+      for (var o = 0; o < selectEl.options.length; o++) {
+        var opt = selectEl.options[o];
+        var optText = normalizeText(opt.textContent);
+        for (var c = 0; c < normalizedCandidates.length; c++) {
+          if (optText === normalizeText(normalizedCandidates[c])) {
+            selectEl.value = opt.value;
+            return true;
+          }
+        }
+      }
+    }
+
+    return false;
+  }
+
+  function normalizeQuickText(value) {
+    return String(value || "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .replace(/["״']/g, "")
+      .toLowerCase();
+  }
+
+  function setSelectByCandidates(selectEl, candidates, useTextFallback) {
+    if (!selectEl || !candidates || !candidates.length) return false;
+
+    var cleanCandidates = candidates
+      .filter(function (x) {
+        return x != null && String(x).trim();
+      })
+      .map(function (x) {
+        return String(x).trim();
+      });
+
+    if (!cleanCandidates.length) return false;
+
+    for (var i = 0; i < cleanCandidates.length; i++) {
+      var candidate = cleanCandidates[i];
+      selectEl.value = candidate;
+      if (String(selectEl.value) === String(candidate)) {
+        return true;
+      }
+    }
+
+    if (useTextFallback) {
+      for (var o = 0; o < selectEl.options.length; o++) {
+        var opt = selectEl.options[o];
+        var optText = normalizeQuickText(opt.textContent);
+        for (var c = 0; c < cleanCandidates.length; c++) {
+          if (optText === normalizeQuickText(cleanCandidates[c])) {
+            selectEl.value = opt.value;
+            return true;
+          }
+        }
+      }
+    }
+
+    return false;
+  }
+
   function onProjectChange() {
     if (!el.project || !el.customer) return;
     var sel = el.project.options[el.project.selectedIndex];
@@ -1441,40 +1531,61 @@
     setReportType(defaultService ? "service_call" : "project");
     if (el.date && prefill.date) el.date.value = prefill.date;
     if (defaultService && el.serviceCall && prefill.serviceCallId) {
-      el.serviceCall.value = prefill.serviceCallId;
+      setSelectByCandidates(el.serviceCall, [prefill.serviceCallId], false);
       onServiceCallChange();
-    } else if (!defaultService && el.project && prefill.projectId) {
-      el.project.value = prefill.projectId;
-      onProjectChange();
+    } else if (!defaultService && el.project) {
+      var projectMatched = setSelectByCandidates(
+        el.project,
+        [prefill.projectId, prefill.projectName, prefill.customerName],
+        true,
+      );
+
+      if (projectMatched) {
+        onProjectChange();
+      }
     }
-    if (!defaultService && el.customer && prefill.customerName)
-      el.customer.value = prefill.customerName;
+    if (!defaultService && el.customer && prefill.customerName) {
+      if (!el.customer.value || !String(el.customer.value).trim()) {
+        el.customer.value = prefill.customerName;
+      }
+    }
     if (el.site && prefill.site) el.site.value = prefill.site;
     if (el.start && prefill.start) el.start.value = prefill.start;
     if (el.end && prefill.end) el.end.value = prefill.end;
-    if (el.reporter && prefill.assigneeName) {
-      var match = MOCK_EMPLOYEES.filter(function (e) {
-        return e.fullName === prefill.assigneeName;
-      })[0];
-      if (match) el.reporter.value = match.id;
+    if (el.reporter && (prefill.reporterId || prefill.reporterName)) {
+      var reporterMatched = setSelectByCandidates(
+        el.reporter,
+        [prefill.reporterId, prefill.reporterName],
+        true,
+      );
+
+      if (!reporterMatched && prefill.reporterName) {
+        var reporterNameNormalized = normalizeText(prefill.reporterName);
+
+        var match = MOCK_EMPLOYEES.filter(function (e) {
+          return normalizeText(e.fullName) === reporterNameNormalized;
+        })[0];
+
+        if (match) {
+          el.reporter.value = String(match.id);
+        }
+      }
     }
-    if (el.role && prefill.role) {
+    if (el.role && prefill.reporterRole) {
       var roleText = (
-        typeof prefill.role === "string" ? prefill.role : ""
+        typeof prefill.reporterRole === "string" ? prefill.reporterRole : ""
       ).trim();
+
       if (roleText) {
-        var roleValue = roleText;
-        var roleOpts = ["מתקין", "מנהל פרויקט", "טכנאי"];
-        if (roleOpts.indexOf(roleText) === -1) {
-          var roleMap = { מנהל: "מנהל פרויקט" };
-          roleValue = roleMap[roleText] || roleValue;
-        }
-        for (var r = 0; r < el.role.options.length; r++) {
-          if (el.role.options[r].value === roleValue) {
-            el.role.value = roleValue;
-            break;
-          }
-        }
+        var roleMap = {
+          מנהל: "מנהל פרויקט",
+          "מנהל עבודה": "מנהל פרויקט",
+          "מתקין ראשי": "מתקין",
+        };
+
+        var mappedRole = roleMap[roleText] || roleText;
+
+        setSelectByCandidates(el.role, [mappedRole, roleText], true);
       }
     }
     if (el.summary) el.summary.value = "";

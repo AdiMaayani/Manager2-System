@@ -612,6 +612,12 @@ document.addEventListener("DOMContentLoaded", () => {
   );
   const CURRENT_USER_ROW_KEY = "david";
 
+  const CURRENT_SESSION_REPORTER = {
+    id: "EMP-001",
+    name: "רביב מעיני",
+    role: "מנהל פרויקט",
+  };
+
   function applyScope(scope) {
     scopeButtons.forEach((b) => b.classList.remove("active"));
     const activeBtn = document.querySelector(
@@ -721,6 +727,36 @@ document.addEventListener("DOMContentLoaded", () => {
   function employeeNameById(id) {
     const e = MOCK_EMPLOYEES.find((x) => x.id === id);
     return e && e.fullName ? e.fullName : id;
+  }
+
+  function normalizeQuickText(value) {
+    return String(value || "")
+      .trim()
+      .replace(/\s+/g, " ")
+      .toLowerCase();
+  }
+
+  function getCurrentSessionReporterContext() {
+    if (
+      CURRENT_SESSION_REPORTER &&
+      (CURRENT_SESSION_REPORTER.id ||
+        CURRENT_SESSION_REPORTER.name ||
+        CURRENT_SESSION_REPORTER.role)
+    ) {
+      return {
+        reporterId: CURRENT_SESSION_REPORTER.id || "",
+        reporterName: CURRENT_SESSION_REPORTER.name || "",
+        reporterRole: CURRENT_SESSION_REPORTER.role || "",
+      };
+    }
+
+    const defaultRole = currentRole === "employee" ? "מתקין" : "מנהל פרויקט";
+
+    return {
+      reporterId: "",
+      reporterName: "",
+      reporterRole: defaultRole,
+    };
   }
 
   function populateAssignedSelect(excludeIds) {
@@ -1091,19 +1127,23 @@ document.addEventListener("DOMContentLoaded", () => {
               ?.textContent || ""
           ).trim()
         : "");
+
+    const sessionReporter = getCurrentSessionReporterContext();
     const serviceCallId = taskEl.getAttribute("data-service-call-id") || null;
-    const role = taskEl.getAttribute("data-role") || null;
 
     const payload = {
       date,
       projectId,
+      projectName: currentWorkPlanData?.project?.title || "",
       customerName,
       site,
       start,
       end,
-      assigneeName: assignee || "",
+      reporterId: sessionReporter.reporterId || "",
+      reporterName: sessionReporter.reporterName || "",
+      reporterRole: sessionReporter.reporterRole || "",
+      taskAssigneeName: assignee || "",
       serviceCallId: serviceCallId || undefined,
-      role: role || undefined,
     };
 
     console.log("Source: Task element + DOM extraction");
@@ -1721,6 +1761,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
       taskEl.setAttribute("data-assignment-source", assignment.source);
       taskEl.setAttribute("data-assignment-type", assignment.type || "");
+
+      if (task.parentWorkItemId || workPlan.project?.workItemId) {
+        taskEl.setAttribute(
+          "data-project-id",
+          String(task.parentWorkItemId || workPlan.project.workItemId),
+        );
+      }
 
       taskEl.setAttribute("data-start-hour", String(startHour));
       taskEl.setAttribute("data-end-hour", String(startHour + duration));
