@@ -2,6 +2,8 @@ using ManageR2.Api.DTOs;
 using ManageR2.Domain.Entities;
 using ManageR2.Domain.Exceptions;
 using ManageR2.Infrastructure.Repositories;
+using ManageR2.Infrastructure.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ManageR2.Api.Controllers;
@@ -11,241 +13,153 @@ namespace ManageR2.Api.Controllers;
 public class UsersController : ControllerBase
 {
     private readonly IUserRepository _userRepository;
+    private readonly IJwtTokenService _jwtTokenService;
+    private readonly IPasswordService _passwordService;
     private readonly ILogger<UsersController> _logger;
 
-    public UsersController(IUserRepository userRepository, ILogger<UsersController> logger)
+    public UsersController(
+        IUserRepository userRepository,
+        IJwtTokenService jwtTokenService,
+        IPasswordService passwordService,
+        ILogger<UsersController> logger)
     {
         _userRepository = userRepository;
+        _jwtTokenService = jwtTokenService;
+        _passwordService = passwordService;
         _logger = logger;
     }
 
+    private static UserResponseDto ToSafeUser(User u)
+    {
+        return new UserResponseDto
+        {
+            UserId = u.UserId,
+            EmployeeId = u.EmployeeId,
+            Username = u.Username,
+            Email = u.Email,
+            IsActive = u.IsActive,
+            LastLoginAt = u.LastLoginAt,
+            CreatedAt = u.CreatedAt
+        };
+    }
+
+    [Authorize]
     [HttpGet]
     public async Task<IActionResult> GetUsers()
     {
-        _logger.LogInformation("GetUsers started.");
-
-        try
-        {
-            var users = await _userRepository.GetUsersAsync();
-
-            _logger.LogInformation("GetUsers succeeded. Returned {UsersCount} users.", users.Count());
-
-            return Ok(users);
-        }
-        catch (UserValidationException ex)
-        {
-            _logger.LogWarning(ex, "GetUsers failed with validation error.");
-
-            return BadRequest(new { message = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "GetUsers failed with unexpected error.");
-
-            return BadRequest(new { message = "Failed to retrieve users." });
-        }
+        var users = await _userRepository.GetUsersAsync();
+        return Ok(users.Select(ToSafeUser));
     }
 
+    [Authorize]
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetUserById(int id)
     {
-        _logger.LogInformation("GetUserById started for UserId={UserId}.", id);
+        var user = await _userRepository.GetUserByIdAsync(id);
+        if (user == null)
+            return NotFound();
 
-        try
-        {
-            var user = await _userRepository.GetUserByIdAsync(id);
-
-            if (user is null)
-            {
-                _logger.LogWarning("GetUserById returned NotFound for UserId={UserId}.", id);
-
-                return NotFound(new { message = $"User with id {id} was not found." });
-            }
-
-            _logger.LogInformation("GetUserById succeeded for UserId={UserId}.", id);
-
-            return Ok(user);
-        }
-        catch (UserValidationException ex)
-        {
-            _logger.LogWarning(ex, "GetUserById failed with validation error for UserId={UserId}.", id);
-
-            return BadRequest(new { message = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "GetUserById failed with unexpected error for UserId={UserId}.", id);
-
-            return BadRequest(new { message = "Failed to retrieve the requested user." });
-        }
+        return Ok(ToSafeUser(user));
     }
 
+    [Authorize]
     [HttpPost]
     public async Task<IActionResult> CreateUser([FromBody] CreateUserDto dto)
     {
-        _logger.LogInformation(
-            "CreateUser started for Username={Username}, Email={Email}, EmployeeId={EmployeeId}.",
-            dto.Username,
-            dto.Email,
-            dto.EmployeeId);
+        if (string.IsNullOrWhiteSpace(dto.Password))
+            return BadRequest(new { message = "Password is required." });
 
-        try
+        _passwordService.CreatePasswordHash(dto.Password, out var hash, out var salt);
+
+        var user = new User
         {
-            var userToCreate = new User
-            {
-                EmployeeId = dto.EmployeeId,
-                Username = dto.Username,
-                Email = dto.Email,
-                PasswordHash = dto.PasswordHash,
-                IsActive = dto.IsActive
-            };
+            EmployeeId = dto.EmployeeId,
+            Username = dto.Username,
+            Email = dto.Email,
+            PasswordHash = hash,
+            PasswordSalt = salt,
+            IsActive = dto.IsActive
+        };
 
-            var newUserId = await _userRepository.CreateUserAsync(userToCreate);
-            var createdUser = await _userRepository.GetUserByIdAsync(newUserId);
+        var id = await _userRepository.CreateUserAsync(user);
+        var created = await _userRepository.GetUserByIdAsync(id);
 
-            if (createdUser is null)
-            {
-                _logger.LogWarning(
-                    "CreateUser created UserId={UserId}, but failed to retrieve the created user.",
-                    newUserId);
-
-                return BadRequest(new { message = "User was created but could not be retrieved." });
-            }
-
-            _logger.LogInformation("CreateUser succeeded for UserId={UserId}.", newUserId);
-
-            return CreatedAtAction(nameof(GetUserById), new { id = newUserId }, createdUser);
-        }
-        catch (UserValidationException ex)
-        {
-            _logger.LogWarning(
-                ex,
-                "CreateUser failed with validation error for Email={Email}, EmployeeId={EmployeeId}.",
-                dto.Email,
-                dto.EmployeeId);
-
-            return BadRequest(new { message = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(
-                ex,
-                "CreateUser failed with unexpected error for Email={Email}, EmployeeId={EmployeeId}.",
-                dto.Email,
-                dto.EmployeeId);
-
-            return BadRequest(new { message = "Failed to create the user." });
-        }
+        return CreatedAtAction(nameof(GetUserById), new { id }, ToSafeUser(created!));
     }
 
+    [Authorize]
     [HttpPut("{id:int}")]
     public async Task<IActionResult> UpdateUser(int id, [FromBody] UpdateUserDto dto)
     {
-        _logger.LogInformation(
-            "UpdateUser started for UserId={UserId}, Email={Email}, EmployeeId={EmployeeId}.",
-            id,
-            dto.Email,
-            dto.EmployeeId);
+        var existing = await _userRepository.GetUserByIdAsync(id);
+        if (existing == null)
+            return NotFound();
 
-        try
+        string hash = existing.PasswordHash;
+        string salt = existing.PasswordSalt;
+
+        if (!string.IsNullOrWhiteSpace(dto.Password))
         {
-            var existingUser = await _userRepository.GetUserByIdAsync(id);
-
-            if (existingUser is null)
-            {
-                _logger.LogWarning("UpdateUser returned NotFound for UserId={UserId}.", id);
-
-                return NotFound(new { message = $"User with id {id} was not found." });
-            }
-
-            var userToUpdate = new User
-            {
-                UserId = id,
-                EmployeeId = dto.EmployeeId,
-                Username = dto.Username,
-                Email = dto.Email,
-                PasswordHash = dto.PasswordHash,
-                IsActive = dto.IsActive
-            };
-
-            var wasUpdated = await _userRepository.UpdateUserAsync(userToUpdate);
-
-            if (!wasUpdated)
-            {
-                _logger.LogWarning("UpdateUser failed because repository returned false for UserId={UserId}.", id);
-
-                return BadRequest(new { message = "User update failed." });
-            }
-
-            var updatedUser = await _userRepository.GetUserByIdAsync(id);
-
-            if (updatedUser is null)
-            {
-                _logger.LogWarning(
-                    "UpdateUser succeeded in repository but failed to retrieve updated user for UserId={UserId}.",
-                    id);
-
-                return BadRequest(new { message = "User was updated but could not be retrieved." });
-            }
-
-            _logger.LogInformation("UpdateUser succeeded for UserId={UserId}.", id);
-
-            return Ok(updatedUser);
+            _passwordService.CreatePasswordHash(dto.Password, out hash, out salt);
         }
-        catch (UserValidationException ex)
+
+        var user = new User
         {
-            _logger.LogWarning(ex, "UpdateUser failed with validation error for UserId={UserId}.", id);
+            UserId = id,
+            EmployeeId = dto.EmployeeId,
+            Username = dto.Username,
+            Email = dto.Email,
+            PasswordHash = hash,
+            PasswordSalt = salt,
+            IsActive = dto.IsActive
+        };
 
-            return BadRequest(new { message = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "UpdateUser failed with unexpected error for UserId={UserId}.", id);
+        await _userRepository.UpdateUserAsync(user);
 
-            return BadRequest(new { message = "Failed to update the user." });
-        }
+        var updated = await _userRepository.GetUserByIdAsync(id);
+        return Ok(ToSafeUser(updated!));
     }
 
+    [Authorize]
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> DeleteUser(int id)
     {
-        _logger.LogInformation("DeleteUser started for UserId={UserId}.", id);
+        var existing = await _userRepository.GetUserByIdAsync(id);
+        if (existing == null)
+            return NotFound();
 
-        try
+        await _userRepository.DeleteUserAsync(id);
+        return NoContent();
+    }
+
+    [HttpPost("login")]
+    public async Task<IActionResult> Login([FromBody] LoginRequestDto dto)
+    {
+        if (string.IsNullOrWhiteSpace(dto.Email))
+            return BadRequest(new { message = "Email is required." });
+
+        if (string.IsNullOrWhiteSpace(dto.Password))
+            return BadRequest(new { message = "Password is required." });
+
+        var email = dto.Email.Trim().ToLower();
+
+        var user = await _userRepository.GetUserByEmailAsync(email);
+        if (user == null)
+            return Unauthorized(new { message = "Invalid email or password." });
+
+        var isValid = _passwordService.VerifyPassword(dto.Password, user.PasswordHash, user.PasswordSalt);
+        if (!isValid)
+            return Unauthorized(new { message = "Invalid email or password." });
+
+        var token = _jwtTokenService.GenerateToken(user);
+
+        return Ok(new LoginResponseDto
         {
-            var existingUser = await _userRepository.GetUserByIdAsync(id);
-
-            if (existingUser is null)
-            {
-                _logger.LogWarning("DeleteUser returned NotFound for UserId={UserId}.", id);
-
-                return NotFound(new { message = $"User with id {id} was not found." });
-            }
-
-            var wasDeleted = await _userRepository.DeleteUserAsync(id);
-
-            if (!wasDeleted)
-            {
-                _logger.LogWarning("DeleteUser failed because repository returned false for UserId={UserId}.", id);
-
-                return BadRequest(new { message = "User delete failed." });
-            }
-
-            _logger.LogInformation("DeleteUser succeeded for UserId={UserId}.", id);
-
-            return NoContent();
-        }
-        catch (UserValidationException ex)
-        {
-            _logger.LogWarning(ex, "DeleteUser failed with validation error for UserId={UserId}.", id);
-
-            return BadRequest(new { message = ex.Message });
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "DeleteUser failed with unexpected error for UserId={UserId}.", id);
-
-            return BadRequest(new { message = "Failed to delete the user." });
-        }
+            UserId = user.UserId,
+            Username = user.Username,
+            Email = user.Email,
+            IsActive = user.IsActive,
+            Token = token
+        });
     }
 }
