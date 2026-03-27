@@ -2,6 +2,7 @@
   "use strict";
 
   var MOCK_PROJECTS = window.MOCK_PROJECTS || [];
+  var API_PROJECTS = [];
   console.groupCollapsed("🔍 [DATA AUDIT] Employees data loaded");
   var MOCK_EMPLOYEES = window.MOCK_EMPLOYEES || [];
   console.log("Source: window.MOCK_EMPLOYEES");
@@ -18,6 +19,63 @@
     (window.CONTACTS_MOCK_DATA && window.CONTACTS_MOCK_DATA.CUSTOMERS) || [];
 
   var QUICK_REPORT_KEY = "manager2_quick_report_prefill";
+
+  function getProjectsData() {
+    return API_PROJECTS.length ? API_PROJECTS : MOCK_PROJECTS;
+  }
+
+  async function loadProjectsFromApi() {
+    console.groupCollapsed("🔍 [DATA AUDIT] Projects source resolution");
+
+    try {
+      var response = await fetch(
+        "http://localhost:5161/api/WorkItems/type/Project",
+        {
+          method: "GET",
+          headers: {
+            Accept: "application/json",
+          },
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          "Projects API request failed with status " + response.status,
+        );
+      }
+
+      var data = await response.json();
+      console.log("Source: http://localhost:5161/api/WorkItems/type/Project");
+      console.log("Raw API data:", data);
+
+      API_PROJECTS = Array.isArray(data)
+        ? data
+            .map(function (item) {
+              return {
+                id:
+                  item && item.workItemId != null
+                    ? String(item.workItemId)
+                    : "",
+                name: item && item.title ? item.title : "",
+                customerName:
+                  item && item.customerName ? item.customerName : "",
+                raw: item || null,
+              };
+            })
+            .filter(function (p) {
+              return p.id && p.name;
+            })
+        : [];
+
+      console.log("Resolved API projects count:", API_PROJECTS.length);
+    } catch (error) {
+      API_PROJECTS = [];
+      console.warn("Projects API unavailable. Falling back to MOCK_PROJECTS.");
+      console.warn(error);
+    }
+
+    console.groupEnd();
+  }
 
   var el = {
     date: null,
@@ -135,14 +193,29 @@
 
   function populateProjects() {
     if (!el.project) return;
+
+    var projects = getProjectsData();
+    var firstOption = el.project.querySelector('option[value=""]');
+
+    el.project.innerHTML = "";
+    if (firstOption) {
+      el.project.appendChild(firstOption);
+    } else {
+      var defaultOpt = document.createElement("option");
+      defaultOpt.value = "";
+      defaultOpt.textContent = "בחר פרויקט";
+      el.project.appendChild(defaultOpt);
+    }
+
     var frag = document.createDocumentFragment();
-    MOCK_PROJECTS.forEach(function (p) {
+    projects.forEach(function (p) {
       var opt = document.createElement("option");
       opt.value = p.id;
       opt.textContent = p.name;
       opt.dataset.customerName = p.customerName || "";
       frag.appendChild(opt);
     });
+
     el.project.appendChild(frag);
   }
 
@@ -200,51 +273,6 @@
         var optText = normalizeText(opt.textContent);
         for (var c = 0; c < normalizedCandidates.length; c++) {
           if (optText === normalizeText(normalizedCandidates[c])) {
-            selectEl.value = opt.value;
-            return true;
-          }
-        }
-      }
-    }
-
-    return false;
-  }
-
-  function normalizeQuickText(value) {
-    return String(value || "")
-      .trim()
-      .replace(/\s+/g, " ")
-      .replace(/["״']/g, "")
-      .toLowerCase();
-  }
-
-  function setSelectByCandidates(selectEl, candidates, useTextFallback) {
-    if (!selectEl || !candidates || !candidates.length) return false;
-
-    var cleanCandidates = candidates
-      .filter(function (x) {
-        return x != null && String(x).trim();
-      })
-      .map(function (x) {
-        return String(x).trim();
-      });
-
-    if (!cleanCandidates.length) return false;
-
-    for (var i = 0; i < cleanCandidates.length; i++) {
-      var candidate = cleanCandidates[i];
-      selectEl.value = candidate;
-      if (String(selectEl.value) === String(candidate)) {
-        return true;
-      }
-    }
-
-    if (useTextFallback) {
-      for (var o = 0; o < selectEl.options.length; o++) {
-        var opt = selectEl.options[o];
-        var optText = normalizeQuickText(opt.textContent);
-        for (var c = 0; c < cleanCandidates.length; c++) {
-          if (optText === normalizeQuickText(cleanCandidates[c])) {
             selectEl.value = opt.value;
             return true;
           }
@@ -339,9 +367,12 @@
 
   function projectNameById(projectId) {
     if (!projectId) return "";
-    var p = MOCK_PROJECTS.filter(function (x) {
-      return x.id === projectId;
+
+    var normalizedProjectId = String(projectId);
+    var p = getProjectsData().filter(function (x) {
+      return String(x.id) === normalizedProjectId;
     })[0];
+
     return p && p.name ? p.name : "";
   }
 
@@ -646,13 +677,44 @@
 
   function renderRecentReports() {
     if (!el.recentTbody) return;
+
+    var projectSel = document.getElementById("report-filter-project");
+    var customerSel = document.getElementById("report-filter-customer");
+
+    var selectedProjectId = projectSel ? String(projectSel.value || "") : "";
+    var selectedProjectText = projectSel
+      ? normalizeText(getSelectedOptionText(projectSel))
+      : "";
+    var selectedCustomer = customerSel
+      ? normalizeText(customerSel.value || "")
+      : "";
+
     el.recentTbody.innerHTML = "";
-    MOCK_RECENT_REPORTS.forEach(function (r) {
+
+    var filteredReports = MOCK_RECENT_REPORTS.filter(function (r) {
+      var reportProjectId = String(r.projectId || "");
+      var reportProjectName = normalizeText(r.projectName || "");
+      var reportCustomerName = normalizeText(r.customerName || "");
+
+      var projectMatch =
+        !selectedProjectId ||
+        reportProjectId === selectedProjectId ||
+        reportProjectName === selectedProjectText;
+
+      var customerMatch =
+        !selectedCustomer || reportCustomerName === selectedCustomer;
+
+      return projectMatch && customerMatch;
+    });
+
+    filteredReports.forEach(function (r) {
       var tr = document.createElement("tr");
       tr.className = "report-row-clickable";
       tr.dataset.reportId = r.id || "";
+
       var status = r.status || "טיוטה";
       var badgeClass = statusBadgeClass(status);
+
       tr.innerHTML =
         "<td>" +
         formatDateYmd(r.date) +
@@ -674,6 +736,7 @@
         ' report-status-badge">' +
         status +
         "</span></td>";
+
       el.recentTbody.appendChild(tr);
     });
   }
@@ -1652,21 +1715,44 @@
     }
   }
 
+  function getSelectedOptionText(selectEl) {
+    if (!selectEl || selectEl.selectedIndex < 0) return "";
+    var opt = selectEl.options[selectEl.selectedIndex];
+    return opt && opt.textContent ? opt.textContent.trim() : "";
+  }
+
   function initToolbarFilters() {
     var projectSel = document.getElementById("report-filter-project");
     var customerSel = document.getElementById("report-filter-customer");
+    var projects = getProjectsData();
+
     if (projectSel) {
-      MOCK_PROJECTS.forEach(function (p) {
+      var projectDefaultOption = projectSel.querySelector('option[value=""]');
+      projectSel.innerHTML = "";
+
+      if (projectDefaultOption) {
+        projectSel.appendChild(projectDefaultOption);
+      }
+
+      projects.forEach(function (p) {
         var opt = document.createElement("option");
         opt.value = p.id;
         opt.textContent = p.name;
         projectSel.appendChild(opt);
       });
     }
+
     if (customerSel) {
+      var customerDefaultOption = customerSel.querySelector('option[value=""]');
+      customerSel.innerHTML = "";
+
+      if (customerDefaultOption) {
+        customerSel.appendChild(customerDefaultOption);
+      }
+
       var seen = {};
-      MOCK_PROJECTS.forEach(function (p) {
-        var name = p.customerName || "";
+      MOCK_RECENT_REPORTS.forEach(function (r) {
+        var name = (r.customerName || "").trim();
         if (name && !seen[name]) {
           seen[name] = true;
           var opt = document.createElement("option");
@@ -1680,6 +1766,7 @@
 
   function initRecentReports() {
     renderRecentReports();
+
     if (el.recentTbody) {
       el.recentTbody.addEventListener("click", function (e) {
         var row = e.target.closest("tr.report-row-clickable");
@@ -1688,14 +1775,27 @@
         }
       });
     }
+
     if (el.viewClose) {
       el.viewClose.addEventListener("click", closeViewModal);
     }
+
+    var projectSel = document.getElementById("report-filter-project");
+    var customerSel = document.getElementById("report-filter-customer");
+
+    if (projectSel) {
+      projectSel.addEventListener("change", renderRecentReports);
+    }
+
+    if (customerSel) {
+      customerSel.addEventListener("change", renderRecentReports);
+    }
   }
 
-  function init() {
+  async function init() {
     initRefs();
     setDefaultDate();
+    await loadProjectsFromApi();
     populateProjects();
     populateEmployees();
     populateServiceCalls();
