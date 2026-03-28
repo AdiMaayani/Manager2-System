@@ -654,11 +654,195 @@
     return draft;
   }
 
+  function toNullableInt(value) {
+    if (value === null || value === undefined) return null;
+    var normalized = String(value).trim();
+    if (!normalized) return null;
+
+    var parsed = parseInt(normalized, 10);
+    return isNaN(parsed) ? null : parsed;
+  }
+
+  function mapMockEmployeeIdToDbEmployeeId(employeeId, employeeName) {
+    var normalizedId = String(employeeId || "").trim();
+    var normalizedName = String(employeeName || "").trim();
+
+    if (normalizedId === "EMP-001" || normalizedName === "רביב מעיני") {
+      return 2;
+    }
+
+    if (normalizedId === "EMP-002" || normalizedName === "רונן כץ") {
+      return 3;
+    }
+
+    if (normalizedId === "EMP-003" || normalizedName === "יוסי כהן") {
+      return 1;
+    }
+
+    return toNullableInt(employeeId);
+  }
+
+  function getReportDateValue() {
+    if (el.date && el.date.value) {
+      return el.date.value;
+    }
+
+    var today = new Date();
+    return (
+      today.getFullYear() +
+      "-" +
+      String(today.getMonth() + 1).padStart(2, "0") +
+      "-" +
+      String(today.getDate()).padStart(2, "0")
+    );
+  }
+
+  function buildCreateWorkReportPayload(draft) {
+    return {
+      reportType: draft.reportType || null,
+      date: draft.date || getReportDateValue(),
+      projectId: toNullableInt(draft.projectId),
+      projectName: draft.projectName || null,
+      customerName: draft.customerName || null,
+      serviceCallId: toNullableInt(draft.serviceCallId),
+      serviceCallTitle: draft.serviceCallTitle || null,
+      site: draft.site || null,
+      start: draft.start || null,
+      end: draft.end || null,
+      summary: draft.summary || null,
+      notes: draft.notes || null,
+      reporterId: mapMockEmployeeIdToDbEmployeeId(
+        draft.reporterId,
+        draft.reporterName,
+      ),
+      reporterName: draft.reporterName || null,
+      role: draft.role || null,
+      systems: Array.isArray(draft.systems) ? draft.systems : [],
+      relatedWorkers: Array.isArray(draft.relatedWorkers)
+        ? draft.relatedWorkers.map(function (worker) {
+            return {
+              id: mapMockEmployeeIdToDbEmployeeId(
+                worker && worker.id,
+                worker && worker.name,
+              ),
+              name: worker && worker.name ? worker.name : null,
+            };
+          })
+        : [],
+      followup: !!draft.followup,
+      followupReason: draft.followupReason || null,
+    };
+  }
+
+  function resetReportForm() {
+    if (el.project) el.project.value = "";
+    if (el.customer) el.customer.value = "";
+    if (el.serviceCall) el.serviceCall.value = "";
+    if (el.projectLinked) el.projectLinked.value = "";
+    if (el.site) el.site.value = "";
+    if (el.start) el.start.value = "";
+    if (el.end) el.end.value = "";
+    if (el.reporter) el.reporter.value = "";
+    if (el.summary) el.summary.value = "";
+    if (el.notes) el.notes.value = "";
+    if (el.role) el.role.value = "";
+    if (el.followup) el.followup.checked = false;
+
+    var followupReasonInput = document.getElementById("report-followup-reason");
+    if (followupReasonInput) {
+      followupReasonInput.value = "";
+    }
+
+    if (el.followupReasonWrap) {
+      el.followupReasonWrap.hidden = true;
+    }
+
+    if (el.systems) {
+      el.systems
+        .querySelectorAll(".report-system-chip.selected")
+        .forEach(function (chip) {
+          chip.classList.remove("selected");
+        });
+    }
+
+    formRelatedWorkers = [];
+    renderFormRelatedWorkersChips();
+
+    if (el.relatedWorkersSelect) {
+      el.relatedWorkersSelect.value = "";
+    }
+
+    if (el.productsTbody) {
+      el.productsTbody.innerHTML = "";
+      el.productsTbody.appendChild(createProductRow());
+    }
+
+    setReportType("project");
+    setDefaultDate();
+  }
+
+  async function submitReport() {
+    var draft = getFormReportDraft();
+    var payload = buildCreateWorkReportPayload(draft);
+
+    console.log("Submitting report payload:", payload);
+
+    if (el.submit) {
+      el.submit.disabled = true;
+      el.submit.textContent = "שולח...";
+    }
+
+    try {
+      var response = await fetch("http://localhost:5161/api/Reports", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Accept: "application/json",
+        },
+        body: JSON.stringify(payload),
+      });
+
+      var responseText = await response.text();
+      var data = null;
+
+      try {
+        data = responseText ? JSON.parse(responseText) : null;
+      } catch (parseError) {
+        data = null;
+      }
+
+      if (!response.ok) {
+        var errorMessage =
+          (data && (data.message || data.title)) ||
+          responseText ||
+          "Report API request failed with status " + response.status;
+
+        throw new Error(errorMessage);
+      }
+
+      console.log("Report created successfully:", data);
+      alert("הדיווח נשלח בהצלחה.");
+
+      resetReportForm();
+      closeFormModal();
+    } catch (error) {
+      console.error("Failed to submit report:", error);
+      alert(
+        "שליחת הדיווח נכשלה: " +
+          (error && error.message ? error.message : error),
+      );
+    } finally {
+      if (el.submit) {
+        el.submit.disabled = false;
+        el.submit.textContent = "שלח דיווח";
+      }
+    }
+  }
+
   function initActions() {
     if (el.submit) {
-      el.submit.addEventListener("click", function () {
-        var draft = getFormReportDraft();
-        console.log("שלח דיווח", draft);
+      el.submit.addEventListener("click", async function () {
+        await submitReport();
       });
     }
     if (el.draft) {
