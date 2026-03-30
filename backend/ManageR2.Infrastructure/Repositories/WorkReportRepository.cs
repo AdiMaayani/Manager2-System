@@ -121,4 +121,156 @@ public class WorkReportRepository : IWorkReportRepository
 
         return null;
     }
+
+    public async Task<List<WorkReportListItemModel>> GetAllAsync()
+{
+    var reports = new List<WorkReportListItemModel>();
+
+    await using var connection = _dbServices.CreateConnection();
+    await using var command = new SqlCommand(
+        @"SELECT 
+              WorkReportId,
+              ReportDate,
+              ProjectName,
+              CustomerName,
+              ReporterName,
+              FollowUpRequired
+          FROM dbo.WorkReports
+          ORDER BY ReportDate DESC",
+        connection)
+    {
+        CommandType = CommandType.Text
+    };
+
+    await connection.OpenAsync();
+    await using var reader = await command.ExecuteReaderAsync();
+
+    while (await reader.ReadAsync())
+    {
+        reports.Add(new WorkReportListItemModel
+        {
+            WorkReportId = reader["WorkReportId"] != DBNull.Value ? Convert.ToInt32(reader["WorkReportId"]) : 0,
+            ReportDate = reader["ReportDate"] != DBNull.Value ? Convert.ToDateTime(reader["ReportDate"]) : null,
+            ProjectName = reader["ProjectName"]?.ToString(),
+            CustomerName = reader["CustomerName"]?.ToString(),
+            ReporterName = reader["ReporterName"]?.ToString(),
+            FollowUpRequired = reader["FollowUpRequired"] != DBNull.Value && Convert.ToBoolean(reader["FollowUpRequired"])
+        });
+    }
+
+    return reports;
+}
+
+public async Task<WorkReportDetailsModel?> GetByIdAsync(int workReportId)
+{
+    await using var connection = _dbServices.CreateConnection();
+    await connection.OpenAsync();
+
+    WorkReportDetailsModel? report = null;
+
+    await using (var command = new SqlCommand(
+        @"SELECT 
+              WorkReportId,
+              WorkItemId,
+              ReportType,
+              ReportDate,
+              ProjectName,
+              CustomerName,
+              Site,
+              StartTime,
+              EndTime,
+              Summary,
+              Notes,
+              ReporterEmployeeId,
+              ReporterName,
+              ReporterRole,
+              FollowUpRequired,
+              FollowUpReason
+          FROM dbo.WorkReports
+          WHERE WorkReportId = @WorkReportId",
+        connection))
+    {
+        command.CommandType = CommandType.Text;
+        command.Parameters.AddWithValue("@WorkReportId", workReportId);
+
+        await using var reader = await command.ExecuteReaderAsync();
+
+        if (await reader.ReadAsync())
+        {
+            report = new WorkReportDetailsModel
+            {
+                WorkReportId = reader["WorkReportId"] != DBNull.Value ? Convert.ToInt32(reader["WorkReportId"]) : 0,
+                ProjectId = reader["WorkItemId"] != DBNull.Value ? Convert.ToInt32(reader["WorkItemId"]) : null,
+                ReportType = reader["ReportType"]?.ToString(),
+                ReportDate = reader["ReportDate"] != DBNull.Value ? Convert.ToDateTime(reader["ReportDate"]) : null,
+                ProjectName = reader["ProjectName"]?.ToString(),
+                CustomerName = reader["CustomerName"]?.ToString(),
+                Site = reader["Site"]?.ToString(),
+                Start = reader["StartTime"]?.ToString(),
+                End = reader["EndTime"]?.ToString(),
+                Summary = reader["Summary"]?.ToString(),
+                Notes = reader["Notes"]?.ToString(),
+                ReporterId = reader["ReporterEmployeeId"] != DBNull.Value ? Convert.ToInt32(reader["ReporterEmployeeId"]) : null,
+                ReporterName = reader["ReporterName"]?.ToString(),
+                Role = reader["ReporterRole"]?.ToString(),
+                Followup = reader["FollowUpRequired"] != DBNull.Value && Convert.ToBoolean(reader["FollowUpRequired"]),
+                FollowupReason = reader["FollowUpReason"]?.ToString()
+            };
+        }
+    }
+
+    if (report == null)
+    {
+        return null;
+    }
+
+    await using (var systemsCommand = new SqlCommand(
+        @"SELECT SystemName
+          FROM dbo.WorkReportSystems
+          WHERE WorkReportId = @WorkReportId
+          ORDER BY WorkReportSystemId",
+        connection))
+    {
+        systemsCommand.CommandType = CommandType.Text;
+        systemsCommand.Parameters.AddWithValue("@WorkReportId", workReportId);
+
+        await using var systemsReader = await systemsCommand.ExecuteReaderAsync();
+
+        while (await systemsReader.ReadAsync())
+        {
+            var systemName = systemsReader["SystemName"]?.ToString();
+            if (!string.IsNullOrWhiteSpace(systemName))
+            {
+                report.Systems.Add(systemName);
+            }
+        }
+    }
+
+    await using (var workersCommand = new SqlCommand(
+        @"SELECT 
+              EmployeeId,
+              EmployeeName
+          FROM dbo.WorkReportEmployeeAssignments
+          WHERE WorkReportId = @WorkReportId
+          ORDER BY WorkReportEmployeeAssignmentId",
+        connection))
+    {
+        workersCommand.CommandType = CommandType.Text;
+        workersCommand.Parameters.AddWithValue("@WorkReportId", workReportId);
+
+        await using var workersReader = await workersCommand.ExecuteReaderAsync();
+
+        while (await workersReader.ReadAsync())
+        {
+            report.RelatedWorkers.Add(new WorkReportRelatedWorkerModel
+            {
+                Id = workersReader["EmployeeId"] != DBNull.Value ? Convert.ToInt32(workersReader["EmployeeId"]) : null,
+                Name = workersReader["EmployeeName"]?.ToString()
+            });
+        }
+    }
+
+    return report;
+}
+
 }

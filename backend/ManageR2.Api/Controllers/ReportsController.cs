@@ -16,6 +16,26 @@ public class ReportsController : ControllerBase
         _workReportRepository = workReportRepository;
     }
 
+    [HttpGet]
+public async Task<IActionResult> GetAll()
+{
+    var reports = await _workReportRepository.GetAllAsync();
+    return Ok(reports);
+}
+
+[HttpGet("{id:int}")]
+public async Task<IActionResult> GetById(int id)
+{
+    var report = await _workReportRepository.GetByIdAsync(id);
+
+    if (report == null)
+    {
+        return NotFound(new { message = $"Report with id {id} was not found." });
+    }
+
+    return Ok(report);
+}
+
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateWorkReportRequest request)
     {

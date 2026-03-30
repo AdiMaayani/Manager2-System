@@ -3,6 +3,8 @@
 
   var MOCK_PROJECTS = window.MOCK_PROJECTS || [];
   var API_PROJECTS = [];
+  var API_REPORTS = [];
+  var API_REPORT_DETAILS = {};
   console.groupCollapsed("🔍 [DATA AUDIT] Employees data loaded");
   var MOCK_EMPLOYEES = window.MOCK_EMPLOYEES || [];
   console.log("Source: window.MOCK_EMPLOYEES");
@@ -20,8 +22,134 @@
 
   var QUICK_REPORT_KEY = "manager2_quick_report_prefill";
 
+  function getReportsData() {
+    return API_REPORTS.length ? API_REPORTS : MOCK_RECENT_REPORTS;
+  }
+
   function getProjectsData() {
     return API_PROJECTS.length ? API_PROJECTS : MOCK_PROJECTS;
+  }
+
+  async function loadReportsFromApi() {
+    console.groupCollapsed("🔍 [DATA AUDIT] Reports source resolution");
+
+    try {
+      var response = await fetch("http://localhost:5161/api/Reports", {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          "Reports API request failed with status " + response.status,
+        );
+      }
+
+      var data = await response.json();
+
+      console.log("Source: http://localhost:5161/api/Reports");
+      console.log("Raw API data:", data);
+
+      API_REPORTS = Array.isArray(data)
+        ? data.map(function (r) {
+            return {
+              id: r.workReportId,
+              date: r.reportDate ? r.reportDate.split("T")[0] : "",
+              projectName: r.projectName || "",
+              customerName: r.customerName || "",
+              reporterName: r.reporterName || "",
+              status: r.followUpRequired ? "הוגש" : "טיוטה",
+            };
+          })
+        : [];
+
+      console.log("Resolved API reports count:", API_REPORTS.length);
+    } catch (error) {
+      API_REPORTS = [];
+      console.warn("Reports API unavailable. Falling back to MOCK.");
+      console.warn(error);
+    }
+
+    console.groupEnd();
+  }
+
+  async function loadReportDetailsById(reportId) {
+    if (!reportId) return null;
+
+    var normalizedId = String(reportId);
+
+    if (API_REPORT_DETAILS[normalizedId]) {
+      return API_REPORT_DETAILS[normalizedId];
+    }
+
+    var response = await fetch(
+      "http://localhost:5161/api/Reports/" + encodeURIComponent(normalizedId),
+      {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+        },
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        "Report details API request failed with status " + response.status,
+      );
+    }
+
+    var data = await response.json();
+
+    var mapped = {
+      id: data.workReportId,
+      date: data.reportDate ? data.reportDate.split("T")[0] : "",
+      reportNumber: data.workReportId ? String(data.workReportId) : "",
+      reportType: data.reportType || "",
+      projectId:
+        data.projectId != null && data.projectId !== ""
+          ? String(data.projectId)
+          : "",
+      projectName: data.projectName || "",
+      customerName: data.customerName || "",
+      serviceCallId:
+        data.serviceCallId != null && data.serviceCallId !== ""
+          ? String(data.serviceCallId)
+          : "",
+      serviceCallTitle: data.serviceCallTitle || "",
+      site: data.site || "",
+      start: data.start || "",
+      end: data.end || "",
+      summary: data.summary || "",
+      notes: data.notes || "",
+      reporterId:
+        data.reporterId != null && data.reporterId !== ""
+          ? String(data.reporterId)
+          : "",
+      reporterName: data.reporterName || "",
+      role: data.role || "",
+      followup: !!data.followup,
+      followupReason: data.followupReason || "",
+      systems: Array.isArray(data.systems) ? data.systems : [],
+      relatedWorkers: Array.isArray(data.relatedWorkers)
+        ? data.relatedWorkers.map(function (worker) {
+            return {
+              id:
+                worker && worker.id != null && worker.id !== ""
+                  ? String(worker.id)
+                  : "",
+              name: worker && worker.name ? worker.name : "",
+            };
+          })
+        : [],
+      products: [],
+      transferredToAccounting: false,
+      status: data.followup ? "הוגש" : "טיוטה",
+    };
+
+    API_REPORT_DETAILS[normalizedId] = mapped;
+    return mapped;
   }
 
   async function loadProjectsFromApi() {
@@ -823,6 +951,11 @@
       console.log("Report created successfully:", data);
       alert("הדיווח נשלח בהצלחה.");
 
+      API_REPORTS = [];
+      API_REPORT_DETAILS = {};
+      await loadReportsFromApi();
+      renderRecentReports();
+
       resetReportForm();
       closeFormModal();
     } catch (error) {
@@ -875,7 +1008,9 @@
 
     el.recentTbody.innerHTML = "";
 
-    var filteredReports = MOCK_RECENT_REPORTS.filter(function (r) {
+    var reportsSource = getReportsData();
+
+    var filteredReports = reportsSource.filter(function (r) {
       var reportProjectId = String(r.projectId || "");
       var reportProjectName = normalizeText(r.projectName || "");
       var reportCustomerName = normalizeText(r.customerName || "");
@@ -936,9 +1071,17 @@
 
   function getReport() {
     if (!selectedReportId) return null;
+
+    var details = API_REPORT_DETAILS[String(selectedReportId)];
+    if (details) {
+      return details;
+    }
+
+    var reports = getReportsData();
+
     return (
-      MOCK_RECENT_REPORTS.filter(function (r) {
-        return r.id === selectedReportId;
+      reports.filter(function (r) {
+        return String(r.id) === String(selectedReportId);
       })[0] || null
     );
   }
@@ -1707,11 +1850,24 @@
     wireDetailsBody(report);
   }
 
-  function openViewModal(id) {
-    var report = MOCK_RECENT_REPORTS.filter(function (r) {
-      return r.id === id;
+  async function openViewModal(id) {
+    var reports = getReportsData();
+
+    var report = reports.filter(function (r) {
+      return String(r.id) === String(id);
     })[0];
+
     if (!report || !el.viewBody || !el.viewModal) return;
+
+    try {
+      var fullReport = await loadReportDetailsById(id);
+      if (fullReport) {
+        report = fullReport;
+      }
+    } catch (error) {
+      console.error("Failed to load full report details:", error);
+    }
+
     selectedReportId = report.id;
     isDetailsExpanded = false;
     isEditMode = false;
@@ -1980,6 +2136,8 @@
     initRefs();
     setDefaultDate();
     await loadProjectsFromApi();
+    await loadReportsFromApi();
+    renderRecentReports();
     populateProjects();
     populateEmployees();
     populateServiceCalls();
