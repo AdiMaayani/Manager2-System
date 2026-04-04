@@ -10,4 +10,6 @@ public interface IUserRepository
     Task<int> CreateUserAsync(User user);
     Task<bool> UpdateUserAsync(User user);
     Task<bool> DeleteUserAsync(int userId);
+    Task<List<string>> GetUserRolesAsync(int userId);
+    Task<List<string>> GetUserDepartmentsAsync(int userId);
 }

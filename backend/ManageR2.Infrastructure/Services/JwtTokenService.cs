@@ -19,7 +19,7 @@ public class JwtTokenService : IJwtTokenService
         _logger = logger;
     }
 
-    public string GenerateToken(User user)
+    public string GenerateToken(User user, List<string> roles)
     {
         _logger.LogInformation("GenerateToken started for UserId={UserId}.", user.UserId);
 
@@ -36,7 +36,7 @@ public class JwtTokenService : IJwtTokenService
         var securityKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(key));
         var credentials = new SigningCredentials(securityKey, SecurityAlgorithms.HmacSha256);
 
-        var claims = new[]
+        var claims = new List<Claim>
         {
             new Claim(JwtRegisteredClaimNames.Sub, user.UserId.ToString()),
             new Claim(JwtRegisteredClaimNames.Email, user.Email),
@@ -44,6 +44,14 @@ public class JwtTokenService : IJwtTokenService
             new Claim("userId", user.UserId.ToString()),
             new Claim("employeeId", user.EmployeeId.ToString())
         };
+
+        foreach (var role in roles)
+        {
+            if (!string.IsNullOrWhiteSpace(role))
+            {
+                claims.Add(new Claim(ClaimTypes.Role, role));
+            }
+        }
 
         var token = new JwtSecurityToken(
             issuer: issuer,

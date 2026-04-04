@@ -44,6 +44,10 @@ public class LoginResponseDto
     public bool IsActive { get; set; }
 
     public string Token { get; set; } = string.Empty;
+
+    public List<string> Roles { get; set; } = new();
+
+    public List<string> Departments { get; set; } = new();
 }
 
 public class UserResponseDto

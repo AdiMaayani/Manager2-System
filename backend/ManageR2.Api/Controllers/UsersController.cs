@@ -1,6 +1,6 @@
+using System.Security.Claims;
 using ManageR2.Api.DTOs;
 using ManageR2.Domain.Entities;
-using ManageR2.Domain.Exceptions;
 using ManageR2.Infrastructure.Repositories;
 using ManageR2.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -15,17 +15,20 @@ public class UsersController : ControllerBase
     private readonly IUserRepository _userRepository;
     private readonly IJwtTokenService _jwtTokenService;
     private readonly IPasswordService _passwordService;
+    private readonly IUserAuthorizationService _userAuthorizationService;
     private readonly ILogger<UsersController> _logger;
 
     public UsersController(
         IUserRepository userRepository,
         IJwtTokenService jwtTokenService,
         IPasswordService passwordService,
+        IUserAuthorizationService userAuthorizationService,
         ILogger<UsersController> logger)
     {
         _userRepository = userRepository;
         _jwtTokenService = jwtTokenService;
         _passwordService = passwordService;
+        _userAuthorizationService = userAuthorizationService;
         _logger = logger;
     }
 
@@ -43,7 +46,7 @@ public class UsersController : ControllerBase
         };
     }
 
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     [HttpGet]
     public async Task<IActionResult> GetUsers()
     {
@@ -55,9 +58,22 @@ public class UsersController : ControllerBase
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetUserById(int id)
     {
+        var currentUserIdClaim = User.FindFirst("userId")?.Value;
+        if (string.IsNullOrWhiteSpace(currentUserIdClaim) || !int.TryParse(currentUserIdClaim, out var currentUserId))
+            return Unauthorized(new { message = "Invalid user token." });
+
+        var currentRoles = User.FindAll(ClaimTypes.Role)
+            .Select(c => c.Value)
+            .Where(v => !string.IsNullOrWhiteSpace(v))
+            .ToList();
+
+        var canView = await _userAuthorizationService.CanViewUserAsync(currentUserId, currentRoles, id);
+        if (!canView)
+            return Forbid();
+
         var user = await _userRepository.GetUserByIdAsync(id);
         if (user == null)
-            return NotFound();
+            return NotFound(new { message = $"User with id {id} was not found." });
 
         return Ok(ToSafeUser(user));
     }
@@ -93,7 +109,7 @@ public class UsersController : ControllerBase
     {
         var existing = await _userRepository.GetUserByIdAsync(id);
         if (existing == null)
-            return NotFound();
+            return NotFound(new { message = $"User with id {id} was not found." });
 
         string hash = existing.PasswordHash;
         string salt = existing.PasswordSalt;
@@ -126,7 +142,7 @@ public class UsersController : ControllerBase
     {
         var existing = await _userRepository.GetUserByIdAsync(id);
         if (existing == null)
-            return NotFound();
+            return NotFound(new { message = $"User with id {id} was not found." });
 
         await _userRepository.DeleteUserAsync(id);
         return NoContent();
@@ -151,7 +167,9 @@ public class UsersController : ControllerBase
         if (!isValid)
             return Unauthorized(new { message = "Invalid email or password." });
 
-        var token = _jwtTokenService.GenerateToken(user);
+        var roles = await _userRepository.GetUserRolesAsync(user.UserId);
+        var departments = await _userRepository.GetUserDepartmentsAsync(user.UserId);
+        var token = _jwtTokenService.GenerateToken(user, roles);
 
         return Ok(new LoginResponseDto
         {
@@ -159,7 +177,9 @@ public class UsersController : ControllerBase
             Username = user.Username,
             Email = user.Email,
             IsActive = user.IsActive,
-            Token = token
+            Token = token,
+            Roles = roles,
+            Departments = departments
         });
     }
 }
