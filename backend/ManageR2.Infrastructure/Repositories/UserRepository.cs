@@ -316,6 +316,82 @@ public class UserRepository : IUserRepository
         }
     }
 
+    public async Task<List<string>> GetUserRolesAsync(int userId)
+    {
+        _logger.LogInformation("GetUserRolesAsync started for UserId={UserId}.", userId);
+
+        var roles = new List<string>();
+
+        try
+        {
+            await using var connection = _dbServices.CreateConnection();
+            await using var command = new SqlCommand(@"
+                SELECT R.RoleName
+                FROM dbo.UserRoles UR
+                INNER JOIN dbo.Roles R ON UR.RoleId = R.RoleId
+                WHERE UR.UserId = @UserId
+                ORDER BY R.RoleName;", connection);
+
+            command.Parameters.AddWithValue("@UserId", userId);
+
+            await connection.OpenAsync();
+            await using var reader = await command.ExecuteReaderAsync();
+
+            while (await reader.ReadAsync())
+            {
+                roles.Add(reader["RoleName"]?.ToString() ?? string.Empty);
+            }
+
+            _logger.LogInformation("GetUserRolesAsync succeeded for UserId={UserId}. Returned {RolesCount} roles.", userId, roles.Count);
+
+            return roles;
+        }
+        catch (SqlException ex)
+        {
+            _logger.LogError(ex, "GetUserRolesAsync failed with SQL error for UserId={UserId}.", userId);
+
+            throw new UserValidationException("Failed to retrieve user roles.", ex);
+        }
+    }
+
+    public async Task<List<string>> GetUserDepartmentsAsync(int userId)
+    {
+        _logger.LogInformation("GetUserDepartmentsAsync started for UserId={UserId}.", userId);
+
+        var departments = new List<string>();
+
+        try
+        {
+            await using var connection = _dbServices.CreateConnection();
+            await using var command = new SqlCommand(@"
+                SELECT D.DepartmentName
+                FROM dbo.UserDepartments UD
+                INNER JOIN dbo.Departments D ON UD.DepartmentId = D.DepartmentId
+                WHERE UD.UserId = @UserId
+                ORDER BY D.DepartmentName;", connection);
+
+            command.Parameters.AddWithValue("@UserId", userId);
+
+            await connection.OpenAsync();
+            await using var reader = await command.ExecuteReaderAsync();
+
+            while (await reader.ReadAsync())
+            {
+                departments.Add(reader["DepartmentName"]?.ToString() ?? string.Empty);
+            }
+
+            _logger.LogInformation("GetUserDepartmentsAsync succeeded for UserId={UserId}. Returned {DepartmentsCount} departments.", userId, departments.Count);
+
+            return departments;
+        }
+        catch (SqlException ex)
+        {
+            _logger.LogError(ex, "GetUserDepartmentsAsync failed with SQL error for UserId={UserId}.", userId);
+
+            throw new UserValidationException("Failed to retrieve user departments.", ex);
+        }
+    }
+
     private static User MapUser(SqlDataReader reader)
     {
         return new User

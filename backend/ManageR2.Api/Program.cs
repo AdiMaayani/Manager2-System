@@ -39,7 +39,7 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-// ✅ CORS CONFIGURATION
+// CORS
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend",
@@ -81,6 +81,7 @@ builder.Services.AddScoped<IWorkItemRepository, WorkItemRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IPasswordService, PasswordService>();
+builder.Services.AddScoped<IUserAuthorizationService, UserAuthorizationService>();
 
 var app = builder.Build();
 
