@@ -1,58 +1,64 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="he" dir="rtl">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>התחברות - ManageR²</title>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>התחברות - ManageR²</title>
 
-  <link rel="stylesheet" href="../styles/tokens.css">
-  <link rel="stylesheet" href="../styles/base.css">
-  <link rel="stylesheet" href="../styles/components.css">
-  <link rel="stylesheet" href="../styles/utilities.css">
-  <link rel="stylesheet" href="../styles/login.css">
-</head>
-<body>
-  <div class="login-container">
-    <div class="card login-card">
-      <div class="login-logo">
-        <img src="../assets/manager2-logo.png" alt="ManageR²" class="login-logo-img">
-      </div>
+    <link rel="stylesheet" href="../styles/tokens.css" />
+    <link rel="stylesheet" href="../styles/base.css" />
+    <link rel="stylesheet" href="../styles/components.css" />
+    <link rel="stylesheet" href="../styles/utilities.css" />
+    <link rel="stylesheet" href="../styles/login.css" />
+  </head>
+  <body>
+    <div class="login-container">
+      <div class="card login-card">
+        <div class="login-logo">
+          <img
+            src="../assets/manager2-logo.png"
+            alt="ManageR²"
+            class="login-logo-img"
+          />
+        </div>
 
-      <!-- 🔼 בלוק שמוזז למעלה: כותרת + שדות + כפתור (בלי הלוגו) -->
-      <div class="login-content">
-        <h1 class="login-title">התחברות למערכת</h1>
+        <!-- 🔼 בלוק שמוזז למעלה: כותרת + שדות + כפתור (בלי הלוגו) -->
+        <div class="login-content">
+          <h1 class="login-title">התחברות למערכת</h1>
 
-        <form id="login-form" class="login-form">
-          <div class="input-group">
-            <input
-              type="text"
-              id="username"
-              name="username"
-              class="input"
-              placeholder="אימייל"
-              required
-              autocomplete="username"
-            >
-          </div>
+          <form id="login-form" class="login-form">
+            <div class="input-group">
+              <input
+                type="text"
+                id="username"
+                name="username"
+                class="input"
+                placeholder="אימייל"
+                required
+                autocomplete="username"
+              />
+            </div>
 
-          <div class="input-group">
-            <input
-              type="password"
-              id="password"
-              name="password"
-              class="input"
-              placeholder="סיסמה"
-              required
-              autocomplete="current-password"
-            >
-          </div>
+            <div class="input-group">
+              <input
+                type="password"
+                id="password"
+                name="password"
+                class="input"
+                placeholder="סיסמה"
+                required
+                autocomplete="current-password"
+              />
+            </div>
 
-          <button type="submit" class="btn btn-primary btn-block">התחבר</button>
-        </form>
+            <button type="submit" class="btn btn-primary btn-block">
+              התחבר
+            </button>
+          </form>
+        </div>
       </div>
     </div>
-  </div>
-
-  <script src="../scripts/login.js"></script>
-</body>
+    <script src="../scripts/api.js"></script>
+    <script src="../scripts/login.js"></script>
+  </body>
 </html>

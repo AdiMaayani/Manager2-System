@@ -11,6 +11,14 @@ public class CreateUserDto
     public string Password { get; set; } = string.Empty;
 
     public bool IsActive { get; set; }
+
+    public string? Phone { get; set; }
+
+    public string? Notes { get; set; }
+
+    public List<string> Roles { get; set; } = new();
+
+    public List<string> Departments { get; set; } = new();
 }
 
 public class UpdateUserDto
@@ -24,6 +32,14 @@ public class UpdateUserDto
     public string Password { get; set; } = string.Empty;
 
     public bool IsActive { get; set; }
+
+    public string? Phone { get; set; }
+
+    public string? Notes { get; set; }
+
+    public List<string> Roles { get; set; } = new();
+
+    public List<string> Departments { get; set; } = new();
 }
 
 public class LoginRequestDto
@@ -65,4 +81,12 @@ public class UserResponseDto
     public DateTime? LastLoginAt { get; set; }
 
     public DateTime CreatedAt { get; set; }
+
+    public string? Phone { get; set; }
+
+    public string? Notes { get; set; }
+
+    public List<string> Roles { get; set; } = new();
+
+    public List<string> Departments { get; set; } = new();
 }
