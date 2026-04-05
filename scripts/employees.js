@@ -1,51 +1,197 @@
-// Employees page functionality
-document.addEventListener('DOMContentLoaded', () => {
-  const employeesTable = document.querySelector('#employees-table tbody');
-  const employeeModal = document.getElementById('employee-modal');
-  const modalOverlay = employeeModal?.querySelector('.modal-overlay');
-  const modalClose = employeeModal?.querySelector('.modal-close');
-  const btnEdit = document.getElementById('btn-edit-employee');
-  const btnSave = document.getElementById('btn-save-employee');
-  const btnCancel = document.getElementById('btn-cancel-employee');
-  
+document.addEventListener("DOMContentLoaded", () => {
+  const employeesTable = document.querySelector("#employees-table tbody");
+  const employeeModal = document.getElementById("employee-modal");
+  const modalOverlay = employeeModal?.querySelector(".modal-overlay");
+  const modalClose = employeeModal?.querySelector(".modal-close");
+  const btnEdit = document.getElementById("btn-edit-employee");
+  const btnSave = document.getElementById("btn-save-employee");
+  const btnCancel = document.getElementById("btn-cancel-employee");
+  const btnNewEmployee = document.getElementById("btn-new-employee");
+  const searchInput = document.querySelector(".search-input .input");
+
+  let employeesState = [];
+  let filteredEmployeesState = [];
   let currentEmployee = null;
   let originalEmployeeData = null;
   let isEditMode = false;
+  let isCreateMode = false;
 
-  // Get employees data
-  function getEmployees() {
-    return window.MOCK_DATA?.employees || [];
+  let availableRoles = [];
+  let availableDepartments = [];
+
+  function getPrimaryRole(roles) {
+    if (!Array.isArray(roles) || roles.length === 0) {
+      return "לא הוגדר";
+    }
+
+    return roles[0];
   }
 
-  // Get status badge class
+  function formatDepartments(departments) {
+    if (!Array.isArray(departments) || departments.length === 0) {
+      return [];
+    }
+
+    return departments.filter(
+      (department) => !!department && department.trim() !== "",
+    );
+  }
+
+  function mapApiUserToEmployee(user) {
+    const roles = Array.isArray(user.roles) ? user.roles : [];
+    const departments = formatDepartments(user.departments);
+
+    return {
+      id: user.userId,
+      userId: user.userId,
+      employeeId: user.employeeId,
+      fullName: user.username || "",
+      role: getPrimaryRole(roles),
+      roles: roles,
+      departments: departments,
+      phone: user.phone || "",
+      email: user.email || "",
+      status: user.isActive ? "זמין" : "לא פעיל",
+      isActive: !!user.isActive,
+      lastLoginAt: user.lastLoginAt,
+      /*
+        TODO (team reminder):
+        todayAssignment should be loaded in the future from Work Plan module.
+      */
+      todayAssignment: "—",
+      /*
+        TODO (team reminder):
+        openReports should be loaded in the future from Projects module.
+      */
+      openReports: "—",
+      notes: user.notes || "",
+      password: "",
+    };
+  }
+
+  async function getEmployees() {
+    const users = await window.apiRequest("/Users");
+    return users.map(mapApiUserToEmployee);
+  }
+
+  async function loadReferenceData() {
+    const [roles, departments] = await Promise.all([
+      window.apiRequest("/Users/roles"),
+      window.apiRequest("/Users/departments"),
+    ]);
+
+    availableRoles = Array.isArray(roles) ? roles : [];
+    availableDepartments = Array.isArray(departments) ? departments : [];
+  }
+
+  function getSelectedValues(selectElement) {
+    if (!selectElement) return [];
+
+    return Array.from(selectElement.selectedOptions)
+      .map((option) => option.value)
+      .filter((value) => !!value && value.trim() !== "");
+  }
+
+  function populateMultiSelect(selectElement, options, selectedValues) {
+    if (!selectElement) return;
+
+    const selectedSet = new Set(
+      Array.isArray(selectedValues) ? selectedValues : [],
+    );
+
+    selectElement.innerHTML = "";
+
+    options.forEach((optionValue) => {
+      const option = document.createElement("option");
+      option.value = optionValue;
+      option.textContent = optionValue;
+      option.selected = selectedSet.has(optionValue);
+      selectElement.appendChild(option);
+    });
+  }
+
   function getStatusBadgeClass(status) {
-    if (status === 'זמין') return 'badge-success';
-    if (status === 'עמוס' || status === 'בשירות') return 'badge-warning';
-    return 'badge-neutral';
+    if (status === "זמין") return "badge-success";
+    if (status === "עמוס" || status === "בשירות") return "badge-warning";
+    if (status === "לא פעיל") return "badge-neutral";
+    return "badge-neutral";
   }
 
-  // Render table rows
-  function renderTable() {
-    if (!employeesTable) return;
-    
-    const employees = getEmployees();
-    employeesTable.innerHTML = '';
+  function formatLastLoginAt(value) {
+    if (!value) {
+      return "לא התחבר";
+    }
 
-    employees.forEach(employee => {
-      const row = document.createElement('tr');
-      row.setAttribute('data-employee-id', employee.id);
-      row.style.cursor = 'pointer';
-      
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+      return "לא זמין";
+    }
+
+    return date.toLocaleString("he-IL");
+  }
+
+  function filterEmployees(searchTerm) {
+    const normalizedSearch = (searchTerm || "").trim().toLowerCase();
+
+    if (!normalizedSearch) {
+      filteredEmployeesState = [...employeesState];
+      return;
+    }
+
+    filteredEmployeesState = employeesState.filter((employee) => {
+      const fullName = (employee.fullName || "").toLowerCase();
+      const role = (employee.role || "").toLowerCase();
+      const email = (employee.email || "").toLowerCase();
+      const phone = (employee.phone || "").toLowerCase();
+      const notes = (employee.notes || "").toLowerCase();
+      const departments = (employee.departments || []).join(" ").toLowerCase();
+      const roles = (employee.roles || []).join(" ").toLowerCase();
+
+      return (
+        fullName.includes(normalizedSearch) ||
+        role.includes(normalizedSearch) ||
+        roles.includes(normalizedSearch) ||
+        email.includes(normalizedSearch) ||
+        phone.includes(normalizedSearch) ||
+        notes.includes(normalizedSearch) ||
+        departments.includes(normalizedSearch)
+      );
+    });
+  }
+
+  function renderTableRows() {
+    if (!employeesTable) return;
+
+    employeesTable.innerHTML = "";
+
+    if (!filteredEmployeesState.length) {
+      employeesTable.innerHTML = `
+        <tr>
+          <td colspan="6" style="text-align: center; padding: 24px;">
+            לא נמצאו עובדים להצגה.
+          </td>
+        </tr>
+      `;
+      return;
+    }
+
+    filteredEmployeesState.forEach((employee) => {
+      const row = document.createElement("tr");
+      row.setAttribute("data-employee-id", employee.id);
+      row.style.cursor = "pointer";
+
       row.innerHTML = `
         <td>${employee.fullName}</td>
-        <td>${employee.primaryRole || employee.role}</td>
+        <td>${employee.role}</td>
         <td><span class="badge ${getStatusBadgeClass(employee.status)}">${employee.status}</span></td>
-        <td>-</td>
-        <td>-</td>
+        <td>${formatLastLoginAt(employee.lastLoginAt)}</td>
+        <td>${employee.todayAssignment}</td>
+        <td>${employee.openReports}</td>
       `;
 
-      row.addEventListener('click', (e) => {
-        if (e.target.closest('.dropdown')) return;
+      row.addEventListener("click", (e) => {
+        if (e.target.closest(".dropdown")) return;
         openEmployeeModal(employee.id);
       });
 
@@ -53,224 +199,543 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Open employee modal
-  function openEmployeeModal(employeeId) {
-    const employees = getEmployees();
-    const employee = employees.find(emp => emp.id === employeeId);
-    
-    if (!employee || !employeeModal) return;
+  async function renderTable() {
+    if (!employeesTable) return;
 
-    currentEmployee = employee;
-    originalEmployeeData = { ...employee };
-    isEditMode = false;
+    employeesTable.innerHTML = "";
 
-    populateModal(employee, false);
-    employeeModal.classList.add('active');
-    document.body.style.overflow = 'hidden';
+    try {
+      employeesState = await getEmployees();
+      filterEmployees(searchInput?.value || "");
+      renderTableRows();
+    } catch (error) {
+      console.error("Failed to load users:", error);
+
+      if (error.status === 401) {
+        window.clearAuthSession();
+        window.location.href = "../pages/login.html";
+        return;
+      }
+
+      if (error.status === 403) {
+        employeesTable.innerHTML = `
+          <tr>
+            <td colspan="6" style="text-align: center; padding: 24px; color: #991b1b;">
+              אין הרשאה לצפות במשתמשים.
+            </td>
+          </tr>
+        `;
+        return;
+      }
+
+      employeesTable.innerHTML = `
+        <tr>
+          <td colspan="6" style="text-align: center; padding: 24px; color: #991b1b;">
+            אירעה שגיאה בטעינת המשתמשים.
+          </td>
+        </tr>
+      `;
+    }
   }
 
-  // Close employee modal
+  function openEmployeeModal(employeeId) {
+    const employee = employeesState.find((emp) => emp.id === employeeId);
+
+    if (!employee || !employeeModal) return;
+
+    currentEmployee = { ...employee };
+    originalEmployeeData = { ...employee };
+    isEditMode = false;
+    isCreateMode = false;
+
+    populateModal(currentEmployee, false);
+    employeeModal.classList.add("active");
+    document.body.style.overflow = "hidden";
+  }
+
+  function openCreateEmployeeModal() {
+    currentEmployee = {
+      id: null,
+      userId: null,
+      employeeId: "",
+      fullName: "",
+      role: "",
+      roles: [],
+      departments: [],
+      phone: "",
+      email: "",
+      status: "זמין",
+      isActive: true,
+      lastLoginAt: null,
+      /*
+        TODO (team reminder):
+        todayAssignment should be loaded in the future from Work Plan module.
+      */
+      todayAssignment: "—",
+      /*
+        TODO (team reminder):
+        openReports should be loaded in the future from Projects module.
+      */
+      openReports: "—",
+      notes: "",
+      password: "",
+    };
+
+    originalEmployeeData = null;
+    isEditMode = true;
+    isCreateMode = true;
+
+    populateModal(currentEmployee, true);
+    employeeModal.classList.add("active");
+    document.body.style.overflow = "hidden";
+  }
+
   function closeEmployeeModal() {
     if (!employeeModal) return;
-    
-    employeeModal.classList.remove('active');
-    document.body.style.overflow = '';
+
+    employeeModal.classList.remove("active");
+    document.body.style.overflow = "";
     currentEmployee = null;
     originalEmployeeData = null;
     isEditMode = false;
+    isCreateMode = false;
   }
 
-  // Populate modal with employee data
-  function populateModal(employee, editMode) {
-    const modalSubtitle = document.getElementById('employee-modal-subtitle');
-    const fieldName = document.getElementById('employee-field-name');
-    const fieldRole = document.getElementById('employee-field-role');
-    const fieldRoles = document.getElementById('employee-field-roles');
-    const fieldPhone = document.getElementById('employee-field-phone');
-    const fieldEmail = document.getElementById('employee-field-email');
-    const fieldStatus = document.getElementById('employee-field-status');
-    const fieldNotes = document.getElementById('employee-field-notes');
-    const viewModeActions = document.getElementById('employee-view-actions');
-    const editModeActions = document.getElementById('employee-edit-actions');
+  function renderBadgeList(container, values, emptyText = "לא הוגדר") {
+    if (!container) return;
 
-    if (modalSubtitle) {
-      modalSubtitle.textContent = employee.fullName;
+    if (!Array.isArray(values) || values.length === 0) {
+      container.textContent = emptyText;
+      return;
     }
 
-    // Set field values
-    if (fieldName) {
-      const input = fieldName.querySelector('input');
-      const valueEl = fieldName.querySelector('.field-value');
+    container.innerHTML = "";
+    const chipsContainer = document.createElement("div");
+    chipsContainer.style.display = "flex";
+    chipsContainer.style.flexWrap = "wrap";
+    chipsContainer.style.gap = "var(--spacing-xs)";
+
+    values.forEach((value) => {
+      const chip = document.createElement("span");
+      chip.className = "badge badge-neutral";
+      chip.textContent = value;
+      chipsContainer.appendChild(chip);
+    });
+
+    container.appendChild(chipsContainer);
+  }
+
+  function populateModal(employee, editMode) {
+    const modalTitle = employeeModal?.querySelector(".modal-title");
+    const modalSubtitle = document.getElementById("employee-modal-subtitle");
+    const fieldEmployeeId = document.getElementById(
+      "employee-field-employee-id",
+    );
+    const fieldName = document.getElementById("employee-field-name");
+    const fieldPassword = document.getElementById("employee-field-password");
+    const fieldRole = document.getElementById("employee-field-role");
+    const fieldRoles = document.getElementById("employee-field-roles");
+    const fieldDepartments = document.getElementById(
+      "employee-field-departments",
+    );
+    const fieldPhone = document.getElementById("employee-field-phone");
+    const fieldEmail = document.getElementById("employee-field-email");
+    const fieldStatus = document.getElementById("employee-field-status");
+    const fieldLastLogin = document.getElementById("employee-field-last-login");
+    const fieldNotes = document.getElementById("employee-field-notes");
+    const rolesSelect = document.getElementById("employee-roles-select");
+    const departmentsSelect = document.getElementById(
+      "employee-departments-select",
+    );
+    const viewModeActions = document.getElementById("employee-view-actions");
+    const editModeActions = document.getElementById("employee-edit-actions");
+
+    if (modalTitle) {
+      modalTitle.textContent = isCreateMode ? "יצירת עובד חדש" : "כרטיס עובד";
+    }
+
+    if (modalSubtitle) {
+      modalSubtitle.textContent = isCreateMode
+        ? "הזן את פרטי המשתמש החדש"
+        : employee.fullName || "";
+    }
+
+    if (fieldEmployeeId) {
+      const input = fieldEmployeeId.querySelector("input");
+      const valueEl = fieldEmployeeId.querySelector(".field-value");
+
       if (editMode && input) {
-        input.value = employee.fullName || '';
+        input.value =
+          employee.employeeId !== null &&
+          employee.employeeId !== undefined &&
+          employee.employeeId !== ""
+            ? employee.employeeId
+            : "";
       } else if (valueEl) {
-        valueEl.textContent = employee.fullName || '';
+        valueEl.textContent =
+          employee.employeeId !== null &&
+          employee.employeeId !== undefined &&
+          employee.employeeId !== ""
+            ? employee.employeeId
+            : "—";
+      }
+    }
+
+    if (fieldName) {
+      const input = fieldName.querySelector("input");
+      const valueEl = fieldName.querySelector(".field-value");
+      if (editMode && input) {
+        input.value = employee.fullName || "";
+      } else if (valueEl) {
+        valueEl.textContent = employee.fullName || "";
+      }
+    }
+
+    if (fieldPassword) {
+      const input = fieldPassword.querySelector("input");
+      const valueEl = fieldPassword.querySelector(".field-value");
+
+      if (editMode && input) {
+        input.value = "";
+      }
+
+      if (valueEl) {
+        valueEl.textContent = isCreateMode ? "יש להזין סיסמה" : "••••••••";
       }
     }
 
     if (fieldRole) {
-      const input = fieldRole.querySelector('input');
-      const valueEl = fieldRole.querySelector('.field-value');
-      if (editMode && input) {
-        input.value = (employee.primaryRole || employee.role) || '';
-      } else if (valueEl) {
-        valueEl.textContent = (employee.primaryRole || employee.role) || '';
-      }
-    }
+      const input = fieldRole.querySelector("input");
+      const valueEl = fieldRole.querySelector(".field-value");
 
-    if (fieldRoles) {
-      const valueEl = fieldRoles.querySelector('.field-value');
-      if (valueEl && !editMode) {
-        const roles = employee.roles || [];
-        if (roles.length > 0) {
-          valueEl.innerHTML = '';
-          const chipsContainer = document.createElement('div');
-          chipsContainer.style.display = 'flex';
-          chipsContainer.style.flexWrap = 'wrap';
-          chipsContainer.style.gap = 'var(--spacing-xs)';
-          roles.forEach(function(role) {
-            const chip = document.createElement('span');
-            chip.className = 'badge badge-neutral';
-            chip.textContent = role;
-            chipsContainer.appendChild(chip);
-          });
-          valueEl.appendChild(chipsContainer);
-        } else {
-          valueEl.textContent = '—';
+      if (isCreateMode) {
+        fieldRole.style.display = "none";
+      } else {
+        fieldRole.style.display = "flex";
+        if (editMode && input) {
+          input.value = employee.role || "";
+        } else if (valueEl) {
+          valueEl.textContent = employee.role || "";
         }
       }
     }
 
+    if (fieldRoles) {
+      const valueEl = fieldRoles.querySelector(".field-value");
+      const inputWrapper = fieldRoles.querySelector(".field-input");
+
+      if (editMode) {
+        if (valueEl) {
+          valueEl.style.display = "none";
+        }
+
+        if (inputWrapper) {
+          inputWrapper.style.display = "block";
+        }
+
+        populateMultiSelect(rolesSelect, availableRoles, employee.roles);
+      } else {
+        if (inputWrapper) {
+          inputWrapper.style.display = "none";
+        }
+
+        if (valueEl) {
+          valueEl.style.display = "block";
+        }
+
+        renderBadgeList(valueEl, employee.roles, "לא הוגדר");
+      }
+    }
+
+    if (fieldDepartments) {
+      const valueEl = fieldDepartments.querySelector(".field-value");
+      const inputWrapper = fieldDepartments.querySelector(".field-input");
+
+      if (editMode) {
+        if (valueEl) {
+          valueEl.style.display = "none";
+        }
+
+        if (inputWrapper) {
+          inputWrapper.style.display = "block";
+        }
+
+        populateMultiSelect(
+          departmentsSelect,
+          availableDepartments,
+          employee.departments,
+        );
+      } else {
+        if (inputWrapper) {
+          inputWrapper.style.display = "none";
+        }
+
+        if (valueEl) {
+          valueEl.style.display = "block";
+        }
+
+        renderBadgeList(valueEl, employee.departments, "לא הוגדרה מחלקה");
+      }
+    }
+
     if (fieldPhone) {
-      const input = fieldPhone.querySelector('input');
-      const valueEl = fieldPhone.querySelector('.field-value');
+      const input = fieldPhone.querySelector("input");
+      const valueEl = fieldPhone.querySelector(".field-value");
       if (editMode && input) {
-        input.value = employee.phone || '';
+        input.value = employee.phone || "";
       } else if (valueEl) {
-        valueEl.textContent = employee.phone || '';
+        valueEl.textContent = employee.phone || "—";
       }
     }
 
     if (fieldEmail) {
-      const input = fieldEmail.querySelector('input');
-      const valueEl = fieldEmail.querySelector('.field-value');
+      const input = fieldEmail.querySelector("input");
+      const valueEl = fieldEmail.querySelector(".field-value");
       if (editMode && input) {
-        input.value = employee.email || '';
+        input.value = employee.email || "";
       } else if (valueEl) {
-        valueEl.textContent = employee.email || '';
+        valueEl.textContent = employee.email || "";
       }
     }
 
     if (fieldStatus) {
-      const select = fieldStatus.querySelector('select');
-      const valueEl = fieldStatus.querySelector('.field-value');
+      const select = fieldStatus.querySelector("select");
+      const valueEl = fieldStatus.querySelector(".field-value");
       if (editMode && select) {
-        select.value = employee.status || '';
+        if (
+          employee.status === "זמין" ||
+          employee.status === "עמוס" ||
+          employee.status === "בשירות" ||
+          employee.status === "לא פעיל"
+        ) {
+          select.value = employee.status;
+        } else {
+          select.value = "לא פעיל";
+        }
       } else if (valueEl) {
-        valueEl.textContent = employee.status || '';
+        valueEl.textContent = employee.status || "";
+      }
+    }
+
+    if (fieldLastLogin) {
+      if (isCreateMode) {
+        fieldLastLogin.style.display = "none";
+      } else {
+        fieldLastLogin.style.display = "flex";
+        const valueEl = fieldLastLogin.querySelector(".field-value");
+        if (valueEl) {
+          valueEl.textContent = formatLastLoginAt(employee.lastLoginAt);
+        }
       }
     }
 
     if (fieldNotes) {
-      const textarea = fieldNotes.querySelector('textarea');
-      const valueEl = fieldNotes.querySelector('.field-value');
+      const textarea = fieldNotes.querySelector("textarea");
+      const valueEl = fieldNotes.querySelector(".field-value");
       if (editMode && textarea) {
-        textarea.value = employee.notes || '';
+        textarea.value = employee.notes || "";
       } else if (valueEl) {
-        valueEl.textContent = employee.notes || '';
+        valueEl.textContent = employee.notes || "—";
       }
     }
 
-    // Toggle view/edit mode
-    if (viewModeActions) viewModeActions.style.display = editMode ? 'none' : 'flex';
-    if (editModeActions) editModeActions.style.display = editMode ? 'flex' : 'none';
+    if (viewModeActions) {
+      viewModeActions.style.display = editMode ? "none" : "flex";
+    }
 
-    // Toggle field editability
-    document.querySelectorAll('#employee-modal .field-value').forEach(el => {
-      el.style.display = editMode ? 'none' : 'block';
+    if (editModeActions) {
+      editModeActions.style.display = editMode ? "flex" : "none";
+    }
+
+    document.querySelectorAll("#employee-modal .field-value").forEach((el) => {
+      el.style.display = editMode ? "none" : "block";
     });
-    document.querySelectorAll('#employee-modal .field-input').forEach(el => {
-      el.style.display = editMode ? 'block' : 'none';
+
+    document.querySelectorAll("#employee-modal .field-input").forEach((el) => {
+      el.style.display = editMode ? "block" : "none";
     });
+
+    if (fieldRoles) {
+      const valueEl = fieldRoles.querySelector(".field-value");
+      const inputWrapper = fieldRoles.querySelector(".field-input");
+
+      if (editMode) {
+        if (valueEl) valueEl.style.display = "none";
+        if (inputWrapper) inputWrapper.style.display = "block";
+      } else {
+        if (valueEl) valueEl.style.display = "block";
+        if (inputWrapper) inputWrapper.style.display = "none";
+      }
+    }
+
+    if (fieldDepartments) {
+      const valueEl = fieldDepartments.querySelector(".field-value");
+      const inputWrapper = fieldDepartments.querySelector(".field-input");
+
+      if (editMode) {
+        if (valueEl) valueEl.style.display = "none";
+        if (inputWrapper) inputWrapper.style.display = "block";
+      } else {
+        if (valueEl) valueEl.style.display = "block";
+        if (inputWrapper) inputWrapper.style.display = "none";
+      }
+    }
+
+    if (!isCreateMode && fieldLastLogin) {
+      const valueEl = fieldLastLogin.querySelector(".field-value");
+      if (valueEl) {
+        valueEl.style.display = "block";
+      }
+    }
   }
 
-  // Enter edit mode
   function enterEditMode() {
-    if (!currentEmployee) return;
+    if (!currentEmployee || isCreateMode) return;
     isEditMode = true;
     populateModal(currentEmployee, true);
   }
 
-  // Cancel edit mode
   function cancelEdit() {
+    if (isCreateMode) {
+      closeEmployeeModal();
+      return;
+    }
+
     if (!currentEmployee || !originalEmployeeData) return;
     isEditMode = false;
     populateModal(originalEmployeeData, false);
   }
 
-  // Save employee
-  function saveEmployee() {
+  async function saveEmployee() {
     if (!currentEmployee) return;
 
-    const fieldName = document.getElementById('employee-field-name');
-    const fieldRole = document.getElementById('employee-field-role');
-    const fieldPhone = document.getElementById('employee-field-phone');
-    const fieldEmail = document.getElementById('employee-field-email');
-    const fieldStatus = document.getElementById('employee-field-status');
-    const fieldNotes = document.getElementById('employee-field-notes');
+    const fieldEmployeeId = document.getElementById(
+      "employee-field-employee-id",
+    );
+    const fieldName = document.getElementById("employee-field-name");
+    const fieldPassword = document.getElementById("employee-field-password");
+    const fieldPhone = document.getElementById("employee-field-phone");
+    const fieldEmail = document.getElementById("employee-field-email");
+    const fieldStatus = document.getElementById("employee-field-status");
+    const fieldNotes = document.getElementById("employee-field-notes");
+    const rolesSelect = document.getElementById("employee-roles-select");
+    const departmentsSelect = document.getElementById(
+      "employee-departments-select",
+    );
 
-    // Get values from inputs
-    const updatedEmployee = {
-      ...currentEmployee,
-      fullName: fieldName?.querySelector('input')?.value || currentEmployee.fullName,
-      role: fieldRole?.querySelector('input')?.value || currentEmployee.role,
-      phone: fieldPhone?.querySelector('input')?.value || currentEmployee.phone,
-      email: fieldEmail?.querySelector('input')?.value || currentEmployee.email,
-      status: fieldStatus?.querySelector('select')?.value || currentEmployee.status,
-      notes: fieldNotes?.querySelector('textarea')?.value || currentEmployee.notes
+    const selectedStatus =
+      fieldStatus?.querySelector("select")?.value || currentEmployee.status;
+
+    const employeeIdValue =
+      fieldEmployeeId?.querySelector("input")?.value?.trim() || "";
+
+    const passwordValue = fieldPassword?.querySelector("input")?.value || "";
+
+    const selectedRoles = getSelectedValues(rolesSelect);
+    const selectedDepartments = getSelectedValues(departmentsSelect);
+
+    const payload = {
+      employeeId: Number(employeeIdValue),
+      username:
+        fieldName?.querySelector("input")?.value?.trim() ||
+        currentEmployee.fullName,
+      email:
+        fieldEmail?.querySelector("input")?.value?.trim() ||
+        currentEmployee.email,
+      password: isCreateMode ? passwordValue : "",
+      isActive: selectedStatus === "זמין",
+      phone: fieldPhone?.querySelector("input")?.value?.trim() || "",
+      notes: fieldNotes?.querySelector("textarea")?.value?.trim() || "",
+      roles: selectedRoles,
+      departments: selectedDepartments,
     };
 
-    // Update in mock data
-    const employees = getEmployees();
-    const index = employees.findIndex(emp => emp.id === currentEmployee.id);
-    if (index !== -1) {
-      employees[index] = updatedEmployee;
+    if (!Number.isInteger(payload.employeeId) || payload.employeeId <= 0) {
+      alert("יש להזין EmployeeId תקין.");
+      return;
     }
 
-    // Update current employee and original data
-    currentEmployee = updatedEmployee;
-    originalEmployeeData = { ...updatedEmployee };
-    isEditMode = false;
+    if (!payload.username) {
+      alert("יש להזין שם מלא.");
+      return;
+    }
 
-    // Re-render table and modal
-    renderTable();
-    populateModal(updatedEmployee, false);
+    if (!payload.email) {
+      alert("יש להזין אימייל.");
+      return;
+    }
+
+    if (isCreateMode && !payload.password) {
+      alert("יש להזין סיסמה לעובד חדש.");
+      return;
+    }
+
+    try {
+      if (isCreateMode) {
+        await window.apiRequest("/Users", {
+          method: "POST",
+          body: JSON.stringify(payload),
+        });
+      } else {
+        await window.apiRequest(`/Users/${currentEmployee.id}`, {
+          method: "PUT",
+          body: JSON.stringify({
+            ...payload,
+            password: "",
+          }),
+        });
+      }
+
+      await renderTable();
+      closeEmployeeModal();
+    } catch (error) {
+      console.error("Failed to save employee:", error);
+
+      let message = isCreateMode ? "שגיאה ביצירת עובד." : "שגיאה בעדכון עובד.";
+
+      if (error?.responseBody?.message) {
+        message = error.responseBody.message;
+      } else if (error?.message) {
+        message = error.message;
+      }
+
+      alert(message);
+    }
   }
 
-  // Event listeners
+  if (btnNewEmployee) {
+    btnNewEmployee.addEventListener("click", openCreateEmployeeModal);
+  }
+
   if (btnEdit) {
-    btnEdit.addEventListener('click', enterEditMode);
+    btnEdit.addEventListener("click", enterEditMode);
   }
 
   if (btnSave) {
-    btnSave.addEventListener('click', saveEmployee);
+    btnSave.addEventListener("click", saveEmployee);
   }
 
   if (btnCancel) {
-    btnCancel.addEventListener('click', cancelEdit);
+    btnCancel.addEventListener("click", cancelEdit);
   }
 
   if (modalClose) {
-    modalClose.addEventListener('click', closeEmployeeModal);
+    modalClose.addEventListener("click", closeEmployeeModal);
   }
 
   if (modalOverlay) {
-    modalOverlay.addEventListener('click', closeEmployeeModal);
+    modalOverlay.addEventListener("click", closeEmployeeModal);
   }
 
-  // Close on ESC key
-  document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && employeeModal?.classList.contains('active')) {
+  if (searchInput) {
+    searchInput.addEventListener("input", (e) => {
+      filterEmployees(e.target.value);
+      renderTableRows();
+    });
+  }
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && employeeModal?.classList.contains("active")) {
       if (isEditMode) {
         cancelEdit();
       } else {
@@ -279,6 +744,19 @@ document.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  // Initial render
-  renderTable();
+  async function initializeEmployeesPage() {
+    try {
+      await loadReferenceData();
+      await renderTable();
+    } catch (error) {
+      console.error("Failed to initialize employees page:", error);
+
+      if (error.status === 401) {
+        window.clearAuthSession();
+        window.location.href = "../pages/login.html";
+      }
+    }
+  }
+
+  initializeEmployeesPage();
 });

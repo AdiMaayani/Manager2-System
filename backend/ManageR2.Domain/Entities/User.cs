@@ -19,4 +19,8 @@ public class User
     public DateTime? LastLoginAt { get; set; }
 
     public DateTime CreatedAt { get; set; }
+
+    public string? Phone { get; set; }
+
+    public string? Notes { get; set; }
 }

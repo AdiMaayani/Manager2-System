@@ -150,6 +150,8 @@ public class UserRepository : IUserRepository
             command.Parameters.AddWithValue("@PasswordHash", user.PasswordHash);
             command.Parameters.AddWithValue("@PasswordSalt", user.PasswordSalt);
             command.Parameters.AddWithValue("@IsActive", user.IsActive);
+            command.Parameters.AddWithValue("@Phone", (object?)user.Phone ?? DBNull.Value);
+            command.Parameters.AddWithValue("@Notes", (object?)user.Notes ?? DBNull.Value);
 
             await connection.OpenAsync();
 
@@ -215,6 +217,8 @@ public class UserRepository : IUserRepository
             command.Parameters.AddWithValue("@PasswordHash", user.PasswordHash);
             command.Parameters.AddWithValue("@PasswordSalt", user.PasswordSalt);
             command.Parameters.AddWithValue("@IsActive", user.IsActive);
+            command.Parameters.AddWithValue("@Phone", (object?)user.Phone ?? DBNull.Value);
+            command.Parameters.AddWithValue("@Notes", (object?)user.Notes ?? DBNull.Value);
 
             await connection.OpenAsync();
 
@@ -392,6 +396,202 @@ public class UserRepository : IUserRepository
         }
     }
 
+    public async Task UpdateLastLoginAtAsync(int userId)
+    {
+        _logger.LogInformation("UpdateLastLoginAtAsync started for UserId={UserId}.", userId);
+
+        try
+        {
+            await using var connection = _dbServices.CreateConnection();
+            await using var command = new SqlCommand(@"
+                UPDATE dbo.Users
+                SET LastLoginAt = SYSUTCDATETIME()
+                WHERE UserId = @UserId;", connection);
+
+            command.Parameters.AddWithValue("@UserId", userId);
+
+            await connection.OpenAsync();
+
+            var rowsAffected = await command.ExecuteNonQueryAsync();
+
+            if (rowsAffected > 0)
+            {
+                _logger.LogInformation("UpdateLastLoginAtAsync succeeded for UserId={UserId}.", userId);
+            }
+            else
+            {
+                _logger.LogWarning("UpdateLastLoginAtAsync affected 0 rows for UserId={UserId}.", userId);
+            }
+        }
+        catch (SqlException ex)
+        {
+            _logger.LogError(ex, "UpdateLastLoginAtAsync failed with SQL error for UserId={UserId}.", userId);
+
+            throw new UserValidationException("Failed to update last login date for the user.", ex);
+        }
+    }
+
+    public async Task SetUserRolesAsync(int userId, List<string> roles)
+    {
+        _logger.LogInformation("SetUserRolesAsync started for UserId={UserId}.", userId);
+
+        try
+        {
+            await using var connection = _dbServices.CreateConnection();
+            await connection.OpenAsync();
+
+            await using (var deleteCommand = new SqlCommand(@"
+                DELETE FROM dbo.UserRoles
+                WHERE UserId = @UserId;", connection))
+            {
+                deleteCommand.Parameters.AddWithValue("@UserId", userId);
+                await deleteCommand.ExecuteNonQueryAsync();
+            }
+
+            if (roles == null || roles.Count == 0)
+            {
+                _logger.LogInformation("No roles provided for UserId={UserId}.", userId);
+                return;
+            }
+
+            foreach (var roleName in roles)
+            {
+                await using var insertCommand = new SqlCommand(@"
+                    INSERT INTO dbo.UserRoles (UserId, RoleId, AssignedAt)
+                    SELECT @UserId, R.RoleId, SYSUTCDATETIME()
+                    FROM dbo.Roles R
+                    WHERE R.RoleName = @RoleName;", connection);
+
+                insertCommand.Parameters.AddWithValue("@UserId", userId);
+                insertCommand.Parameters.AddWithValue("@RoleName", roleName);
+
+                await insertCommand.ExecuteNonQueryAsync();
+            }
+
+            _logger.LogInformation("SetUserRolesAsync completed for UserId={UserId}.", userId);
+        }
+        catch (SqlException ex)
+        {
+            _logger.LogError(ex, "SetUserRolesAsync failed for UserId={UserId}.", userId);
+            throw new UserValidationException("Failed to update user roles.", ex);
+        }
+    }
+
+    public async Task SetUserDepartmentsAsync(int userId, List<string> departments)
+    {
+        _logger.LogInformation("SetUserDepartmentsAsync started for UserId={UserId}.", userId);
+
+        try
+        {
+            await using var connection = _dbServices.CreateConnection();
+            await connection.OpenAsync();
+
+            await using (var deleteCommand = new SqlCommand(@"
+                DELETE FROM dbo.UserDepartments
+                WHERE UserId = @UserId;", connection))
+            {
+                deleteCommand.Parameters.AddWithValue("@UserId", userId);
+                await deleteCommand.ExecuteNonQueryAsync();
+            }
+
+            if (departments == null || departments.Count == 0)
+            {
+                _logger.LogInformation("No departments provided for UserId={UserId}.", userId);
+                return;
+            }
+
+            foreach (var departmentName in departments)
+            {
+                await using var insertCommand = new SqlCommand(@"
+                    INSERT INTO dbo.UserDepartments (UserId, DepartmentId, AssignedAt)
+                    SELECT @UserId, D.DepartmentId, SYSUTCDATETIME()
+                    FROM dbo.Departments D
+                    WHERE D.DepartmentName = @DepartmentName;", connection);
+
+                insertCommand.Parameters.AddWithValue("@UserId", userId);
+                insertCommand.Parameters.AddWithValue("@DepartmentName", departmentName);
+
+                await insertCommand.ExecuteNonQueryAsync();
+            }
+
+            _logger.LogInformation("SetUserDepartmentsAsync completed for UserId={UserId}.", userId);
+        }
+        catch (SqlException ex)
+        {
+            _logger.LogError(ex, "SetUserDepartmentsAsync failed for UserId={UserId}.", userId);
+            throw new UserValidationException("Failed to update user departments.", ex);
+        }
+    }
+
+    public async Task<List<string>> GetAllRoleNamesAsync()
+    {
+        _logger.LogInformation("GetAllRoleNamesAsync started.");
+
+        var roles = new List<string>();
+
+        try
+        {
+            await using var connection = _dbServices.CreateConnection();
+            await using var command = new SqlCommand(@"
+                SELECT RoleName
+                FROM dbo.Roles
+                WHERE IsActive = 1
+                ORDER BY RoleName;", connection);
+
+            await connection.OpenAsync();
+            await using var reader = await command.ExecuteReaderAsync();
+
+            while (await reader.ReadAsync())
+            {
+                roles.Add(reader["RoleName"]?.ToString() ?? string.Empty);
+            }
+
+            _logger.LogInformation("GetAllRoleNamesAsync succeeded. Returned {RolesCount} roles.", roles.Count);
+
+            return roles;
+        }
+        catch (SqlException ex)
+        {
+            _logger.LogError(ex, "GetAllRoleNamesAsync failed with SQL error.");
+
+            throw new UserValidationException("Failed to retrieve roles list.", ex);
+        }
+    }
+
+    public async Task<List<string>> GetAllDepartmentNamesAsync()
+    {
+        _logger.LogInformation("GetAllDepartmentNamesAsync started.");
+
+        var departments = new List<string>();
+
+        try
+        {
+            await using var connection = _dbServices.CreateConnection();
+            await using var command = new SqlCommand(@"
+                SELECT DepartmentName
+                FROM dbo.Departments
+                ORDER BY DepartmentName;", connection);
+
+            await connection.OpenAsync();
+            await using var reader = await command.ExecuteReaderAsync();
+
+            while (await reader.ReadAsync())
+            {
+                departments.Add(reader["DepartmentName"]?.ToString() ?? string.Empty);
+            }
+
+            _logger.LogInformation("GetAllDepartmentNamesAsync succeeded. Returned {DepartmentsCount} departments.", departments.Count);
+
+            return departments;
+        }
+        catch (SqlException ex)
+        {
+            _logger.LogError(ex, "GetAllDepartmentNamesAsync failed with SQL error.");
+
+            throw new UserValidationException("Failed to retrieve departments list.", ex);
+        }
+    }
+
     private static User MapUser(SqlDataReader reader)
     {
         return new User
@@ -404,7 +604,9 @@ public class UserRepository : IUserRepository
             PasswordSalt = reader["PasswordSalt"] != DBNull.Value ? reader["PasswordSalt"]?.ToString() ?? string.Empty : string.Empty,
             IsActive = reader["IsActive"] != DBNull.Value && Convert.ToBoolean(reader["IsActive"]),
             LastLoginAt = reader["LastLoginAt"] != DBNull.Value ? Convert.ToDateTime(reader["LastLoginAt"]) : null,
-            CreatedAt = reader["CreatedAt"] != DBNull.Value ? Convert.ToDateTime(reader["CreatedAt"]) : DateTime.MinValue
+            CreatedAt = reader["CreatedAt"] != DBNull.Value ? Convert.ToDateTime(reader["CreatedAt"]) : DateTime.MinValue,
+            Phone = reader["Phone"] != DBNull.Value ? reader["Phone"]?.ToString() : null,
+            Notes = reader["Notes"] != DBNull.Value ? reader["Notes"]?.ToString() : null
         };
     }
 }

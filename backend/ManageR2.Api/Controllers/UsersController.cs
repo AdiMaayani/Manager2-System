@@ -32,8 +32,11 @@ public class UsersController : ControllerBase
         _logger = logger;
     }
 
-    private static UserResponseDto ToSafeUser(User u)
+    private async Task<UserResponseDto> ToSafeUserAsync(User u)
     {
+        var roles = await _userRepository.GetUserRolesAsync(u.UserId);
+        var departments = await _userRepository.GetUserDepartmentsAsync(u.UserId);
+
         return new UserResponseDto
         {
             UserId = u.UserId,
@@ -42,7 +45,11 @@ public class UsersController : ControllerBase
             Email = u.Email,
             IsActive = u.IsActive,
             LastLoginAt = u.LastLoginAt,
-            CreatedAt = u.CreatedAt
+            CreatedAt = u.CreatedAt,
+            Roles = roles,
+            Departments = departments,
+            Phone = u.Phone,
+            Notes = u.Notes,
         };
     }
 
@@ -51,7 +58,31 @@ public class UsersController : ControllerBase
     public async Task<IActionResult> GetUsers()
     {
         var users = await _userRepository.GetUsersAsync();
-        return Ok(users.Select(ToSafeUser));
+
+        var response = new List<UserResponseDto>();
+
+        foreach (var user in users)
+        {
+            response.Add(await ToSafeUserAsync(user));
+        }
+
+        return Ok(response);
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpGet("roles")]
+    public async Task<IActionResult> GetAllRoles()
+    {
+        var roles = await _userRepository.GetAllRoleNamesAsync();
+        return Ok(roles);
+    }
+
+    [Authorize(Roles = "Admin")]
+    [HttpGet("departments")]
+    public async Task<IActionResult> GetAllDepartments()
+    {
+        var departments = await _userRepository.GetAllDepartmentNamesAsync();
+        return Ok(departments);
     }
 
     [Authorize]
@@ -75,7 +106,7 @@ public class UsersController : ControllerBase
         if (user == null)
             return NotFound(new { message = $"User with id {id} was not found." });
 
-        return Ok(ToSafeUser(user));
+        return Ok(await ToSafeUserAsync(user));
     }
 
     [Authorize]
@@ -94,13 +125,19 @@ public class UsersController : ControllerBase
             Email = dto.Email,
             PasswordHash = hash,
             PasswordSalt = salt,
-            IsActive = dto.IsActive
+            IsActive = dto.IsActive,
+            Phone = dto.Phone,
+            Notes = dto.Notes
         };
 
         var id = await _userRepository.CreateUserAsync(user);
+
+        await _userRepository.SetUserRolesAsync(id, dto.Roles);
+        await _userRepository.SetUserDepartmentsAsync(id, dto.Departments);
+
         var created = await _userRepository.GetUserByIdAsync(id);
 
-        return CreatedAtAction(nameof(GetUserById), new { id }, ToSafeUser(created!));
+        return CreatedAtAction(nameof(GetUserById), new { id }, await ToSafeUserAsync(created!));
     }
 
     [Authorize]
@@ -127,13 +164,18 @@ public class UsersController : ControllerBase
             Email = dto.Email,
             PasswordHash = hash,
             PasswordSalt = salt,
-            IsActive = dto.IsActive
+            IsActive = dto.IsActive,
+            Phone = dto.Phone,
+            Notes = dto.Notes
         };
 
         await _userRepository.UpdateUserAsync(user);
 
+        await _userRepository.SetUserRolesAsync(id, dto.Roles);
+        await _userRepository.SetUserDepartmentsAsync(id, dto.Departments);
+
         var updated = await _userRepository.GetUserByIdAsync(id);
-        return Ok(ToSafeUser(updated!));
+        return Ok(await ToSafeUserAsync(updated!));
     }
 
     [Authorize]
@@ -167,16 +209,22 @@ public class UsersController : ControllerBase
         if (!isValid)
             return Unauthorized(new { message = "Invalid email or password." });
 
-        var roles = await _userRepository.GetUserRolesAsync(user.UserId);
-        var departments = await _userRepository.GetUserDepartmentsAsync(user.UserId);
-        var token = _jwtTokenService.GenerateToken(user, roles);
+        await _userRepository.UpdateLastLoginAtAsync(user.UserId);
+
+        var refreshedUser = await _userRepository.GetUserByIdAsync(user.UserId);
+        if (refreshedUser == null)
+            return Unauthorized(new { message = "Failed to reload user after login." });
+
+        var roles = await _userRepository.GetUserRolesAsync(refreshedUser.UserId);
+        var departments = await _userRepository.GetUserDepartmentsAsync(refreshedUser.UserId);
+        var token = _jwtTokenService.GenerateToken(refreshedUser, roles);
 
         return Ok(new LoginResponseDto
         {
-            UserId = user.UserId,
-            Username = user.Username,
-            Email = user.Email,
-            IsActive = user.IsActive,
+            UserId = refreshedUser.UserId,
+            Username = refreshedUser.Username,
+            Email = refreshedUser.Email,
+            IsActive = refreshedUser.IsActive,
             Token = token,
             Roles = roles,
             Departments = departments
