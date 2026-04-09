@@ -8,6 +8,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnCancel = document.getElementById("btn-cancel-employee");
   const btnNewEmployee = document.getElementById("btn-new-employee");
   const searchInput = document.querySelector(".search-input .input");
+  const roleFiltersContainer = document.getElementById(
+    "employees-role-filters",
+  );
+  const departmentFiltersContainer = document.getElementById(
+    "employees-department-filters",
+  );
 
   let employeesState = [];
   let filteredEmployeesState = [];
@@ -18,6 +24,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let availableRoles = [];
   let availableDepartments = [];
+
+  let selectedRoleFilter = "הכל";
+  let selectedDepartmentFilters = [];
 
   function getPrimaryRole(roles) {
     if (!Array.isArray(roles) || roles.length === 0) {
@@ -131,32 +140,84 @@ document.addEventListener("DOMContentLoaded", () => {
     return date.toLocaleString("he-IL");
   }
 
+  function hasActiveDepartmentFilters() {
+    return (
+      Array.isArray(selectedDepartmentFilters) &&
+      selectedDepartmentFilters.length > 0
+    );
+  }
+
+  function employeeMatchesText(employee, normalizedSearch) {
+    if (!normalizedSearch) {
+      return true;
+    }
+
+    const fullName = (employee.fullName || "").toLowerCase();
+    const role = (employee.role || "").toLowerCase();
+    const email = (employee.email || "").toLowerCase();
+    const phone = (employee.phone || "").toLowerCase();
+    const notes = (employee.notes || "").toLowerCase();
+    const departments = (employee.departments || []).join(" ").toLowerCase();
+    const roles = (employee.roles || []).join(" ").toLowerCase();
+
+    return (
+      fullName.includes(normalizedSearch) ||
+      role.includes(normalizedSearch) ||
+      roles.includes(normalizedSearch) ||
+      email.includes(normalizedSearch) ||
+      phone.includes(normalizedSearch) ||
+      notes.includes(normalizedSearch) ||
+      departments.includes(normalizedSearch)
+    );
+  }
+
+  function employeeMatchesRoleFilter(employee) {
+    if (!selectedRoleFilter || selectedRoleFilter === "הכל") {
+      return false;
+    }
+
+    const employeeRoles = Array.isArray(employee.roles) ? employee.roles : [];
+
+    return employeeRoles.some((role) => role === selectedRoleFilter);
+  }
+
+  function employeeMatchesDepartmentFilters(employee) {
+    if (!hasActiveDepartmentFilters()) {
+      return false;
+    }
+
+    const employeeDepartments = Array.isArray(employee.departments)
+      ? employee.departments
+      : [];
+
+    return selectedDepartmentFilters.some((department) =>
+      employeeDepartments.includes(department),
+    );
+  }
+
+  function employeeMatchesStructuredFilters(employee) {
+    const roleFilterActive =
+      !!selectedRoleFilter && selectedRoleFilter !== "הכל";
+    const departmentFilterActive = hasActiveDepartmentFilters();
+
+    if (!roleFilterActive && !departmentFilterActive) {
+      return true;
+    }
+
+    const matchesRole = employeeMatchesRoleFilter(employee);
+    const matchesDepartment = employeeMatchesDepartmentFilters(employee);
+
+    return matchesRole || matchesDepartment;
+  }
+
   function filterEmployees(searchTerm) {
     const normalizedSearch = (searchTerm || "").trim().toLowerCase();
 
-    if (!normalizedSearch) {
-      filteredEmployeesState = [...employeesState];
-      return;
-    }
-
     filteredEmployeesState = employeesState.filter((employee) => {
-      const fullName = (employee.fullName || "").toLowerCase();
-      const role = (employee.role || "").toLowerCase();
-      const email = (employee.email || "").toLowerCase();
-      const phone = (employee.phone || "").toLowerCase();
-      const notes = (employee.notes || "").toLowerCase();
-      const departments = (employee.departments || []).join(" ").toLowerCase();
-      const roles = (employee.roles || []).join(" ").toLowerCase();
+      const textMatch = employeeMatchesText(employee, normalizedSearch);
+      const filtersMatch = employeeMatchesStructuredFilters(employee);
 
-      return (
-        fullName.includes(normalizedSearch) ||
-        role.includes(normalizedSearch) ||
-        roles.includes(normalizedSearch) ||
-        email.includes(normalizedSearch) ||
-        phone.includes(normalizedSearch) ||
-        notes.includes(normalizedSearch) ||
-        departments.includes(normalizedSearch)
-      );
+      return textMatch && filtersMatch;
     });
   }
 
@@ -199,6 +260,85 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  function createFilterChip(label, isActive, onClick) {
+    const chip = document.createElement("button");
+    chip.type = "button";
+    chip.className = `filter-chip${isActive ? " active" : ""}`;
+    chip.textContent = label;
+    chip.addEventListener("click", onClick);
+    return chip;
+  }
+
+  function renderRoleFilters() {
+    if (!roleFiltersContainer) return;
+
+    roleFiltersContainer.innerHTML = "";
+
+    const allChip = createFilterChip(
+      "הכל",
+      selectedRoleFilter === "הכל",
+      () => {
+        selectedRoleFilter = "הכל";
+        renderRoleFilters();
+        filterEmployees(searchInput?.value || "");
+        renderTableRows();
+      },
+    );
+
+    roleFiltersContainer.appendChild(allChip);
+
+    availableRoles.forEach((roleName) => {
+      const chip = createFilterChip(
+        roleName,
+        selectedRoleFilter === roleName,
+        () => {
+          selectedRoleFilter = roleName;
+          renderRoleFilters();
+          filterEmployees(searchInput?.value || "");
+          renderTableRows();
+        },
+      );
+
+      roleFiltersContainer.appendChild(chip);
+    });
+  }
+
+  function toggleDepartmentFilter(departmentName) {
+    const exists = selectedDepartmentFilters.includes(departmentName);
+
+    if (exists) {
+      selectedDepartmentFilters = selectedDepartmentFilters.filter(
+        (department) => department !== departmentName,
+      );
+    } else {
+      selectedDepartmentFilters = [
+        ...selectedDepartmentFilters,
+        departmentName,
+      ];
+    }
+  }
+
+  function renderDepartmentFilters() {
+    if (!departmentFiltersContainer) return;
+
+    departmentFiltersContainer.innerHTML = "";
+
+    availableDepartments.forEach((departmentName) => {
+      const chip = createFilterChip(
+        departmentName,
+        selectedDepartmentFilters.includes(departmentName),
+        () => {
+          toggleDepartmentFilter(departmentName);
+          renderDepartmentFilters();
+          filterEmployees(searchInput?.value || "");
+          renderTableRows();
+        },
+      );
+
+      departmentFiltersContainer.appendChild(chip);
+    });
+  }
+
   async function renderTable() {
     if (!employeesTable) return;
 
@@ -206,6 +346,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     try {
       employeesState = await getEmployees();
+      employeesState.sort((a, b) =>
+        a.fullName.localeCompare(b.fullName, "he-IL"),
+      );
       filterEmployees(searchInput?.value || "");
       renderTableRows();
     } catch (error) {
@@ -259,8 +402,8 @@ document.addEventListener("DOMContentLoaded", () => {
       userId: null,
       employeeId: "",
       fullName: "",
-      role: "",
-      roles: [],
+      role: "Employee",
+      roles: ["Employee"],
       departments: [],
       phone: "",
       email: "",
@@ -651,7 +794,7 @@ document.addEventListener("DOMContentLoaded", () => {
     };
 
     if (!Number.isInteger(payload.employeeId) || payload.employeeId <= 0) {
-      alert("יש להזין EmployeeId תקין.");
+      alert("יש להזין מס׳ עובד בחברה.");
       return;
     }
 
@@ -667,6 +810,19 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (isCreateMode && !payload.password) {
       alert("יש להזין סיסמה לעובד חדש.");
+      return;
+    }
+
+    if (!Array.isArray(payload.roles) || payload.roles.length === 0) {
+      alert("יש לבחור לפחות תפקיד אחד.");
+      return;
+    }
+
+    if (
+      !Array.isArray(payload.departments) ||
+      payload.departments.length === 0
+    ) {
+      alert("יש לבחור לפחות מחלקה אחת.");
       return;
     }
 
@@ -747,6 +903,8 @@ document.addEventListener("DOMContentLoaded", () => {
   async function initializeEmployeesPage() {
     try {
       await loadReferenceData();
+      renderRoleFilters();
+      renderDepartmentFilters();
       await renderTable();
     } catch (error) {
       console.error("Failed to initialize employees page:", error);
