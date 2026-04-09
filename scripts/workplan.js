@@ -172,6 +172,11 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function renderWeeklyView() {
+    if (!currentWorkPlanData || !currentWorkPlanData.tasks) {
+      console.warn("WorkPlan data not ready for rendering");
+      return;
+    }
+
     const grid = document.getElementById("weekly-grid");
     if (!grid) return;
 
@@ -301,6 +306,11 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function renderMonthlyView() {
+    if (!currentWorkPlanData || !currentWorkPlanData.tasks) {
+      console.warn("WorkPlan data not ready for rendering");
+      return;
+    }
+
     const grid = document.getElementById("monthly-grid");
     if (!grid) return;
 
@@ -463,6 +473,11 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function renderYearlyView() {
+    if (!currentWorkPlanData || !currentWorkPlanData.tasks) {
+      console.warn("WorkPlan data not ready for rendering");
+      return;
+    }
+
     const grid = document.getElementById("yearly-grid");
     if (!grid) return;
 
