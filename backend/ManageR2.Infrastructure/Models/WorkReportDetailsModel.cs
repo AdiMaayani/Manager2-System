@@ -18,6 +18,7 @@ public class WorkReportDetailsModel
     public int? ReporterId { get; set; }
     public string? ReporterName { get; set; }
     public string? Role { get; set; }
+    public string? Status { get; set; }
     public bool Followup { get; set; }
     public string? FollowupReason { get; set; }
     public List<string> Systems { get; set; } = new();

@@ -74,9 +74,10 @@ public async Task<IActionResult> GetById(int id)
             Summary = request.Summary,
             Notes = request.Notes,
             ReporterId = request.ReporterId,
-            ReporterName = request.ReporterName,
-            Role = request.Role,
-            Systems = request.Systems ?? new List<string>(),
+ReporterName = request.ReporterName,
+Role = request.Role,
+Status = request.Status,
+Systems = request.Systems ?? new List<string>(),
             RelatedWorkers = request.RelatedWorkers?.Select(w => new WorkReportRelatedWorkerModel
             {
                 Id = w.Id,

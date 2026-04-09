@@ -58,27 +58,46 @@ public class WorkItemRepository : IWorkItemRepository
     }
 
     public async Task<List<WorkItem>> GetByTypeAsync(string workType)
+{
+    var workItems = new List<WorkItem>();
+
+    await using var connection = _dbServices.CreateConnection();
+    await using var command = new SqlCommand(
+        @"SELECT 
+              wi.WorkItemId,
+              wi.Title,
+              wi.Description,
+              wi.WorkType,
+              wi.BillingType,
+              wi.Status,
+              wi.CustomerId,
+              c.CustomerName AS CustomerName,
+              wi.SiteId,
+              wi.CreatedAt,
+              wi.ClosedAt,
+              wi.ParentWorkItemId
+          FROM dbo.WorkItems wi
+          LEFT JOIN dbo.Customers c
+              ON wi.CustomerId = c.CustomerId
+          WHERE wi.WorkType = @WorkType
+          ORDER BY wi.CreatedAt DESC",
+        connection)
     {
-        var workItems = new List<WorkItem>();
+        CommandType = CommandType.Text
+    };
 
-        await using var connection = _dbServices.CreateConnection();
-        await using var command = new SqlCommand("sp_GetWorkItemsByType", connection)
-        {
-            CommandType = CommandType.StoredProcedure
-        };
+    command.Parameters.AddWithValue("@WorkType", workType);
 
-        command.Parameters.AddWithValue("@WorkType", workType);
+    await connection.OpenAsync();
+    await using var reader = await command.ExecuteReaderAsync();
 
-        await connection.OpenAsync();
-        await using var reader = await command.ExecuteReaderAsync();
-
-        while (await reader.ReadAsync())
-        {
-            workItems.Add(MapWorkItem(reader));
-        }
-
-        return workItems;
+    while (await reader.ReadAsync())
+    {
+        workItems.Add(MapWorkItem(reader));
     }
+
+    return workItems;
+}
 
     public async Task<List<WorkItem>> GetTasksByParentIdAsync(int parentWorkItemId)
     {
@@ -87,20 +106,23 @@ public class WorkItemRepository : IWorkItemRepository
         await using var connection = _dbServices.CreateConnection();
         await using var command = new SqlCommand(
             @"SELECT 
-                  WorkItemId,
-                  Title,
-                  Description,
-                  WorkType,
-                  BillingType,
-                  Status,
-                  CustomerId,
-                  SiteId,
-                  CreatedAt,
-                  ClosedAt,
-                  ParentWorkItemId
-              FROM dbo.WorkItems
-              WHERE ParentWorkItemId = @ParentWorkItemId
-              ORDER BY CreatedAt DESC",
+      wi.WorkItemId,
+      wi.Title,
+      wi.Description,
+      wi.WorkType,
+      wi.BillingType,
+      wi.Status,
+      wi.CustomerId,
+      c.CustomerName AS CustomerName,
+      wi.SiteId,
+      wi.CreatedAt,
+      wi.ClosedAt,
+      wi.ParentWorkItemId
+  FROM dbo.WorkItems wi
+  LEFT JOIN dbo.Customers c
+      ON wi.CustomerId = c.CustomerId
+  WHERE wi.ParentWorkItemId = @ParentWorkItemId
+  ORDER BY wi.CreatedAt DESC",
             connection)
         {
             CommandType = CommandType.Text
@@ -274,19 +296,22 @@ public class WorkItemRepository : IWorkItemRepository
 
         await using (var projectCommand = new SqlCommand(
             @"SELECT 
-                  WorkItemId,
-                  Title,
-                  Description,
-                  WorkType,
-                  BillingType,
-                  Status,
-                  CustomerId,
-                  SiteId,
-                  CreatedAt,
-                  ClosedAt,
-                  ParentWorkItemId
-              FROM dbo.WorkItems
-              WHERE WorkItemId = @ProjectId",
+      wi.WorkItemId,
+      wi.Title,
+      wi.Description,
+      wi.WorkType,
+      wi.BillingType,
+      wi.Status,
+      wi.CustomerId,
+      c.CustomerName AS CustomerName,
+      wi.SiteId,
+      wi.CreatedAt,
+      wi.ClosedAt,
+      wi.ParentWorkItemId
+  FROM dbo.WorkItems wi
+  LEFT JOIN dbo.Customers c
+      ON wi.CustomerId = c.CustomerId
+  WHERE wi.WorkItemId = @ProjectId",
             connection))
         {
             projectCommand.CommandType = CommandType.Text;
@@ -307,20 +332,23 @@ public class WorkItemRepository : IWorkItemRepository
 
         await using (var tasksCommand = new SqlCommand(
             @"SELECT 
-                  WorkItemId,
-                  Title,
-                  Description,
-                  WorkType,
-                  BillingType,
-                  Status,
-                  CustomerId,
-                  SiteId,
-                  CreatedAt,
-                  ClosedAt,
-                  ParentWorkItemId
-              FROM dbo.WorkItems
-              WHERE ParentWorkItemId = @ProjectId
-              ORDER BY CreatedAt DESC",
+      wi.WorkItemId,
+      wi.Title,
+      wi.Description,
+      wi.WorkType,
+      wi.BillingType,
+      wi.Status,
+      wi.CustomerId,
+      c.CustomerName AS CustomerName,
+      wi.SiteId,
+      wi.CreatedAt,
+      wi.ClosedAt,
+      wi.ParentWorkItemId
+  FROM dbo.WorkItems wi
+  LEFT JOIN dbo.Customers c
+      ON wi.CustomerId = c.CustomerId
+  WHERE wi.ParentWorkItemId = @ProjectId
+  ORDER BY wi.CreatedAt DESC",
             connection))
         {
             tasksCommand.CommandType = CommandType.Text;
@@ -402,19 +430,20 @@ public class WorkItemRepository : IWorkItemRepository
     private static WorkItem MapWorkItem(SqlDataReader reader)
     {
         return new WorkItem
-        {
-            WorkItemId = GetIntValue(reader, "WorkItemId"),
-            Title = GetStringValue(reader, "Title") ?? string.Empty,
-            Description = GetStringValue(reader, "Description"),
-            WorkType = GetStringValue(reader, "WorkType"),
-            BillingType = GetStringValue(reader, "BillingType"),
-            Status = GetStringValue(reader, "Status"),
-            CustomerId = GetIntValue(reader, "CustomerId"),
-            SiteId = GetIntValue(reader, "SiteId"),
-            CreatedAt = GetDateTimeValue(reader, "CreatedAt") ?? DateTime.MinValue,
-            ClosedAt = GetDateTimeValue(reader, "ClosedAt"),
-            ParentWorkItemId = GetNullableIntValue(reader, "ParentWorkItemId")
-        };
+{
+    WorkItemId = GetIntValue(reader, "WorkItemId"),
+    Title = GetStringValue(reader, "Title") ?? string.Empty,
+    Description = GetStringValue(reader, "Description"),
+    WorkType = GetStringValue(reader, "WorkType"),
+    BillingType = GetStringValue(reader, "BillingType"),
+    Status = GetStringValue(reader, "Status"),
+    CustomerId = GetIntValue(reader, "CustomerId"),
+    CustomerName = GetStringValue(reader, "CustomerName"),
+    SiteId = GetIntValue(reader, "SiteId"),
+    CreatedAt = GetDateTimeValue(reader, "CreatedAt") ?? DateTime.MinValue,
+    ClosedAt = GetDateTimeValue(reader, "ClosedAt"),
+    ParentWorkItemId = GetNullableIntValue(reader, "ParentWorkItemId")
+};
     }
 
     private static WorkPlanAssignmentResult MapWorkPlanAssignment(SqlDataReader reader)

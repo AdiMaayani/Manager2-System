@@ -41,10 +41,11 @@ public class WorkReportRepository : IWorkReportRepository
                 command.Parameters.AddWithValue("@EndTime", request.End ?? (object)DBNull.Value);
                 command.Parameters.AddWithValue("@Summary", request.Summary ?? (object)DBNull.Value);
                 command.Parameters.AddWithValue("@Notes", request.Notes ?? (object)DBNull.Value);
-                command.Parameters.AddWithValue("@ReporterEmployeeId", request.ReporterId ?? (object)DBNull.Value);
-                command.Parameters.AddWithValue("@ReporterName", request.ReporterName ?? (object)DBNull.Value);
-                command.Parameters.AddWithValue("@ReporterRole", request.Role ?? (object)DBNull.Value);
-                command.Parameters.AddWithValue("@WorkersCount", request.RelatedWorkers?.Count ?? 0);
+               command.Parameters.AddWithValue("@ReporterEmployeeId", request.ReporterId ?? (object)DBNull.Value);
+command.Parameters.AddWithValue("@ReporterName", request.ReporterName ?? (object)DBNull.Value);
+command.Parameters.AddWithValue("@ReporterRole", request.Role ?? (object)DBNull.Value);
+command.Parameters.AddWithValue("@Status", request.Status ?? (object)DBNull.Value);
+command.Parameters.AddWithValue("@WorkersCount", request.RelatedWorkers?.Count ?? 0);
                 command.Parameters.AddWithValue("@FollowUpRequired", request.Followup);
                 command.Parameters.AddWithValue("@FollowUpReason", request.FollowupReason ?? (object)DBNull.Value);
 
@@ -129,14 +130,15 @@ public class WorkReportRepository : IWorkReportRepository
     await using var connection = _dbServices.CreateConnection();
     await using var command = new SqlCommand(
         @"SELECT 
-              WorkReportId,
-              ReportDate,
-              ProjectName,
-              CustomerName,
-              ReporterName,
-              FollowUpRequired
-          FROM dbo.WorkReports
-          ORDER BY ReportDate DESC",
+      WorkReportId,
+      ReportDate,
+      ProjectName,
+      CustomerName,
+      ReporterName,
+      Status,
+      FollowUpRequired
+  FROM dbo.WorkReports
+  ORDER BY ReportDate DESC, WorkReportId DESC",
         connection)
     {
         CommandType = CommandType.Text
@@ -148,14 +150,15 @@ public class WorkReportRepository : IWorkReportRepository
     while (await reader.ReadAsync())
     {
         reports.Add(new WorkReportListItemModel
-        {
-            WorkReportId = reader["WorkReportId"] != DBNull.Value ? Convert.ToInt32(reader["WorkReportId"]) : 0,
-            ReportDate = reader["ReportDate"] != DBNull.Value ? Convert.ToDateTime(reader["ReportDate"]) : null,
-            ProjectName = reader["ProjectName"]?.ToString(),
-            CustomerName = reader["CustomerName"]?.ToString(),
-            ReporterName = reader["ReporterName"]?.ToString(),
-            FollowUpRequired = reader["FollowUpRequired"] != DBNull.Value && Convert.ToBoolean(reader["FollowUpRequired"])
-        });
+{
+    WorkReportId = reader["WorkReportId"] != DBNull.Value ? Convert.ToInt32(reader["WorkReportId"]) : 0,
+    ReportDate = reader["ReportDate"] != DBNull.Value ? Convert.ToDateTime(reader["ReportDate"]) : null,
+    ProjectName = reader["ProjectName"]?.ToString(),
+    CustomerName = reader["CustomerName"]?.ToString(),
+    ReporterName = reader["ReporterName"]?.ToString(),
+    Status = reader["Status"]?.ToString(),
+    FollowUpRequired = reader["FollowUpRequired"] != DBNull.Value && Convert.ToBoolean(reader["FollowUpRequired"])
+});
     }
 
     return reports;
@@ -169,25 +172,26 @@ public async Task<WorkReportDetailsModel?> GetByIdAsync(int workReportId)
     WorkReportDetailsModel? report = null;
 
     await using (var command = new SqlCommand(
-        @"SELECT 
-              WorkReportId,
-              WorkItemId,
-              ReportType,
-              ReportDate,
-              ProjectName,
-              CustomerName,
-              Site,
-              StartTime,
-              EndTime,
-              Summary,
-              Notes,
-              ReporterEmployeeId,
-              ReporterName,
-              ReporterRole,
-              FollowUpRequired,
-              FollowUpReason
-          FROM dbo.WorkReports
-          WHERE WorkReportId = @WorkReportId",
+@"SELECT 
+      WorkReportId,
+      WorkItemId,
+      ReportType,
+      ReportDate,
+      ProjectName,
+      CustomerName,
+      Site,
+      StartTime,
+      EndTime,
+      Summary,
+      Notes,
+      ReporterEmployeeId,
+      ReporterName,
+      ReporterRole,
+      Status,
+      FollowUpRequired,
+      FollowUpReason
+  FROM dbo.WorkReports
+  WHERE WorkReportId = @WorkReportId",
         connection))
     {
         command.CommandType = CommandType.Text;
@@ -213,6 +217,7 @@ public async Task<WorkReportDetailsModel?> GetByIdAsync(int workReportId)
                 ReporterId = reader["ReporterEmployeeId"] != DBNull.Value ? Convert.ToInt32(reader["ReporterEmployeeId"]) : null,
                 ReporterName = reader["ReporterName"]?.ToString(),
                 Role = reader["ReporterRole"]?.ToString(),
+                Status = reader["Status"]?.ToString(),
                 Followup = reader["FollowUpRequired"] != DBNull.Value && Convert.ToBoolean(reader["FollowUpRequired"]),
                 FollowupReason = reader["FollowUpReason"]?.ToString()
             };

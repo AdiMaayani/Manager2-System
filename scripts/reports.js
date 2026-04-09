@@ -60,7 +60,7 @@
               projectName: r.projectName || "",
               customerName: r.customerName || "",
               reporterName: r.reporterName || "",
-              status: r.followUpRequired ? "הוגש" : "טיוטה",
+              status: r.status || "טיוטה",
             };
           })
         : [];
@@ -145,7 +145,7 @@
         : [],
       products: [],
       transferredToAccounting: false,
-      status: data.followup ? "הוגש" : "טיוטה",
+      status: data.status || "טיוטה",
     };
 
     API_REPORT_DETAILS[normalizedId] = mapped;
@@ -774,6 +774,7 @@
       relatedWorkers: formRelatedWorkers.slice(),
       notes: el.notes ? el.notes.value : "",
       followup: el.followup ? el.followup.checked : false,
+      status: "הוגש",
       followupReason:
         (document.getElementById("report-followup-reason") &&
           document.getElementById("report-followup-reason").value) ||
@@ -845,6 +846,7 @@
       ),
       reporterName: draft.reporterName || null,
       role: draft.role || null,
+      status: draft.status || "הוגש",
       systems: Array.isArray(draft.systems) ? draft.systems : [],
       relatedWorkers: Array.isArray(draft.relatedWorkers)
         ? draft.relatedWorkers.map(function (worker) {
