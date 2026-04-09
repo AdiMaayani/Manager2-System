@@ -1729,7 +1729,52 @@ document.addEventListener("DOMContentLoaded", () => {
     );
   }
 
+  function getProjectIdFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    const rawProjectId = params.get("projectId");
+
+    if (!rawProjectId) {
+      return null;
+    }
+
+    const parsedProjectId = parseInt(rawProjectId, 10);
+
+    if (Number.isNaN(parsedProjectId) || parsedProjectId <= 0) {
+      return null;
+    }
+
+    return parsedProjectId;
+  }
+
   let currentWorkPlanData = null;
+
+  async function loadWorkPlanFromApi() {
+    const projectId = getProjectIdFromUrl();
+    if (projectId === null) {
+      console.warn("No valid projectId found in URL");
+      return;
+    }
+
+    const workPlan = await fetchWorkPlan(projectId);
+    currentWorkPlanData = workPlan;
+
+    if (!workPlan) {
+      console.warn("No work plan returned from API");
+      return;
+    }
+
+    renderTasksFromAPI(workPlan);
+    renderWeeklyView();
+    renderMonthlyView();
+    renderYearlyView();
+    updateWorkplanTitle();
+
+    console.groupCollapsed("📦 [MAPPED DATA]");
+    console.log("Project:", workPlan.project);
+    console.log("Tasks:", workPlan.tasks);
+    console.log("Assignments:", workPlan.assignments);
+    console.groupEnd();
+  }
 
   function renderTasksFromAPI(workPlan) {
     if (!workPlan || !workPlan.tasks) return;
@@ -1792,22 +1837,6 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   (async () => {
-    const TEST_PROJECT_ID = 1;
-
-    const workPlan = await fetchWorkPlan(TEST_PROJECT_ID);
-    currentWorkPlanData = workPlan;
-
-    if (!workPlan) {
-      console.warn("No WorkPlan data received");
-      return;
-    }
-
-    renderTasksFromAPI(workPlan);
-
-    console.groupCollapsed("📦 [MAPPED DATA]");
-    console.log("Project:", workPlan.project);
-    console.log("Tasks:", workPlan.tasks);
-    console.log("Assignments:", workPlan.assignments);
-    console.groupEnd();
+    await loadWorkPlanFromApi();
   })();
 });
