@@ -29,6 +29,16 @@ document.addEventListener("DOMContentLoaded", () => {
     "workplan-project-filter",
   );
 
+  const projectFilterToggle = projectFilterDropdown
+    ? projectFilterDropdown.querySelector(".filter-dropdown-toggle")
+    : null;
+
+  const projectFilterMenu = projectFilterDropdown
+    ? projectFilterDropdown.querySelector(".filter-dropdown-menu")
+    : null;
+
+  let apiProjects = [];
+
   function setRole(role) {
     currentRole = role;
     if (roleLabel) {
@@ -45,6 +55,22 @@ document.addEventListener("DOMContentLoaded", () => {
       item.addEventListener("click", () => {
         setRole(item.getAttribute("data-role") || "manager");
       });
+    });
+  }
+
+  if (projectFilterDropdown && projectFilterToggle && projectFilterMenu) {
+    projectFilterToggle.addEventListener("click", (e) => {
+      e.stopPropagation();
+      projectFilterDropdown.classList.toggle("open");
+    });
+
+    document.addEventListener("click", () => {
+      projectFilterDropdown.classList.remove("open");
+    });
+
+    projectFilterMenu.addEventListener("click", (e) => {
+      e.stopPropagation();
+      projectFilterDropdown.classList.remove("open");
     });
   }
 
@@ -168,7 +194,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
 
-    return extractTaskData();
+    return [];
   }
 
   function renderWeeklyView() {
@@ -299,10 +325,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
 
-    return extractTaskData().map((task, index) => ({
-      ...task,
-      dayIndex: index % 7,
-    }));
+    return [];
   }
 
   function renderMonthlyView() {
@@ -466,10 +489,7 @@ document.addEventListener("DOMContentLoaded", () => {
       });
     }
 
-    return extractTaskData().map((task, index) => ({
-      ...task,
-      monthIndex: index % 12,
-    }));
+    return [];
   }
 
   function renderYearlyView() {
@@ -1037,6 +1057,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   const QUICK_REPORT_KEY = "manager2_quick_report_prefill";
+  const WORKPLAN_REFRESH_KEY = "manager2_workplan_refresh_needed";
 
   function buildQuickReportPrefill(taskEl) {
     console.groupCollapsed("🔍 [DATA AUDIT] Quick-report payload built");
@@ -1184,6 +1205,8 @@ document.addEventListener("DOMContentLoaded", () => {
           "Stored in sessionStorage, navigating to reports.html?quick=1",
         );
         console.groupEnd();
+        sessionStorage.setItem(QUICK_REPORT_KEY, JSON.stringify(prefill));
+        sessionStorage.setItem(WORKPLAN_REFRESH_KEY, "1");
         window.location.href = "reports.html?quick=1";
       } catch (e) {
         console.error("Error storing quick report prefill:", e);
@@ -1744,6 +1767,103 @@ document.addEventListener("DOMContentLoaded", () => {
     );
   }
 
+  async function loadProjectsFromApi() {
+    const response = await fetch(
+      "http://localhost:5161/api/WorkItems/type/Project",
+      {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+        },
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        "Projects API request failed with status " + response.status,
+      );
+    }
+
+    const data = await response.json();
+
+    apiProjects = Array.isArray(data)
+      ? data
+          .map((item) => ({
+            id: item && item.workItemId != null ? String(item.workItemId) : "",
+            title: item && item.title ? item.title : "",
+          }))
+          .filter((project) => project.id && project.title)
+      : [];
+  }
+
+  function populateProjectFilterDropdown(selectedProjectId) {
+    if (!projectFilterDropdown || !projectFilterMenu || !projectFilterToggle) {
+      return;
+    }
+
+    projectFilterMenu.innerHTML = "";
+
+    const selectedProject = apiProjects.find(
+      (project) => String(project.id) === String(selectedProjectId),
+    );
+
+    projectFilterToggle.innerHTML = `
+      ${selectedProject ? selectedProject.title : "סינון לפי פרויקט"}
+      <span>▼</span>
+    `;
+
+    apiProjects.forEach((project) => {
+      const item = document.createElement("div");
+      item.className = "filter-dropdown-item";
+      item.setAttribute("data-project-id", project.id);
+      item.textContent = project.title;
+
+      if (String(project.id) === String(selectedProjectId)) {
+        item.classList.add("active");
+      }
+
+      item.addEventListener("click", async () => {
+        await handleProjectFilterChange(project.id);
+      });
+
+      projectFilterMenu.appendChild(item);
+    });
+  }
+
+  function setProjectIdInUrl(projectId) {
+    const url = new URL(window.location.href);
+    url.searchParams.set("projectId", String(projectId));
+    window.history.replaceState({}, "", url.toString());
+  }
+
+  function getEffectiveProjectId() {
+    const projectIdFromUrl = getProjectIdFromUrl();
+
+    if (
+      projectIdFromUrl !== null &&
+      apiProjects.some(
+        (project) => String(project.id) === String(projectIdFromUrl),
+      )
+    ) {
+      return projectIdFromUrl;
+    }
+
+    if (apiProjects.length > 0) {
+      return parseInt(apiProjects[0].id, 10);
+    }
+
+    return null;
+  }
+
+  async function handleProjectFilterChange(projectId) {
+    if (!projectId) {
+      return;
+    }
+
+    setProjectIdInUrl(projectId);
+    await loadWorkPlanFromApi();
+  }
+
   function getProjectIdFromUrl() {
     const params = new URLSearchParams(window.location.search);
     const rawProjectId = params.get("projectId");
@@ -1763,17 +1883,64 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let currentWorkPlanData = null;
 
+  function clearWorkPlanViews() {
+    const weeklyGrid = document.getElementById("weekly-grid");
+    const monthlyGrid = document.getElementById("monthly-grid");
+    const yearlyGrid = document.getElementById("yearly-grid");
+
+    if (weeklyGrid) {
+      weeklyGrid.innerHTML = "";
+    }
+
+    if (monthlyGrid) {
+      monthlyGrid.innerHTML = "";
+    }
+
+    if (yearlyGrid) {
+      yearlyGrid.innerHTML = "";
+    }
+
+    document.querySelectorAll(".workplan-track").forEach((track) => {
+      track.querySelectorAll(".task").forEach((task) => task.remove());
+    });
+
+    const weekTitle = document.getElementById("week-title");
+    const monthTitle = document.getElementById("month-title");
+    const yearTitle = document.getElementById("year-title");
+
+    if (weekTitle) {
+      weekTitle.textContent = "לא נבחר פרויקט";
+    }
+
+    if (monthTitle) {
+      monthTitle.textContent = "לא נבחר פרויקט";
+    }
+
+    if (yearTitle) {
+      yearTitle.textContent = "לא נבחר פרויקט";
+    }
+  }
+
   async function loadWorkPlanFromApi() {
-    const projectId = getProjectIdFromUrl();
-    if (projectId === null) {
-      console.warn("No valid projectId found in URL");
+    await loadProjectsFromApi();
+
+    const effectiveProjectId = getEffectiveProjectId();
+
+    if (effectiveProjectId === null) {
+      currentWorkPlanData = null;
+      clearWorkPlanViews();
+      console.warn("No projects available for WorkPlan");
       return;
     }
 
-    const workPlan = await fetchWorkPlan(projectId);
+    setProjectIdInUrl(effectiveProjectId);
+    populateProjectFilterDropdown(effectiveProjectId);
+
+    const workPlan = await fetchWorkPlan(effectiveProjectId);
     currentWorkPlanData = workPlan;
 
     if (!workPlan) {
+      clearWorkPlanViews();
       console.warn("No work plan returned from API");
       return;
     }
@@ -1785,10 +1952,27 @@ document.addEventListener("DOMContentLoaded", () => {
     updateWorkplanTitle();
 
     console.groupCollapsed("📦 [MAPPED DATA]");
+    console.log("Effective Project ID:", effectiveProjectId);
     console.log("Project:", workPlan.project);
     console.log("Tasks:", workPlan.tasks);
     console.log("Assignments:", workPlan.assignments);
     console.groupEnd();
+  }
+
+  async function refreshWorkPlan() {
+    await loadWorkPlanFromApi();
+    console.log("🔄 WorkPlan refreshed");
+  }
+
+  async function refreshWorkPlanIfNeeded() {
+    const refreshNeeded = sessionStorage.getItem(WORKPLAN_REFRESH_KEY);
+
+    if (refreshNeeded !== "1") {
+      return;
+    }
+
+    sessionStorage.removeItem(WORKPLAN_REFRESH_KEY);
+    await refreshWorkPlan();
   }
 
   function renderTasksFromAPI(workPlan) {
@@ -1853,5 +2037,6 @@ document.addEventListener("DOMContentLoaded", () => {
 
   (async () => {
     await loadWorkPlanFromApi();
+    await refreshWorkPlanIfNeeded();
   })();
 });
