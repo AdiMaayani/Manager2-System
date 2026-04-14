@@ -1924,6 +1924,7 @@ document.addEventListener("DOMContentLoaded", () => {
   async function loadWorkPlanFromApi() {
     await loadProjectsFromApi();
 
+    const projectIdFromUrl = getProjectIdFromUrl();
     const effectiveProjectId = getEffectiveProjectId();
 
     if (effectiveProjectId === null) {
@@ -1933,7 +1934,10 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    setProjectIdInUrl(effectiveProjectId);
+    if (projectIdFromUrl !== null) {
+      setProjectIdInUrl(effectiveProjectId);
+    }
+
     populateProjectFilterDropdown(effectiveProjectId);
 
     const workPlan = await fetchWorkPlan(effectiveProjectId);
@@ -1952,6 +1956,7 @@ document.addEventListener("DOMContentLoaded", () => {
     updateWorkplanTitle();
 
     console.groupCollapsed("📦 [MAPPED DATA]");
+    console.log("Project ID from URL:", projectIdFromUrl);
     console.log("Effective Project ID:", effectiveProjectId);
     console.log("Project:", workPlan.project);
     console.log("Tasks:", workPlan.tasks);
@@ -1976,63 +1981,111 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function renderTasksFromAPI(workPlan) {
-    if (!workPlan || !workPlan.tasks) return;
-
-    console.groupCollapsed("🎯 Rendering Tasks From API");
-
-    const track = document.querySelector(
-      '.workplan-track[data-drop-row="yossi"]',
-    );
-    if (!track) {
-      console.warn("No track found for rendering");
-      console.groupEnd();
+    if (!workPlan || !Array.isArray(workPlan.tasks)) {
       return;
     }
 
-    track.querySelectorAll(".task").forEach((task) => task.remove());
+    console.groupCollapsed("🎯 Rendering Tasks From API");
+
+    renderDailyProjectModeFromApi(workPlan);
+
+    console.log("Rendered tasks:", workPlan.tasks.length);
+    console.groupEnd();
+  }
+
+  function renderDailyProjectModeFromApi(workPlan) {
+    const projectsGrid = document.querySelector(
+      ".workplan-mode-projects .workplan-grid",
+    );
+
+    if (!projectsGrid) {
+      console.warn("Projects daily grid was not found");
+      return;
+    }
+
+    const header = projectsGrid.querySelector(".workplan-header");
+
+    if (!header) {
+      console.warn("Projects daily grid header was not found");
+      return;
+    }
+
+    projectsGrid
+      .querySelectorAll(".workplan-row")
+      .forEach((row) => row.remove());
+
+    const row = document.createElement("div");
+    row.className = "workplan-row";
+    row.setAttribute("data-row-type", "project");
+    row.setAttribute(
+      "data-project-id",
+      String(workPlan.project?.workItemId || ""),
+    );
+
+    const stickyCol = document.createElement("div");
+    stickyCol.className = "workplan-sticky-col row-cell";
+
+    const rowTitle = document.createElement("div");
+    rowTitle.className = "row-title";
+    rowTitle.textContent = workPlan.project?.title || "פרויקט";
+
+    const rowSubtitle = document.createElement("div");
+    rowSubtitle.className = "row-subtitle";
+    rowSubtitle.textContent =
+      "משימות פרויקט • " + String(workPlan.tasks.length || 0);
+
+    stickyCol.appendChild(rowTitle);
+    stickyCol.appendChild(rowSubtitle);
+
+    const track = document.createElement("div");
+    track.className = "workplan-track";
+    track.setAttribute(
+      "data-drop-row",
+      "project-" + String(workPlan.project?.workItemId || "current"),
+    );
 
     workPlan.tasks.forEach((task, index) => {
       const assignment = resolveAssignment(task, workPlan);
-      const responsible = assignment.displayName;
-      const startHour = 8 + index * 2;
+      const startHour = Math.min(8 + index * 2, 22);
       const duration = 2;
+      const endHour = Math.min(startHour + duration, 24);
 
       const taskEl = document.createElement("button");
       taskEl.type = "button";
       taskEl.className = "task task-project";
-      taskEl.setAttribute("data-task-id", task.workItemId);
-      taskEl.setAttribute("data-assignee-name", responsible);
-
-      taskEl.setAttribute("data-assignment-source", assignment.source);
+      taskEl.setAttribute("data-task-id", String(task.workItemId));
+      taskEl.setAttribute(
+        "data-project-id",
+        String(task.parentWorkItemId || workPlan.project?.workItemId || ""),
+      );
+      taskEl.setAttribute("data-start-hour", String(startHour));
+      taskEl.setAttribute("data-end-hour", String(endHour));
+      taskEl.setAttribute("data-assignee-name", assignment.displayName || "");
+      taskEl.setAttribute(
+        "data-assignment-source",
+        assignment.source || "none",
+      );
       taskEl.setAttribute("data-assignment-type", assignment.type || "");
 
-      if (task.parentWorkItemId || workPlan.project?.workItemId) {
-        taskEl.setAttribute(
-          "data-project-id",
-          String(task.parentWorkItemId || workPlan.project.workItemId),
-        );
-      }
-
-      taskEl.setAttribute("data-start-hour", String(startHour));
-      taskEl.setAttribute("data-end-hour", String(startHour + duration));
-
       taskEl.style.left = `calc((${startHour} / 24) * 100%)`;
-      taskEl.style.width = `calc((${duration} / 24) * 100%)`;
+      taskEl.style.width = `calc((${Math.max(endHour - startHour, 1)} / 24) * 100%)`;
 
       taskEl.innerHTML = `
-        <div class="task-name">${task.title}</div>
+        <div class="task-name">${task.title || ""}</div>
         <div class="task-meta">
-          ${String(startHour).padStart(2, "0")}:00–${String(startHour + duration).padStart(2, "0")}:00
-          • ${task.status}
-          • API
+          ${String(startHour).padStart(2, "0")}:00–${String(endHour).padStart(2, "0")}:00
+          • ${task.status || "-"}
+          • ${assignment.displayName || "ללא שיוך"}
         </div>
       `;
 
       track.appendChild(taskEl);
     });
 
-    console.log("Rendered tasks:", workPlan.tasks.length);
-    console.groupEnd();
+    row.appendChild(stickyCol);
+    row.appendChild(track);
+
+    projectsGrid.appendChild(row);
   }
 
   (async () => {
