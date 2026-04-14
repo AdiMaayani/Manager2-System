@@ -1,5 +1,6 @@
 using System.Text;
 using ManageR2.Infrastructure.DAL;
+using ManageR2.Infrastructure.Interfaces;
 using ManageR2.Infrastructure.Repositories;
 using ManageR2.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -79,6 +80,8 @@ builder.Services.AddAuthorization();
 builder.Services.AddScoped<DBServices>();
 builder.Services.AddScoped<IWorkItemRepository, WorkItemRepository>();
 builder.Services.AddScoped<IUserRepository, UserRepository>();
+builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
+builder.Services.AddScoped<IContactRepository, ContactRepository>();
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IPasswordService, PasswordService>();
 builder.Services.AddScoped<IUserAuthorizationService, UserAuthorizationService>();
