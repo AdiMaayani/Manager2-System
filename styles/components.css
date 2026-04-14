@@ -820,3 +820,45 @@
   line-height: 1;
   margin-left: var(--spacing-xs);
 }
+/* Employees table - keep fixed column widths */
+#employees-table {
+  width: 100%;
+  table-layout: fixed;
+}
+
+#employees-table th,
+#employees-table td {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#employees-table th:nth-child(1),
+#employees-table td:nth-child(1) {
+  width: 24%;
+}
+
+#employees-table th:nth-child(2),
+#employees-table td:nth-child(2) {
+  width: 16%;
+}
+
+#employees-table th:nth-child(3),
+#employees-table td:nth-child(3) {
+  width: 10%;
+}
+
+#employees-table th:nth-child(4),
+#employees-table td:nth-child(4) {
+  width: 18%;
+}
+
+#employees-table th:nth-child(5),
+#employees-table td:nth-child(5) {
+  width: 16%;
+}
+
+#employees-table th:nth-child(6),
+#employees-table td:nth-child(6) {
+  width: 16%;
+}

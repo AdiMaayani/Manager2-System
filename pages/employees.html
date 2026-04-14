@@ -191,20 +191,68 @@
                 </div>
 
                 <div class="employees-controls-right">
-                  <div class="employees-filter-group">
-                    <div class="filter-chip active">הכל</div>
-                    <div class="filter-chip">טכנאים</div>
-                    <div class="filter-chip">מנהלי פרויקטים</div>
-                    <div class="filter-chip">משרד</div>
-                  </div>
+                  <div
+                    style="
+                      display: flex;
+                      flex-direction: column;
+                      gap: var(--spacing-sm);
+                      width: 100%;
+                    "
+                  >
+                    <div
+                      style="
+                        display: flex;
+                        align-items: center;
+                        gap: var(--spacing-sm);
+                        flex-wrap: wrap;
+                      "
+                    >
+                      <span
+                        style="
+                          font-size: var(--font-size-sm);
+                          color: var(--color-neutral-700);
+                          font-weight: 600;
+                          min-width: 60px;
+                        "
+                        >תפקידים:</span
+                      >
+                      <div
+                        class="employees-filter-group"
+                        id="employees-role-filters"
+                      ></div>
+                    </div>
 
-                  <div class="search-input relative">
-                    <input
-                      type="text"
-                      class="input"
-                      placeholder="חיפוש עובד לפי שם/תפקיד..."
-                    />
-                    <span class="search-icon" aria-hidden="true">⌕</span>
+                    <div
+                      style="
+                        display: flex;
+                        align-items: center;
+                        gap: var(--spacing-sm);
+                        flex-wrap: wrap;
+                      "
+                    >
+                      <span
+                        style="
+                          font-size: var(--font-size-sm);
+                          color: var(--color-neutral-700);
+                          font-weight: 600;
+                          min-width: 60px;
+                        "
+                        >מחלקות:</span
+                      >
+                      <div
+                        class="employees-filter-group"
+                        id="employees-department-filters"
+                      ></div>
+                    </div>
+
+                    <div class="search-input relative">
+                      <input
+                        type="text"
+                        class="input"
+                        placeholder=" ⌕ חיפוש עובד לפי שם/טלפון/אימייל/הערות..."
+                      />
+                      <span class="search-icon" aria-hidden="true"></span>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -252,7 +300,7 @@
         </div>
         <div class="modal-body">
           <div class="form-group" id="employee-field-employee-id">
-            <label>EmployeeId</label>
+            <label>מס׳ עובד בחברה</label>
             <div class="field-value"></div>
             <div class="field-input" style="display: none">
               <input type="number" class="input" value="" min="1" />
