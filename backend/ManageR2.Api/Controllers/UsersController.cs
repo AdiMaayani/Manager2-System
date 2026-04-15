@@ -352,6 +352,7 @@ public class UsersController : ControllerBase
         return Ok(new LoginResponseDto
         {
             UserId = refreshedUser.UserId,
+            EmployeeId = refreshedUser.EmployeeId,
             Username = refreshedUser.Username,
             Email = refreshedUser.Email,
             IsActive = refreshedUser.IsActive,

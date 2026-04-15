@@ -14,6 +14,7 @@ function setAuthSession(loginResponse) {
     "manager2_user",
     JSON.stringify({
       userId: loginResponse.userId,
+      employeeId: loginResponse.employeeId,
       username: loginResponse.username,
       email: loginResponse.email,
       isActive: loginResponse.isActive,

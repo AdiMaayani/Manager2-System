@@ -1,11 +1,65 @@
 // Workplan specific interactivity (no backend, UX-only)
 document.addEventListener("DOMContentLoaded", () => {
-  console.groupCollapsed("🔍 [DATA AUDIT] Employees data loaded");
   const MOCK_EMPLOYEES = window.MOCK_EMPLOYEES || [];
-  console.log("Source: window.MOCK_EMPLOYEES");
-  console.log("Count:", MOCK_EMPLOYEES.length);
-  console.log("Data:", MOCK_EMPLOYEES);
-  console.groupEnd();
+  let API_EMPLOYEES = [];
+
+  function getEmployeesData() {
+    return API_EMPLOYEES.length ? API_EMPLOYEES : MOCK_EMPLOYEES;
+  }
+
+  async function loadEmployeesFromApi() {
+    console.groupCollapsed("🔍 [DATA AUDIT] Employees source resolution");
+
+    try {
+      const response = await fetch("http://localhost:5161/api/Employees", {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(
+          "Employees API request failed with status " + response.status,
+        );
+      }
+
+      const data = await response.json();
+
+      console.log("Source: http://localhost:5161/api/Employees");
+      console.log("Raw API data:", data);
+
+      API_EMPLOYEES = Array.isArray(data)
+        ? data.map((item) => ({
+            id: item && item.employeeId != null ? String(item.employeeId) : "",
+            employeeId:
+              item && item.employeeId != null ? String(item.employeeId) : "",
+            fullName: item && item.fullName ? item.fullName : "",
+            role: item && item.primaryRole ? item.primaryRole : "",
+            phone: item && item.phone ? item.phone : "",
+            email: item && item.email ? item.email : "",
+            isActive: !!(item && item.isActive),
+            createdAt: item && item.createdAt ? item.createdAt : null,
+            raw: item || null,
+          }))
+        : [];
+
+      console.log("Resolved API employees count:", API_EMPLOYEES.length);
+      console.log("Resolved employees data:", API_EMPLOYEES);
+
+      renderEmployeeFilterMenu();
+    } catch (error) {
+      API_EMPLOYEES = [];
+      console.warn(
+        "Employees API unavailable. Falling back to MOCK_EMPLOYEES.",
+      );
+      console.warn(error);
+    }
+
+    renderEmployeeFilterMenu();
+
+    console.groupEnd();
+  }
 
   const workplanShell = document.querySelector(".workplan-shell");
   if (workplanShell) {
@@ -21,7 +75,7 @@ document.addEventListener("DOMContentLoaded", () => {
     );
   }
 
-  let currentRole = "manager";
+  let selectedEmployeeFilterId = "";
   const roleLabel = document.getElementById("role-label");
   const roleMenu = document.getElementById("role-menu");
   const viewModeDropdown = document.getElementById("workplan-view-mode");
@@ -39,23 +93,78 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let apiProjects = [];
 
-  function setRole(role) {
-    currentRole = role;
-    if (roleLabel) {
-      const roleName =
-        role === "employee" ? "עובד" : role === "ceo" ? "רביב" : "מנהל";
-      roleLabel.textContent = `הצג לפי עובד: ${roleName}`;
+  function updateEmployeeFilterLabel() {
+    if (!roleLabel) return;
+
+    if (!selectedEmployeeFilterId) {
+      roleLabel.textContent = "הצג לפי עובד: כל העובדים";
+      return;
     }
-    updateTaskInteractivity();
-    closeDetails();
+
+    const selectedEmployee = getEmployeesData().find(
+      (employee) =>
+        String(employee.id || employee.employeeId || "").trim() ===
+        String(selectedEmployeeFilterId).trim(),
+    );
+
+    roleLabel.textContent = `הצג לפי עובד: ${selectedEmployee?.fullName || "כל העובדים"}`;
   }
 
-  if (roleMenu) {
-    roleMenu.querySelectorAll("[data-role]").forEach((item) => {
+  function renderEmployeeFilterMenu() {
+    if (!roleMenu) return;
+
+    roleMenu.innerHTML = "";
+
+    const createMenuItem = (label, employeeId) => {
+      const item = document.createElement("div");
+      item.className = "filter-dropdown-item";
+      item.textContent = label;
+      item.setAttribute("data-employee-id", employeeId);
+
       item.addEventListener("click", () => {
-        setRole(item.getAttribute("data-role") || "manager");
+        selectedEmployeeFilterId = employeeId;
+        updateEmployeeFilterLabel();
+
+        const activeScopeBtn = document.querySelector(".tab-scope.active");
+        const currentScope = activeScopeBtn
+          ? activeScopeBtn.getAttribute("data-scope") || "company"
+          : "company";
+
+        const activeRangeBtn = document.querySelector(".tab-range.active");
+        const currentRange = activeRangeBtn
+          ? activeRangeBtn.getAttribute("data-range") || "daily"
+          : "daily";
+
+        applyScope(currentScope);
+
+        if (currentRange === "weekly") {
+          renderWeeklyView();
+        } else if (currentRange === "monthly") {
+          renderMonthlyView();
+        } else if (currentRange === "yearly") {
+          renderYearlyView();
+        }
+
+        closeDetails();
       });
+
+      return item;
+    };
+
+    roleMenu.appendChild(createMenuItem("כל העובדים", ""));
+
+    getEmployeesData().forEach((employee) => {
+      const employeeId = String(
+        employee.id || employee.employeeId || "",
+      ).trim();
+      if (!employeeId) return;
+
+      roleMenu.appendChild(
+        createMenuItem(employee.fullName || employeeId, employeeId),
+      );
     });
+
+    updateEmployeeFilterLabel();
   }
 
   if (projectFilterDropdown && projectFilterToggle && projectFilterMenu) {
@@ -237,9 +346,14 @@ document.addEventListener("DOMContentLoaded", () => {
     });
     grid.appendChild(header);
 
-    const employees = [
-      ...new Set(tasks.map((t) => t.assignee).filter(Boolean)),
-    ];
+    let employees = [...new Set(tasks.map((t) => t.assignee).filter(Boolean))];
+
+    if (selectedEmployeeFilterId) {
+      const selectedEmployeeName = employeeNameById(selectedEmployeeFilterId);
+      employees = employees.filter(
+        (employeeName) => employeeName === selectedEmployeeName,
+      );
+    }
 
     employees.forEach((employee) => {
       const row = document.createElement("div");
@@ -645,7 +759,6 @@ document.addEventListener("DOMContentLoaded", () => {
   const employeeRows = document.querySelectorAll(
     '.workplan-mode-employees .workplan-row[data-row-type="employee"]',
   );
-  const CURRENT_USER_ROW_KEY = "david";
 
   const CURRENT_SESSION_REPORTER = {
     id: "EMP-001",
@@ -679,15 +792,32 @@ document.addEventListener("DOMContentLoaded", () => {
         projectsMode.classList.remove("active");
       }
 
+      const employeeRows = document.querySelectorAll(
+        '.workplan-mode-employees .workplan-row[data-row-type="employee"]',
+      );
+
+      const currentUserEmployeeId = getCurrentUserEmployeeId();
+
       employeeRows.forEach((row) => {
+        const rowKey = normalizeEmployeeId(row.getAttribute("data-row-key"));
+
         if (scope === "personal") {
+          row.style.display = rowMatchesEmployee(row, currentUserEmployeeId)
+            ? "grid"
+            : "none";
+          return;
+        }
+
+        if (scope === "employee") {
           row.style.display =
-            row.getAttribute("data-row-key") === CURRENT_USER_ROW_KEY
+            !selectedEmployeeFilterId ||
+            rowKey === normalizeEmployeeId(selectedEmployeeFilterId)
               ? "grid"
               : "none";
-        } else {
-          row.style.display = "grid";
+          return;
         }
+
+        row.style.display = "grid";
       });
     }
 
@@ -760,8 +890,59 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function employeeNameById(id) {
-    const e = MOCK_EMPLOYEES.find((x) => x.id === id);
+    const normalizedId = String(id || "").trim();
+    const e = getEmployeesData().find(
+      (x) => String(x.id || x.employeeId || "").trim() === normalizedId,
+    );
     return e && e.fullName ? e.fullName : id;
+  }
+
+  function getCurrentUserEmployeeId() {
+    const currentUser =
+      typeof window.getCurrentUser === "function"
+        ? window.getCurrentUser()
+        : null;
+
+    if (!currentUser || currentUser.employeeId == null) {
+      return "";
+    }
+
+    return String(currentUser.employeeId).trim();
+  }
+
+  function normalizeEmployeeId(value) {
+    return String(value || "").trim();
+  }
+
+  function taskAssignedToEmployee(task, employeeId) {
+    const normalizedEmployeeId = normalizeEmployeeId(employeeId);
+    if (!normalizedEmployeeId || !task) {
+      return false;
+    }
+
+    const assignedIds = Array.isArray(task.assignedEmployeeIds)
+      ? task.assignedEmployeeIds.map(normalizeEmployeeId).filter(Boolean)
+      : [];
+
+    if (assignedIds.includes(normalizedEmployeeId)) {
+      return true;
+    }
+
+    const directEmployeeId = normalizeEmployeeId(
+      task.employeeId || task.assigneeEmployeeId,
+    );
+
+    return !!directEmployeeId && directEmployeeId === normalizedEmployeeId;
+  }
+
+  function rowMatchesEmployee(row, employeeId) {
+    const normalizedEmployeeId = normalizeEmployeeId(employeeId);
+    if (!row || !normalizedEmployeeId) {
+      return false;
+    }
+
+    const rowKey = normalizeEmployeeId(row.getAttribute("data-row-key"));
+    return !!rowKey && rowKey === normalizedEmployeeId;
   }
 
   function normalizeQuickText(value) {
@@ -772,6 +953,24 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function getCurrentSessionReporterContext() {
+    const selectedEmployee =
+      getEmployeesData().find(
+        (employee) =>
+          String(employee.id || employee.employeeId || "").trim() ===
+          String(selectedEmployeeFilterId || "").trim(),
+      ) || null;
+
+    if (selectedEmployee) {
+      return {
+        reporterId: String(
+          selectedEmployee.id || selectedEmployee.employeeId || "",
+        ),
+        reporterName: selectedEmployee.fullName || "",
+        reporterRole:
+          selectedEmployee.role || selectedEmployee.primaryRole || "",
+      };
+    }
+
     if (
       CURRENT_SESSION_REPORTER &&
       (CURRENT_SESSION_REPORTER.id ||
@@ -785,12 +984,10 @@ document.addEventListener("DOMContentLoaded", () => {
       };
     }
 
-    const defaultRole = currentRole === "employee" ? "מתקין" : "מנהל פרויקט";
-
     return {
       reporterId: "",
       reporterName: "",
-      reporterRole: defaultRole,
+      reporterRole: "מנהל פרויקט",
     };
   }
 
@@ -798,11 +995,13 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!editAssignedSelect) return;
     editAssignedSelect.innerHTML = '<option value="">בחר עובד</option>';
     const skip = new Set(excludeIds || []);
-    MOCK_EMPLOYEES.forEach((emp) => {
-      if (skip.has(emp.id)) return;
+    getEmployeesData().forEach((emp) => {
+      const employeeId = String(emp.id || emp.employeeId || "").trim();
+      if (!employeeId || skip.has(employeeId)) return;
+
       const o = document.createElement("option");
-      o.value = emp.id;
-      o.textContent = emp.fullName;
+      o.value = employeeId;
+      o.textContent = emp.fullName || employeeId;
       o.dataset.name = emp.fullName || "";
       editAssignedSelect.appendChild(o);
     });
@@ -1225,16 +1424,26 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function canEditTask(taskEl) {
+    if (!taskEl) return false;
+
     const locked = taskEl.getAttribute("data-locked") === "true";
     const personal = taskEl.getAttribute("data-personal") === "true";
-    if (currentRole === "employee") {
-      return personal && !locked;
+    const currentScope = getCurrentScope();
+
+    if (locked) {
+      return false;
     }
-    return !locked || currentRole !== "employee";
+
+    if (currentScope === "personal") {
+      return personal;
+    }
+
+    return true;
   }
 
   function canLockTask() {
-    return currentRole === "manager" || currentRole === "ceo";
+    const currentScope = getCurrentScope();
+    return currentScope !== "personal";
   }
 
   function isTaskReportRelevant(taskEl) {
@@ -1248,13 +1457,16 @@ document.addEventListener("DOMContentLoaded", () => {
     const locked = taskEl.getAttribute("data-locked") === "true";
     const personal = taskEl.getAttribute("data-personal") === "true";
     const editable = canEditTask(taskEl);
+    const currentScope = getCurrentScope();
 
     if (actionEdit) {
       actionEdit.disabled = !editable;
     }
+
     if (actionLock) {
       actionLock.disabled = !canLockTask();
     }
+
     if (actionQuickReport) {
       actionQuickReport.style.display = isTaskReportRelevant(taskEl)
         ? ""
@@ -1262,27 +1474,28 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (permsEl) {
-      if (currentRole === "employee") {
+      if (currentScope === "personal") {
         permsEl.textContent = locked
-          ? "אין הרשאה: משימה נעולה ע״י מנהל."
+          ? "אין הרשאה: משימה נעולה."
           : personal
-            ? "יש הרשאה: ניתן לערוך/לגרור משימות אישיות שלך."
-            : "אין הרשאה: לא ניתן לשנות לוחות זמנים של עובדים אחרים.";
-      } else if (currentRole === "ceo") {
-        permsEl.textContent = "הרשאות מלאות: ניתן לערוך הכל ולנעול משימות.";
+            ? "יש הרשאה: ניתן לערוך/לגרור משימות אישיות."
+            : "אין הרשאה: בחתך אישי ניתן לשנות רק משימות אישיות.";
+      } else if (currentScope === "project") {
+        permsEl.textContent =
+          "הרשאות פרויקט: ניתן לערוך משימות פעילות ולנהל שיוכים.";
       } else {
         permsEl.textContent =
-          "הרשאות מנהל: ניתן לערוך הכל ולנעול משימות (עובדים לא יכולים לעקוף נעילה).";
+          "הרשאות תצוגה כללית: ניתן לערוך משימות לא נעולות ולצפות בפרטים.";
       }
     }
 
     if (actionHint) {
-      if (!editable && currentRole === "employee") {
+      if (!editable && currentScope === "personal") {
         actionHint.textContent =
-          "כדי לשנות משימה שאינה אישית/נעולה — פנה למנהל.";
+          "כדי לשנות משימה שאינה אישית או נעולה — עבור לחתך מתאים או פנה למנהל.";
       } else if (editable) {
         actionHint.textContent =
-          "גרירה/שינוי זמן משימה מתאפשרים רק לפי הרשאות.";
+          "גרירה/שינוי זמן משימה מתאפשרים רק לפי ההרשאות הפעילות.";
       } else {
         actionHint.textContent = "";
       }
@@ -1504,12 +1717,23 @@ document.addEventListener("DOMContentLoaded", () => {
   let dragStartLeftPx = 0;
   let isDragging = false;
 
+  function getCurrentScope() {
+    const activeScopeBtn = document.querySelector(".tab-scope.active");
+    return activeScopeBtn
+      ? activeScopeBtn.getAttribute("data-scope") || "company"
+      : "company";
+  }
+
   function updateTaskInteractivity() {
+    const currentScope = getCurrentScope();
+
     document.querySelectorAll(".task[data-task-id]").forEach((task) => {
       const locked = task.getAttribute("data-locked") === "true";
       const personal = task.getAttribute("data-personal") === "true";
+
       const allowed =
-        currentRole !== "employee" ? !locked : personal && !locked;
+        currentScope === "personal" ? personal && !locked : !locked;
+
       task.classList.toggle("task-draggable", allowed);
       task.setAttribute("aria-disabled", allowed ? "false" : "true");
     });
@@ -1591,7 +1815,7 @@ document.addEventListener("DOMContentLoaded", () => {
   document.addEventListener("mousemove", onMouseMove);
   document.addEventListener("mouseup", onMouseUp);
 
-  setRole("manager");
+  updateEmployeeFilterLabel();
 
   function updateWorkplanTitle() {
     const titleEl = document.getElementById("workplan-title");
@@ -1673,17 +1897,18 @@ document.addEventListener("DOMContentLoaded", () => {
         displayName: "—",
         source: "none",
         type: null,
+        employeeId: null,
+        contractorId: null,
+        role: "",
       };
     }
 
-    // 1. חיפוש assignment ברמת המשימה
     let assignment = workPlan.assignments.find(
       (a) => a.workItemId === task.workItemId,
     );
 
     let source = "task";
 
-    // 2. fallback לפרויקט
     if (!assignment) {
       assignment = workPlan.assignments.find(
         (a) => a.workItemId === workPlan.project.workItemId,
@@ -1696,6 +1921,9 @@ document.addEventListener("DOMContentLoaded", () => {
         displayName: "—",
         source: "none",
         type: null,
+        employeeId: null,
+        contractorId: null,
+        role: "",
       };
     }
 
@@ -1704,6 +1932,10 @@ document.addEventListener("DOMContentLoaded", () => {
         displayName: assignment.employeeName,
         source,
         type: "employee",
+        employeeId:
+          assignment.employeeId != null ? String(assignment.employeeId) : null,
+        contractorId: null,
+        role: assignment.assignmentRole || "",
       };
     }
 
@@ -1712,6 +1944,12 @@ document.addEventListener("DOMContentLoaded", () => {
         displayName: assignment.contractorName,
         source,
         type: "contractor",
+        employeeId: null,
+        contractorId:
+          assignment.contractorId != null
+            ? String(assignment.contractorId)
+            : null,
+        role: assignment.assignmentRole || "",
       };
     }
 
@@ -1720,6 +1958,9 @@ document.addEventListener("DOMContentLoaded", () => {
         displayName: `Employee #${assignment.employeeId}`,
         source,
         type: "employee",
+        employeeId: String(assignment.employeeId),
+        contractorId: null,
+        role: assignment.assignmentRole || "",
       };
     }
 
@@ -1728,6 +1969,9 @@ document.addEventListener("DOMContentLoaded", () => {
         displayName: `Contractor #${assignment.contractorId}`,
         source,
         type: "contractor",
+        employeeId: null,
+        contractorId: String(assignment.contractorId),
+        role: assignment.assignmentRole || "",
       };
     }
 
@@ -1735,6 +1979,9 @@ document.addEventListener("DOMContentLoaded", () => {
       displayName: "—",
       source: "none",
       type: null,
+      employeeId: null,
+      contractorId: null,
+      role: "",
     };
   }
 
@@ -1922,7 +2169,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function loadWorkPlanFromApi() {
-    await loadProjectsFromApi();
+    await Promise.all([loadProjectsFromApi(), loadEmployeesFromApi()]);
 
     const projectIdFromUrl = getProjectIdFromUrl();
     const effectiveProjectId = getEffectiveProjectId();
@@ -1988,6 +2235,7 @@ document.addEventListener("DOMContentLoaded", () => {
     console.groupCollapsed("🎯 Rendering Tasks From API");
 
     renderDailyProjectModeFromApi(workPlan);
+    renderDailyEmployeesModeFromApi(workPlan);
 
     console.log("Rendered tasks:", workPlan.tasks.length);
     console.groupEnd();
@@ -2086,6 +2334,123 @@ document.addEventListener("DOMContentLoaded", () => {
     row.appendChild(track);
 
     projectsGrid.appendChild(row);
+  }
+
+  function renderDailyEmployeesModeFromApi(workPlan) {
+    const employeesGrid = document.querySelector(
+      ".workplan-mode-employees .workplan-grid",
+    );
+
+    if (!employeesGrid) {
+      console.warn("Employees daily grid was not found");
+      return;
+    }
+
+    const header = employeesGrid.querySelector(".workplan-header");
+
+    if (!header) {
+      console.warn("Employees daily grid header was not found");
+      return;
+    }
+
+    employeesGrid
+      .querySelectorAll(".workplan-row")
+      .forEach((row) => row.remove());
+
+    const employees = getEmployeesData().filter(
+      (employee) => employee && employee.fullName,
+    );
+
+    employees.forEach((employee) => {
+      const row = document.createElement("div");
+      row.className = "workplan-row";
+      row.setAttribute("data-row-type", "employee");
+      row.setAttribute(
+        "data-row-key",
+        String(employee.id || employee.employeeId || "").trim(),
+      );
+
+      const stickyCol = document.createElement("div");
+      stickyCol.className = "workplan-sticky-col row-cell";
+
+      const rowTitle = document.createElement("div");
+      rowTitle.className = "row-title";
+      rowTitle.textContent = employee.fullName || "עובד";
+
+      const rowSubtitle = document.createElement("div");
+      rowSubtitle.className = "row-subtitle";
+      rowSubtitle.textContent = employee.role || employee.primaryRole || "—";
+
+      stickyCol.appendChild(rowTitle);
+      stickyCol.appendChild(rowSubtitle);
+
+      const track = document.createElement("div");
+      track.className = "workplan-track";
+      track.setAttribute(
+        "data-drop-row",
+        String(employee.id || employee.employeeId || "").trim(),
+      );
+
+      const employeeTasks = Array.isArray(workPlan.tasks)
+        ? workPlan.tasks.filter((task) => {
+            const assignment = resolveAssignment(task, workPlan);
+            return (
+              String(assignment.employeeId || "").trim() ===
+              String(employee.id || employee.employeeId || "").trim()
+            );
+          })
+        : [];
+
+      employeeTasks.forEach((task, index) => {
+        const assignment = resolveAssignment(task, workPlan);
+        const startHour = Math.min(8 + index * 2, 22);
+        const duration = 2;
+        const endHour = Math.min(startHour + duration, 24);
+
+        const taskEl = document.createElement("button");
+        taskEl.type = "button";
+        taskEl.className = "task task-project";
+        taskEl.setAttribute("data-task-id", String(task.workItemId));
+        taskEl.setAttribute(
+          "data-project-id",
+          String(task.parentWorkItemId || workPlan.project?.workItemId || ""),
+        );
+        taskEl.setAttribute("data-start-hour", String(startHour));
+        taskEl.setAttribute("data-end-hour", String(endHour));
+        taskEl.setAttribute("data-assignee-name", employee.fullName || "");
+        taskEl.setAttribute(
+          "data-assigned-ids",
+          String(employee.id || employee.employeeId || "").trim(),
+        );
+        taskEl.setAttribute(
+          "data-assignment-source",
+          assignment.source || "employee",
+        );
+        taskEl.setAttribute("data-assignment-type", assignment.type || "");
+        if (assignment.role) {
+          taskEl.setAttribute("data-role", assignment.role);
+        }
+
+        taskEl.style.left = `calc((${startHour} / 24) * 100%)`;
+        taskEl.style.width = `calc((${Math.max(endHour - startHour, 1)} / 24) * 100%)`;
+
+        taskEl.innerHTML = `
+          <div class="task-name">${task.title || ""}</div>
+          <div class="task-meta">
+            ${String(startHour).padStart(2, "0")}:00–${String(endHour).padStart(2, "0")}:00
+            • ${task.status || "-"}
+            • ${assignment.role || employee.role || "שיוך עובד"}
+          </div>
+        `;
+
+        track.appendChild(taskEl);
+      });
+
+      row.appendChild(stickyCol);
+      row.appendChild(track);
+
+      employeesGrid.appendChild(row);
+    });
   }
 
   (async () => {

@@ -122,6 +122,56 @@ public class WorkItemsController : ControllerBase
         return Ok(response);
     }
 
+    [HttpGet("work-plan/all")]
+public async Task<ActionResult<List<WorkPlanDto>>> GetAllWorkPlans()
+{
+    var workPlans = await _workItemRepository.GetAllWorkPlansAsync();
+
+    var response = workPlans.Select(workPlanResult => new WorkPlanDto
+    {
+        Project = new ProjectSummaryDto
+        {
+            WorkItemId = workPlanResult.Project.WorkItemId,
+            Title = workPlanResult.Project.Title ?? string.Empty,
+            Description = workPlanResult.Project.Description,
+            WorkType = workPlanResult.Project.WorkType ?? string.Empty,
+            Status = workPlanResult.Project.Status ?? string.Empty,
+            BillingType = workPlanResult.Project.BillingType,
+            CustomerId = workPlanResult.Project.CustomerId,
+            SiteId = workPlanResult.Project.SiteId,
+            CreatedAt = workPlanResult.Project.CreatedAt,
+            ClosedAt = workPlanResult.Project.ClosedAt,
+            ParentWorkItemId = workPlanResult.Project.ParentWorkItemId
+        },
+        Tasks = workPlanResult.Tasks.Select(task => new TaskSummaryDto
+        {
+            WorkItemId = task.WorkItemId,
+            Title = task.Title ?? string.Empty,
+            Description = task.Description,
+            WorkType = task.WorkType ?? string.Empty,
+            Status = task.Status ?? string.Empty,
+            BillingType = task.BillingType,
+            CustomerId = task.CustomerId,
+            SiteId = task.SiteId,
+            CreatedAt = task.CreatedAt,
+            ClosedAt = task.ClosedAt,
+            ParentWorkItemId = task.ParentWorkItemId
+        }).ToList(),
+        Assignments = workPlanResult.Assignments.Select(assignment => new WorkAssignmentDto
+        {
+            WorkItemId = assignment.WorkItemId,
+            EmployeeId = assignment.EmployeeId,
+            ContractorId = assignment.ContractorId,
+            AssignmentType = assignment.AssignmentType,
+            AssignmentRole = assignment.AssignmentRole,
+            EmployeeName = assignment.EmployeeName,
+            ContractorName = assignment.ContractorName
+        }).ToList()
+    }).ToList();
+
+    return Ok(response);
+}
+
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] WorkItem workItem)
     {

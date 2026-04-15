@@ -308,10 +308,10 @@ public class WorkItemRepository : IWorkItemRepository
       wi.CreatedAt,
       wi.ClosedAt,
       wi.ParentWorkItemId
-  FROM dbo.WorkItems wi
-  LEFT JOIN dbo.Customers c
+      FROM dbo.WorkItems wi
+      LEFT JOIN dbo.Customers c
       ON wi.CustomerId = c.CustomerId
-  WHERE wi.WorkItemId = @ProjectId",
+      WHERE wi.WorkItemId = @ProjectId",
             connection))
         {
             projectCommand.CommandType = CommandType.Text;
@@ -426,6 +426,43 @@ public class WorkItemRepository : IWorkItemRepository
             Assignments = assignments
         };
     }
+
+    public async Task<List<WorkPlanResult>> GetAllWorkPlansAsync()
+{
+    var results = new List<WorkPlanResult>();
+
+    await using var connection = _dbServices.CreateConnection();
+    await connection.OpenAsync();
+
+    // 1. Get all projects
+    var projects = new List<WorkItem>();
+
+    using (var cmd = new SqlCommand(@"
+        SELECT *
+        FROM WorkItems
+        WHERE WorkType = 'Project'
+    ", connection))
+    {
+        using var reader = await cmd.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            projects.Add(MapWorkItem(reader));
+        }
+    }
+
+    // 2. For each project, reuse existing logic
+    foreach (var project in projects)
+    {
+        var workPlan = await GetWorkPlanAsync(project.WorkItemId);
+
+        if (workPlan != null)
+        {
+            results.Add(workPlan);
+        }
+    }
+
+    return results;
+}
 
     private static WorkItem MapWorkItem(SqlDataReader reader)
     {
