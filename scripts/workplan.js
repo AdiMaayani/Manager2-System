@@ -93,6 +93,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let apiProjects = [];
 
+  let allWorkPlansData = [];
+
   function updateEmployeeFilterLabel() {
     if (!roleLabel) return;
 
@@ -2043,12 +2045,48 @@ document.addEventListener("DOMContentLoaded", () => {
       : [];
   }
 
+  async function loadAllWorkPlansFromApi() {
+    const response = await fetch(
+      "http://localhost:5161/api/WorkItems/work-plan/all",
+      {
+        method: "GET",
+        headers: {
+          Accept: "application/json",
+        },
+      },
+    );
+
+    if (!response.ok) {
+      throw new Error(
+        "All WorkPlans API request failed with status " + response.status,
+      );
+    }
+
+    const data = await response.json();
+
+    allWorkPlansData = Array.isArray(data) ? data : [];
+  }
+
   function populateProjectFilterDropdown(selectedProjectId) {
     if (!projectFilterDropdown || !projectFilterMenu || !projectFilterToggle) {
       return;
     }
 
     projectFilterMenu.innerHTML = "";
+
+    const allProjectsItem = document.createElement("div");
+    allProjectsItem.className = "filter-dropdown-item";
+    allProjectsItem.textContent = "כל הפרויקטים";
+    allProjectsItem.setAttribute("data-project-id", "all");
+
+    allProjectsItem.addEventListener("click", () => {
+      if (projectFilterToggle) {
+        projectFilterToggle.innerHTML = `כל הפרויקטים <span>▼</span>`;
+      }
+
+      projectFilterDropdown.classList.remove("open");
+    });
+    projectFilterMenu.appendChild(allProjectsItem);
 
     const selectedProject = apiProjects.find(
       (project) => String(project.id) === String(selectedProjectId),
@@ -2092,14 +2130,43 @@ document.addEventListener("DOMContentLoaded", () => {
         (project) => String(project.id) === String(projectIdFromUrl),
       )
     ) {
-      return projectIdFromUrl;
+      return {
+        projectId: projectIdFromUrl,
+        source: "URL",
+      };
+    }
+
+    const firstProjectWithTasks = allWorkPlansData.find(
+      (workPlan) =>
+        workPlan &&
+        workPlan.project &&
+        workPlan.project.workItemId != null &&
+        Array.isArray(workPlan.tasks) &&
+        workPlan.tasks.length > 0,
+    );
+
+    if (
+      firstProjectWithTasks &&
+      firstProjectWithTasks.project &&
+      firstProjectWithTasks.project.workItemId != null
+    ) {
+      return {
+        projectId: parseInt(firstProjectWithTasks.project.workItemId, 10),
+        source: "DEFAULT",
+      };
     }
 
     if (apiProjects.length > 0) {
-      return parseInt(apiProjects[0].id, 10);
+      return {
+        projectId: parseInt(apiProjects[0].id, 10),
+        source: "DEFAULT",
+      };
     }
 
-    return null;
+    return {
+      projectId: null,
+      source: "DEFAULT",
+    };
   }
 
   async function handleProjectFilterChange(projectId) {
@@ -2169,21 +2236,25 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function loadWorkPlanFromApi() {
-    await Promise.all([loadProjectsFromApi(), loadEmployeesFromApi()]);
+    await Promise.all([
+      loadProjectsFromApi(),
+      loadEmployeesFromApi(),
+      loadAllWorkPlansFromApi(),
+    ]);
 
     const projectIdFromUrl = getProjectIdFromUrl();
-    const effectiveProjectId = getEffectiveProjectId();
+    const { projectId: effectiveProjectId, source: projectIdSource } =
+      getEffectiveProjectId();
 
     if (effectiveProjectId === null) {
       currentWorkPlanData = null;
       clearWorkPlanViews();
       console.warn("No projects available for WorkPlan");
+      console.log("Selected projectId source:", projectIdSource);
       return;
     }
 
-    if (projectIdFromUrl !== null) {
-      setProjectIdInUrl(effectiveProjectId);
-    }
+    setProjectIdInUrl(effectiveProjectId);
 
     populateProjectFilterDropdown(effectiveProjectId);
 
@@ -2193,6 +2264,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!workPlan) {
       clearWorkPlanViews();
       console.warn("No work plan returned from API");
+      console.log("Selected projectId source:", projectIdSource);
       return;
     }
 
@@ -2204,6 +2276,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     console.groupCollapsed("📦 [MAPPED DATA]");
     console.log("Project ID from URL:", projectIdFromUrl);
+    console.log("Selected projectId source:", projectIdSource);
     console.log("Effective Project ID:", effectiveProjectId);
     console.log("Project:", workPlan.project);
     console.log("Tasks:", workPlan.tasks);
