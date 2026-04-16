@@ -45,7 +45,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const existingToken = window.getAuthToken ? window.getAuthToken() : "";
 
   if (existingUser && existingToken) {
-    window.location.href = "../index.html";
+    window.location.href = "index.html";
     return;
   }
 
@@ -77,7 +77,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       window.setAuthSession(loginResponse);
-      window.location.href = "../index.html";
+      window.location.href = "index.html";
     } catch (error) {
       if (error.status === 401) {
         showError("אימייל או סיסמה שגויים.");

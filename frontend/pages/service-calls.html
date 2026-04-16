@@ -34,7 +34,7 @@
         </div>
 
         <div class="sidebar-nav-main">
-          <a href="../index.html" class="sidebar-nav-link">
+          <a href="index.html" class="sidebar-nav-link">
             <span class="nav-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24"><path d="M4 13h7V4H4v9zm0 7h7v-5H4v5zm9 0h7V11h-7v9zm0-18v7h7V2h-7z"/></svg>
             </span>
@@ -822,7 +822,7 @@
       }
 
       // Deep-link hook for callId query parameter
-      // Supports: /pages/service-calls.html?callId=XXXX
+      // Supports: service-calls.html?callId=XXXX (same folder as index.html)
       (function() {
         const urlParams = new URLSearchParams(window.location.search);
         const callId = urlParams.get('callId');

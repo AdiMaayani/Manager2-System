@@ -275,19 +275,19 @@ document.addEventListener('DOMContentLoaded', () => {
           alertLinks.innerHTML = '';
           if (alertId === 'alert-1' || alertId === 'alert-3') {
             const link = document.createElement('a');
-            link.href = 'pages/projects.html';
+            link.href = 'projects.html';
             link.textContent = 'פתח פרויקט';
             link.className = 'btn btn-sm btn-primary';
             alertLinks.appendChild(link);
           } else if (alertId === 'alert-2') {
             const link = document.createElement('a');
-            link.href = 'pages/reports.html';
+            link.href = 'reports.html';
             link.textContent = 'פתח דיווחי ביצוע';
             link.className = 'btn btn-sm btn-primary';
             alertLinks.appendChild(link);
           } else if (alertId === 'alert-4') {
             const link = document.createElement('a');
-            link.href = 'pages/cashflow.html';
+            link.href = 'cashflow.html';
             link.textContent = 'פתח תזרים מזומנים';
             link.className = 'btn btn-sm btn-primary';
             alertLinks.appendChild(link);
@@ -345,7 +345,7 @@ document.addEventListener('DOMContentLoaded', () => {
       e.preventDefault();
       const quoteId = btn.getAttribute('data-quote-id');
       // Navigate to quote page
-      window.location.href = `pages/quotes.html#${quoteId}`;
+      window.location.href = `quotes.html#${quoteId}`;
     });
   });
 
@@ -357,11 +357,11 @@ document.addEventListener('DOMContentLoaded', () => {
       const entityType = item.getAttribute('data-entity-type');
       // Navigate to relevant page (simplified)
       if (entityType === 'project') {
-        window.location.href = 'pages/projects.html';
+        window.location.href = 'projects.html';
       } else if (entityType === 'quote') {
-        window.location.href = 'pages/quotes.html';
+        window.location.href = 'quotes.html';
       } else if (entityType === 'service') {
-        window.location.href = 'pages/service-calls.html';
+        window.location.href = 'service-calls.html';
       }
     });
   });
