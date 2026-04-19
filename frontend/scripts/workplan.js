@@ -770,8 +770,11 @@ document.addEventListener("DOMContentLoaded", () => {
     role: "מנהל פרויקט",
   };
 
-  function applyScope(scope) {
-    if (scope !== "project") {
+  function applyScope(scope, options) {
+    const opts = options == null ? {} : options;
+    const skipProjectIdUrlCleanup = opts.skipProjectIdUrlCleanup === true;
+
+    if (scope !== "project" && !skipProjectIdUrlCleanup) {
       const url = new URL(window.location.href);
       if (url.searchParams.has("projectId")) {
         url.searchParams.delete("projectId");
@@ -795,6 +798,14 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       if (projectsMode) {
         projectsMode.classList.add("active");
+      }
+
+      const urlPidForScope = getProjectIdFromUrl();
+      const hasExplicitUrlProjectSelectionForScope =
+        urlPidForScope === "all" ||
+        (urlPidForScope !== null && typeof urlPidForScope === "number");
+      if (!hasExplicitUrlProjectSelectionForScope) {
+        void loadWorkPlanFromApi();
       }
     } else {
       if (employeesMode) {
@@ -1870,7 +1881,7 @@ document.addEventListener("DOMContentLoaded", () => {
     titleEl.textContent = `תוכנית עבודה – חתך: ${scopeText} | תצוגה: ${rangeDisplayText}`;
   }
 
-  applyScope("company");
+  applyScope("company", { skipProjectIdUrlCleanup: true });
   updateWorkplanTitle();
   toggleConditionalDropdowns("company");
 
@@ -2060,7 +2071,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     allWorkPlansData = Array.isArray(data) ? data : [];
 
-    if (selectedWorkPlanId == null && allWorkPlansData.length > 0) {
+    if (
+      selectedWorkPlanId == null &&
+      allWorkPlansData.length > 0 &&
+      getProjectIdFromUrl() !== "all"
+    ) {
       const firstProjectId = allWorkPlansData[0]?.project?.workItemId;
       if (firstProjectId != null) {
         selectedWorkPlanId = firstProjectId;
@@ -2204,6 +2219,12 @@ document.addEventListener("DOMContentLoaded", () => {
   async function handleProjectFilterChange(projectId) {
     if (!projectId) {
       return;
+    }
+
+    if (String(projectId).trim().toLowerCase() === "all") {
+      selectedWorkPlanId = null;
+    } else {
+      selectedWorkPlanId = projectId;
     }
 
     setProjectIdInUrl(projectId);
