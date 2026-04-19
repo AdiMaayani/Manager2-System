@@ -43,11 +43,30 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const existingUser = window.getCurrentUser ? window.getCurrentUser() : null;
   const existingToken = window.getAuthToken ? window.getAuthToken() : "";
+  const hasValidToken = window.ensureValidToken
+    ? window.ensureValidToken()
+    : false;
 
-  if (existingUser && existingToken) {
-    window.location.href = "index.html";
-    return;
-  }
+  if (existingUser && existingToken && hasValidToken) {
+    const returnUrl = window.getReturnUrl ? window.getReturnUrl() : "";
+
+    if (returnUrl) {
+      window.clearReturnUrl();
+      window.location.href = returnUrl;
+      return;
+    }
+
+      window.setAuthSession(loginResponse);
+
+      const returnUrl = window.getReturnUrl ? window.getReturnUrl() : "";
+
+      if (returnUrl) {
+        window.clearReturnUrl();
+        window.location.href = returnUrl;
+        return;
+      }
+
+      window.location.href = "../index.html";
 
   loginForm.addEventListener("submit", async (e) => {
     e.preventDefault();
@@ -77,9 +96,22 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       window.setAuthSession(loginResponse);
+<<<<<<< Updated upstream:frontend/scripts/login.js
       window.location.href = "index.html";
+=======
+
+      const returnUrl = window.getReturnUrl ? window.getReturnUrl() : "";
+
+      if (returnUrl) {
+        window.clearReturnUrl();
+        window.location.href = returnUrl;
+        return;
+      }
+
+      window.location.href = "../index.html";
+>>>>>>> Stashed changes:scripts/login.js
     } catch (error) {
-      if (error.status === 401) {
+      if (error.status === 401 || error.status === 403) {
         showError("אימייל או סיסמה שגויים.");
       } else if (error.status === 400) {
         showError(error.message || "הבקשה אינה תקינה.");

@@ -2,6 +2,7 @@ using ManageR2.Api.DTOs;
 using ManageR2.Domain.Entities;
 using ManageR2.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Mvc;
+using ManageR2.Infrastructure.Models;
 
 namespace ManageR2.Api.Controllers;
 
@@ -21,6 +22,38 @@ public class WorkItemsController : ControllerBase
     {
         var workItems = await _workItemRepository.GetAllAsync();
         return Ok(workItems);
+    }
+
+    [HttpGet("projects-list")]
+    public async Task<ActionResult<List<ProjectListItemDto>>> GetProjectsList()
+    {
+        var projects = await _workItemRepository.GetProjectsListAsync();
+
+        var result = projects.Select(project => new ProjectListItemDto
+        {
+            WorkItemId = project.WorkItemId,
+            ProjectNumber = $"P-{project.WorkItemId}",
+            Title = project.Title,
+            CustomerName = project.CustomerName,
+            ProjectManagerName = string.IsNullOrWhiteSpace(project.ProjectManagerName)
+                ? "-"
+                : project.ProjectManagerName,
+            Status = string.IsNullOrWhiteSpace(project.Status)
+                ? "-"
+                : project.Status,
+            CreatedAt = project.CreatedAt,
+            SiteName = string.IsNullOrWhiteSpace(project.SiteName)
+                ? "-"
+                : project.SiteName,
+            BillingType = string.IsNullOrWhiteSpace(project.BillingType)
+                ? "-"
+                : project.BillingType,
+            DealCloseDate = project.DealCloseDate,
+            FinanceProjectNumber = project.FinanceProjectNumber,
+            InvoiceNumber = project.InvoiceNumber
+        }).ToList();
+
+        return Ok(result);
     }
 
     [HttpGet("{id}")]

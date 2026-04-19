@@ -58,12 +58,12 @@ public class WorkItemRepository : IWorkItemRepository
     }
 
     public async Task<List<WorkItem>> GetByTypeAsync(string workType)
-{
-    var workItems = new List<WorkItem>();
+    {
+        var workItems = new List<WorkItem>();
 
-    await using var connection = _dbServices.CreateConnection();
-    await using var command = new SqlCommand(
-        @"SELECT 
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand(
+            @"SELECT 
               wi.WorkItemId,
               wi.Title,
               wi.Description,
@@ -81,23 +81,23 @@ public class WorkItemRepository : IWorkItemRepository
               ON wi.CustomerId = c.CustomerId
           WHERE wi.WorkType = @WorkType
           ORDER BY wi.CreatedAt DESC",
-        connection)
-    {
-        CommandType = CommandType.Text
-    };
+            connection)
+        {
+            CommandType = CommandType.Text
+        };
 
-    command.Parameters.AddWithValue("@WorkType", workType);
+        command.Parameters.AddWithValue("@WorkType", workType);
 
-    await connection.OpenAsync();
-    await using var reader = await command.ExecuteReaderAsync();
+        await connection.OpenAsync();
+        await using var reader = await command.ExecuteReaderAsync();
 
-    while (await reader.ReadAsync())
-    {
-        workItems.Add(MapWorkItem(reader));
+        while (await reader.ReadAsync())
+        {
+            workItems.Add(MapWorkItem(reader));
+        }
+
+        return workItems;
     }
-
-    return workItems;
-}
 
     public async Task<List<WorkItem>> GetTasksByParentIdAsync(int parentWorkItemId)
     {
@@ -157,6 +157,9 @@ public class WorkItemRepository : IWorkItemRepository
         command.Parameters.AddWithValue("@CustomerId", workItem.CustomerId);
         command.Parameters.AddWithValue("@SiteId", workItem.SiteId);
         command.Parameters.AddWithValue("@ParentWorkItemId", workItem.ParentWorkItemId ?? (object)DBNull.Value);
+        command.Parameters.AddWithValue("@DealCloseDate", (object?)workItem.DealCloseDate ?? DBNull.Value);
+        command.Parameters.AddWithValue("@FinanceProjectNumber", (object?)workItem.FinanceProjectNumber ?? DBNull.Value);
+        command.Parameters.AddWithValue("@InvoiceNumber", (object?)workItem.InvoiceNumber ?? DBNull.Value);
 
         await connection.OpenAsync();
 
@@ -182,6 +185,9 @@ public class WorkItemRepository : IWorkItemRepository
         command.Parameters.AddWithValue("@Status", workItem.Status ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("@CustomerId", workItem.CustomerId);
         command.Parameters.AddWithValue("@SiteId", workItem.SiteId);
+        command.Parameters.AddWithValue("@DealCloseDate", (object?)workItem.DealCloseDate ?? DBNull.Value);
+        command.Parameters.AddWithValue("@FinanceProjectNumber", (object?)workItem.FinanceProjectNumber ?? DBNull.Value);
+        command.Parameters.AddWithValue("@InvoiceNumber", (object?)workItem.InvoiceNumber ?? DBNull.Value);
 
         await connection.OpenAsync();
 
@@ -428,59 +434,62 @@ public class WorkItemRepository : IWorkItemRepository
     }
 
     public async Task<List<WorkPlanResult>> GetAllWorkPlansAsync()
-{
-    var results = new List<WorkPlanResult>();
+    {
+        var results = new List<WorkPlanResult>();
 
-    await using var connection = _dbServices.CreateConnection();
-    await connection.OpenAsync();
+        await using var connection = _dbServices.CreateConnection();
+        await connection.OpenAsync();
 
-    // 1. Get all projects
-    var projects = new List<WorkItem>();
+        // 1. Get all projects
+        var projects = new List<WorkItem>();
 
-    using (var cmd = new SqlCommand(@"
+        using (var cmd = new SqlCommand(@"
         SELECT *
         FROM WorkItems
         WHERE WorkType = 'Project'
     ", connection))
-    {
-        using var reader = await cmd.ExecuteReaderAsync();
-        while (await reader.ReadAsync())
         {
-            projects.Add(MapWorkItem(reader));
+            using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                projects.Add(MapWorkItem(reader));
+            }
         }
-    }
 
-    // 2. For each project, reuse existing logic
-    foreach (var project in projects)
-    {
-        var workPlan = await GetWorkPlanAsync(project.WorkItemId);
-
-        if (workPlan != null)
+        // 2. For each project, reuse existing logic
+        foreach (var project in projects)
         {
-            results.Add(workPlan);
-        }
-    }
+            var workPlan = await GetWorkPlanAsync(project.WorkItemId);
 
-    return results;
-}
+            if (workPlan != null)
+            {
+                results.Add(workPlan);
+            }
+        }
+
+        return results;
+    }
 
     private static WorkItem MapWorkItem(SqlDataReader reader)
     {
         return new WorkItem
-{
-    WorkItemId = GetIntValue(reader, "WorkItemId"),
-    Title = GetStringValue(reader, "Title") ?? string.Empty,
-    Description = GetStringValue(reader, "Description"),
-    WorkType = GetStringValue(reader, "WorkType"),
-    BillingType = GetStringValue(reader, "BillingType"),
-    Status = GetStringValue(reader, "Status"),
-    CustomerId = GetIntValue(reader, "CustomerId"),
-    CustomerName = GetStringValue(reader, "CustomerName"),
-    SiteId = GetIntValue(reader, "SiteId"),
-    CreatedAt = GetDateTimeValue(reader, "CreatedAt") ?? DateTime.MinValue,
-    ClosedAt = GetDateTimeValue(reader, "ClosedAt"),
-    ParentWorkItemId = GetNullableIntValue(reader, "ParentWorkItemId")
-};
+        {
+            WorkItemId = GetIntValue(reader, "WorkItemId"),
+            Title = GetStringValue(reader, "Title") ?? string.Empty,
+            Description = GetStringValue(reader, "Description"),
+            WorkType = GetStringValue(reader, "WorkType"),
+            BillingType = GetStringValue(reader, "BillingType"),
+            Status = GetStringValue(reader, "Status"),
+            CustomerId = GetIntValue(reader, "CustomerId"),
+            CustomerName = GetStringValue(reader, "CustomerName"),
+            SiteId = GetIntValue(reader, "SiteId"),
+            CreatedAt = GetDateTimeValue(reader, "CreatedAt") ?? DateTime.MinValue,
+            ClosedAt = GetDateTimeValue(reader, "ClosedAt"),
+            ParentWorkItemId = GetNullableIntValue(reader, "ParentWorkItemId"),
+            DealCloseDate = GetDateTimeValue(reader, "DealCloseDate"),
+            FinanceProjectNumber = GetStringValue(reader, "FinanceProjectNumber"),
+            InvoiceNumber = GetStringValue(reader, "InvoiceNumber")
+        };
     }
 
     private static WorkPlanAssignmentResult MapWorkPlanAssignment(SqlDataReader reader)
@@ -548,5 +557,39 @@ public class WorkItemRepository : IWorkItemRepository
         }
 
         return Convert.ToDateTime(reader[columnName]);
+    }
+
+    public async Task<List<ProjectListItemResult>> GetProjectsListAsync()
+    {
+        var projects = new List<ProjectListItemResult>();
+
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand("dbo.sp_GetProjectsList", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+
+        await connection.OpenAsync();
+        await using var reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            projects.Add(new ProjectListItemResult
+            {
+                WorkItemId = GetIntValue(reader, "WorkItemId"),
+                Title = GetStringValue(reader, "Title") ?? string.Empty,
+                CustomerName = GetStringValue(reader, "CustomerName") ?? string.Empty,
+                ProjectManagerName = GetStringValue(reader, "ProjectManagerName") ?? "-",
+                Status = GetStringValue(reader, "Status") ?? string.Empty,
+                CreatedAt = GetDateTimeValue(reader, "CreatedAt") ?? DateTime.MinValue,
+                SiteName = GetStringValue(reader, "SiteName") ?? "-",
+                BillingType = GetStringValue(reader, "BillingType") ?? string.Empty,
+                DealCloseDate = GetDateTimeValue(reader, "DealCloseDate"),
+                FinanceProjectNumber = GetStringValue(reader, "FinanceProjectNumber"),
+                InvoiceNumber = GetStringValue(reader, "InvoiceNumber")
+            });
+        }
+
+        return projects;
     }
 }

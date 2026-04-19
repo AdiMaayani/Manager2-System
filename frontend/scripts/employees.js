@@ -916,5 +916,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  initializeEmployeesPage();
+  window.bootProtectedPage(() => {
+    initializeEmployeesPage();
+  });
 });
