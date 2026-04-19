@@ -771,6 +771,14 @@ document.addEventListener("DOMContentLoaded", () => {
   };
 
   function applyScope(scope) {
+    if (scope !== "project") {
+      const url = new URL(window.location.href);
+      if (url.searchParams.has("projectId")) {
+        url.searchParams.delete("projectId");
+        window.history.replaceState({}, "", url.toString());
+      }
+    }
+
     scopeButtons.forEach((b) => b.classList.remove("active"));
     const activeBtn = document.querySelector(
       `.tab-group-scope [data-scope="${scope}"]`,
@@ -2205,11 +2213,15 @@ document.addEventListener("DOMContentLoaded", () => {
   function isAllProjectsMode() {
     const urlProjectId = getProjectIdFromUrl();
 
-    return (
+    if (
       String(urlProjectId || "")
         .trim()
         .toLowerCase() === "all"
-    );
+    ) {
+      return true;
+    }
+
+    return urlProjectId === null;
   }
 
   function getProjectIdFromUrl() {
@@ -2298,13 +2310,21 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    const hasExplicitUrlProjectSelection =
+      projectIdFromUrl === "all" ||
+      (projectIdFromUrl !== null && typeof projectIdFromUrl === "number");
+
+    const resolvedProjectId = hasExplicitUrlProjectSelection
+      ? projectIdFromUrl
+      : "all";
+
     if (projectIdSource === "URL") {
       setProjectIdInUrl(effectiveProjectId);
     }
 
-    populateProjectFilterDropdown(effectiveProjectId);
+    populateProjectFilterDropdown(resolvedProjectId);
 
-    if (effectiveProjectId === "all") {
+    if (resolvedProjectId === "all") {
       currentWorkPlanData = {
         project: null,
         tasks: [],
@@ -2345,6 +2365,7 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log("Project ID from URL:", projectIdFromUrl);
     console.log("Selected projectId source:", projectIdSource);
     console.log("Effective Project ID:", effectiveProjectId);
+    console.log("Resolved Project ID:", resolvedProjectId);
     console.log("Project:", workPlan.project);
     console.log("Tasks:", workPlan.tasks);
     console.log("Assignments:", workPlan.assignments);
