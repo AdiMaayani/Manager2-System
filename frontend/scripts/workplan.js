@@ -2376,6 +2376,10 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    const algorithmInputModel =
+      window.WorkPlanAlgorithmModel.buildAssignmentInputModel(workPlan);
+    console.log("algorithmInputModel:", algorithmInputModel);
+
     renderTasksFromAPI(workPlan);
     renderWeeklyView();
     renderMonthlyView();
