@@ -2366,7 +2366,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const workPlan = await fetchWorkPlan(effectiveProjectId);
+    const workPlan = await window.WorkPlanApi.getWorkPlanById(effectiveProjectId);
     currentWorkPlanData = workPlan;
 
     if (!workPlan) {

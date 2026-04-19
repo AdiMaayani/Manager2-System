@@ -6,9 +6,14 @@
       throw new Error("apiRequest is not available on window.");
     }
 
-    return window.apiRequest("/WorkItems/" + encodeURIComponent(projectId) + "/work-plan", {
-      method: "GET",
-    });
+    try {
+      return await window.apiRequest("/WorkItems/" + encodeURIComponent(projectId) + "/work-plan", {
+        method: "GET",
+      });
+    } catch (error) {
+      console.warn(error);
+      return null;
+    }
   }
 
   async function getAllWorkPlans() {
