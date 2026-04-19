@@ -2168,6 +2168,13 @@ document.addEventListener("DOMContentLoaded", () => {
       };
     }
 
+    if (selectedWorkPlanId != null) {
+      return {
+        projectId: selectedWorkPlanId,
+        source: "SELECTED",
+      };
+    }
+
     if (
       projectIdFromUrl !== null &&
       apiProjects.some(
@@ -2177,45 +2184,6 @@ document.addEventListener("DOMContentLoaded", () => {
       return {
         projectId: projectIdFromUrl,
         source: "URL",
-      };
-    }
-
-    const firstProjectWithTasks = allWorkPlansData.find(
-      (workPlan) =>
-        workPlan &&
-        workPlan.project &&
-        workPlan.project.workItemId != null &&
-        Array.isArray(workPlan.tasks) &&
-        workPlan.tasks.length > 0,
-    );
-
-    if (
-      firstProjectWithTasks &&
-      firstProjectWithTasks.project &&
-      firstProjectWithTasks.project.workItemId != null
-    ) {
-      return {
-        projectId: parseInt(firstProjectWithTasks.project.workItemId, 10),
-        source: "DEFAULT",
-      };
-    }
-
-    const firstProjectFromAllWorkPlans = allWorkPlansData.find(
-      (workPlan) =>
-        workPlan && workPlan.project && workPlan.project.workItemId != null,
-    );
-
-    if (
-      firstProjectFromAllWorkPlans &&
-      firstProjectFromAllWorkPlans.project &&
-      firstProjectFromAllWorkPlans.project.workItemId != null
-    ) {
-      return {
-        projectId: parseInt(
-          firstProjectFromAllWorkPlans.project.workItemId,
-          10,
-        ),
-        source: "DEFAULT",
       };
     }
 
@@ -2330,7 +2298,9 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    setProjectIdInUrl(effectiveProjectId);
+    if (projectIdSource === "URL") {
+      setProjectIdInUrl(effectiveProjectId);
+    }
 
     populateProjectFilterDropdown(effectiveProjectId);
 
