@@ -95,6 +95,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let allWorkPlansData = [];
 
+  let selectedWorkPlanId = null;
+
   function updateEmployeeFilterLabel() {
     if (!roleLabel) return;
 
@@ -2046,30 +2048,22 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function loadAllWorkPlansFromApi() {
-    const response = await fetch(
-      "http://localhost:5161/api/WorkItems/work-plan/all",
-      {
-        method: "GET",
-        headers: {
-          Accept: "application/json",
-        },
-      },
-    );
-
-    if (!response.ok) {
-      throw new Error(
-        "All WorkPlans API request failed with status " + response.status,
-      );
-    }
-
-    const data = await response.json();
+    const data = await window.apiRequest("/WorkItems/work-plan/all");
 
     allWorkPlansData = Array.isArray(data) ? data : [];
+
+    if (selectedWorkPlanId == null && allWorkPlansData.length > 0) {
+      const firstProjectId = allWorkPlansData[0]?.project?.workItemId;
+      if (firstProjectId != null) {
+        selectedWorkPlanId = firstProjectId;
+      }
+    }
 
     console.groupCollapsed("📦 [ALL WORKPLANS API]");
     console.log("Raw all workplans data:", data);
     console.log("Resolved allWorkPlansData:", allWorkPlansData);
     console.log("All workplans count:", allWorkPlansData.length);
+    console.log("selectedWorkPlanId:", selectedWorkPlanId);
     console.groupEnd();
   }
 
