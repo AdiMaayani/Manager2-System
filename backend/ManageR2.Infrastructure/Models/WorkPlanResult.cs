@@ -25,6 +25,10 @@ namespace ManageR2.Infrastructure.Models
 
         public string? AssignmentRole { get; set; }
 
+        public decimal? AssignedHours { get; set; }
+
+        public bool IsManualAssignment { get; set; }
+
         public string? EmployeeName { get; set; }
 
         public string? ContractorName { get; set; }

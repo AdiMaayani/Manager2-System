@@ -33,6 +33,12 @@ namespace ManageR2.Api.DTOs
         public string WorkType { get; set; } = string.Empty;
         public string Status { get; set; } = string.Empty;
         public string? BillingType { get; set; }
+        public decimal? EstimatedHours { get; set; }
+        public string? Priority { get; set; }
+        public DateTime? PlannedStart { get; set; }
+        public DateTime? PlannedEnd { get; set; }
+        public string? RequiredRole { get; set; }
+        public bool IsLocked { get; set; }
         public int? CustomerId { get; set; }
         public int? SiteId { get; set; }
         public DateTime CreatedAt { get; set; }
@@ -47,6 +53,8 @@ namespace ManageR2.Api.DTOs
         public int? ContractorId { get; set; }
         public string AssignmentType { get; set; } = string.Empty;
         public string? AssignmentRole { get; set; }
+        public decimal? AssignedHours { get; set; }
+        public bool IsManualAssignment { get; set; }
         public string? EmployeeName { get; set; }
         public string? ContractorName { get; set; }
     }

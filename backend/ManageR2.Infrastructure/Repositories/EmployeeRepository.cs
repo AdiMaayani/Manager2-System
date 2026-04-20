@@ -26,6 +26,8 @@ public class EmployeeRepository : IEmployeeRepository
                   PrimaryRole,
                   Phone,
                   Email,
+                  DailyCapacityHours,
+                  IsAssignable,
                   IsActive,
                   CreatedAt
               FROM dbo.Employees
@@ -56,6 +58,8 @@ public class EmployeeRepository : IEmployeeRepository
                   PrimaryRole,
                   Phone,
                   Email,
+                  DailyCapacityHours,
+                  IsAssignable,
                   IsActive,
                   CreatedAt
               FROM dbo.Employees
@@ -87,6 +91,8 @@ public class EmployeeRepository : IEmployeeRepository
             PrimaryRole = reader["PrimaryRole"]?.ToString() ?? string.Empty,
             Phone = reader["Phone"] != DBNull.Value ? reader["Phone"]?.ToString() : null,
             Email = reader["Email"] != DBNull.Value ? reader["Email"]?.ToString() : null,
+            DailyCapacityHours = reader["DailyCapacityHours"] != DBNull.Value ? Convert.ToDecimal(reader["DailyCapacityHours"]) : null,
+            IsAssignable = reader["IsAssignable"] != DBNull.Value && Convert.ToBoolean(reader["IsAssignable"]),
             IsActive = reader["IsActive"] != DBNull.Value && Convert.ToBoolean(reader["IsActive"]),
             CreatedAt = reader["CreatedAt"] != DBNull.Value ? Convert.ToDateTime(reader["CreatedAt"]) : DateTime.MinValue
         };

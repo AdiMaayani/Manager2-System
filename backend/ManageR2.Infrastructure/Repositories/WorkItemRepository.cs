@@ -70,6 +70,12 @@ public class WorkItemRepository : IWorkItemRepository
               wi.WorkType,
               wi.BillingType,
               wi.Status,
+              wi.EstimatedHours,
+              wi.Priority,
+              wi.PlannedStart,
+              wi.PlannedEnd,
+              wi.RequiredRole,
+              wi.IsLocked,
               wi.CustomerId,
               c.CustomerName AS CustomerName,
               wi.SiteId,
@@ -112,6 +118,12 @@ public class WorkItemRepository : IWorkItemRepository
       wi.WorkType,
       wi.BillingType,
       wi.Status,
+      wi.EstimatedHours,
+      wi.Priority,
+      wi.PlannedStart,
+      wi.PlannedEnd,
+      wi.RequiredRole,
+      wi.IsLocked,
       wi.CustomerId,
       c.CustomerName AS CustomerName,
       wi.SiteId,
@@ -302,6 +314,12 @@ public class WorkItemRepository : IWorkItemRepository
       wi.WorkType,
       wi.BillingType,
       wi.Status,
+      wi.EstimatedHours,
+      wi.Priority,
+      wi.PlannedStart,
+      wi.PlannedEnd,
+      wi.RequiredRole,
+      wi.IsLocked,
       wi.CustomerId,
       c.CustomerName AS CustomerName,
       wi.SiteId,
@@ -338,6 +356,12 @@ public class WorkItemRepository : IWorkItemRepository
       wi.WorkType,
       wi.BillingType,
       wi.Status,
+      wi.EstimatedHours,
+      wi.Priority,
+      wi.PlannedStart,
+      wi.PlannedEnd,
+      wi.RequiredRole,
+      wi.IsLocked,
       wi.CustomerId,
       c.CustomerName AS CustomerName,
       wi.SiteId,
@@ -381,6 +405,8 @@ public class WorkItemRepository : IWorkItemRepository
                   CAST(NULL AS INT) AS ContractorId,
                   CAST('Employee' AS NVARCHAR(50)) AS AssignmentType,
                   wea.AssignmentRole,
+                  wea.AssignedHours,
+                  wea.IsManualAssignment,
                   e.FullName AS EmployeeName,
                   CAST(NULL AS NVARCHAR(255)) AS ContractorName
               FROM dbo.WorkEmployeeAssignments wea
@@ -397,6 +423,8 @@ public class WorkItemRepository : IWorkItemRepository
                   wca.ContractorId,
                   CAST('Contractor' AS NVARCHAR(50)) AS AssignmentType,
                   wca.AssignmentRole,
+                  CAST(NULL AS DECIMAL(5,2)) AS AssignedHours,
+                  CAST(0 AS BIT) AS IsManualAssignment,
                   CAST(NULL AS NVARCHAR(255)) AS EmployeeName,
                   c.FullName AS ContractorName
               FROM dbo.WorkContractorAssignments wca
@@ -474,6 +502,12 @@ public class WorkItemRepository : IWorkItemRepository
     WorkType = GetStringValue(reader, "WorkType"),
     BillingType = GetStringValue(reader, "BillingType"),
     Status = GetStringValue(reader, "Status"),
+    EstimatedHours = GetDecimalValue(reader, "EstimatedHours"),
+    Priority = GetStringValue(reader, "Priority"),
+    PlannedStart = GetDateTimeValue(reader, "PlannedStart"),
+    PlannedEnd = GetDateTimeValue(reader, "PlannedEnd"),
+    RequiredRole = GetStringValue(reader, "RequiredRole"),
+    IsLocked = HasColumn(reader, "IsLocked") && reader["IsLocked"] != DBNull.Value && Convert.ToBoolean(reader["IsLocked"]),
     CustomerId = GetIntValue(reader, "CustomerId"),
     CustomerName = GetStringValue(reader, "CustomerName"),
     SiteId = GetIntValue(reader, "SiteId"),
@@ -492,6 +526,8 @@ public class WorkItemRepository : IWorkItemRepository
             ContractorId = GetNullableIntValue(reader, "ContractorId"),
             AssignmentType = GetStringValue(reader, "AssignmentType") ?? string.Empty,
             AssignmentRole = GetStringValue(reader, "AssignmentRole"),
+            AssignedHours = GetDecimalValue(reader, "AssignedHours"),
+            IsManualAssignment = HasColumn(reader, "IsManualAssignment") && reader["IsManualAssignment"] != DBNull.Value && Convert.ToBoolean(reader["IsManualAssignment"]),
             EmployeeName = GetStringValue(reader, "EmployeeName"),
             ContractorName = GetStringValue(reader, "ContractorName")
         };
@@ -548,5 +584,15 @@ public class WorkItemRepository : IWorkItemRepository
         }
 
         return Convert.ToDateTime(reader[columnName]);
+    }
+
+    private static decimal? GetDecimalValue(SqlDataReader reader, string columnName)
+    {
+        if (!HasColumn(reader, columnName) || reader[columnName] == DBNull.Value)
+        {
+            return null;
+        }
+
+        return Convert.ToDecimal(reader[columnName]);
     }
 }
