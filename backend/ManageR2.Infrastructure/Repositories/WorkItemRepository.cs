@@ -306,33 +306,9 @@ public class WorkItemRepository : IWorkItemRepository
         var tasks = new List<WorkItem>();
         var assignments = new List<WorkPlanAssignmentResult>();
 
-        await using (var projectCommand = new SqlCommand(
-            @"SELECT 
-      wi.WorkItemId,
-      wi.Title,
-      wi.Description,
-      wi.WorkType,
-      wi.BillingType,
-      wi.Status,
-      wi.EstimatedHours,
-      wi.Priority,
-      wi.PlannedStart,
-      wi.PlannedEnd,
-      wi.RequiredRole,
-      wi.IsLocked,
-      wi.CustomerId,
-      c.CustomerName AS CustomerName,
-      wi.SiteId,
-      wi.CreatedAt,
-      wi.ClosedAt,
-      wi.ParentWorkItemId
-      FROM dbo.WorkItems wi
-      LEFT JOIN dbo.Customers c
-      ON wi.CustomerId = c.CustomerId
-      WHERE wi.WorkItemId = @ProjectId",
-            connection))
+        await using (var projectCommand = new SqlCommand("sp_GetWorkPlanProject", connection))
         {
-            projectCommand.CommandType = CommandType.Text;
+            projectCommand.CommandType = CommandType.StoredProcedure;
             projectCommand.Parameters.AddWithValue("@ProjectId", projectId);
 
             await using var projectReader = await projectCommand.ExecuteReaderAsync();
@@ -348,34 +324,9 @@ public class WorkItemRepository : IWorkItemRepository
             return null;
         }
 
-        await using (var tasksCommand = new SqlCommand(
-            @"SELECT 
-      wi.WorkItemId,
-      wi.Title,
-      wi.Description,
-      wi.WorkType,
-      wi.BillingType,
-      wi.Status,
-      wi.EstimatedHours,
-      wi.Priority,
-      wi.PlannedStart,
-      wi.PlannedEnd,
-      wi.RequiredRole,
-      wi.IsLocked,
-      wi.CustomerId,
-      c.CustomerName AS CustomerName,
-      wi.SiteId,
-      wi.CreatedAt,
-      wi.ClosedAt,
-      wi.ParentWorkItemId
-  FROM dbo.WorkItems wi
-  LEFT JOIN dbo.Customers c
-      ON wi.CustomerId = c.CustomerId
-  WHERE wi.ParentWorkItemId = @ProjectId
-  ORDER BY wi.CreatedAt DESC",
-            connection))
+        await using (var tasksCommand = new SqlCommand("sp_GetWorkPlanTasks", connection))
         {
-            tasksCommand.CommandType = CommandType.Text;
+            tasksCommand.CommandType = CommandType.StoredProcedure;
             tasksCommand.Parameters.AddWithValue("@ProjectId", projectId);
 
             await using var tasksReader = await tasksCommand.ExecuteReaderAsync();
@@ -386,57 +337,9 @@ public class WorkItemRepository : IWorkItemRepository
             }
         }
 
-        await using (var assignmentsCommand = new SqlCommand(
-            @";WITH RelevantWorkItems AS
-              (
-                  SELECT WorkItemId
-                  FROM dbo.WorkItems
-                  WHERE WorkItemId = @ProjectId
-
-                  UNION
-
-                  SELECT WorkItemId
-                  FROM dbo.WorkItems
-                  WHERE ParentWorkItemId = @ProjectId
-              )
-              SELECT 
-                  wea.WorkItemId,
-                  wea.EmployeeId,
-                  CAST(NULL AS INT) AS ContractorId,
-                  CAST('Employee' AS NVARCHAR(50)) AS AssignmentType,
-                  wea.AssignmentRole,
-                  wea.AssignedHours,
-                  wea.IsManualAssignment,
-                  e.FullName AS EmployeeName,
-                  CAST(NULL AS NVARCHAR(255)) AS ContractorName
-              FROM dbo.WorkEmployeeAssignments wea
-              INNER JOIN RelevantWorkItems rwi
-                  ON wea.WorkItemId = rwi.WorkItemId
-              INNER JOIN dbo.Employees e
-                  ON wea.EmployeeId = e.EmployeeId
-
-              UNION ALL
-
-              SELECT 
-                  wca.WorkItemId,
-                  CAST(NULL AS INT) AS EmployeeId,
-                  wca.ContractorId,
-                  CAST('Contractor' AS NVARCHAR(50)) AS AssignmentType,
-                  wca.AssignmentRole,
-                  CAST(NULL AS DECIMAL(5,2)) AS AssignedHours,
-                  CAST(0 AS BIT) AS IsManualAssignment,
-                  CAST(NULL AS NVARCHAR(255)) AS EmployeeName,
-                  c.FullName AS ContractorName
-              FROM dbo.WorkContractorAssignments wca
-              INNER JOIN RelevantWorkItems rwi
-                  ON wca.WorkItemId = rwi.WorkItemId
-              INNER JOIN dbo.Contractors c
-                  ON wca.ContractorId = c.ContractorId
-
-              ORDER BY WorkItemId",
-            connection))
+        await using (var assignmentsCommand = new SqlCommand("sp_GetWorkPlanAssignments", connection))
         {
-            assignmentsCommand.CommandType = CommandType.Text;
+            assignmentsCommand.CommandType = CommandType.StoredProcedure;
             assignmentsCommand.Parameters.AddWithValue("@ProjectId", projectId);
 
             await using var assignmentsReader = await assignmentsCommand.ExecuteReaderAsync();
