@@ -36,6 +36,12 @@ document.addEventListener("DOMContentLoaded", () => {
               item && item.employeeId != null ? String(item.employeeId) : "",
             fullName: item && item.fullName ? item.fullName : "",
             role: item && item.primaryRole ? item.primaryRole : "",
+            primaryRole: item && item.primaryRole ? item.primaryRole : "",
+            dailyCapacityHours:
+              item && item.dailyCapacityHours != null
+                ? item.dailyCapacityHours
+                : null,
+            isAssignable: item && item.isAssignable === true,
             phone: item && item.phone ? item.phone : "",
             email: item && item.email ? item.email : "",
             isActive: !!(item && item.isActive),
@@ -2376,8 +2382,13 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    const mappedEmployees =
+      window.WorkPlanMappers.mapEmployeeResponse(getEmployeesData());
+
     const algorithmInputModel =
-      window.WorkPlanAlgorithmModel.buildAssignmentInputModel(workPlan);
+      window.WorkPlanAlgorithmModel.buildAssignmentInputModel(workPlan, {
+        employees: mappedEmployees,
+      });
     console.log("algorithmInputModel:", algorithmInputModel);
 
     renderTasksFromAPI(workPlan);

@@ -2,108 +2,164 @@
   "use strict";
 
   function buildAssignmentInputModel(workPlanData, options) {
-    var raw = workPlanData || null;
-    var sourceTasks = raw && Array.isArray(raw.tasks) ? raw.tasks : [];
+    var source = workPlanData || null;
+    var safeOptions = options || {};
+    var rawProject = source && source.project ? source.project : null;
+    var rawTasks = source && Array.isArray(source.tasks) ? source.tasks : [];
     var rawAssignments =
-      raw && Array.isArray(raw.assignments) ? raw.assignments : [];
+      source && Array.isArray(source.assignments) ? source.assignments : [];
+    var rawEmployees = Array.isArray(safeOptions.employees)
+      ? safeOptions.employees
+      : [];
 
-    function priorityFromStatus(status) {
-      var s = String(status || "").trim();
-      if (s === "Planned") {
-        return 1;
-      }
-      if (s === "Open") {
-        return 2;
-      }
-      return 0;
-    }
-
-    var tasks = sourceTasks.map(function (task) {
+    var assignments = rawAssignments.map(function (assignment) {
+      var row = assignment || {};
       return {
-        id: task && task.workItemId,
-        title: task && task.title,
-        status: task && task.status,
-        duration: 1,
-        priority: priorityFromStatus(task && task.status),
-        dependencies: [],
-        assignedEmployees: [],
+        workItemId: row.workItemId ?? null,
+        employeeId: row.employeeId ?? null,
+        contractorId: row.contractorId ?? null,
+        assignmentRole: row.assignmentRole ?? null,
+        assignmentType: row.assignmentType ?? null,
+        assignedHours: row.assignedHours ?? null,
+        isManualAssignment: row.isManualAssignment === true,
+        employeeName: row.employeeName ?? null,
+        contractorName: row.contractorName ?? null,
       };
     });
 
-    var employeeMap = new Map();
-    for (var i = 0; i < rawAssignments.length; i++) {
-      var a = rawAssignments[i];
-      if (a == null || a.employeeId == null) {
+    var taskAssignmentsMap = new Map();
+    for (var i = 0; i < assignments.length; i++) {
+      var assignmentRow = assignments[i];
+      if (assignmentRow.workItemId == null) {
         continue;
       }
-      var key = String(a.employeeId);
-      if (!employeeMap.has(key)) {
-        employeeMap.set(key, {
-          id: a.employeeId,
-          name: a.employeeName || "",
-          role: a.assignmentRole || "",
-          capacity: 8,
-          currentLoad: 0,
+      var taskKey = String(assignmentRow.workItemId);
+      if (!taskAssignmentsMap.has(taskKey)) {
+        taskAssignmentsMap.set(taskKey, []);
+      }
+      taskAssignmentsMap.get(taskKey).push(assignmentRow);
+    }
+
+    var tasks = rawTasks.map(function (task) {
+      var row = task || {};
+      var taskId = row.id ?? row.workItemId ?? null;
+      var relatedAssignments =
+        taskId == null ? [] : taskAssignmentsMap.get(String(taskId)) || [];
+
+      var assignedEmployeeIds = [];
+      for (var j = 0; j < relatedAssignments.length; j++) {
+        var related = relatedAssignments[j];
+        if (related.employeeId == null) {
+          continue;
+        }
+        var exists = assignedEmployeeIds.some(function (employeeId) {
+          return String(employeeId) === String(related.employeeId);
+        });
+        if (!exists) {
+          assignedEmployeeIds.push(related.employeeId);
+        }
+      }
+
+      var manualAssignmentCount = relatedAssignments.filter(function (related) {
+        return related.isManualAssignment === true;
+      }).length;
+
+      return {
+        id: taskId,
+        title: row.title ?? "",
+        status: row.status ?? "",
+        estimatedHours: row.estimatedHours ?? null,
+        priority: row.priority ?? null,
+        plannedStart: row.plannedStart ?? null,
+        plannedEnd: row.plannedEnd ?? null,
+        requiredRole: row.requiredRole ?? null,
+        isLocked: row.isLocked === true,
+        parentWorkItemId: row.parentWorkItemId ?? null,
+        assignedEmployeeIds: assignedEmployeeIds,
+        manualAssignmentCount: manualAssignmentCount,
+      };
+    });
+
+    var employees = rawEmployees.map(function (employee) {
+      var row = employee || {};
+      var employeeId = row.id ?? row.employeeId ?? null;
+      return {
+        id: employeeId,
+        fullName: row.fullName ?? "",
+        role: row.primaryRole ?? row.role ?? "",
+        dailyCapacityHours: row.dailyCapacityHours ?? null,
+        isAssignable: row.isAssignable === true,
+        isActive: row.isActive === true,
+      };
+    });
+
+    var constraints = [];
+
+    for (var k = 0; k < tasks.length; k++) {
+      var taskRow = tasks[k];
+      if (taskRow.isLocked === true) {
+        constraints.push({
+          type: "locked_task",
+          taskId: taskRow.id,
+          value: true,
+        });
+      }
+      if (taskRow.requiredRole != null && String(taskRow.requiredRole) !== "") {
+        constraints.push({
+          type: "required_role",
+          taskId: taskRow.id,
+          value: taskRow.requiredRole,
+        });
+      }
+      if (taskRow.plannedStart != null || taskRow.plannedEnd != null) {
+        constraints.push({
+          type: "task_time_window",
+          taskId: taskRow.id,
+          value: {
+            plannedStart: taskRow.plannedStart,
+            plannedEnd: taskRow.plannedEnd,
+          },
         });
       }
     }
 
-    var taskById = new Map();
-    for (var t = 0; t < tasks.length; t++) {
-      var taskRow = tasks[t];
-      if (taskRow && taskRow.id != null) {
-        taskById.set(String(taskRow.id), taskRow);
+    for (var m = 0; m < employees.length; m++) {
+      var employeeRow = employees[m];
+      if (employeeRow.isAssignable === false) {
+        constraints.push({
+          type: "employee_assignable",
+          employeeId: employeeRow.id,
+          value: false,
+        });
       }
     }
 
-    for (var j = 0; j < rawAssignments.length; j++) {
-      var asg = rawAssignments[j];
-      if (asg == null || asg.workItemId == null || asg.employeeId == null) {
-        continue;
-      }
-      var linked = taskById.get(String(asg.workItemId));
-      if (!linked) {
-        continue;
-      }
-      var empId = asg.employeeId;
-      var already = linked.assignedEmployees.some(function (x) {
-        return String(x) === String(empId);
-      });
-      if (!already) {
-        linked.assignedEmployees.push(empId);
-      }
-      var empRow = employeeMap.get(String(empId));
-      if (empRow) {
-        empRow.currentLoad += 1;
+    for (var n = 0; n < assignments.length; n++) {
+      var assignment = assignments[n];
+      if (assignment.isManualAssignment === true) {
+        constraints.push({
+          type: "manual_assignment",
+          taskId: assignment.workItemId,
+          employeeId: assignment.employeeId,
+          value: true,
+        });
       }
     }
-
-    var employees = Array.from(employeeMap.values());
-
-    console.groupCollapsed("🧠 [ALGORITHM INPUT MODEL]");
-    console.log("projectId:", raw && raw.project ? raw.project.workItemId : null);
-    console.log("tasks:", tasks);
-    console.log("employees:", employees);
-    console.log("assignments:", rawAssignments.slice());
-    console.log("constraints:", {
-      maxTasksPerEmployee: 5,
-      allowOverAllocation: false,
-    });
-    console.groupEnd();
 
     return {
-      projectId: raw && raw.project ? raw.project.workItemId : null,
-      project: raw && raw.project ? raw.project : null,
+      project: rawProject
+        ? {
+            id: rawProject.id ?? rawProject.workItemId ?? null,
+            title: rawProject.title ?? "",
+            status: rawProject.status ?? "",
+          }
+        : null,
       tasks: tasks,
       employees: employees,
-      assignments: rawAssignments.slice(),
-      constraints: {
-        maxTasksPerEmployee: 5,
-        allowOverAllocation: false,
-      },
-      options: options || {},
-      source: raw,
-      raw: raw,
+      assignments: assignments,
+      constraints: constraints,
+      options: safeOptions,
+      source: source,
     };
   }
 
