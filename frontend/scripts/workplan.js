@@ -36,6 +36,12 @@ document.addEventListener("DOMContentLoaded", () => {
               item && item.employeeId != null ? String(item.employeeId) : "",
             fullName: item && item.fullName ? item.fullName : "",
             role: item && item.primaryRole ? item.primaryRole : "",
+            primaryRole: item && item.primaryRole ? item.primaryRole : "",
+            dailyCapacityHours:
+              item && item.dailyCapacityHours != null
+                ? item.dailyCapacityHours
+                : null,
+            isAssignable: item && item.isAssignable === true,
             phone: item && item.phone ? item.phone : "",
             email: item && item.email ? item.email : "",
             isActive: !!(item && item.isActive),
@@ -770,7 +776,18 @@ document.addEventListener("DOMContentLoaded", () => {
     role: "מנהל פרויקט",
   };
 
-  function applyScope(scope) {
+  function applyScope(scope, options) {
+    const opts = options == null ? {} : options;
+    const skipProjectIdUrlCleanup = opts.skipProjectIdUrlCleanup === true;
+
+    if (scope !== "project" && !skipProjectIdUrlCleanup) {
+      const url = new URL(window.location.href);
+      if (url.searchParams.has("projectId")) {
+        url.searchParams.delete("projectId");
+        window.history.replaceState({}, "", url.toString());
+      }
+    }
+
     scopeButtons.forEach((b) => b.classList.remove("active"));
     const activeBtn = document.querySelector(
       `.tab-group-scope [data-scope="${scope}"]`,
@@ -787,6 +804,14 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       if (projectsMode) {
         projectsMode.classList.add("active");
+      }
+
+      const urlPidForScope = getProjectIdFromUrl();
+      const hasExplicitUrlProjectSelectionForScope =
+        urlPidForScope === "all" ||
+        (urlPidForScope !== null && typeof urlPidForScope === "number");
+      if (!hasExplicitUrlProjectSelectionForScope) {
+        void loadWorkPlanFromApi();
       }
     } else {
       if (employeesMode) {
@@ -1862,7 +1887,7 @@ document.addEventListener("DOMContentLoaded", () => {
     titleEl.textContent = `תוכנית עבודה – חתך: ${scopeText} | תצוגה: ${rangeDisplayText}`;
   }
 
-  applyScope("company");
+  applyScope("company", { skipProjectIdUrlCleanup: true });
   updateWorkplanTitle();
   toggleConditionalDropdowns("company");
 
@@ -2052,7 +2077,11 @@ document.addEventListener("DOMContentLoaded", () => {
 
     allWorkPlansData = Array.isArray(data) ? data : [];
 
-    if (selectedWorkPlanId == null && allWorkPlansData.length > 0) {
+    if (
+      selectedWorkPlanId == null &&
+      allWorkPlansData.length > 0 &&
+      getProjectIdFromUrl() !== "all"
+    ) {
       const firstProjectId = allWorkPlansData[0]?.project?.workItemId;
       if (firstProjectId != null) {
         selectedWorkPlanId = firstProjectId;
@@ -2168,6 +2197,13 @@ document.addEventListener("DOMContentLoaded", () => {
       };
     }
 
+    if (selectedWorkPlanId != null) {
+      return {
+        projectId: selectedWorkPlanId,
+        source: "SELECTED",
+      };
+    }
+
     if (
       projectIdFromUrl !== null &&
       apiProjects.some(
@@ -2177,45 +2213,6 @@ document.addEventListener("DOMContentLoaded", () => {
       return {
         projectId: projectIdFromUrl,
         source: "URL",
-      };
-    }
-
-    const firstProjectWithTasks = allWorkPlansData.find(
-      (workPlan) =>
-        workPlan &&
-        workPlan.project &&
-        workPlan.project.workItemId != null &&
-        Array.isArray(workPlan.tasks) &&
-        workPlan.tasks.length > 0,
-    );
-
-    if (
-      firstProjectWithTasks &&
-      firstProjectWithTasks.project &&
-      firstProjectWithTasks.project.workItemId != null
-    ) {
-      return {
-        projectId: parseInt(firstProjectWithTasks.project.workItemId, 10),
-        source: "DEFAULT",
-      };
-    }
-
-    const firstProjectFromAllWorkPlans = allWorkPlansData.find(
-      (workPlan) =>
-        workPlan && workPlan.project && workPlan.project.workItemId != null,
-    );
-
-    if (
-      firstProjectFromAllWorkPlans &&
-      firstProjectFromAllWorkPlans.project &&
-      firstProjectFromAllWorkPlans.project.workItemId != null
-    ) {
-      return {
-        projectId: parseInt(
-          firstProjectFromAllWorkPlans.project.workItemId,
-          10,
-        ),
-        source: "DEFAULT",
       };
     }
 
@@ -2230,6 +2227,12 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    if (String(projectId).trim().toLowerCase() === "all") {
+      selectedWorkPlanId = null;
+    } else {
+      selectedWorkPlanId = projectId;
+    }
+
     setProjectIdInUrl(projectId);
     await loadWorkPlanFromApi();
   }
@@ -2237,11 +2240,15 @@ document.addEventListener("DOMContentLoaded", () => {
   function isAllProjectsMode() {
     const urlProjectId = getProjectIdFromUrl();
 
-    return (
+    if (
       String(urlProjectId || "")
         .trim()
         .toLowerCase() === "all"
-    );
+    ) {
+      return true;
+    }
+
+    return urlProjectId === null;
   }
 
   function getProjectIdFromUrl() {
@@ -2330,11 +2337,21 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    setProjectIdInUrl(effectiveProjectId);
+    const hasExplicitUrlProjectSelection =
+      projectIdFromUrl === "all" ||
+      (projectIdFromUrl !== null && typeof projectIdFromUrl === "number");
 
-    populateProjectFilterDropdown(effectiveProjectId);
+    const resolvedProjectId = hasExplicitUrlProjectSelection
+      ? projectIdFromUrl
+      : "all";
 
-    if (effectiveProjectId === "all") {
+    if (projectIdSource === "URL") {
+      setProjectIdInUrl(effectiveProjectId);
+    }
+
+    populateProjectFilterDropdown(resolvedProjectId);
+
+    if (resolvedProjectId === "all") {
       currentWorkPlanData = {
         project: null,
         tasks: [],
@@ -2355,7 +2372,7 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
-    const workPlan = await fetchWorkPlan(effectiveProjectId);
+    const workPlan = await window.WorkPlanApi.getWorkPlanById(effectiveProjectId);
     currentWorkPlanData = workPlan;
 
     if (!workPlan) {
@@ -2364,6 +2381,15 @@ document.addEventListener("DOMContentLoaded", () => {
       console.log("Selected projectId source:", projectIdSource);
       return;
     }
+
+    const mappedEmployees =
+      window.WorkPlanMappers.mapEmployeeResponse(getEmployeesData());
+
+    const algorithmInputModel =
+      window.WorkPlanAlgorithmModel.buildAssignmentInputModel(workPlan, {
+        employees: mappedEmployees,
+      });
+    console.log("algorithmInputModel:", algorithmInputModel);
 
     renderTasksFromAPI(workPlan);
     renderWeeklyView();
@@ -2375,6 +2401,7 @@ document.addEventListener("DOMContentLoaded", () => {
     console.log("Project ID from URL:", projectIdFromUrl);
     console.log("Selected projectId source:", projectIdSource);
     console.log("Effective Project ID:", effectiveProjectId);
+    console.log("Resolved Project ID:", resolvedProjectId);
     console.log("Project:", workPlan.project);
     console.log("Tasks:", workPlan.tasks);
     console.log("Assignments:", workPlan.assignments);

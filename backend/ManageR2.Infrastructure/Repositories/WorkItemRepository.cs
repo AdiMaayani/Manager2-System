@@ -277,7 +277,7 @@ public class WorkItemRepository : IWorkItemRepository
         var tasks = new List<WorkItem>();
         var assignments = new List<WorkPlanAssignmentResult>();
 
-        await using (var projectCommand = new SqlCommand("dbo.sp_GetProjectForWorkPlan", connection))
+        await using (var projectCommand = new SqlCommand("sp_GetWorkPlanProject", connection))
         {
             projectCommand.CommandType = CommandType.StoredProcedure;
             projectCommand.Parameters.AddWithValue("@ProjectId", projectId);
@@ -295,7 +295,7 @@ public class WorkItemRepository : IWorkItemRepository
             return null;
         }
 
-        await using (var tasksCommand = new SqlCommand("dbo.sp_GetProjectTasksForWorkPlan", connection))
+        await using (var tasksCommand = new SqlCommand("sp_GetWorkPlanTasks", connection))
         {
             tasksCommand.CommandType = CommandType.StoredProcedure;
             tasksCommand.Parameters.AddWithValue("@ProjectId", projectId);
@@ -308,7 +308,7 @@ public class WorkItemRepository : IWorkItemRepository
             }
         }
 
-        await using (var assignmentsCommand = new SqlCommand("dbo.sp_GetWorkPlanAssignments", connection))
+        await using (var assignmentsCommand = new SqlCommand("sp_GetWorkPlanAssignments", connection))
         {
             assignmentsCommand.CommandType = CommandType.StoredProcedure;
             assignmentsCommand.Parameters.AddWithValue("@ProjectId", projectId);
@@ -371,6 +371,12 @@ public class WorkItemRepository : IWorkItemRepository
             WorkType = GetStringValue(reader, "WorkType"),
             BillingType = GetStringValue(reader, "BillingType"),
             Status = GetStringValue(reader, "Status"),
+            EstimatedHours = GetDecimalValue(reader, "EstimatedHours"),
+            Priority = GetStringValue(reader, "Priority"),
+            PlannedStart = GetDateTimeValue(reader, "PlannedStart"),
+            PlannedEnd = GetDateTimeValue(reader, "PlannedEnd"),
+            RequiredRole = GetStringValue(reader, "RequiredRole"),
+            IsLocked = HasColumn(reader, "IsLocked") && reader["IsLocked"] != DBNull.Value && Convert.ToBoolean(reader["IsLocked"]),
             CustomerId = GetIntValue(reader, "CustomerId"),
             CustomerName = GetStringValue(reader, "CustomerName"),
             SiteId = GetIntValue(reader, "SiteId"),
@@ -392,6 +398,8 @@ public class WorkItemRepository : IWorkItemRepository
             ContractorId = GetNullableIntValue(reader, "ContractorId"),
             AssignmentType = GetStringValue(reader, "AssignmentType") ?? string.Empty,
             AssignmentRole = GetStringValue(reader, "AssignmentRole"),
+            AssignedHours = GetDecimalValue(reader, "AssignedHours"),
+            IsManualAssignment = HasColumn(reader, "IsManualAssignment") && reader["IsManualAssignment"] != DBNull.Value && Convert.ToBoolean(reader["IsManualAssignment"]),
             EmployeeName = GetStringValue(reader, "EmployeeName"),
             ContractorName = GetStringValue(reader, "ContractorName")
         };
@@ -564,7 +572,6 @@ public class WorkItemRepository : IWorkItemRepository
 
         return milestonesDictionary.Values.ToList();
     }
-
     private static decimal? GetDecimalValue(SqlDataReader reader, string columnName)
     {
         if (!HasColumn(reader, columnName) || reader[columnName] == DBNull.Value)
@@ -594,7 +601,4 @@ public class WorkItemRepository : IWorkItemRepository
 
         return Convert.ToBoolean(reader[columnName]);
     }
-
-
 }
-

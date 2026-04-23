@@ -134,6 +134,12 @@ public class WorkItemsController : ControllerBase
                 WorkType = task.WorkType ?? string.Empty,
                 Status = task.Status ?? string.Empty,
                 BillingType = task.BillingType,
+                EstimatedHours = task.EstimatedHours,
+                Priority = task.Priority,
+                PlannedStart = task.PlannedStart,
+                PlannedEnd = task.PlannedEnd,
+                RequiredRole = task.RequiredRole,
+                IsLocked = task.IsLocked,
                 CustomerId = task.CustomerId,
                 SiteId = task.SiteId,
                 CreatedAt = task.CreatedAt,
@@ -147,6 +153,8 @@ public class WorkItemsController : ControllerBase
                 ContractorId = assignment.ContractorId,
                 AssignmentType = assignment.AssignmentType,
                 AssignmentRole = assignment.AssignmentRole,
+                AssignedHours = assignment.AssignedHours,
+                IsManualAssignment = assignment.IsManualAssignment,
                 EmployeeName = assignment.EmployeeName,
                 ContractorName = assignment.ContractorName
             }).ToList()
@@ -184,6 +192,12 @@ public class WorkItemsController : ControllerBase
                 WorkType = task.WorkType ?? string.Empty,
                 Status = task.Status ?? string.Empty,
                 BillingType = task.BillingType,
+                EstimatedHours = task.EstimatedHours,
+                Priority = task.Priority,
+                PlannedStart = task.PlannedStart,
+                PlannedEnd = task.PlannedEnd,
+                RequiredRole = task.RequiredRole,
+                IsLocked = task.IsLocked,
                 CustomerId = task.CustomerId,
                 SiteId = task.SiteId,
                 CreatedAt = task.CreatedAt,
@@ -197,6 +211,8 @@ public class WorkItemsController : ControllerBase
                 ContractorId = assignment.ContractorId,
                 AssignmentType = assignment.AssignmentType,
                 AssignmentRole = assignment.AssignmentRole,
+                AssignedHours = assignment.AssignedHours,
+                IsManualAssignment = assignment.IsManualAssignment,
                 EmployeeName = assignment.EmployeeName,
                 ContractorName = assignment.ContractorName
             }).ToList()
