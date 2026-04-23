@@ -23,6 +23,9 @@ namespace ManageR2.Api.DTOs
         public DateTime CreatedAt { get; set; }
         public DateTime? ClosedAt { get; set; }
         public int? ParentWorkItemId { get; set; }
+        public DateTime? DealCloseDate { get; set; }
+        public string? FinanceProjectNumber { get; set; }
+        public string? InvoiceNumber { get; set; }
     }
 
     public class TaskSummaryDto
@@ -44,6 +47,9 @@ namespace ManageR2.Api.DTOs
         public DateTime CreatedAt { get; set; }
         public DateTime? ClosedAt { get; set; }
         public int? ParentWorkItemId { get; set; }
+        public DateTime? DealCloseDate { get; set; }
+        public string? FinanceProjectNumber { get; set; }
+        public string? InvoiceNumber { get; set; }
     }
 
     public class WorkAssignmentDto

@@ -339,6 +339,9 @@ public class UsersController : ControllerBase
         if (!isValid)
             return Unauthorized(new { message = "Invalid email or password." });
 
+        if (!user.IsActive)
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = "User is inactive and cannot log in." });
+
         await _userRepository.UpdateLastLoginAtAsync(user.UserId);
 
         var refreshedUser = await _userRepository.GetUserByIdAsync(user.UserId);
