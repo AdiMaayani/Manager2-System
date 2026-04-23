@@ -23,5 +23,7 @@ namespace ManageR2.Infrastructure.Repositories
 
         Task<WorkPlanResult?> GetWorkPlanAsync(int projectId);
         Task<List<WorkPlanResult>> GetAllWorkPlansAsync();
+
+        Task<List<ProjectMilestoneResult>> GetProjectMilestonesAsync(int projectId);
     }
 }

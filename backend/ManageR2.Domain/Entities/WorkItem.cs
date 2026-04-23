@@ -18,4 +18,9 @@ public class WorkItem
     public string? FinanceProjectNumber { get; set; }
     public string? InvoiceNumber { get; set; }
 
+    public DateTime? PlannedStart { get; set; }
+    public DateTime? PlannedEnd { get; set; }
+    public decimal? EstimatedHours { get; set; }
+    public string? Priority { get; set; }
+    public bool IsLocked { get; set; }
 }

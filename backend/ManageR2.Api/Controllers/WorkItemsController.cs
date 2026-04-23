@@ -156,54 +156,107 @@ public class WorkItemsController : ControllerBase
     }
 
     [HttpGet("work-plan/all")]
-public async Task<ActionResult<List<WorkPlanDto>>> GetAllWorkPlans()
-{
-    var workPlans = await _workItemRepository.GetAllWorkPlansAsync();
-
-    var response = workPlans.Select(workPlanResult => new WorkPlanDto
+    public async Task<ActionResult<List<WorkPlanDto>>> GetAllWorkPlans()
     {
-        Project = new ProjectSummaryDto
-        {
-            WorkItemId = workPlanResult.Project.WorkItemId,
-            Title = workPlanResult.Project.Title ?? string.Empty,
-            Description = workPlanResult.Project.Description,
-            WorkType = workPlanResult.Project.WorkType ?? string.Empty,
-            Status = workPlanResult.Project.Status ?? string.Empty,
-            BillingType = workPlanResult.Project.BillingType,
-            CustomerId = workPlanResult.Project.CustomerId,
-            SiteId = workPlanResult.Project.SiteId,
-            CreatedAt = workPlanResult.Project.CreatedAt,
-            ClosedAt = workPlanResult.Project.ClosedAt,
-            ParentWorkItemId = workPlanResult.Project.ParentWorkItemId
-        },
-        Tasks = workPlanResult.Tasks.Select(task => new TaskSummaryDto
-        {
-            WorkItemId = task.WorkItemId,
-            Title = task.Title ?? string.Empty,
-            Description = task.Description,
-            WorkType = task.WorkType ?? string.Empty,
-            Status = task.Status ?? string.Empty,
-            BillingType = task.BillingType,
-            CustomerId = task.CustomerId,
-            SiteId = task.SiteId,
-            CreatedAt = task.CreatedAt,
-            ClosedAt = task.ClosedAt,
-            ParentWorkItemId = task.ParentWorkItemId
-        }).ToList(),
-        Assignments = workPlanResult.Assignments.Select(assignment => new WorkAssignmentDto
-        {
-            WorkItemId = assignment.WorkItemId,
-            EmployeeId = assignment.EmployeeId,
-            ContractorId = assignment.ContractorId,
-            AssignmentType = assignment.AssignmentType,
-            AssignmentRole = assignment.AssignmentRole,
-            EmployeeName = assignment.EmployeeName,
-            ContractorName = assignment.ContractorName
-        }).ToList()
-    }).ToList();
+        var workPlans = await _workItemRepository.GetAllWorkPlansAsync();
 
-    return Ok(response);
-}
+        var response = workPlans.Select(workPlanResult => new WorkPlanDto
+        {
+            Project = new ProjectSummaryDto
+            {
+                WorkItemId = workPlanResult.Project.WorkItemId,
+                Title = workPlanResult.Project.Title ?? string.Empty,
+                Description = workPlanResult.Project.Description,
+                WorkType = workPlanResult.Project.WorkType ?? string.Empty,
+                Status = workPlanResult.Project.Status ?? string.Empty,
+                BillingType = workPlanResult.Project.BillingType,
+                CustomerId = workPlanResult.Project.CustomerId,
+                SiteId = workPlanResult.Project.SiteId,
+                CreatedAt = workPlanResult.Project.CreatedAt,
+                ClosedAt = workPlanResult.Project.ClosedAt,
+                ParentWorkItemId = workPlanResult.Project.ParentWorkItemId
+            },
+            Tasks = workPlanResult.Tasks.Select(task => new TaskSummaryDto
+            {
+                WorkItemId = task.WorkItemId,
+                Title = task.Title ?? string.Empty,
+                Description = task.Description,
+                WorkType = task.WorkType ?? string.Empty,
+                Status = task.Status ?? string.Empty,
+                BillingType = task.BillingType,
+                CustomerId = task.CustomerId,
+                SiteId = task.SiteId,
+                CreatedAt = task.CreatedAt,
+                ClosedAt = task.ClosedAt,
+                ParentWorkItemId = task.ParentWorkItemId
+            }).ToList(),
+            Assignments = workPlanResult.Assignments.Select(assignment => new WorkAssignmentDto
+            {
+                WorkItemId = assignment.WorkItemId,
+                EmployeeId = assignment.EmployeeId,
+                ContractorId = assignment.ContractorId,
+                AssignmentType = assignment.AssignmentType,
+                AssignmentRole = assignment.AssignmentRole,
+                EmployeeName = assignment.EmployeeName,
+                ContractorName = assignment.ContractorName
+            }).ToList()
+        }).ToList();
+
+        return Ok(response);
+    }
+
+    [HttpGet("{id}/milestones")]
+    public async Task<ActionResult<List<ProjectMilestoneDto>>> GetProjectMilestones(int id)
+    {
+        var workItem = await _workItemRepository.GetByIdAsync(id);
+
+        if (workItem == null)
+        {
+            return NotFound($"Work item with ID {id} was not found.");
+        }
+
+        if (!string.Equals(workItem.WorkType, "Project", StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest($"Milestones are only available for projects. WorkItem {id} is of type '{workItem.WorkType}'.");
+        }
+
+        var milestones = await _workItemRepository.GetProjectMilestonesAsync(id);
+
+        var response = milestones.Select(milestone => new ProjectMilestoneDto
+        {
+            WorkItemId = milestone.WorkItemId,
+            Title = milestone.Title,
+            Description = milestone.Description,
+            WorkType = milestone.WorkType,
+            Status = milestone.Status,
+            BillingType = milestone.BillingType,
+            CustomerId = milestone.CustomerId,
+            SiteId = milestone.SiteId,
+            CreatedAt = milestone.CreatedAt,
+            PlannedStart = milestone.PlannedStart,
+            PlannedEnd = milestone.PlannedEnd,
+            ClosedAt = milestone.ClosedAt,
+            Priority = milestone.Priority,
+            EstimatedHours = milestone.EstimatedHours,
+            IsLocked = milestone.IsLocked,
+            Employees = milestone.Employees.Select(employee => new ProjectMilestoneEmployeeDto
+            {
+                EmployeeId = employee.EmployeeId,
+                EmployeeName = employee.EmployeeName,
+                AssignmentRole = employee.AssignmentRole,
+                AssignedHours = employee.AssignedHours,
+                IsManualAssignment = employee.IsManualAssignment
+            }).ToList(),
+            Contractors = milestone.Contractors.Select(contractor => new ProjectMilestoneContractorDto
+            {
+                ContractorId = contractor.ContractorId,
+                ContractorName = contractor.ContractorName,
+                AssignmentRole = contractor.AssignmentRole
+            }).ToList()
+        }).ToList();
+
+        return Ok(response);
+    }
 
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] WorkItem workItem)
@@ -308,7 +361,10 @@ public async Task<ActionResult<List<WorkPlanDto>>> GetAllWorkPlans()
             BillingType = request.BillingType,
             CustomerId = request.CustomerId,
             SiteId = request.SiteId,
-            ParentWorkItemId = null
+            ParentWorkItemId = null,
+            DealCloseDate = request.DealCloseDate,
+            FinanceProjectNumber = request.FinanceProjectNumber,
+            InvoiceNumber = request.InvoiceNumber
         };
 
         var newWorkItemId = await _workItemRepository.CreateAsync(project);
@@ -378,7 +434,10 @@ public async Task<ActionResult<List<WorkPlanDto>>> GetAllWorkPlans()
             BillingType = request.BillingType,
             CustomerId = request.CustomerId,
             SiteId = request.SiteId,
-            ParentWorkItemId = request.ParentWorkItemId
+            ParentWorkItemId = request.ParentWorkItemId,
+            DealCloseDate = request.DealCloseDate,
+            FinanceProjectNumber = request.FinanceProjectNumber,
+            InvoiceNumber = request.InvoiceNumber
         };
 
         var newWorkItemId = await _workItemRepository.CreateAsync(task);
@@ -507,6 +566,9 @@ public class CreateProjectRequest
     public string BillingType { get; set; } = string.Empty;
     public int CustomerId { get; set; }
     public int SiteId { get; set; }
+    public DateTime? DealCloseDate { get; set; }
+    public string? FinanceProjectNumber { get; set; }
+    public string? InvoiceNumber { get; set; }
 }
 
 public class CreateTaskRequest
@@ -518,6 +580,9 @@ public class CreateTaskRequest
     public int CustomerId { get; set; }
     public int SiteId { get; set; }
     public int? ParentWorkItemId { get; set; }
+    public DateTime? DealCloseDate { get; set; }
+    public string? FinanceProjectNumber { get; set; }
+    public string? InvoiceNumber { get; set; }
 }
 
 public class AssignEmployeeRequest
@@ -531,3 +596,4 @@ public class AssignContractorRequest
     public int ContractorId { get; set; }
     public string AssignmentRole { get; set; } = string.Empty;
 }
+
