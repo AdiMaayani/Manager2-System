@@ -8,6 +8,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   let errorBox = document.getElementById("login-error-message");
+
   if (!errorBox) {
     errorBox = document.createElement("div");
     errorBox.id = "login-error-message";
@@ -43,8 +44,21 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const existingUser = window.getCurrentUser ? window.getCurrentUser() : null;
   const existingToken = window.getAuthToken ? window.getAuthToken() : "";
+  const hasValidToken = window.ensureValidToken
+    ? window.ensureValidToken()
+    : false;
 
-  if (existingUser && existingToken) {
+  if (existingUser && existingToken && hasValidToken) {
+    const returnUrl = window.getReturnUrl ? window.getReturnUrl() : "";
+
+    if (returnUrl) {
+      if (window.clearReturnUrl) {
+        window.clearReturnUrl();
+      }
+      window.location.href = returnUrl;
+      return;
+    }
+
     window.location.href = "index.html";
     return;
   }
@@ -76,15 +90,32 @@ document.addEventListener("DOMContentLoaded", () => {
         throw new Error("התחברות נכשלה. לא התקבל טוקן מהשרת.");
       }
 
+      if (!window.setAuthSession) {
+        throw new Error("Session manager is not available.");
+      }
+
       window.setAuthSession(loginResponse);
+
+      const returnUrl = window.getReturnUrl ? window.getReturnUrl() : "";
+
+      if (returnUrl) {
+        if (window.clearReturnUrl) {
+          window.clearReturnUrl();
+        }
+        window.location.href = returnUrl;
+        return;
+      }
+
       window.location.href = "index.html";
     } catch (error) {
-      if (error.status === 401) {
+      console.error("Login failed:", error);
+
+      if (error?.status === 401 || error?.status === 403) {
         showError("אימייל או סיסמה שגויים.");
-      } else if (error.status === 400) {
+      } else if (error?.status === 400) {
         showError(error.message || "הבקשה אינה תקינה.");
       } else {
-        showError("אירעה שגיאה בעת ההתחברות. נסה שוב.");
+        showError(error?.message || "אירעה שגיאה בעת ההתחברות. נסה שוב.");
       }
     } finally {
       setLoadingState(false);

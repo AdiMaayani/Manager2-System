@@ -58,74 +58,36 @@ public class WorkItemRepository : IWorkItemRepository
     }
 
     public async Task<List<WorkItem>> GetByTypeAsync(string workType)
-{
-    var workItems = new List<WorkItem>();
-
-    await using var connection = _dbServices.CreateConnection();
-    await using var command = new SqlCommand(
-        @"SELECT 
-              wi.WorkItemId,
-              wi.Title,
-              wi.Description,
-              wi.WorkType,
-              wi.BillingType,
-              wi.Status,
-              wi.CustomerId,
-              c.CustomerName AS CustomerName,
-              wi.SiteId,
-              wi.CreatedAt,
-              wi.ClosedAt,
-              wi.ParentWorkItemId
-          FROM dbo.WorkItems wi
-          LEFT JOIN dbo.Customers c
-              ON wi.CustomerId = c.CustomerId
-          WHERE wi.WorkType = @WorkType
-          ORDER BY wi.CreatedAt DESC",
-        connection)
     {
-        CommandType = CommandType.Text
-    };
+        var workItems = new List<WorkItem>();
 
-    command.Parameters.AddWithValue("@WorkType", workType);
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand("dbo.sp_GetWorkItemsByType", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
 
-    await connection.OpenAsync();
-    await using var reader = await command.ExecuteReaderAsync();
+        command.Parameters.AddWithValue("@WorkType", workType);
 
-    while (await reader.ReadAsync())
-    {
-        workItems.Add(MapWorkItem(reader));
+        await connection.OpenAsync();
+        await using var reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            workItems.Add(MapWorkItem(reader));
+        }
+
+        return workItems;
     }
-
-    return workItems;
-}
 
     public async Task<List<WorkItem>> GetTasksByParentIdAsync(int parentWorkItemId)
     {
         var workItems = new List<WorkItem>();
 
         await using var connection = _dbServices.CreateConnection();
-        await using var command = new SqlCommand(
-            @"SELECT 
-      wi.WorkItemId,
-      wi.Title,
-      wi.Description,
-      wi.WorkType,
-      wi.BillingType,
-      wi.Status,
-      wi.CustomerId,
-      c.CustomerName AS CustomerName,
-      wi.SiteId,
-      wi.CreatedAt,
-      wi.ClosedAt,
-      wi.ParentWorkItemId
-  FROM dbo.WorkItems wi
-  LEFT JOIN dbo.Customers c
-      ON wi.CustomerId = c.CustomerId
-  WHERE wi.ParentWorkItemId = @ParentWorkItemId
-  ORDER BY wi.CreatedAt DESC",
-            connection)
+        await using var command = new SqlCommand("dbo.sp_GetTasksByParentWorkItemId", connection)
         {
-            CommandType = CommandType.Text
+            CommandType = CommandType.StoredProcedure
         };
 
         command.Parameters.AddWithValue("@ParentWorkItemId", parentWorkItemId);
@@ -157,6 +119,9 @@ public class WorkItemRepository : IWorkItemRepository
         command.Parameters.AddWithValue("@CustomerId", workItem.CustomerId);
         command.Parameters.AddWithValue("@SiteId", workItem.SiteId);
         command.Parameters.AddWithValue("@ParentWorkItemId", workItem.ParentWorkItemId ?? (object)DBNull.Value);
+        command.Parameters.AddWithValue("@DealCloseDate", (object?)workItem.DealCloseDate ?? DBNull.Value);
+        command.Parameters.AddWithValue("@FinanceProjectNumber", (object?)workItem.FinanceProjectNumber ?? DBNull.Value);
+        command.Parameters.AddWithValue("@InvoiceNumber", (object?)workItem.InvoiceNumber ?? DBNull.Value);
 
         await connection.OpenAsync();
 
@@ -164,6 +129,11 @@ public class WorkItemRepository : IWorkItemRepository
         var newWorkItemId = result != null ? Convert.ToInt32(result) : 0;
 
         return newWorkItemId;
+    }
+
+    public async Task<int> CreateMilestoneAsync(WorkItem workItem)
+    {
+        return await CreateAsync(workItem);
     }
 
     public async Task<bool> UpdateAsync(int id, WorkItem workItem)
@@ -182,6 +152,9 @@ public class WorkItemRepository : IWorkItemRepository
         command.Parameters.AddWithValue("@Status", workItem.Status ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("@CustomerId", workItem.CustomerId);
         command.Parameters.AddWithValue("@SiteId", workItem.SiteId);
+        command.Parameters.AddWithValue("@DealCloseDate", (object?)workItem.DealCloseDate ?? DBNull.Value);
+        command.Parameters.AddWithValue("@FinanceProjectNumber", (object?)workItem.FinanceProjectNumber ?? DBNull.Value);
+        command.Parameters.AddWithValue("@InvoiceNumber", (object?)workItem.InvoiceNumber ?? DBNull.Value);
 
         await connection.OpenAsync();
 
@@ -189,6 +162,11 @@ public class WorkItemRepository : IWorkItemRepository
         var rowsAffected = result != null ? Convert.ToInt32(result) : 0;
 
         return rowsAffected > 0;
+    }
+
+    public async Task<bool> UpdateMilestoneAsync(int milestoneId, WorkItem workItem)
+    {
+        return await UpdateAsync(milestoneId, workItem);
     }
 
     public async Task<bool> CloseAsync(int workItemId)
@@ -207,6 +185,11 @@ public class WorkItemRepository : IWorkItemRepository
         var rowsAffected = result != null ? Convert.ToInt32(result) : 0;
 
         return rowsAffected > 0;
+    }
+
+    public async Task<bool> SoftDeleteMilestoneAsync(int milestoneId)
+    {
+        return await CloseAsync(milestoneId);
     }
 
     public async Task<bool> AssignEmployeeToWorkAsync(int workItemId, int employeeId, string assignmentRole)
@@ -294,27 +277,9 @@ public class WorkItemRepository : IWorkItemRepository
         var tasks = new List<WorkItem>();
         var assignments = new List<WorkPlanAssignmentResult>();
 
-        await using (var projectCommand = new SqlCommand(
-            @"SELECT 
-      wi.WorkItemId,
-      wi.Title,
-      wi.Description,
-      wi.WorkType,
-      wi.BillingType,
-      wi.Status,
-      wi.CustomerId,
-      c.CustomerName AS CustomerName,
-      wi.SiteId,
-      wi.CreatedAt,
-      wi.ClosedAt,
-      wi.ParentWorkItemId
-      FROM dbo.WorkItems wi
-      LEFT JOIN dbo.Customers c
-      ON wi.CustomerId = c.CustomerId
-      WHERE wi.WorkItemId = @ProjectId",
-            connection))
+        await using (var projectCommand = new SqlCommand("dbo.sp_GetProjectForWorkPlan", connection))
         {
-            projectCommand.CommandType = CommandType.Text;
+            projectCommand.CommandType = CommandType.StoredProcedure;
             projectCommand.Parameters.AddWithValue("@ProjectId", projectId);
 
             await using var projectReader = await projectCommand.ExecuteReaderAsync();
@@ -330,28 +295,9 @@ public class WorkItemRepository : IWorkItemRepository
             return null;
         }
 
-        await using (var tasksCommand = new SqlCommand(
-            @"SELECT 
-      wi.WorkItemId,
-      wi.Title,
-      wi.Description,
-      wi.WorkType,
-      wi.BillingType,
-      wi.Status,
-      wi.CustomerId,
-      c.CustomerName AS CustomerName,
-      wi.SiteId,
-      wi.CreatedAt,
-      wi.ClosedAt,
-      wi.ParentWorkItemId
-  FROM dbo.WorkItems wi
-  LEFT JOIN dbo.Customers c
-      ON wi.CustomerId = c.CustomerId
-  WHERE wi.ParentWorkItemId = @ProjectId
-  ORDER BY wi.CreatedAt DESC",
-            connection))
+        await using (var tasksCommand = new SqlCommand("dbo.sp_GetProjectTasksForWorkPlan", connection))
         {
-            tasksCommand.CommandType = CommandType.Text;
+            tasksCommand.CommandType = CommandType.StoredProcedure;
             tasksCommand.Parameters.AddWithValue("@ProjectId", projectId);
 
             await using var tasksReader = await tasksCommand.ExecuteReaderAsync();
@@ -362,53 +308,9 @@ public class WorkItemRepository : IWorkItemRepository
             }
         }
 
-        await using (var assignmentsCommand = new SqlCommand(
-            @";WITH RelevantWorkItems AS
-              (
-                  SELECT WorkItemId
-                  FROM dbo.WorkItems
-                  WHERE WorkItemId = @ProjectId
-
-                  UNION
-
-                  SELECT WorkItemId
-                  FROM dbo.WorkItems
-                  WHERE ParentWorkItemId = @ProjectId
-              )
-              SELECT 
-                  wea.WorkItemId,
-                  wea.EmployeeId,
-                  CAST(NULL AS INT) AS ContractorId,
-                  CAST('Employee' AS NVARCHAR(50)) AS AssignmentType,
-                  wea.AssignmentRole,
-                  e.FullName AS EmployeeName,
-                  CAST(NULL AS NVARCHAR(255)) AS ContractorName
-              FROM dbo.WorkEmployeeAssignments wea
-              INNER JOIN RelevantWorkItems rwi
-                  ON wea.WorkItemId = rwi.WorkItemId
-              INNER JOIN dbo.Employees e
-                  ON wea.EmployeeId = e.EmployeeId
-
-              UNION ALL
-
-              SELECT 
-                  wca.WorkItemId,
-                  CAST(NULL AS INT) AS EmployeeId,
-                  wca.ContractorId,
-                  CAST('Contractor' AS NVARCHAR(50)) AS AssignmentType,
-                  wca.AssignmentRole,
-                  CAST(NULL AS NVARCHAR(255)) AS EmployeeName,
-                  c.FullName AS ContractorName
-              FROM dbo.WorkContractorAssignments wca
-              INNER JOIN RelevantWorkItems rwi
-                  ON wca.WorkItemId = rwi.WorkItemId
-              INNER JOIN dbo.Contractors c
-                  ON wca.ContractorId = c.ContractorId
-
-              ORDER BY WorkItemId",
-            connection))
+        await using (var assignmentsCommand = new SqlCommand("dbo.sp_GetWorkPlanAssignments", connection))
         {
-            assignmentsCommand.CommandType = CommandType.Text;
+            assignmentsCommand.CommandType = CommandType.StoredProcedure;
             assignmentsCommand.Parameters.AddWithValue("@ProjectId", projectId);
 
             await using var assignmentsReader = await assignmentsCommand.ExecuteReaderAsync();
@@ -428,59 +330,57 @@ public class WorkItemRepository : IWorkItemRepository
     }
 
     public async Task<List<WorkPlanResult>> GetAllWorkPlansAsync()
-{
-    var results = new List<WorkPlanResult>();
-
-    await using var connection = _dbServices.CreateConnection();
-    await connection.OpenAsync();
-
-    // 1. Get all projects
-    var projects = new List<WorkItem>();
-
-    using (var cmd = new SqlCommand(@"
-        SELECT *
-        FROM WorkItems
-        WHERE WorkType = 'Project'
-    ", connection))
     {
-        using var reader = await cmd.ExecuteReaderAsync();
-        while (await reader.ReadAsync())
+        var results = new List<WorkPlanResult>();
+
+        await using var connection = _dbServices.CreateConnection();
+        await connection.OpenAsync();
+
+        var projects = new List<WorkItem>();
+
+        await using (var cmd = new SqlCommand("dbo.sp_GetAllProjectsForWorkPlans", connection))
         {
-            projects.Add(MapWorkItem(reader));
+            cmd.CommandType = CommandType.StoredProcedure;
+
+            await using var reader = await cmd.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                projects.Add(MapWorkItem(reader));
+            }
         }
-    }
 
-    // 2. For each project, reuse existing logic
-    foreach (var project in projects)
-    {
-        var workPlan = await GetWorkPlanAsync(project.WorkItemId);
-
-        if (workPlan != null)
+        foreach (var project in projects)
         {
-            results.Add(workPlan);
+            var workPlan = await GetWorkPlanAsync(project.WorkItemId);
+
+            if (workPlan != null)
+            {
+                results.Add(workPlan);
+            }
         }
+
+        return results;
     }
-
-    return results;
-}
-
     private static WorkItem MapWorkItem(SqlDataReader reader)
     {
         return new WorkItem
-{
-    WorkItemId = GetIntValue(reader, "WorkItemId"),
-    Title = GetStringValue(reader, "Title") ?? string.Empty,
-    Description = GetStringValue(reader, "Description"),
-    WorkType = GetStringValue(reader, "WorkType"),
-    BillingType = GetStringValue(reader, "BillingType"),
-    Status = GetStringValue(reader, "Status"),
-    CustomerId = GetIntValue(reader, "CustomerId"),
-    CustomerName = GetStringValue(reader, "CustomerName"),
-    SiteId = GetIntValue(reader, "SiteId"),
-    CreatedAt = GetDateTimeValue(reader, "CreatedAt") ?? DateTime.MinValue,
-    ClosedAt = GetDateTimeValue(reader, "ClosedAt"),
-    ParentWorkItemId = GetNullableIntValue(reader, "ParentWorkItemId")
-};
+        {
+            WorkItemId = GetIntValue(reader, "WorkItemId"),
+            Title = GetStringValue(reader, "Title") ?? string.Empty,
+            Description = GetStringValue(reader, "Description"),
+            WorkType = GetStringValue(reader, "WorkType"),
+            BillingType = GetStringValue(reader, "BillingType"),
+            Status = GetStringValue(reader, "Status"),
+            CustomerId = GetIntValue(reader, "CustomerId"),
+            CustomerName = GetStringValue(reader, "CustomerName"),
+            SiteId = GetIntValue(reader, "SiteId"),
+            CreatedAt = GetDateTimeValue(reader, "CreatedAt") ?? DateTime.MinValue,
+            ClosedAt = GetDateTimeValue(reader, "ClosedAt"),
+            ParentWorkItemId = GetNullableIntValue(reader, "ParentWorkItemId"),
+            DealCloseDate = GetDateTimeValue(reader, "DealCloseDate"),
+            FinanceProjectNumber = GetStringValue(reader, "FinanceProjectNumber"),
+            InvoiceNumber = GetStringValue(reader, "InvoiceNumber")
+        };
     }
 
     private static WorkPlanAssignmentResult MapWorkPlanAssignment(SqlDataReader reader)
@@ -549,4 +449,152 @@ public class WorkItemRepository : IWorkItemRepository
 
         return Convert.ToDateTime(reader[columnName]);
     }
+
+    public async Task<List<ProjectListItemResult>> GetProjectsListAsync()
+    {
+        var projects = new List<ProjectListItemResult>();
+
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand("dbo.sp_GetProjectsList", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+
+        await connection.OpenAsync();
+        await using var reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            projects.Add(new ProjectListItemResult
+            {
+                WorkItemId = GetIntValue(reader, "WorkItemId"),
+                Title = GetStringValue(reader, "Title") ?? string.Empty,
+                CustomerName = GetStringValue(reader, "CustomerName") ?? string.Empty,
+                ProjectManagerName = GetStringValue(reader, "ProjectManagerName") ?? "-",
+                Status = GetStringValue(reader, "Status") ?? string.Empty,
+                CreatedAt = GetDateTimeValue(reader, "CreatedAt") ?? DateTime.MinValue,
+                SiteName = GetStringValue(reader, "SiteName") ?? "-",
+                BillingType = GetStringValue(reader, "BillingType") ?? string.Empty,
+                DealCloseDate = GetDateTimeValue(reader, "DealCloseDate"),
+                FinanceProjectNumber = GetStringValue(reader, "FinanceProjectNumber"),
+                InvoiceNumber = GetStringValue(reader, "InvoiceNumber")
+            });
+        }
+
+        return projects;
+    }
+
+    public async Task<List<ProjectMilestoneResult>> GetProjectMilestonesAsync(int projectId)
+    {
+        var milestonesDictionary = new Dictionary<int, ProjectMilestoneResult>();
+
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand("dbo.sp_GetProjectMilestones", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+
+        command.Parameters.AddWithValue("@ProjectId", projectId);
+
+        await connection.OpenAsync();
+        await using var reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            var workItemId = GetIntValue(reader, "WorkItemId");
+
+            if (!milestonesDictionary.TryGetValue(workItemId, out var milestone))
+            {
+                milestone = new ProjectMilestoneResult
+                {
+                    WorkItemId = workItemId,
+                    Title = GetStringValue(reader, "Title") ?? string.Empty,
+                    Description = GetStringValue(reader, "Description"),
+                    WorkType = GetStringValue(reader, "WorkType") ?? string.Empty,
+                    Status = GetStringValue(reader, "Status") ?? string.Empty,
+                    BillingType = GetStringValue(reader, "BillingType"),
+                    CustomerId = GetIntValue(reader, "CustomerId"),
+                    SiteId = GetNullableIntValue(reader, "SiteId"),
+                    CreatedAt = GetDateTimeValue(reader, "CreatedAt") ?? DateTime.MinValue,
+                    PlannedStart = GetDateTimeValue(reader, "PlannedStart"),
+                    PlannedEnd = GetDateTimeValue(reader, "PlannedEnd"),
+                    ClosedAt = GetDateTimeValue(reader, "ClosedAt"),
+                    Priority = GetStringValue(reader, "Priority"),
+                    EstimatedHours = GetDecimalValue(reader, "EstimatedHours"),
+                    IsLocked = GetBoolValue(reader, "IsLocked")
+                };
+
+                milestonesDictionary.Add(workItemId, milestone);
+            }
+
+            var employeeId = GetNullableIntValue(reader, "EmployeeId");
+            if (employeeId.HasValue && employeeId.Value > 0)
+            {
+                var alreadyExists = milestone.Employees.Any(e => e.EmployeeId == employeeId.Value);
+
+                if (!alreadyExists)
+                {
+                    milestone.Employees.Add(new ProjectMilestoneEmployeeAssignmentResult
+                    {
+                        EmployeeId = employeeId.Value,
+                        EmployeeName = GetStringValue(reader, "EmployeeName") ?? string.Empty,
+                        AssignmentRole = GetStringValue(reader, "AssignmentRole"),
+                        AssignedHours = GetDecimalValue(reader, "AssignedHours"),
+                        IsManualAssignment = GetNullableBoolValue(reader, "IsManualAssignment")
+                    });
+                }
+            }
+
+            var contractorId = GetNullableIntValue(reader, "ContractorId");
+            if (contractorId.HasValue && contractorId.Value > 0)
+            {
+                var alreadyExists = milestone.Contractors.Any(c => c.ContractorId == contractorId.Value);
+
+                if (!alreadyExists)
+                {
+                    milestone.Contractors.Add(new ProjectMilestoneContractorAssignmentResult
+                    {
+                        ContractorId = contractorId.Value,
+                        ContractorName = GetStringValue(reader, "ContractorName") ?? string.Empty,
+                        AssignmentRole = GetStringValue(reader, "ContractorAssignmentRole")
+                    });
+                }
+            }
+        }
+
+        return milestonesDictionary.Values.ToList();
+    }
+
+    private static decimal? GetDecimalValue(SqlDataReader reader, string columnName)
+    {
+        if (!HasColumn(reader, columnName) || reader[columnName] == DBNull.Value)
+        {
+            return null;
+        }
+
+        return Convert.ToDecimal(reader[columnName]);
+    }
+
+    private static bool GetBoolValue(SqlDataReader reader, string columnName)
+    {
+        if (!HasColumn(reader, columnName) || reader[columnName] == DBNull.Value)
+        {
+            return false;
+        }
+
+        return Convert.ToBoolean(reader[columnName]);
+    }
+
+    private static bool? GetNullableBoolValue(SqlDataReader reader, string columnName)
+    {
+        if (!HasColumn(reader, columnName) || reader[columnName] == DBNull.Value)
+        {
+            return null;
+        }
+
+        return Convert.ToBoolean(reader[columnName]);
+    }
+
+
 }
+

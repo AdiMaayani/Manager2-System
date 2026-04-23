@@ -329,12 +329,10 @@ public class UserRepository : IUserRepository
         try
         {
             await using var connection = _dbServices.CreateConnection();
-            await using var command = new SqlCommand(@"
-                SELECT R.RoleName
-                FROM dbo.UserRoles UR
-                INNER JOIN dbo.Roles R ON UR.RoleId = R.RoleId
-                WHERE UR.UserId = @UserId
-                ORDER BY R.RoleName;", connection);
+            await using var command = new SqlCommand("dbo.sp_GetUserRoles", connection)
+            {
+                CommandType = CommandType.StoredProcedure
+            };
 
             command.Parameters.AddWithValue("@UserId", userId);
 
@@ -367,12 +365,10 @@ public class UserRepository : IUserRepository
         try
         {
             await using var connection = _dbServices.CreateConnection();
-            await using var command = new SqlCommand(@"
-                SELECT D.DepartmentName
-                FROM dbo.UserDepartments UD
-                INNER JOIN dbo.Departments D ON UD.DepartmentId = D.DepartmentId
-                WHERE UD.UserId = @UserId
-                ORDER BY D.DepartmentName;", connection);
+            await using var command = new SqlCommand("dbo.sp_GetUserDepartments", connection)
+            {
+                CommandType = CommandType.StoredProcedure
+            };
 
             command.Parameters.AddWithValue("@UserId", userId);
 
@@ -403,16 +399,19 @@ public class UserRepository : IUserRepository
         try
         {
             await using var connection = _dbServices.CreateConnection();
-            await using var command = new SqlCommand(@"
-                UPDATE dbo.Users
-                SET LastLoginAt = SYSUTCDATETIME()
-                WHERE UserId = @UserId;", connection);
+            await using var command = new SqlCommand("dbo.sp_UpdateUserLastLogin", connection)
+            {
+                CommandType = CommandType.StoredProcedure
+            };
 
             command.Parameters.AddWithValue("@UserId", userId);
 
             await connection.OpenAsync();
 
-            var rowsAffected = await command.ExecuteNonQueryAsync();
+            var result = await command.ExecuteScalarAsync();
+            var rowsAffected = result != null && result != DBNull.Value
+                ? Convert.ToInt32(result)
+                : 0;
 
             if (rowsAffected > 0)
             {
@@ -440,12 +439,12 @@ public class UserRepository : IUserRepository
             await using var connection = _dbServices.CreateConnection();
             await connection.OpenAsync();
 
-            await using (var deleteCommand = new SqlCommand(@"
-                DELETE FROM dbo.UserRoles
-                WHERE UserId = @UserId;", connection))
+            await using (var deactivateCommand = new SqlCommand("dbo.sp_DeactivateUserRoles", connection))
             {
-                deleteCommand.Parameters.AddWithValue("@UserId", userId);
-                await deleteCommand.ExecuteNonQueryAsync();
+                deactivateCommand.CommandType = CommandType.StoredProcedure;
+                deactivateCommand.Parameters.AddWithValue("@UserId", userId);
+
+                await deactivateCommand.ExecuteNonQueryAsync();
             }
 
             if (roles == null || roles.Count == 0)
@@ -456,16 +455,20 @@ public class UserRepository : IUserRepository
 
             foreach (var roleName in roles)
             {
-                await using var insertCommand = new SqlCommand(@"
-                    INSERT INTO dbo.UserRoles (UserId, RoleId, AssignedAt)
-                    SELECT @UserId, R.RoleId, SYSUTCDATETIME()
-                    FROM dbo.Roles R
-                    WHERE R.RoleName = @RoleName;", connection);
+                if (string.IsNullOrWhiteSpace(roleName))
+                {
+                    continue;
+                }
 
-                insertCommand.Parameters.AddWithValue("@UserId", userId);
-                insertCommand.Parameters.AddWithValue("@RoleName", roleName);
+                await using var upsertCommand = new SqlCommand("dbo.sp_UpsertUserRole", connection)
+                {
+                    CommandType = CommandType.StoredProcedure
+                };
 
-                await insertCommand.ExecuteNonQueryAsync();
+                upsertCommand.Parameters.AddWithValue("@UserId", userId);
+                upsertCommand.Parameters.AddWithValue("@RoleName", roleName.Trim());
+
+                await upsertCommand.ExecuteNonQueryAsync();
             }
 
             _logger.LogInformation("SetUserRolesAsync completed for UserId={UserId}.", userId);
@@ -486,12 +489,12 @@ public class UserRepository : IUserRepository
             await using var connection = _dbServices.CreateConnection();
             await connection.OpenAsync();
 
-            await using (var deleteCommand = new SqlCommand(@"
-                DELETE FROM dbo.UserDepartments
-                WHERE UserId = @UserId;", connection))
+            await using (var deactivateCommand = new SqlCommand("dbo.sp_DeactivateUserDepartments", connection))
             {
-                deleteCommand.Parameters.AddWithValue("@UserId", userId);
-                await deleteCommand.ExecuteNonQueryAsync();
+                deactivateCommand.CommandType = CommandType.StoredProcedure;
+                deactivateCommand.Parameters.AddWithValue("@UserId", userId);
+
+                await deactivateCommand.ExecuteNonQueryAsync();
             }
 
             if (departments == null || departments.Count == 0)
@@ -502,16 +505,20 @@ public class UserRepository : IUserRepository
 
             foreach (var departmentName in departments)
             {
-                await using var insertCommand = new SqlCommand(@"
-                    INSERT INTO dbo.UserDepartments (UserId, DepartmentId, AssignedAt)
-                    SELECT @UserId, D.DepartmentId, SYSUTCDATETIME()
-                    FROM dbo.Departments D
-                    WHERE D.DepartmentName = @DepartmentName;", connection);
+                if (string.IsNullOrWhiteSpace(departmentName))
+                {
+                    continue;
+                }
 
-                insertCommand.Parameters.AddWithValue("@UserId", userId);
-                insertCommand.Parameters.AddWithValue("@DepartmentName", departmentName);
+                await using var upsertCommand = new SqlCommand("dbo.sp_UpsertUserDepartment", connection)
+                {
+                    CommandType = CommandType.StoredProcedure
+                };
 
-                await insertCommand.ExecuteNonQueryAsync();
+                upsertCommand.Parameters.AddWithValue("@UserId", userId);
+                upsertCommand.Parameters.AddWithValue("@DepartmentName", departmentName.Trim());
+
+                await upsertCommand.ExecuteNonQueryAsync();
             }
 
             _logger.LogInformation("SetUserDepartmentsAsync completed for UserId={UserId}.", userId);
@@ -532,11 +539,10 @@ public class UserRepository : IUserRepository
         try
         {
             await using var connection = _dbServices.CreateConnection();
-            await using var command = new SqlCommand(@"
-                SELECT RoleName
-                FROM dbo.Roles
-                WHERE IsActive = 1
-                ORDER BY RoleName;", connection);
+            await using var command = new SqlCommand("dbo.sp_GetAllRoleNames", connection)
+            {
+                CommandType = CommandType.StoredProcedure
+            };
 
             await connection.OpenAsync();
             await using var reader = await command.ExecuteReaderAsync();
@@ -567,10 +573,10 @@ public class UserRepository : IUserRepository
         try
         {
             await using var connection = _dbServices.CreateConnection();
-            await using var command = new SqlCommand(@"
-                SELECT DepartmentName
-                FROM dbo.Departments
-                ORDER BY DepartmentName;", connection);
+            await using var command = new SqlCommand("dbo.sp_GetAllDepartmentNames", connection)
+            {
+                CommandType = CommandType.StoredProcedure
+            };
 
             await connection.OpenAsync();
             await using var reader = await command.ExecuteReaderAsync();

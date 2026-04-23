@@ -19,8 +19,11 @@ namespace ManageR2.Infrastructure.Repositories
         Task<bool> EmployeeExistsAsync(int employeeId);
         Task<bool> ContractorExistsAsync(int contractorId);
 
-                // 🆕 Work Plan
+        Task<List<ProjectListItemResult>> GetProjectsListAsync();
+
         Task<WorkPlanResult?> GetWorkPlanAsync(int projectId);
         Task<List<WorkPlanResult>> GetAllWorkPlansAsync();
+
+        Task<List<ProjectMilestoneResult>> GetProjectMilestonesAsync(int projectId);
     }
 }
