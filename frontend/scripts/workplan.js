@@ -2070,6 +2070,13 @@ document.addEventListener("DOMContentLoaded", () => {
           }))
           .filter((project) => project.id && project.title)
       : [];
+
+    if (
+      window.WorkPlanState &&
+      typeof window.WorkPlanState.setApiProjects === "function"
+    ) {
+      window.WorkPlanState.setApiProjects(apiProjects);
+    }
   }
 
   async function loadAllWorkPlansFromApi() {
@@ -2078,14 +2085,32 @@ document.addEventListener("DOMContentLoaded", () => {
     allWorkPlansData = Array.isArray(data) ? data : [];
 
     if (
+      window.WorkPlanState &&
+      typeof window.WorkPlanState.setAllWorkPlansData === "function"
+    ) {
+      window.WorkPlanState.setAllWorkPlansData(allWorkPlansData);
+    }
+
+    const projectIdFromUrl = getProjectIdFromUrl();
+    const hasExplicitUrlProjectSelection =
+      projectIdFromUrl === "all" || typeof projectIdFromUrl === "number";
+
+    if (
       selectedWorkPlanId == null &&
       allWorkPlansData.length > 0 &&
-      getProjectIdFromUrl() !== "all"
+      !hasExplicitUrlProjectSelection
     ) {
       const firstProjectId = allWorkPlansData[0]?.project?.workItemId;
       if (firstProjectId != null) {
         selectedWorkPlanId = firstProjectId;
       }
+    }
+
+    if (
+      window.WorkPlanState &&
+      typeof window.WorkPlanState.setSelectedWorkPlanId === "function"
+    ) {
+      window.WorkPlanState.setSelectedWorkPlanId(selectedWorkPlanId);
     }
 
     console.groupCollapsed("📦 [ALL WORKPLANS API]");
@@ -2190,9 +2215,12 @@ document.addEventListener("DOMContentLoaded", () => {
   function getEffectiveProjectId() {
     const projectIdFromUrl = getProjectIdFromUrl();
 
-    if (projectIdFromUrl === "all") {
+    if (
+      projectIdFromUrl === "all" ||
+      (projectIdFromUrl !== null && typeof projectIdFromUrl === "number")
+    ) {
       return {
-        projectId: "all",
+        projectId: projectIdFromUrl,
         source: "URL",
       };
     }
@@ -2201,18 +2229,6 @@ document.addEventListener("DOMContentLoaded", () => {
       return {
         projectId: selectedWorkPlanId,
         source: "SELECTED",
-      };
-    }
-
-    if (
-      projectIdFromUrl !== null &&
-      apiProjects.some(
-        (project) => String(project.id) === String(projectIdFromUrl),
-      )
-    ) {
-      return {
-        projectId: projectIdFromUrl,
-        source: "URL",
       };
     }
 
@@ -2231,6 +2247,13 @@ document.addEventListener("DOMContentLoaded", () => {
       selectedWorkPlanId = null;
     } else {
       selectedWorkPlanId = projectId;
+    }
+
+    if (
+      window.WorkPlanState &&
+      typeof window.WorkPlanState.setSelectedWorkPlanId === "function"
+    ) {
+      window.WorkPlanState.setSelectedWorkPlanId(selectedWorkPlanId);
     }
 
     setProjectIdInUrl(projectId);
@@ -2331,6 +2354,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     if (effectiveProjectId === null) {
       currentWorkPlanData = null;
+      if (
+        window.WorkPlanState &&
+        typeof window.WorkPlanState.setCurrentWorkPlanData === "function"
+      ) {
+        window.WorkPlanState.setCurrentWorkPlanData(null);
+      }
       clearWorkPlanViews();
       console.warn("No projects available for WorkPlan");
       console.log("Selected projectId source:", projectIdSource);
@@ -2357,6 +2386,12 @@ document.addEventListener("DOMContentLoaded", () => {
         tasks: [],
         assignments: [],
       };
+      if (
+        window.WorkPlanState &&
+        typeof window.WorkPlanState.setCurrentWorkPlanData === "function"
+      ) {
+        window.WorkPlanState.setCurrentWorkPlanData(currentWorkPlanData);
+      }
 
       clearWorkPlanViews();
       renderTasksFromAPI(currentWorkPlanData);
@@ -2374,6 +2409,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const workPlan = await window.WorkPlanApi.getWorkPlanById(effectiveProjectId);
     currentWorkPlanData = workPlan;
+    if (
+      window.WorkPlanState &&
+      typeof window.WorkPlanState.setCurrentWorkPlanData === "function"
+    ) {
+      window.WorkPlanState.setCurrentWorkPlanData(currentWorkPlanData);
+    }
 
     if (!workPlan) {
       clearWorkPlanViews();
