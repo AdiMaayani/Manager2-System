@@ -906,6 +906,281 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let currentTaskElement = null;
   let editModeAssigned = [];
+  let latestAlgorithmOutput = null;
+  let latestAlgorithmTaskResultsById = new Map();
+
+  function normalizeTaskId(value) {
+    if (value == null) return "";
+    return String(value).trim();
+  }
+
+  function getInsightsUiText() {
+    return {
+      title: "תובנות שיבוץ חכם",
+      violations: "חריגות",
+      warnings: "אזהרות",
+      suggestions: "הצעות",
+      candidateEmployees: "עובדים מועמדים",
+      suggestionAvailable: "קיימת הצעה עבור משימה זו.",
+      fallbackViolation: "זוהתה חריגה.",
+      fallbackWarning: "זוהתה אזהרה.",
+    };
+  }
+
+  function getAlgorithmIssueText(code) {
+    const map = {
+      MISSING_ASSIGNMENT: "למשימה אין עובד משויך",
+      MISSING_ESTIMATE: "חסר אומדן זמן למשימה",
+      MISSING_TIME_WINDOW: "חסר חלון זמן מתוכנן למשימה",
+      LOCKED_TASK_CONFLICT: "משימה נעולה עם שיוך ידני דורשת בדיקה",
+      MANUAL_ASSIGNMENT_REVIEW: "משימה עם שיוך ידני דורשת בדיקה",
+      ROLE_MISMATCH: "התפקיד של העובד אינו מתאים למשימה",
+      EMPLOYEE_NOT_ASSIGNABLE: "העובד אינו זמין לשיבוץ",
+      OVER_ASSIGNED_HOURS: "העובד חורג מכמות השעות המותרת",
+    };
+
+    return map[code] || "";
+  }
+
+  function buildAlgorithmTaskResultsLookup(algorithmOutput) {
+    const lookup = new Map();
+    const taskResults = Array.isArray(algorithmOutput?.taskResults)
+      ? algorithmOutput.taskResults
+      : [];
+
+    taskResults.forEach((taskResult) => {
+      const taskId = normalizeTaskId(
+        taskResult?.taskId ?? taskResult?.workItemId ?? "",
+      );
+      if (!taskId) return;
+      lookup.set(taskId, taskResult);
+    });
+
+    return lookup;
+  }
+
+  function setLatestAlgorithmOutput(algorithmOutput) {
+    latestAlgorithmOutput = algorithmOutput || null;
+    latestAlgorithmTaskResultsById = buildAlgorithmTaskResultsLookup(
+      latestAlgorithmOutput,
+    );
+  }
+
+  function buildCombinedAlgorithmOutputFromWorkPlans(workPlans, mappedEmployees) {
+    const combined = {
+      taskResults: [],
+      warnings: [],
+      violations: [],
+      suggestions: [],
+    };
+    const seenTaskIds = new Set();
+
+    (Array.isArray(workPlans) ? workPlans : []).forEach((workPlan) => {
+      if (!workPlan || !Array.isArray(workPlan.tasks)) return;
+
+      const algorithmInputModel =
+        window.WorkPlanAlgorithmModel.buildAssignmentInputModel(workPlan, {
+          employees: Array.isArray(mappedEmployees) ? mappedEmployees : [],
+        });
+      const algorithmOutput =
+        window.WorkPlanAlgorithmModel.buildAssignmentSuggestions(
+          algorithmInputModel,
+        ) || {};
+
+      (Array.isArray(algorithmOutput.taskResults)
+        ? algorithmOutput.taskResults
+        : []
+      ).forEach((taskResult) => {
+        const taskId = normalizeTaskId(
+          taskResult?.taskId ?? taskResult?.workItemId ?? "",
+        );
+        if (!taskId || seenTaskIds.has(taskId)) return;
+        seenTaskIds.add(taskId);
+        combined.taskResults.push(taskResult);
+      });
+
+      (Array.isArray(algorithmOutput.warnings)
+        ? algorithmOutput.warnings
+        : []
+      ).forEach((item) => {
+        const taskId = normalizeTaskId(item?.taskId ?? item?.workItemId ?? "");
+        if (!taskId || !seenTaskIds.has(taskId)) return;
+        combined.warnings.push(item);
+      });
+
+      (Array.isArray(algorithmOutput.violations)
+        ? algorithmOutput.violations
+        : []
+      ).forEach((item) => {
+        const taskId = normalizeTaskId(item?.taskId ?? item?.workItemId ?? "");
+        if (!taskId || !seenTaskIds.has(taskId)) return;
+        combined.violations.push(item);
+      });
+
+      (Array.isArray(algorithmOutput.suggestions)
+        ? algorithmOutput.suggestions
+        : []
+      ).forEach((item) => {
+        const taskId = normalizeTaskId(item?.taskId ?? item?.workItemId ?? "");
+        if (!taskId || !seenTaskIds.has(taskId)) return;
+        combined.suggestions.push(item);
+      });
+    });
+
+    return combined;
+  }
+
+  function getTaskAlgorithmInsight(taskId) {
+    if (!latestAlgorithmOutput) return null;
+
+    const taskIdStr = normalizeTaskId(taskId);
+    if (!taskIdStr) return null;
+    const taskResult = latestAlgorithmTaskResultsById.get(taskIdStr) || null;
+    const warnings = Array.isArray(latestAlgorithmOutput.warnings)
+      ? latestAlgorithmOutput.warnings.filter(
+          (item) =>
+            normalizeTaskId(item?.taskId ?? item?.workItemId ?? "") === taskIdStr,
+        )
+      : [];
+    const violations = Array.isArray(latestAlgorithmOutput.violations)
+      ? latestAlgorithmOutput.violations.filter(
+          (item) =>
+            normalizeTaskId(item?.taskId ?? item?.workItemId ?? "") === taskIdStr,
+        )
+      : [];
+    const suggestions = Array.isArray(latestAlgorithmOutput.suggestions)
+      ? latestAlgorithmOutput.suggestions.filter(
+          (item) =>
+            normalizeTaskId(item?.taskId ?? item?.workItemId ?? "") === taskIdStr,
+        )
+      : [];
+
+    if (!taskResult && !warnings.length && !violations.length && !suggestions.length) {
+      return null;
+    }
+
+    return { taskResult, warnings, violations, suggestions };
+  }
+
+  function getTaskAlgorithmCounts(taskId) {
+    const insight = getTaskAlgorithmInsight(taskId);
+    return {
+      result: insight?.taskResult?.result || "",
+      warningCount: insight ? insight.warnings.length : 0,
+      violationCount: insight ? insight.violations.length : 0,
+      suggestionCount: insight ? insight.suggestions.length : 0,
+    };
+  }
+
+  function buildTaskAlgorithmIndicatorsHtml(counts) {
+    if (!counts) {
+      return '<div class="task-algorithm-indicators" aria-hidden="true"></div>';
+    }
+
+    const warningCount = Number(counts.warningCount) || 0;
+    const violationCount = Number(counts.violationCount) || 0;
+    const suggestionCount = Number(counts.suggestionCount) || 0;
+
+    if (warningCount <= 0 && violationCount <= 0 && suggestionCount <= 0) {
+      return '<div class="task-algorithm-indicators" aria-hidden="true"></div>';
+    }
+
+    const badges = [];
+    if (violationCount > 0) {
+      badges.push(
+        `<span class="task-algorithm-badge task-algorithm-badge-violation">V:${violationCount}</span>`,
+      );
+    }
+    if (warningCount > 0) {
+      badges.push(
+        `<span class="task-algorithm-badge task-algorithm-badge-warning">W:${warningCount}</span>`,
+      );
+    }
+    if (suggestionCount > 0) {
+      badges.push(
+        `<span class="task-algorithm-badge task-algorithm-badge-suggestion">S:${suggestionCount}</span>`,
+      );
+    }
+
+    return `<div class="task-algorithm-indicators">${badges.join("")}</div>`;
+  }
+
+  function renderTaskAlgorithmInsights(taskId) {
+    if (!viewMode) return;
+
+    const existingInsightsEl = viewMode.querySelector(".wp-smart-insights");
+    if (existingInsightsEl) {
+      existingInsightsEl.remove();
+    }
+
+    const insight = getTaskAlgorithmInsight(taskId);
+    if (!insight) return;
+    const hasInsightContent =
+      insight.violations.length > 0 ||
+      insight.warnings.length > 0 ||
+      insight.suggestions.length > 0;
+    if (!hasInsightContent) return;
+    const i18n = getInsightsUiText();
+
+    const candidateNames = insight.suggestions
+      .flatMap((suggestion) =>
+        Array.isArray(suggestion?.candidates) ? suggestion.candidates : [],
+      )
+      .map((candidate) => candidate?.employeeName || "")
+      .filter(Boolean);
+
+    const insightsEl = document.createElement("section");
+    insightsEl.className = "wp-smart-insights";
+    insightsEl.innerHTML = `
+      <h4 class="wp-smart-insights-title">${i18n.title}</h4>
+      ${
+        insight.violations.length
+          ? `<div class="wp-smart-insights-group">
+               <div class="wp-smart-insights-label">${i18n.violations}</div>
+               <ul class="wp-smart-insights-list">
+                 ${insight.violations
+                   .map(
+                     (item) =>
+                       `<li>${getAlgorithmIssueText(item?.code) || item?.message || i18n.fallbackViolation}</li>`,
+                   )
+                   .join("")}
+               </ul>
+             </div>`
+          : ""
+      }
+      ${
+        insight.warnings.length
+          ? `<div class="wp-smart-insights-group">
+               <div class="wp-smart-insights-label">${i18n.warnings}</div>
+               <ul class="wp-smart-insights-list">
+                 ${insight.warnings
+                   .map(
+                     (item) =>
+                       `<li>${getAlgorithmIssueText(item?.code) || item?.message || i18n.fallbackWarning}</li>`,
+                   )
+                   .join("")}
+               </ul>
+             </div>`
+          : ""
+      }
+      ${
+        insight.suggestions.length
+          ? `<div class="wp-smart-insights-group">
+               <div class="wp-smart-insights-label">${i18n.suggestions}</div>
+               <div class="wp-smart-insights-text">
+                 ${
+                   candidateNames.length
+                     ? i18n.candidateEmployees + ": " + candidateNames.join(", ")
+                     : i18n.suggestionAvailable
+                 }
+               </div>
+             </div>`
+          : ""
+      }
+    `;
+
+    viewMode.appendChild(insightsEl);
+  }
 
   function getCanonicalTaskElement(taskId) {
     if (!taskId) return null;
@@ -1709,6 +1984,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (roleEl) {
       roleEl.textContent = taskRole || "—";
     }
+    renderTaskAlgorithmInsights(taskEl.getAttribute("data-task-id"));
 
     currentTaskElement = taskEl;
     updatePanelActions(taskEl);
@@ -2381,6 +2657,13 @@ document.addEventListener("DOMContentLoaded", () => {
     populateProjectFilterDropdown(resolvedProjectId);
 
     if (resolvedProjectId === "all") {
+      const mappedEmployeesForAllProjects =
+        window.WorkPlanMappers.mapEmployeeResponse(getEmployeesData());
+      const combinedAlgorithmOutput = buildCombinedAlgorithmOutputFromWorkPlans(
+        allWorkPlansData,
+        mappedEmployeesForAllProjects,
+      );
+      setLatestAlgorithmOutput(combinedAlgorithmOutput);
       currentWorkPlanData = {
         project: null,
         tasks: [],
@@ -2417,6 +2700,7 @@ document.addEventListener("DOMContentLoaded", () => {
     }
 
     if (!workPlan) {
+      setLatestAlgorithmOutput(null);
       clearWorkPlanViews();
       console.warn("No work plan returned from API");
       console.log("Selected projectId source:", projectIdSource);
@@ -2431,6 +2715,11 @@ document.addEventListener("DOMContentLoaded", () => {
         employees: mappedEmployees,
       });
     console.log("algorithmInputModel:", algorithmInputModel);
+    const algorithmOutput = window.WorkPlanAlgorithmModel.buildAssignmentSuggestions(
+      algorithmInputModel,
+    );
+    setLatestAlgorithmOutput(algorithmOutput);
+    console.log("algorithmOutput:", algorithmOutput);
 
     renderTasksFromAPI(workPlan);
     renderWeeklyView();
@@ -2543,6 +2832,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     workPlan.tasks.forEach((task, index) => {
       const assignment = resolveAssignment(task, workPlan);
+      const algorithmCounts = getTaskAlgorithmCounts(task.workItemId);
       const startHour = Math.min(8 + index * 2, 22);
       const duration = 2;
       const endHour = Math.min(startHour + duration, 24);
@@ -2563,6 +2853,19 @@ document.addEventListener("DOMContentLoaded", () => {
         assignment.source || "none",
       );
       taskEl.setAttribute("data-assignment-type", assignment.type || "");
+      taskEl.setAttribute("data-algorithm-result", algorithmCounts.result || "");
+      taskEl.setAttribute(
+        "data-warning-count",
+        String(algorithmCounts.warningCount),
+      );
+      taskEl.setAttribute(
+        "data-violation-count",
+        String(algorithmCounts.violationCount),
+      );
+      taskEl.setAttribute(
+        "data-suggestion-count",
+        String(algorithmCounts.suggestionCount),
+      );
 
       taskEl.style.left = `calc((${startHour} / 24) * 100%)`;
       taskEl.style.width = `calc((${Math.max(endHour - startHour, 1)} / 24) * 100%)`;
@@ -2574,6 +2877,7 @@ document.addEventListener("DOMContentLoaded", () => {
           • ${task.status || "-"}
           • ${assignment.displayName || "ללא שיוך"}
         </div>
+        ${buildTaskAlgorithmIndicatorsHtml(algorithmCounts)}
       `;
 
       track.appendChild(taskEl);
@@ -2652,6 +2956,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
       workPlan.tasks.forEach((task, index) => {
         const assignment = resolveAssignment(task, workPlan);
+        const algorithmCounts = getTaskAlgorithmCounts(
+          normalizeTaskId(task?.workItemId ?? task?.id ?? ""),
+        );
         const startHour = Math.min(8 + index * 2, 22);
         const duration = 2;
         const endHour = Math.min(startHour + duration, 24);
@@ -2672,6 +2979,22 @@ document.addEventListener("DOMContentLoaded", () => {
           assignment.source || "none",
         );
         taskEl.setAttribute("data-assignment-type", assignment.type || "");
+        taskEl.setAttribute(
+          "data-algorithm-result",
+          String(algorithmCounts.result || ""),
+        );
+        taskEl.setAttribute(
+          "data-warning-count",
+          String(algorithmCounts.warningCount || 0),
+        );
+        taskEl.setAttribute(
+          "data-violation-count",
+          String(algorithmCounts.violationCount || 0),
+        );
+        taskEl.setAttribute(
+          "data-suggestion-count",
+          String(algorithmCounts.suggestionCount || 0),
+        );
 
         taskEl.style.left = `calc((${startHour} / 24) * 100%)`;
         taskEl.style.width = `calc((${Math.max(endHour - startHour, 1)} / 24) * 100%)`;
@@ -2683,6 +3006,7 @@ document.addEventListener("DOMContentLoaded", () => {
             • ${task.status || "-"}
             • ${assignment.displayName || "ללא שיוך"}
           </div>
+          ${buildTaskAlgorithmIndicatorsHtml(algorithmCounts)}
         `;
 
         track.appendChild(taskEl);
@@ -2778,6 +3102,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       employeeTasks.forEach(({ task, workPlan: taskWorkPlan }, index) => {
         const assignment = resolveAssignment(task, taskWorkPlan);
+        const algorithmCounts = getTaskAlgorithmCounts(task.workItemId);
         const startHour = Math.min(8 + index * 2, 22);
         const duration = 2;
         const endHour = Math.min(startHour + duration, 24);
@@ -2801,6 +3126,19 @@ document.addEventListener("DOMContentLoaded", () => {
           assignment.source || "employee",
         );
         taskEl.setAttribute("data-assignment-type", assignment.type || "");
+        taskEl.setAttribute("data-algorithm-result", algorithmCounts.result || "");
+        taskEl.setAttribute(
+          "data-warning-count",
+          String(algorithmCounts.warningCount),
+        );
+        taskEl.setAttribute(
+          "data-violation-count",
+          String(algorithmCounts.violationCount),
+        );
+        taskEl.setAttribute(
+          "data-suggestion-count",
+          String(algorithmCounts.suggestionCount),
+        );
         if (assignment.role) {
           taskEl.setAttribute("data-role", assignment.role);
         }
@@ -2815,6 +3153,7 @@ document.addEventListener("DOMContentLoaded", () => {
             • ${task.status || "-"}
             • ${assignment.role || employee.role || "שיוך עובד"}
           </div>
+          ${buildTaskAlgorithmIndicatorsHtml(algorithmCounts)}
         `;
 
         track.appendChild(taskEl);
