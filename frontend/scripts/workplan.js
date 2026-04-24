@@ -193,6 +193,17 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  const newTaskButton = document.getElementById("btn-new-task");
+  if (newTaskButton) {
+    newTaskButton.addEventListener("click", () => {
+      console.groupCollapsed("➕ [NEW TASK BUTTON CLICKED]");
+      console.log("currentWorkPlanData:", currentWorkPlanData);
+      console.log("selectedWorkPlanId:", selectedWorkPlanId);
+      console.log("latestBackendAssignmentResult:", latestBackendAssignmentResult);
+      console.groupEnd();
+    });
+  }
+
   function toggleConditionalDropdowns(scope) {
     if (viewModeDropdown) {
       if (scope === "employee") {
