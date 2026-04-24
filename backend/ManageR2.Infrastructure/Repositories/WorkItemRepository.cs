@@ -122,6 +122,12 @@ public class WorkItemRepository : IWorkItemRepository
         command.Parameters.AddWithValue("@DealCloseDate", (object?)workItem.DealCloseDate ?? DBNull.Value);
         command.Parameters.AddWithValue("@FinanceProjectNumber", (object?)workItem.FinanceProjectNumber ?? DBNull.Value);
         command.Parameters.AddWithValue("@InvoiceNumber", (object?)workItem.InvoiceNumber ?? DBNull.Value);
+        command.Parameters.AddWithValue("@PlannedStart", (object?)workItem.PlannedStart ?? DBNull.Value);
+        command.Parameters.AddWithValue("@PlannedEnd", (object?)workItem.PlannedEnd ?? DBNull.Value);
+        command.Parameters.AddWithValue("@EstimatedHours", (object?)workItem.EstimatedHours ?? DBNull.Value);
+        command.Parameters.AddWithValue("@Priority", (object?)workItem.Priority ?? DBNull.Value);
+        command.Parameters.AddWithValue("@RequiredRole", (object?)workItem.RequiredRole ?? DBNull.Value);
+        command.Parameters.AddWithValue("@IsLocked", workItem.IsLocked);
 
         await connection.OpenAsync();
 
@@ -155,6 +161,13 @@ public class WorkItemRepository : IWorkItemRepository
         command.Parameters.AddWithValue("@DealCloseDate", (object?)workItem.DealCloseDate ?? DBNull.Value);
         command.Parameters.AddWithValue("@FinanceProjectNumber", (object?)workItem.FinanceProjectNumber ?? DBNull.Value);
         command.Parameters.AddWithValue("@InvoiceNumber", (object?)workItem.InvoiceNumber ?? DBNull.Value);
+        command.Parameters.AddWithValue("@PlannedStart", (object?)workItem.PlannedStart ?? DBNull.Value);
+        command.Parameters.AddWithValue("@PlannedEnd", (object?)workItem.PlannedEnd ?? DBNull.Value);
+        command.Parameters.AddWithValue("@EstimatedHours", (object?)workItem.EstimatedHours ?? DBNull.Value);
+        command.Parameters.AddWithValue("@Priority", (object?)workItem.Priority ?? DBNull.Value);
+        command.Parameters.AddWithValue("@RequiredRole", (object?)workItem.RequiredRole ?? DBNull.Value);
+        command.Parameters.AddWithValue("@IsLocked", workItem.IsLocked);
+
 
         await connection.OpenAsync();
 
@@ -528,6 +541,7 @@ public class WorkItemRepository : IWorkItemRepository
                     PlannedEnd = GetDateTimeValue(reader, "PlannedEnd"),
                     ClosedAt = GetDateTimeValue(reader, "ClosedAt"),
                     Priority = GetStringValue(reader, "Priority"),
+                    RequiredRole = GetStringValue(reader, "RequiredRole"),
                     EstimatedHours = GetDecimalValue(reader, "EstimatedHours"),
                     IsLocked = GetBoolValue(reader, "IsLocked")
                 };
@@ -600,5 +614,41 @@ public class WorkItemRepository : IWorkItemRepository
         }
 
         return Convert.ToBoolean(reader[columnName]);
+    }
+
+    public async Task<bool> DeleteEmployeeAssignmentsByWorkItemIdAsync(int workItemId)
+    {
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand("sp_DeleteEmployeeAssignmentsByWorkItemId", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+
+        command.Parameters.AddWithValue("@WorkItemId", workItemId);
+
+        await connection.OpenAsync();
+
+        var result = await command.ExecuteScalarAsync();
+        var rowsAffected = result != null ? Convert.ToInt32(result) : 0;
+
+        return rowsAffected >= 0;
+    }
+
+    public async Task<bool> DeleteContractorAssignmentsByWorkItemIdAsync(int workItemId)
+    {
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand("sp_DeleteContractorAssignmentsByWorkItemId", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+
+        command.Parameters.AddWithValue("@WorkItemId", workItemId);
+
+        await connection.OpenAsync();
+
+        var result = await command.ExecuteScalarAsync();
+        var rowsAffected = result != null ? Convert.ToInt32(result) : 0;
+
+        return rowsAffected >= 0;
     }
 }

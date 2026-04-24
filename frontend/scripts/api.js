@@ -82,16 +82,21 @@ function redirectToLoginWithReturnUrl() {
   const currentSearch = window.location.search || "";
   const currentUrl = `${currentPath}${currentSearch}`;
 
-  if (
-    currentPath &&
-    !currentPath.endsWith("/pages/login.html") &&
-    currentPath !== "/pages/login.html"
-  ) {
+  const isLoginPage =
+    currentPath.endsWith("/frontend/pages/login.html") ||
+    currentPath.endsWith("/pages/login.html") ||
+    currentPath.endsWith("/login.html");
+
+  if (currentPath && !isLoginPage) {
     setReturnUrl(currentUrl);
   }
 
   clearAuthSession();
-  window.location.href = "/pages/login.html";
+
+  const isInsidePagesFolder = currentPath.includes("/frontend/pages/");
+  window.location.href = isInsidePagesFolder
+    ? "login.html"
+    : "/frontend/pages/login.html";
 }
 
 function requireAuthOrRedirect() {

@@ -37,20 +37,24 @@ async function openProject(id) {
   let p = projectRows[id];
   if (!p) return;
 
+  const isTemporaryNewProject = isCreateMode && !p.workItemId;
+
   await ensureProjectLookupsLoaded();
 
-  p = await loadProjectDetailsFromApi(id);
-  if (!p) return;
+  if (!isTemporaryNewProject) {
+    p = await loadProjectDetailsFromApi(id);
+    if (!p) return;
 
-  const assignmentData = await loadProjectAssignmentsFromApi(id);
-  p.manager = assignmentData.manager;
-  p.team = assignmentData.team;
+    const assignmentData = await loadProjectAssignmentsFromApi(id);
+    p.managers = assignmentData.managers;
+    p.team = assignmentData.team;
 
-  projectRows[id] = {
-    ...projectRows[id],
-    manager: p.manager,
-    team: p.team,
-  };
+    projectRows[id] = {
+      ...projectRows[id],
+      managers: p.managers,
+      team: p.team,
+    };
+  }
 
   document
     .querySelectorAll("#projects-table tbody tr")
@@ -65,7 +69,6 @@ async function openProject(id) {
   }
 
   currentProjectId = id;
-  isCreateMode = false;
   isEditMode = false;
   projectSnapshot = null;
 
@@ -95,10 +98,22 @@ async function openProject(id) {
   document.getElementById("proj-description").textContent =
     p.raw?.description || p.description || "-";
 
-  updateTeamView(p.manager, p.team);
+  if (!Array.isArray(p.managers)) {
+    p.managers = [];
+  }
 
-  const projectTasks = await loadProjectTasksFromApi(id);
-  renderProjectTasks(projectTasks);
+  if (!Array.isArray(p.team)) {
+    p.team = [];
+  }
+
+  updateTeamView(p.managers, p.team);
+
+  if (isTemporaryNewProject) {
+    renderProjectMilestones([]);
+  } else {
+    const projectMilestones = await loadProjectMilestonesFromApi(id);
+    renderProjectMilestones(projectMilestones);
+  }
 
   exitEditMode();
   updateMaximizeButtonState();
@@ -236,17 +251,24 @@ function createSnapshot() {
 
   // Get team data
   const managerView = document.getElementById("proj-manager-view");
-  const teamView = document.getElementById("proj-team-view");
-  const manager = managerView
-    ? managerView.textContent.trim()
-    : p.manager || "";
-  const team = p.team ? [...p.team] : [];
+  const managersText = managerView ? managerView.textContent.trim() : "";
+  const managers =
+    managersText && managersText !== "-"
+      ? managersText
+          .split(",")
+          .map((name) => name.trim())
+          .filter(Boolean)
+      : Array.isArray(p.managers)
+        ? [...p.managers]
+        : [];
+
+  const team = Array.isArray(p.team) ? [...p.team] : [];
 
   // Create deep copy of current project data
   return {
     name: p.name,
     customer: p.customer,
-    manager: manager,
+    managers: managers,
     status: p.status,
     openDate: p.openDate,
     closeDate: p.closeDate,
@@ -274,7 +296,7 @@ async function enterEditMode() {
   document.getElementById("edit-mode-indicator").style.display = "inline";
   updateEditToggleButton();
 
-  // Team stays read-only for now until backend team editing is connected safely
+  // Team section is derived from work assignments and stays read-only
   switchTeamToView();
 
   // Switch BOQ to edit mode
@@ -374,7 +396,10 @@ function cancelEdit() {
   // Restore from snapshot
   p.name = projectSnapshot.name;
   p.customer = projectSnapshot.customer;
-  p.manager = projectSnapshot.manager;
+  p.managers = Array.isArray(projectSnapshot.managers)
+    ? [...projectSnapshot.managers]
+    : [];
+  p.team = Array.isArray(projectSnapshot.team) ? [...projectSnapshot.team] : [];
   p.status = projectSnapshot.status;
   p.openDate = projectSnapshot.openDate;
   p.closeDate = projectSnapshot.closeDate;
@@ -392,9 +417,12 @@ function cancelEdit() {
     p.financeNumber || "-";
 
   // Restore team from snapshot
-  p.manager = projectSnapshot.manager;
-  p.team = projectSnapshot.team ? [...projectSnapshot.team] : [];
-  updateTeamView(p.manager, p.team);
+  p.managers = Array.isArray(projectSnapshot.managers)
+    ? [...projectSnapshot.managers]
+    : [];
+  p.team = Array.isArray(projectSnapshot.team) ? [...projectSnapshot.team] : [];
+
+  updateTeamView(p.managers, p.team);
 
   // Restore BOQ from snapshot
   restoreBOQFromSnapshot();
@@ -410,12 +438,16 @@ function cancelEdit() {
 }
 
 // Team management functions
-function updateTeamView(manager, team) {
+function updateTeamView(managers, team) {
   const managerView = document.getElementById("proj-manager-view");
   const teamView = document.getElementById("proj-team-view");
 
   if (managerView) {
-    managerView.textContent = manager || "-";
+    if (managers && managers.length > 0) {
+      managerView.textContent = managers.join(", ");
+    } else {
+      managerView.textContent = "-";
+    }
   }
 
   if (teamView) {
@@ -427,151 +459,17 @@ function updateTeamView(manager, team) {
   }
 }
 
-function switchTeamToEdit() {
-  const p = projectRows[currentProjectId];
-  if (!p) return;
-
-  // Show edit controls
-  document.getElementById("proj-manager-view").style.display = "none";
-  document.getElementById("proj-manager-edit").style.display = "block";
-  document.getElementById("proj-team-view").style.display = "none";
-  document.getElementById("proj-team-edit").style.display = "block";
-
-  // Set manager dropdown value
-  const managerSelect = document.getElementById("proj-manager-select");
-  if (managerSelect) {
-    managerSelect.value = p.manager || "";
-  }
-
-  // Populate team chips
-  updateTeamChips(p.team || []);
-
-  // Attach handlers
-  attachTeamHandlers();
-
-  if (window.lucide) lucide.createIcons();
-}
-
 function switchTeamToView() {
-  // Hide edit controls
-  document.getElementById("proj-manager-view").style.display = "block";
-  document.getElementById("proj-manager-edit").style.display = "none";
-  document.getElementById("proj-team-view").style.display = "block";
-  document.getElementById("proj-team-edit").style.display = "none";
+  const managerView = document.getElementById("proj-manager-view");
+  const teamView = document.getElementById("proj-team-view");
 
-  // Reset handler flag for next edit mode entry
-  managerChangeHandlerAttached = false;
-}
-
-function updateTeamChips(team) {
-  const chipsContainer = document.getElementById("proj-team-chips");
-  if (!chipsContainer) return;
-
-  chipsContainer.innerHTML = "";
-  team.forEach((member) => {
-    const chip = document.createElement("span");
-    chip.className = "badge badge-neutral team-chip";
-    chip.dataset.teamMember = member;
-    chip.innerHTML = `${escapeHtml(member)}<button type="button" class="chip-remove" data-remove-team="${member}" aria-label="הסר">×</button>`;
-    chipsContainer.appendChild(chip);
-  });
-}
-
-function commitTeamChanges() {
-  const p = projectRows[currentProjectId];
-  if (!p) return;
-
-  // Get manager from dropdown
-  const managerSelect = document.getElementById("proj-manager-select");
-  if (managerSelect) {
-    p.manager = managerSelect.value || "";
+  if (managerView) {
+    managerView.style.display = "block";
   }
 
-  // Get team from chips
-  const chips = document.querySelectorAll("#proj-team-chips .team-chip");
-  p.team = Array.from(chips)
-    .map((chip) => chip.dataset.teamMember)
-    .filter((m) => m);
-
-  // Update view
-  updateTeamView(p.manager, p.team);
-}
-
-let managerChangeHandlerAttached = false;
-
-function attachTeamHandlers() {
-  // Remove team member handlers
-  document.querySelectorAll(".chip-remove").forEach((btn) => {
-    // Remove existing listeners to avoid duplicates
-    const newBtn = btn.cloneNode(true);
-    btn.parentNode.replaceChild(newBtn, btn);
-
-    newBtn.addEventListener("click", (e) => {
-      e.stopPropagation();
-      const member = newBtn.dataset.removeTeam;
-      const chip = newBtn.closest(".team-chip");
-      if (chip) chip.remove();
-    });
-  });
-
-  // Manager change handler - remove manager from team if present (attach only once)
-  if (!managerChangeHandlerAttached) {
-    const managerSelect = document.getElementById("proj-manager-select");
-    if (managerSelect) {
-      managerSelect.addEventListener("change", () => {
-        const newManager = managerSelect.value;
-        if (!newManager) return;
-
-        // Remove manager from team chips if present
-        const chips = document.querySelectorAll("#proj-team-chips .team-chip");
-        chips.forEach((chip) => {
-          if (chip.dataset.teamMember === newManager) {
-            chip.remove();
-          }
-        });
-      });
-      managerChangeHandlerAttached = true;
-    }
+  if (teamView) {
+    teamView.style.display = "block";
   }
-}
-
-// Team add handler
-const teamAddBtn = document.getElementById("proj-team-add-btn");
-const teamAddSelect = document.getElementById("proj-team-add-select");
-if (teamAddBtn && teamAddSelect) {
-  teamAddBtn.addEventListener("click", () => {
-    const selected = teamAddSelect.value;
-    if (!selected) return;
-
-    // Get current manager
-    const managerSelect = document.getElementById("proj-manager-select");
-    const currentManager = managerSelect ? managerSelect.value : "";
-
-    // Prevent adding manager to team
-    if (selected === currentManager) {
-      alert("מנהל הפרויקט לא יכול להיות גם בעובדים המשויכים");
-      return;
-    }
-
-    // Check if already in team
-    const existing = Array.from(
-      document.querySelectorAll("#proj-team-chips .team-chip"),
-    ).map((c) => c.dataset.teamMember);
-    if (existing.includes(selected)) {
-      alert("העובד כבר קיים בצוות");
-      return;
-    }
-
-    // Add chip
-    const chipsContainer = document.getElementById("proj-team-chips");
-    const chip = document.createElement("span");
-    chip.className = "badge badge-neutral team-chip";
-    chip.dataset.teamMember = selected;
-    chip.innerHTML = `${escapeHtml(selected)}<button type="button" class="chip-remove" data-remove-team="${selected}" aria-label="הסר">×</button>`;
-    chipsContainer.appendChild(chip);
-    teamAddSelect.value = "";
-    attachTeamHandlers();
-  });
 }
 
 // BOQ editing functions
@@ -1354,19 +1252,21 @@ function getBillingTypeMeta(billingTypeCode) {
   return match;
 }
 
-async function loadProjectTasksFromApi(projectId) {
+async function loadProjectMilestonesFromApi(projectId) {
   const existingProject = projectRows[projectId];
+
   if (!existingProject || !existingProject.workItemId) {
     return [];
   }
 
   try {
-    const tasks = await apiRequest(
-      `/WorkItems/${existingProject.workItemId}/tasks`,
+    const milestones = await apiRequest(
+      `/WorkItems/${existingProject.workItemId}/milestones`,
     );
-    return Array.isArray(tasks) ? tasks : [];
+
+    return Array.isArray(milestones) ? milestones : [];
   } catch (error) {
-    console.error(`Failed to load tasks for ${projectId}:`, error);
+    console.error(`Failed to load milestones for ${projectId}:`, error);
     return [];
   }
 }
@@ -1376,7 +1276,7 @@ async function loadProjectAssignmentsFromApi(projectId) {
 
   if (!existingProject || !existingProject.workItemId) {
     return {
-      manager: "-",
+      managers: [],
       team: [],
     };
   }
@@ -1390,85 +1290,160 @@ async function loadProjectAssignmentsFromApi(projectId) {
       ? workPlan.assignments
       : [];
 
+    const tasks = Array.isArray(workPlan?.tasks) ? workPlan.tasks : [];
+
+    const projectWorkItemId = Number(existingProject.workItemId);
+
+    // 🔹 כל ה־IDs הרלוונטיים (Project + Tasks)
+    const relevantWorkItemIds = new Set([
+      projectWorkItemId,
+      ...tasks.map((t) => Number(t.workItemId)),
+    ]);
+
+    // 🔹 סינון עובדים בלבד + שייכות לפרויקט/משימות
     const employeeAssignments = assignments.filter((assignment) => {
       return (
         assignment &&
         assignment.assignmentType === "Employee" &&
-        Number(assignment.workItemId) === Number(existingProject.workItemId) &&
+        relevantWorkItemIds.has(Number(assignment.workItemId)) &&
         assignment.employeeName
       );
     });
 
-    let manager = "-";
-    const team = [];
+    const managers = [];
+    const teamSet = new Set();
 
     employeeAssignments.forEach((assignment) => {
       const employeeName = String(assignment.employeeName || "").trim();
-      const assignmentRole = String(assignment.assignmentRole || "")
+      const role = String(assignment.assignmentRole || "")
         .trim()
         .toLowerCase();
 
       if (!employeeName) return;
 
-      if (assignmentRole === "team leader") {
-        if (manager === "-") {
-          manager = employeeName;
+      if (role === "project manager") {
+        if (!managers.includes(employeeName)) {
+          managers.push(employeeName);
         }
-        return;
-      }
-
-      if (!team.includes(employeeName)) {
-        team.push(employeeName);
+      } else {
+        teamSet.add(employeeName);
       }
     });
 
     return {
-      manager,
-      team,
+      managers,
+      team: Array.from(teamSet),
     };
   } catch (error) {
     console.error(`Failed to load assignments for ${projectId}:`, error);
 
     return {
-      manager: existingProject.manager || "-",
-      team: Array.isArray(existingProject.team) ? existingProject.team : [],
+      managers: [],
+      team: [],
     };
   }
 }
+function renderProjectMilestones(milestones) {
+  const milestonesContainer = document.getElementById(
+    "project-milestones-list",
+  );
+  if (!milestonesContainer) return;
 
-function renderProjectTasks(tasks) {
-  const tasksContainer = document.getElementById("project-tasks-list");
-  if (!tasksContainer) return;
-
-  if (!Array.isArray(tasks) || tasks.length === 0) {
-    tasksContainer.innerHTML = `
+  if (!Array.isArray(milestones) || milestones.length === 0) {
+    milestonesContainer.innerHTML = `
       <div class="card">
-        <div class="font-semibold mb-sm">משימות פרויקט</div>
-        <div class="text-sm text-neutral-600">לא נמצאו משימות לפרויקט זה.</div>
+        <div class="font-semibold mb-sm">אבני דרך / משימות פרויקט</div>
+        <div class="text-sm text-neutral-600">לא נמצאו אבני דרך לפרויקט זה.</div>
       </div>
     `;
     return;
   }
 
-  tasksContainer.innerHTML = "";
+  milestonesContainer.innerHTML = "";
 
-  tasks.forEach((task) => {
-    const statusInfo = getProjectStatusMeta(task.status);
+  milestones.forEach((milestone) => {
+    const statusInfo = getProjectStatusMeta(milestone.status);
+    const employees = Array.isArray(milestone.employees)
+      ? milestone.employees
+      : [];
+    const contractors = Array.isArray(milestone.contractors)
+      ? milestone.contractors
+      : [];
 
-    const taskCard = document.createElement("div");
-    taskCard.className = "card";
-    taskCard.innerHTML = `
-      <div class="font-semibold mb-sm">${escapeHtml(task.title || "-")}</div>
-      <div class="text-sm text-neutral-600 mb-sm">
-        ${escapeHtml(task.description || "ללא תיאור")}
+    const employeeNames = employees
+      .map((employee) => employee.employeeName)
+      .filter(Boolean);
+
+    const contractorNames = contractors
+      .map((contractor) => contractor.contractorName)
+      .filter(Boolean);
+
+    const assignedEmployeesText =
+      employeeNames.length > 0 ? employeeNames.join(", ") : "-";
+
+    const assignedContractorsText =
+      contractorNames.length > 0 ? contractorNames.join(", ") : "-";
+
+    const plannedStartText = milestone.plannedStart
+      ? formatProjectDate(milestone.plannedStart)
+      : "-";
+
+    const plannedEndText = milestone.plannedEnd
+      ? formatProjectDate(milestone.plannedEnd)
+      : "-";
+
+    const closedAtText = milestone.closedAt
+      ? formatProjectDate(milestone.closedAt)
+      : "-";
+
+    const estimatedHoursText =
+      milestone.estimatedHours != null ? String(milestone.estimatedHours) : "-";
+
+    const priorityText = milestone.priority || "-";
+
+    const lockedBadge = milestone.isLocked
+      ? `<span class="badge badge-warning">נעול</span>`
+      : "";
+
+    const milestoneCard = document.createElement("div");
+    milestoneCard.className = "card";
+    milestoneCard.innerHTML = `
+      <div class="flex justify-content-between align-items-start mb-sm">
+        <div>
+          <div class="font-semibold mb-xs">${escapeHtml(milestone.title || "-")}</div>
+          <div class="text-sm text-neutral-600">
+            ${escapeHtml(milestone.description || "ללא תיאור")}
+          </div>
+        </div>
+        <div class="flex gap-sm align-items-center">
+          <span class="badge ${escapeHtml(statusInfo.badgeClass)}">${escapeHtml(statusInfo.display)}</span>
+          ${lockedBadge}
+        </div>
       </div>
-      <div class="flex gap-sm align-items-center">
-        <span class="badge ${escapeHtml(statusInfo.badgeClass)}">${escapeHtml(statusInfo.display)}</span>
-        <span class="text-sm text-neutral-600">#${escapeHtml(String(task.workItemId))}</span>
+
+      <div class="grid grid-cols-2 gap-md mt-sm">
+        <div>
+          <div class="text-sm"><strong>מזהה משימה:</strong> #${escapeHtml(String(milestone.workItemId || "-"))}</div>
+          <div class="text-sm"><strong>סוג:</strong> ${escapeHtml(milestone.workType || "-")}</div>
+          <div class="text-sm"><strong>עדיפות:</strong> ${escapeHtml(priorityText)}</div>
+          <div class="text-sm"><strong>הערכת שעות:</strong> ${escapeHtml(estimatedHoursText)}</div>
+        </div>
+
+        <div>
+          <div class="text-sm"><strong>תאריך יצירה:</strong> ${escapeHtml(formatProjectDate(milestone.createdAt))}</div>
+          <div class="text-sm"><strong>תחילה מתוכננת:</strong> ${escapeHtml(plannedStartText)}</div>
+          <div class="text-sm"><strong>סיום מתוכנן:</strong> ${escapeHtml(plannedEndText)}</div>
+          <div class="text-sm"><strong>תאריך סגירה:</strong> ${escapeHtml(closedAtText)}</div>
+        </div>
+      </div>
+
+      <div class="mt-sm">
+        <div class="text-sm"><strong>עובדים משויכים:</strong> ${escapeHtml(assignedEmployeesText)}</div>
+        <div class="text-sm"><strong>קבלנים משויכים:</strong> ${escapeHtml(assignedContractorsText)}</div>
       </div>
     `;
 
-    tasksContainer.appendChild(taskCard);
+    milestonesContainer.appendChild(milestoneCard);
   });
 }
 
@@ -1490,7 +1465,10 @@ async function loadProjectsFromApi() {
             workItemId: project.workItemId,
             name: project.title || "-",
             customer: project.customerName || "-",
-            manager: project.projectManagerName || "-",
+            managers:
+              project.projectManagerName && project.projectManagerName !== "-"
+                ? [project.projectManagerName]
+                : [],
             status: statusInfo.display,
             statusCode: statusInfo.code,
             statusBadgeClass: statusInfo.badgeClass,
@@ -1526,7 +1504,7 @@ async function loadProjectsFromApi() {
       projectRows[project.id] = {
         name: project.name,
         customer: project.customer,
-        manager: project.manager,
+        managers: Array.isArray(project.managers) ? project.managers : [],
         status: project.status,
         statusCode: project.statusCode,
         openDate: project.openDate,
@@ -1563,7 +1541,11 @@ function renderProjectsTable(projects) {
       <td>${escapeHtml(project.number)}</td>
       <td>${escapeHtml(project.name)}</td>
       <td>${escapeHtml(project.customer)}</td>
-      <td>${escapeHtml(project.manager)}</td>
+      <td>${escapeHtml(
+        Array.isArray(project.managers) && project.managers.length > 0
+          ? project.managers.join(", ")
+          : "-",
+      )}</td>
       <td><span class="badge ${escapeHtml(project.statusBadgeClass)}">${escapeHtml(project.status)}</span></td>
       <td>${escapeHtml(project.openDate)}</td>
       <td>${escapeHtml(project.area)}</td>
@@ -1592,7 +1574,9 @@ async function loadProjectDetailsFromApi(projectId) {
       ...existingProject,
       name: workItem.title || existingProject.name || "-",
       customer: getCustomerDisplayName(workItem.customerId),
-      manager: existingProject.manager || "-",
+      managers: Array.isArray(existingProject.managers)
+        ? existingProject.managers
+        : [],
       status: statusInfo.display,
       statusCode: statusInfo.code,
       openDate: formatProjectDate(workItem.createdAt),
@@ -2242,14 +2226,17 @@ if (btnNewProject) {
     projectRows[tempProjectId] = {
       name: "",
       customer: "-",
-      manager: "-",
-      status: "Open",
+      managers: [],
+      status: "פתוח",
+      statusCode: "Open",
       openDate: "-",
       closeDate: "-",
       number: "חדש",
       financeNumber: "-",
-      billingType: "Fixed",
-      siteId: "-",
+      invoiceNumber: "-",
+      billingType: "קבוע",
+      billingTypeCode: "Fixed",
+      siteId: null,
       description: "",
       team: [],
       raw: {
@@ -2258,7 +2245,11 @@ if (btnNewProject) {
         status: "Open",
         customerId: null,
         siteId: null,
-        area: "-",
+        siteName: "",
+        description: "",
+        dealCloseDate: null,
+        financeProjectNumber: "",
+        invoiceNumber: "",
         createdAt: null,
         closedAt: null,
         parentWorkItemId: null,
@@ -2414,22 +2405,21 @@ function scrollTabbar(direction) {
   });
 }
 
-// האזנה לגלילה ושינוי גודל חלון
-if (tabbarScroller) {
+// לחיצה על החצים
+if (tabbarScroller && tabbarArrowStart && tabbarArrowEnd) {
   tabbarScroller.addEventListener("scroll", updateTabbarArrows);
   new ResizeObserver(updateTabbarArrows).observe(tabbarScroller);
+
+  tabbarArrowStart.addEventListener("click", (e) => {
+    e.preventDefault();
+    scrollTabbar("start");
+  });
+
+  tabbarArrowEnd.addEventListener("click", (e) => {
+    e.preventDefault();
+    scrollTabbar("end");
+  });
 }
-
-// לחיצה על החצים
-tabbarArrowStart.addEventListener("click", (e) => {
-  e.preventDefault();
-  scrollTabbar("start");
-});
-
-tabbarArrowEnd.addEventListener("click", (e) => {
-  e.preventDefault();
-  scrollTabbar("end");
-});
 
 // החלפת טאבים
 document.querySelectorAll(".project-drawer-tabs .tab").forEach((tab) => {

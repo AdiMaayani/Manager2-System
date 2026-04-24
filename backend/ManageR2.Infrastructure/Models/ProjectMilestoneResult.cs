@@ -31,6 +31,8 @@ public class ProjectMilestoneResult
 
     public string? Priority { get; set; }
 
+    public string? RequiredRole { get; set; }
+
     public decimal? EstimatedHours { get; set; }
 
     public bool IsLocked { get; set; }
