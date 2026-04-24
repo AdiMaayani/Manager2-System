@@ -2721,6 +2721,28 @@ document.addEventListener("DOMContentLoaded", () => {
     setLatestAlgorithmOutput(algorithmOutput);
     console.log("algorithmOutput:", algorithmOutput);
 
+    const backendProjectIdFromWorkPlan =
+      Number(currentWorkPlanData?.project?.workItemId) ||
+      Number(currentWorkPlanData?.project?.id) ||
+      null;
+
+    if (backendProjectIdFromWorkPlan && backendProjectIdFromWorkPlan > 0) {
+      try {
+        const backendResult =
+          await window.WorkPlanApi.getSmartAssignmentRecommendations({
+            projectId: backendProjectIdFromWorkPlan,
+            includeLockedTasks: false,
+            saveRun: false,
+          });
+
+        console.groupCollapsed("🧠 [BACKEND SMART ASSIGNMENT RESULT]");
+        console.log("backendSmartAssignmentResult:", backendResult);
+        console.groupEnd();
+      } catch (error) {
+        console.warn("Backend Smart Assignment debug call failed.", error);
+      }
+    }
+
     renderTasksFromAPI(workPlan);
     renderWeeklyView();
     renderMonthlyView();
