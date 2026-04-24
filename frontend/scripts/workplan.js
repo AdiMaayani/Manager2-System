@@ -908,6 +908,8 @@ document.addEventListener("DOMContentLoaded", () => {
   let editModeAssigned = [];
   let latestAlgorithmOutput = null;
   let latestAlgorithmTaskResultsById = new Map();
+  let latestBackendAssignmentResult = null;
+  let latestBackendTaskResultsById = new Map();
 
   function normalizeTaskId(value) {
     if (value == null) return "";
@@ -964,6 +966,23 @@ document.addEventListener("DOMContentLoaded", () => {
     latestAlgorithmTaskResultsById = buildAlgorithmTaskResultsLookup(
       latestAlgorithmOutput,
     );
+  }
+
+  function setLatestBackendAssignmentResult(result) {
+    latestBackendAssignmentResult = result || null;
+
+    latestBackendTaskResultsById = new Map();
+
+    const taskResults = Array.isArray(result?.taskResults)
+      ? result.taskResults
+      : [];
+
+    taskResults.forEach((taskResult) => {
+      const taskId = String(taskResult.workItemId || "").trim();
+      if (!taskId) return;
+
+      latestBackendTaskResultsById.set(taskId, taskResult);
+    });
   }
 
   function buildCombinedAlgorithmOutputFromWorkPlans(workPlans, mappedEmployees) {
@@ -2737,6 +2756,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         console.groupCollapsed("🧠 [BACKEND SMART ASSIGNMENT RESULT]");
         console.log("backendSmartAssignmentResult:", backendResult);
+        setLatestBackendAssignmentResult(backendResult);
         console.groupEnd();
       } catch (error) {
         console.warn("Backend Smart Assignment debug call failed.", error);
