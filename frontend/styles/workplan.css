@@ -275,6 +275,44 @@
   text-overflow: ellipsis;
 }
 
+.task-algorithm-indicators {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 4px;
+  min-height: 14px;
+}
+
+.task-algorithm-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 1px 6px;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.2;
+  border: 1px solid transparent;
+}
+
+.task-algorithm-badge-violation {
+  color: #991b1b;
+  background: #fee2e2;
+  border-color: #fecaca;
+}
+
+.task-algorithm-badge-warning {
+  color: #92400e;
+  background: #fef3c7;
+  border-color: #fde68a;
+}
+
+.task-algorithm-badge-suggestion {
+  color: #1e3a8a;
+  background: #dbeafe;
+  border-color: #bfdbfe;
+}
+
 .task-locked {
   background: var(--color-danger-50);
   border-color: var(--color-danger-100);
@@ -816,4 +854,40 @@ body.modal-open {
   border-top: 1px solid var(--color-neutral-200);
   padding-top: var(--spacing-md);
   margin-top: var(--spacing-md);
+}
+
+.wp-smart-insights {
+  margin-top: var(--spacing-lg);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--color-neutral-200);
+}
+
+.wp-smart-insights-title {
+  margin: 0 0 var(--spacing-sm);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-900);
+}
+
+.wp-smart-insights-group + .wp-smart-insights-group {
+  margin-top: var(--spacing-sm);
+}
+
+.wp-smart-insights-label {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-700);
+  margin-bottom: 4px;
+}
+
+.wp-smart-insights-list {
+  margin: 0;
+  padding-inline-start: 18px;
+  color: var(--color-neutral-800);
+  font-size: var(--font-size-xs);
+}
+
+.wp-smart-insights-text {
+  font-size: var(--font-size-xs);
+  color: var(--color-neutral-800);
 }
