@@ -36,9 +36,21 @@
     });
   }
 
+  async function getSmartAssignmentRecommendations(request) {
+    if (!request) {
+      throw new Error("Smart assignment request is required.");
+    }
+
+    return window.apiRequest("/SmartAssignment/recommend", {
+      method: "POST",
+      body: JSON.stringify(request),
+    });
+  }
+
   window.WorkPlanApi = Object.freeze({
     getWorkPlanById,
     getAllWorkPlans,
     getEmployees,
+    getSmartAssignmentRecommendations,
   });
 })();
