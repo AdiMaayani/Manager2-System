@@ -254,6 +254,7 @@ public class WorkItemsController : ControllerBase
             ClosedAt = milestone.ClosedAt,
             Priority = milestone.Priority,
             EstimatedHours = milestone.EstimatedHours,
+            RequiredRole = milestone.RequiredRole,
             IsLocked = milestone.IsLocked,
             Employees = milestone.Employees.Select(employee => new ProjectMilestoneEmployeeDto
             {
@@ -572,44 +573,249 @@ public class WorkItemsController : ControllerBase
 
         return Ok(new { message = "Contractor assigned successfully." });
     }
-}
 
-public class CreateProjectRequest
-{
-    public string Title { get; set; } = string.Empty;
-    public string? Description { get; set; }
-    public string Status { get; set; } = string.Empty;
-    public string BillingType { get; set; } = string.Empty;
-    public int CustomerId { get; set; }
-    public int SiteId { get; set; }
-    public DateTime? DealCloseDate { get; set; }
-    public string? FinanceProjectNumber { get; set; }
-    public string? InvoiceNumber { get; set; }
-}
+    [HttpPost("{projectId}/milestones")]
+    public async Task<IActionResult> CreateMilestone(int projectId, [FromBody] CreateMilestoneRequest request)
+    {
+        if (request == null)
+        {
+            return BadRequest("Milestone data is required.");
+        }
 
-public class CreateTaskRequest
-{
-    public string Title { get; set; } = string.Empty;
-    public string? Description { get; set; }
-    public string Status { get; set; } = string.Empty;
-    public string BillingType { get; set; } = string.Empty;
-    public int CustomerId { get; set; }
-    public int SiteId { get; set; }
-    public int? ParentWorkItemId { get; set; }
-    public DateTime? DealCloseDate { get; set; }
-    public string? FinanceProjectNumber { get; set; }
-    public string? InvoiceNumber { get; set; }
-}
+        if (string.IsNullOrWhiteSpace(request.Title))
+        {
+            return BadRequest("Title is required.");
+        }
 
-public class AssignEmployeeRequest
-{
-    public int EmployeeId { get; set; }
-    public string AssignmentRole { get; set; } = string.Empty;
-}
+        if (string.IsNullOrWhiteSpace(request.Status))
+        {
+            return BadRequest("Status is required.");
+        }
 
-public class AssignContractorRequest
-{
-    public int ContractorId { get; set; }
-    public string AssignmentRole { get; set; } = string.Empty;
+        if (string.IsNullOrWhiteSpace(request.BillingType))
+        {
+            return BadRequest("BillingType is required.");
+        }
+
+        if (request.CustomerId <= 0)
+        {
+            return BadRequest("CustomerId must be greater than 0.");
+        }
+
+        if (request.SiteId <= 0)
+        {
+            return BadRequest("SiteId must be greater than 0.");
+        }
+
+        // לוודא שהפרויקט קיים
+        var project = await _workItemRepository.GetByIdAsync(projectId);
+        if (project == null)
+        {
+            return NotFound($"Project with ID {projectId} was not found.");
+        }
+
+        if (!string.Equals(project.WorkType, "Project", StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest($"WorkItem {projectId} is not a project.");
+        }
+
+        // יצירת ה־milestone
+        var milestone = new WorkItem
+        {
+            Title = request.Title,
+            Description = request.Description,
+            WorkType = "Task",
+            Status = request.Status,
+            BillingType = request.BillingType,
+            CustomerId = request.CustomerId,
+            SiteId = request.SiteId,
+            ParentWorkItemId = projectId,
+
+            PlannedStart = request.PlannedStart,
+            PlannedEnd = request.PlannedEnd,
+            EstimatedHours = request.EstimatedHours,
+            Priority = request.Priority,
+            RequiredRole = request.RequiredRole,
+            IsLocked = request.IsLocked
+        };
+
+        var newMilestoneId = await _workItemRepository.CreateMilestoneAsync(milestone);
+
+        if (newMilestoneId <= 0)
+        {
+            return BadRequest("Failed to create milestone.");
+        }
+
+        // Assign Employees
+        if (request.Employees != null && request.Employees.Any())
+        {
+            foreach (var employee in request.Employees)
+            {
+                var exists = await _workItemRepository.EmployeeExistsAsync(employee.EmployeeId);
+                if (!exists)
+                {
+                    return NotFound($"Employee with ID {employee.EmployeeId} was not found.");
+                }
+
+                await _workItemRepository.AssignEmployeeToWorkAsync(
+                    newMilestoneId,
+                    employee.EmployeeId,
+                    employee.AssignmentRole
+                );
+            }
+        }
+
+        // Assign Contractors
+        if (request.Contractors != null && request.Contractors.Any())
+        {
+            foreach (var contractor in request.Contractors)
+            {
+                var exists = await _workItemRepository.ContractorExistsAsync(contractor.ContractorId);
+                if (!exists)
+                {
+                    return NotFound($"Contractor with ID {contractor.ContractorId} was not found.");
+                }
+
+                await _workItemRepository.AssignContractorToWorkAsync(
+                    newMilestoneId,
+                    contractor.ContractorId,
+                    contractor.AssignmentRole
+                );
+            }
+        }
+
+        return Ok(new
+        {
+            message = "Milestone created successfully.",
+            milestoneId = newMilestoneId
+        });
+    }
+
+    [HttpPut("milestones/{milestoneId}")]
+    public async Task<IActionResult> UpdateMilestone(int milestoneId, [FromBody] UpdateMilestoneRequest request)
+    {
+        if (request == null)
+        {
+            return BadRequest("Milestone data is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Title))
+        {
+            return BadRequest("Title is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Status))
+        {
+            return BadRequest("Status is required.");
+        }
+
+        if (string.IsNullOrWhiteSpace(request.BillingType))
+        {
+            return BadRequest("BillingType is required.");
+        }
+
+        if (request.CustomerId <= 0)
+        {
+            return BadRequest("CustomerId must be greater than 0.");
+        }
+
+        if (request.SiteId <= 0)
+        {
+            return BadRequest("SiteId must be greater than 0.");
+        }
+
+        var existingMilestone = await _workItemRepository.GetByIdAsync(milestoneId);
+        if (existingMilestone == null)
+        {
+            return NotFound($"Milestone with ID {milestoneId} was not found.");
+        }
+
+        if (!string.Equals(existingMilestone.WorkType, "Task", StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest($"WorkItem {milestoneId} is not a milestone/task.");
+        }
+
+        var milestone = new WorkItem
+        {
+            Title = request.Title,
+            Description = request.Description,
+            WorkType = existingMilestone.WorkType,
+            Status = request.Status,
+            BillingType = request.BillingType,
+            CustomerId = request.CustomerId,
+            SiteId = request.SiteId,
+            ParentWorkItemId = existingMilestone.ParentWorkItemId,
+            DealCloseDate = existingMilestone.DealCloseDate,
+            FinanceProjectNumber = existingMilestone.FinanceProjectNumber,
+            InvoiceNumber = existingMilestone.InvoiceNumber,
+
+            PlannedStart = request.PlannedStart,
+            PlannedEnd = request.PlannedEnd,
+            EstimatedHours = request.EstimatedHours,
+            Priority = request.Priority,
+            RequiredRole = request.RequiredRole,
+            IsLocked = request.IsLocked
+        };
+
+        var updated = await _workItemRepository.UpdateMilestoneAsync(milestoneId, milestone);
+
+        if (!updated)
+        {
+            return BadRequest("Failed to update milestone.");
+        }
+
+        var deletedEmployees = await _workItemRepository.DeleteEmployeeAssignmentsByWorkItemIdAsync(milestoneId);
+        if (!deletedEmployees)
+        {
+            return BadRequest("Failed to reset employee assignments.");
+        }
+
+        var deletedContractors = await _workItemRepository.DeleteContractorAssignmentsByWorkItemIdAsync(milestoneId);
+        if (!deletedContractors)
+        {
+            return BadRequest("Failed to reset contractor assignments.");
+        }
+
+        if (request.Employees != null && request.Employees.Any())
+        {
+            foreach (var employee in request.Employees)
+            {
+                var exists = await _workItemRepository.EmployeeExistsAsync(employee.EmployeeId);
+                if (!exists)
+                {
+                    return NotFound($"Employee with ID {employee.EmployeeId} was not found.");
+                }
+
+                await _workItemRepository.AssignEmployeeToWorkAsync(
+                    milestoneId,
+                    employee.EmployeeId,
+                    employee.AssignmentRole
+                );
+            }
+        }
+
+        if (request.Contractors != null && request.Contractors.Any())
+        {
+            foreach (var contractor in request.Contractors)
+            {
+                var exists = await _workItemRepository.ContractorExistsAsync(contractor.ContractorId);
+                if (!exists)
+                {
+                    return NotFound($"Contractor with ID {contractor.ContractorId} was not found.");
+                }
+
+                await _workItemRepository.AssignContractorToWorkAsync(
+                    milestoneId,
+                    contractor.ContractorId,
+                    contractor.AssignmentRole
+                );
+            }
+        }
+
+        return Ok(new
+        {
+            message = "Milestone updated successfully."
+        });
+    }
 }
 
