@@ -11,6 +11,10 @@ public class WorkItem
     public string? Status { get; set; }
 
     public decimal? EstimatedHours { get; set; }
+    public DateTime? ActualStart { get; set; }
+    public DateTime? ActualEnd { get; set; }
+    public decimal? ActualHours { get; set; }
+
     public string? Priority { get; set; }
     public DateTime? PlannedStart { get; set; }
     public DateTime? PlannedEnd { get; set; }

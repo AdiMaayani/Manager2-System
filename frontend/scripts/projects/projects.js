@@ -1,3 +1,15 @@
+// =====================================================
+// Projects Legacy Entry File
+// =====================================================
+// This file is intentionally kept minimal after splitting
+// the Projects page logic into dedicated module files.
+//
+// The real page initialization now lives in:
+// projects-main.js
+//
+// This file can remain empty for backward compatibility,
+// or be removed later after projects.html is fully updated.
+// =====================================================
 // נתוני הפרויקטים
 // TODO: temporary mock data until backend integration is connected
 const projectRows = {};
@@ -26,6 +38,7 @@ const PROJECT_STATUS_OPTIONS = [
   { code: "Wiring", display: "השחלה", badgeClass: "badge-warning" },
   { code: "Execution", display: "ביצוע", badgeClass: "badge-warning" },
   { code: "Closed", display: "סיום", badgeClass: "badge-success" },
+  { code: "Cancelled", display: "מבוטל", badgeClass: "badge-neutral" },
 ];
 
 const BILLING_TYPE_OPTIONS = [
@@ -1250,6 +1263,126 @@ function formatDate(dateValue, options = {}) {
     : `${day}/${month}/${year}`;
 }
 
+function calculateHoursBetween(startValue, endValue) {
+  if (!startValue || !endValue) return { value: "", display: "" };
+
+  const start = new Date(startValue);
+  const end = new Date(endValue);
+
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) {
+    return { value: "", display: "" };
+  }
+
+  const diffMs = end.getTime() - start.getTime();
+  if (diffMs <= 0) return { value: "", display: "" };
+
+  const totalMinutes = Math.floor(diffMs / (1000 * 60));
+  const hours = totalMinutes / 60;
+
+  const hh = String(Math.floor(totalMinutes / 60)).padStart(2, "0");
+  const mm = String(totalMinutes % 60).padStart(2, "0");
+
+  return {
+    value: Number(hours.toFixed(2)),
+    display: `${hh}:${mm}`,
+  };
+}
+
+function formatDecimalHoursToTime(decimalHours) {
+  if (decimalHours == null || decimalHours === "") return "-";
+
+  const numericHours = Number(decimalHours);
+
+  if (Number.isNaN(numericHours) || numericHours < 0) {
+    return "-";
+  }
+
+  const totalMinutes = Math.round(numericHours * 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+
+  return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+}
+
+function getHoursDecimalValue(hoursInputId, startValue, endValue) {
+  const input = document.getElementById(hoursInputId);
+
+  if (input?.dataset.decimalValue) {
+    return Number(input.dataset.decimalValue);
+  }
+
+  const calculated = calculateHoursBetween(startValue, endValue);
+
+  return calculated.value !== "" ? calculated.value : null;
+}
+
+function handleDatesChange(startInputId, endInputId, hoursInputId) {
+  const startInput = document.getElementById(startInputId);
+  const endInput = document.getElementById(endInputId);
+  const hoursInput = document.getElementById(hoursInputId);
+
+  if (!startInput || !endInput || !hoursInput) return;
+
+  const result = calculateHoursBetween(startInput.value, endInput.value);
+
+  hoursInput.value = result.display || "";
+  hoursInput.dataset.decimalValue = result.value || "";
+}
+
+function attachMilestoneDateHandlers() {
+  const plannedStartInput = document.getElementById(
+    "milestone-planned-start-input",
+  );
+  const plannedEndInput = document.getElementById(
+    "milestone-planned-end-input",
+  );
+
+  const actualStartInput = document.getElementById(
+    "milestone-actual-start-input",
+  );
+  const actualEndInput = document.getElementById("milestone-actual-end-input");
+
+  if (plannedStartInput) {
+    plannedStartInput.addEventListener("change", () => {
+      handleDatesChange(
+        "milestone-planned-start-input",
+        "milestone-planned-end-input",
+        "milestone-estimated-hours-input",
+      );
+    });
+  }
+
+  if (plannedEndInput) {
+    plannedEndInput.addEventListener("change", () => {
+      handleDatesChange(
+        "milestone-planned-start-input",
+        "milestone-planned-end-input",
+        "milestone-estimated-hours-input",
+      );
+    });
+  }
+
+  if (actualStartInput) {
+    actualStartInput.addEventListener("change", () => {
+      handleDatesChange(
+        "milestone-actual-start-input",
+        "milestone-actual-end-input",
+        "milestone-actual-hours-input",
+      );
+    });
+  }
+
+  if (actualEndInput) {
+    actualEndInput.addEventListener("change", () => {
+      handleDatesChange(
+        "milestone-actual-start-input",
+        "milestone-actual-end-input",
+        "milestone-actual-hours-input",
+      );
+    });
+  }
+}
+
 function getProjectStatusMeta(statusCode) {
   if (!statusCode) {
     return {
@@ -1407,6 +1540,8 @@ function renderProjectMilestones(milestones) {
 
   milestones.forEach((milestone) => {
     const statusInfo = getProjectStatusMeta(milestone.status);
+    const isLockedStatus =
+      milestone.status === "Cancelled" || milestone.status === "Closed";
     const employees = Array.isArray(milestone.employees)
       ? milestone.employees
       : [];
@@ -1441,10 +1576,25 @@ function renderProjectMilestones(milestones) {
     });
 
     const estimatedHoursText =
-      milestone.estimatedHours != null ? String(milestone.estimatedHours) : "-";
+      milestone.estimatedHours != null
+        ? formatDecimalHoursToTime(milestone.estimatedHours)
+        : "-";
 
     const priorityText = milestone.priority || "-";
     const requiredRoleText = milestone.requiredRole || "-";
+
+    const actualStartText = formatDate(milestone.actualStart, {
+      includeTime: true,
+    });
+
+    const actualEndText = formatDate(milestone.actualEnd, {
+      includeTime: true,
+    });
+
+    const actualHoursText =
+      milestone.actualHours != null
+        ? formatDecimalHoursToTime(milestone.actualHours)
+        : "-";
 
     const lockedBadge = milestone.isLocked
       ? `<span class="badge badge-warning">נעול</span>`
@@ -1469,20 +1619,22 @@ function renderProjectMilestones(milestones) {
 
     <div class="milestone-card-actions">
       <button
-        type="button"
-        class="btn btn-outline btn-sm milestone-edit-btn"
-        data-milestone-id="${escapeHtml(String(milestone.workItemId))}"
-      >
-        ערוך
-      </button>
+  type="button"
+  class="btn btn-outline btn-sm milestone-edit-btn"
+  data-milestone-id="${escapeHtml(String(milestone.workItemId))}"
+  ${isLockedStatus ? "disabled" : ""}
+>
+  ערוך
+</button>
 
-      <button
-        type="button"
-        class="btn btn-outline btn-sm milestone-delete-btn"
-        data-milestone-id="${escapeHtml(String(milestone.workItemId))}"
-      >
-        בטל
-      </button>
+<button
+  type="button"
+  class="btn btn-outline btn-sm milestone-delete-btn"
+  data-milestone-id="${escapeHtml(String(milestone.workItemId))}"
+  ${isLockedStatus ? "disabled" : ""}
+>
+  בטל
+</button>
     </div>
   </div>
 
@@ -1494,13 +1646,16 @@ function renderProjectMilestones(milestones) {
       <div class="milestone-info-row"><span>עדיפות</span><strong>${escapeHtml(priorityText)}</strong></div>
       <div class="milestone-info-row"><span>תפקיד נדרש</span><strong>${escapeHtml(requiredRoleText)}</strong></div>
       <div class="milestone-info-row"><span>הערכת שעות</span><strong>${escapeHtml(estimatedHoursText)}</strong></div>
+      <div class="milestone-info-row"><span>שעות בפועל</span><strong>${escapeHtml(actualHoursText)}</strong></div>
     </div>
 
     <div class="milestone-card-section">
       <div class="milestone-card-section-title">תאריכים</div>
       <div class="milestone-info-row"><span>תאריך יצירה</span><strong>${escapeHtml(formatDate(milestone.createdAt))}</strong></div>
       <div class="milestone-info-row"><span>תחילה מתוכננת</span><strong>${escapeHtml(plannedStartText)}</strong></div>
+      <div class="milestone-info-row"><span>תחילה בפועל</span><strong>${escapeHtml(actualStartText)}</strong></div>
       <div class="milestone-info-row"><span>סיום מתוכנן</span><strong>${escapeHtml(plannedEndText)}</strong></div>
+      <div class="milestone-info-row"><span>סיום בפועל</span><strong>${escapeHtml(actualEndText)}</strong></div>
       <div class="milestone-info-row"><span>תאריך סגירה</span><strong>${escapeHtml(closedAtText)}</strong></div>
     </div>
   </div>
@@ -1529,6 +1684,7 @@ function attachMilestoneCardHandlers() {
       e.stopPropagation();
 
       const milestoneId = Number(btn.dataset.milestoneId);
+      if (btn.disabled) return;
 
       const milestone = currentProjectMilestones.find(
         (m) => Number(m.workItemId) === milestoneId,
@@ -1549,6 +1705,8 @@ function attachMilestoneCardHandlers() {
       e.stopPropagation();
 
       const milestoneId = Number(btn.dataset.milestoneId);
+
+      if (btn.disabled) return;
 
       const confirmDelete = confirm("האם לבטל את אבן הדרך?");
       if (!confirmDelete) return;
@@ -1579,6 +1737,13 @@ async function cancelMilestoneApi(milestoneId) {
 }
 
 function openMilestoneForm(milestone = null) {
+  if (
+    milestone &&
+    (milestone.status === "Cancelled" || milestone.status === "Closed")
+  ) {
+    alert("לא ניתן לערוך אבן דרך שבוטלה או נסגרה");
+    return;
+  }
   const formCard = document.getElementById("milestone-form-card");
   if (!formCard) return;
 
@@ -1622,9 +1787,45 @@ function openMilestoneForm(milestone = null) {
             includeTime: true,
           })
         : "";
+    document.getElementById("milestone-actual-start-input").value =
+      milestone.actualStart
+        ? formatDate(milestone.actualStart, {
+            target: "input",
+            includeTime: true,
+          })
+        : "";
 
+    document.getElementById("milestone-actual-end-input").value =
+      milestone.actualEnd
+        ? formatDate(milestone.actualEnd, {
+            target: "input",
+            includeTime: true,
+          })
+        : "";
+    document.getElementById("milestone-actual-hours-input").value =
+      milestone.actualHours != null
+        ? formatDecimalHoursToTime(milestone.actualHours)
+        : "";
     document.getElementById("milestone-estimated-hours-input").value =
-      milestone.estimatedHours ?? "";
+      milestone.estimatedHours != null
+        ? formatDecimalHoursToTime(milestone.estimatedHours)
+        : "";
+
+    const estimatedHoursInput = document.getElementById(
+      "milestone-estimated-hours-input",
+    );
+
+    if (estimatedHoursInput) {
+      estimatedHoursInput.dataset.decimalValue = milestone.estimatedHours ?? "";
+    }
+
+    const actualHoursInput = document.getElementById(
+      "milestone-actual-hours-input",
+    );
+
+    if (actualHoursInput) {
+      actualHoursInput.dataset.decimalValue = milestone.actualHours ?? "";
+    }
 
     document.getElementById("milestone-required-role-input").value =
       milestone.requiredRole || "";
@@ -1648,6 +1849,9 @@ function openMilestoneForm(milestone = null) {
     document.getElementById("milestone-planned-start-input").value = "";
     document.getElementById("milestone-planned-end-input").value = "";
     document.getElementById("milestone-estimated-hours-input").value = "";
+    document.getElementById("milestone-actual-start-input").value = "";
+    document.getElementById("milestone-actual-end-input").value = "";
+    document.getElementById("milestone-actual-hours-input").value = "";
     document.getElementById("milestone-required-role-input").value = "";
     document.getElementById("milestone-description-input").value = "";
     document.getElementById("milestone-is-locked-input").checked = false;
@@ -1691,8 +1895,21 @@ function collectMilestoneFormData() {
     document.getElementById("milestone-planned-start-input")?.value || null;
   const plannedEnd =
     document.getElementById("milestone-planned-end-input")?.value || null;
-  const estimatedHoursValue =
-    document.getElementById("milestone-estimated-hours-input")?.value || "";
+
+  const actualStart =
+    document.getElementById("milestone-actual-start-input")?.value || null;
+
+  const actualEnd =
+    document.getElementById("milestone-actual-end-input")?.value || null;
+
+  const estimatedHoursInput = document.getElementById(
+    "milestone-estimated-hours-input",
+  );
+
+  const actualHoursInput = document.getElementById(
+    "milestone-actual-hours-input",
+  );
+
   const requiredRole =
     document.getElementById("milestone-required-role-input")?.value.trim() ||
     null;
@@ -1753,7 +1970,18 @@ function collectMilestoneFormData() {
     siteId,
     plannedStart,
     plannedEnd,
-    estimatedHours: estimatedHoursValue ? Number(estimatedHoursValue) : null,
+    estimatedHours: getHoursDecimalValue(
+      "milestone-estimated-hours-input",
+      plannedStart,
+      plannedEnd,
+    ),
+    actualStart,
+    actualEnd,
+    actualHours: getHoursDecimalValue(
+      "milestone-actual-hours-input",
+      actualStart,
+      actualEnd,
+    ),
     priority,
     requiredRole,
     isLocked,
@@ -1827,6 +2055,9 @@ async function createMilestoneApi(projectId, data) {
       plannedStart: data.plannedStart,
       plannedEnd: data.plannedEnd,
       estimatedHours: data.estimatedHours,
+      actualStart: data.actualStart,
+      actualEnd: data.actualEnd,
+      actualHours: data.actualHours,
       priority: data.priority,
       requiredRole: data.requiredRole,
       isLocked: data.isLocked,
@@ -1852,6 +2083,9 @@ async function updateMilestoneApi(milestoneId, data) {
       plannedStart: data.plannedStart,
       plannedEnd: data.plannedEnd,
       estimatedHours: data.estimatedHours,
+      actualStart: data.actualStart,
+      actualEnd: data.actualEnd,
+      actualHours: data.actualHours,
       priority: data.priority,
       requiredRole: data.requiredRole,
       isLocked: data.isLocked,
@@ -2937,6 +3171,8 @@ function handleProjectDeepLink() {
 }
 
 if (window.lucide) lucide.createIcons();
+
+attachMilestoneDateHandlers();
 
 window.bootProtectedPage(() => {
   loadProjectsFromApi();

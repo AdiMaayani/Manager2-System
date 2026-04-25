@@ -977,12 +977,11 @@
                           <div class="details-field">
                             <div class="details-field-label">הערכת שעות</div>
                             <input
-                              type="number"
+                              type="text"
                               class="input"
                               id="milestone-estimated-hours-input"
-                              min="0"
-                              step="0.5"
-                              placeholder="לדוגמה: 8"
+                              placeholder="מחושב אוטומטית או ידני"
+                              readonly
                             />
                           </div>
 
@@ -993,6 +992,35 @@
                               class="input"
                               id="milestone-required-role-input"
                               placeholder="לדוגמה: חשמלאי / מתכנן"
+                            />
+                          </div>
+
+                          <div class="details-field">
+                            <div class="details-field-label">תחילה בפועל</div>
+                            <input
+                              type="datetime-local"
+                              class="input"
+                              id="milestone-actual-start-input"
+                            />
+                          </div>
+
+                          <div class="details-field">
+                            <div class="details-field-label">סיום בפועל</div>
+                            <input
+                              type="datetime-local"
+                              class="input"
+                              id="milestone-actual-end-input"
+                            />
+                          </div>
+
+                          <div class="details-field">
+                            <div class="details-field-label">שעות בפועל</div>
+                            <input
+                              type="text"
+                              class="input"
+                              id="milestone-actual-hours-input"
+                              placeholder="מחושב אוטומטית"
+                              readonly
                             />
                           </div>
                         </div>
@@ -1430,6 +1458,17 @@
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="../scripts/ui.js"></script>
     <script src="../scripts/api.js"></script>
-    <script src="../scripts/projects.js"></script>
+    <script src="../scripts/projects/projects-state.js"></script>
+    <script src="../scripts/projects/projects-utils.js"></script>
+    <script src="../scripts/projects/projects-api.js"></script>
+    <script src="../scripts/projects/projects-drawer.js"></script>
+    <script src="../scripts/projects/projects-overview.js"></script>
+    <script src="../scripts/projects/projects-milestones.js"></script>
+    <script src="../scripts/projects/projects-boq.js"></script>
+    <script src="../scripts/projects/projects-drawings.js"></script>
+    <script src="../scripts/projects/projects-equipment.js"></script>
+    <script src="../scripts/projects/projects-events.js"></script>
+    <script src="../scripts/projects/projects-main.js"></script>
+    <!-- <script src="../scripts/projects/projects.js"></script> -->
   </body>
 </html>
