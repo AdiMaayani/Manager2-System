@@ -817,5 +817,33 @@ public class WorkItemsController : ControllerBase
             message = "Milestone updated successfully."
         });
     }
+
+    [HttpPut("milestones/{milestoneId}/cancel")]
+    public async Task<IActionResult> SoftDeleteMilestone(int milestoneId)
+    {
+        var existingMilestone = await _workItemRepository.GetByIdAsync(milestoneId);
+
+        if (existingMilestone == null)
+        {
+            return NotFound($"Milestone with ID {milestoneId} was not found.");
+        }
+
+        if (!string.Equals(existingMilestone.WorkType, "Task", StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest($"WorkItem {milestoneId} is not a milestone/task.");
+        }
+
+        var deleted = await _workItemRepository.SoftDeleteMilestoneAsync(milestoneId);
+
+        if (!deleted)
+        {
+            return BadRequest("Failed to cancel milestone.");
+        }
+
+        return Ok(new
+        {
+            message = "Milestone cancelled successfully."
+        });
+    }
 }
 

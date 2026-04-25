@@ -16,6 +16,8 @@ let currentProjectId = null;
 let isCreateMode = false;
 let customersById = {};
 let sitesById = {};
+let currentProjectMilestones = [];
+let editingMilestoneId = null;
 
 const PROJECT_STATUS_OPTIONS = [
   { code: "Open", display: "פתוח", badgeClass: "badge-neutral" },
@@ -109,18 +111,38 @@ async function openProject(id) {
   updateTeamView(p.managers, p.team);
 
   if (isTemporaryNewProject) {
-    renderProjectMilestones([]);
+    currentProjectMilestones = [];
+    renderProjectMilestones(currentProjectMilestones);
   } else {
-    const projectMilestones = await loadProjectMilestonesFromApi(id);
-    renderProjectMilestones(projectMilestones);
+    currentProjectMilestones = await loadProjectMilestonesFromApi(id);
+    renderProjectMilestones(currentProjectMilestones);
   }
 
   exitEditMode();
   updateMaximizeButtonState();
+  setDefaultProjectTab();
 
   projOverlay.classList.add("is-open");
   document.body.classList.add("drawer-open");
   setTimeout(updateTabbarArrows, 150);
+}
+
+function setDefaultProjectTab() {
+  document
+    .querySelectorAll(".project-drawer-tabs .tab")
+    .forEach((tab) => tab.classList.remove("active"));
+
+  document
+    .querySelectorAll(".tab-content")
+    .forEach((content) => content.classList.remove("active"));
+
+  const overviewTab = document.querySelector(
+    '.project-drawer-tabs .tab[data-tab="overview"]',
+  );
+  const overviewContent = document.getElementById("overview-content");
+
+  if (overviewTab) overviewTab.classList.add("active");
+  if (overviewContent) overviewContent.classList.add("active");
 }
 
 function closeProjectDrawer() {
@@ -274,6 +296,9 @@ function createSnapshot() {
     closeDate: p.closeDate,
     number: p.number,
     financeNumber: p.financeNumber,
+    invoiceNumber: p.invoiceNumber,
+    billingType: p.billingType,
+    description: p.description,
     team: team,
     boq: boqData,
     drawings: drawingsData,
@@ -405,6 +430,11 @@ function cancelEdit() {
   p.closeDate = projectSnapshot.closeDate;
   p.number = projectSnapshot.number;
   p.financeNumber = projectSnapshot.financeNumber;
+  p.invoiceNumber = projectSnapshot.invoiceNumber;
+
+  p.billingType = projectSnapshot.billingType;
+
+  p.description = projectSnapshot.description;
 
   // Update UI
   document.getElementById("proj-name").textContent = p.name;
@@ -415,6 +445,14 @@ function cancelEdit() {
   document.getElementById("proj-number").textContent = p.number || "-";
   document.getElementById("proj-finance-number").textContent =
     p.financeNumber || "-";
+  document.getElementById("proj-invoice-number").textContent =
+    p.invoiceNumber || "-";
+
+  document.getElementById("proj-billing-type").textContent =
+    p.billingType || "-";
+
+  document.getElementById("proj-description").textContent =
+    p.description || "-";
 
   // Restore team from snapshot
   p.managers = Array.isArray(projectSnapshot.managers)
@@ -1180,7 +1218,7 @@ function resetProjectCreateState() {
   isCreateMode = false;
 }
 
-function formatDateForInput(dateValue) {
+function formatDateForInput(dateValue, includeTime = false) {
   if (!dateValue) return "";
 
   const date = new Date(dateValue);
@@ -1190,7 +1228,14 @@ function formatDateForInput(dateValue) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
 
-  return `${year}-${month}-${day}`;
+  if (!includeTime) {
+    return `${year}-${month}-${day}`;
+  }
+
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+
+  return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
 function formatProjectDate(dateValue) {
@@ -1400,50 +1445,414 @@ function renderProjectMilestones(milestones) {
       milestone.estimatedHours != null ? String(milestone.estimatedHours) : "-";
 
     const priorityText = milestone.priority || "-";
+    const requiredRoleText = milestone.requiredRole || "-";
 
     const lockedBadge = milestone.isLocked
       ? `<span class="badge badge-warning">נעול</span>`
       : "";
 
     const milestoneCard = document.createElement("div");
-    milestoneCard.className = "card";
+    milestoneCard.className = "card milestone-card";
+
     milestoneCard.innerHTML = `
-      <div class="flex justify-content-between align-items-start mb-sm">
-        <div>
-          <div class="font-semibold mb-xs">${escapeHtml(milestone.title || "-")}</div>
-          <div class="text-sm text-neutral-600">
-            ${escapeHtml(milestone.description || "ללא תיאור")}
-          </div>
-        </div>
-        <div class="flex gap-sm align-items-center">
-          <span class="badge ${escapeHtml(statusInfo.badgeClass)}">${escapeHtml(statusInfo.display)}</span>
-          ${lockedBadge}
-        </div>
+  <div class="milestone-card-header">
+    <div class="milestone-card-main">
+      <div class="milestone-card-title-row">
+        <h4 class="milestone-card-title">${escapeHtml(milestone.title || "-")}</h4>
+        <span class="badge ${escapeHtml(statusInfo.badgeClass)}">${escapeHtml(statusInfo.display)}</span>
+        ${lockedBadge}
       </div>
 
-      <div class="grid grid-cols-2 gap-md mt-sm">
-        <div>
-          <div class="text-sm"><strong>מזהה משימה:</strong> #${escapeHtml(String(milestone.workItemId || "-"))}</div>
-          <div class="text-sm"><strong>סוג:</strong> ${escapeHtml(milestone.workType || "-")}</div>
-          <div class="text-sm"><strong>עדיפות:</strong> ${escapeHtml(priorityText)}</div>
-          <div class="text-sm"><strong>הערכת שעות:</strong> ${escapeHtml(estimatedHoursText)}</div>
-        </div>
-
-        <div>
-          <div class="text-sm"><strong>תאריך יצירה:</strong> ${escapeHtml(formatProjectDate(milestone.createdAt))}</div>
-          <div class="text-sm"><strong>תחילה מתוכננת:</strong> ${escapeHtml(plannedStartText)}</div>
-          <div class="text-sm"><strong>סיום מתוכנן:</strong> ${escapeHtml(plannedEndText)}</div>
-          <div class="text-sm"><strong>תאריך סגירה:</strong> ${escapeHtml(closedAtText)}</div>
-        </div>
+      <div class="milestone-card-description">
+        ${escapeHtml(milestone.description || "ללא תיאור")}
       </div>
+    </div>
 
-      <div class="mt-sm">
-        <div class="text-sm"><strong>עובדים משויכים:</strong> ${escapeHtml(assignedEmployeesText)}</div>
-        <div class="text-sm"><strong>קבלנים משויכים:</strong> ${escapeHtml(assignedContractorsText)}</div>
-      </div>
-    `;
+    <div class="milestone-card-actions">
+      <button
+        type="button"
+        class="btn btn-outline btn-sm milestone-edit-btn"
+        data-milestone-id="${escapeHtml(String(milestone.workItemId))}"
+      >
+        ערוך
+      </button>
+
+      <button
+        type="button"
+        class="btn btn-outline btn-sm milestone-delete-btn"
+        data-milestone-id="${escapeHtml(String(milestone.workItemId))}"
+      >
+        בטל
+      </button>
+    </div>
+  </div>
+
+  <div class="milestone-card-grid">
+    <div class="milestone-card-section">
+      <div class="milestone-card-section-title">פרטי משימה</div>
+      <div class="milestone-info-row"><span>מזהה</span><strong>#${escapeHtml(String(milestone.workItemId || "-"))}</strong></div>
+      <div class="milestone-info-row"><span>סוג</span><strong>${escapeHtml(milestone.workType || "-")}</strong></div>
+      <div class="milestone-info-row"><span>עדיפות</span><strong>${escapeHtml(priorityText)}</strong></div>
+      <div class="milestone-info-row"><span>תפקיד נדרש</span><strong>${escapeHtml(requiredRoleText)}</strong></div>
+      <div class="milestone-info-row"><span>הערכת שעות</span><strong>${escapeHtml(estimatedHoursText)}</strong></div>
+    </div>
+
+    <div class="milestone-card-section">
+      <div class="milestone-card-section-title">תאריכים</div>
+      <div class="milestone-info-row"><span>תאריך יצירה</span><strong>${escapeHtml(formatProjectDate(milestone.createdAt))}</strong></div>
+      <div class="milestone-info-row"><span>תחילה מתוכננת</span><strong>${escapeHtml(plannedStartText)}</strong></div>
+      <div class="milestone-info-row"><span>סיום מתוכנן</span><strong>${escapeHtml(plannedEndText)}</strong></div>
+      <div class="milestone-info-row"><span>תאריך סגירה</span><strong>${escapeHtml(closedAtText)}</strong></div>
+    </div>
+  </div>
+
+  <div class="milestone-card-assignments">
+    <div class="milestone-info-row">
+      <span>עובדים משויכים</span>
+      <strong>${escapeHtml(assignedEmployeesText)}</strong>
+    </div>
+    <div class="milestone-info-row">
+      <span>קבלנים משויכים</span>
+      <strong>${escapeHtml(assignedContractorsText)}</strong>
+    </div>
+  </div>
+`;
 
     milestonesContainer.appendChild(milestoneCard);
+  });
+  attachMilestoneCardHandlers();
+}
+
+function attachMilestoneCardHandlers() {
+  // Edit
+  document.querySelectorAll(".milestone-edit-btn").forEach((btn) => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+
+      const milestoneId = Number(btn.dataset.milestoneId);
+
+      const milestone = currentProjectMilestones.find(
+        (m) => Number(m.workItemId) === milestoneId,
+      );
+
+      if (!milestone) {
+        alert("אבן דרך לא נמצאה");
+        return;
+      }
+
+      openMilestoneForm(milestone);
+    });
+  });
+
+  // Soft Delete (Cancel)
+  document.querySelectorAll(".milestone-delete-btn").forEach((btn) => {
+    btn.addEventListener("click", async (e) => {
+      e.stopPropagation();
+
+      const milestoneId = Number(btn.dataset.milestoneId);
+
+      const confirmDelete = confirm("האם לבטל את אבן הדרך?");
+      if (!confirmDelete) return;
+
+      try {
+        await cancelMilestoneApi(milestoneId);
+
+        alert("אבן הדרך בוטלה");
+
+        const currentProject = projectRows[currentProjectId];
+
+        currentProjectMilestones =
+          await loadProjectMilestonesFromApi(currentProjectId);
+
+        renderProjectMilestones(currentProjectMilestones);
+      } catch (error) {
+        console.error("Cancel milestone failed:", error);
+        alert("ביטול אבן הדרך נכשל");
+      }
+    });
+  });
+}
+
+async function cancelMilestoneApi(milestoneId) {
+  await apiRequest(`/WorkItems/milestones/${milestoneId}/cancel`, {
+    method: "PUT",
+  });
+}
+
+function openMilestoneForm(milestone = null) {
+  const formCard = document.getElementById("milestone-form-card");
+  if (!formCard) return;
+
+  formCard.style.display = "block";
+  formCard.scrollIntoView({
+    behavior: "smooth",
+    block: "start",
+  });
+
+  if (milestone) {
+    // מצב עריכה
+    editingMilestoneId = milestone.workItemId;
+
+    document.getElementById("milestone-form-title").textContent =
+      "עריכת אבן דרך";
+
+    document.getElementById("milestone-title-input").value =
+      milestone.title || "";
+
+    document.getElementById("milestone-status-input").value =
+      milestone.status || "Planned";
+
+    document.getElementById("milestone-billing-type-input").value =
+      milestone.billingType || "Internal";
+
+    document.getElementById("milestone-priority-input").value =
+      milestone.priority || "";
+
+    document.getElementById("milestone-planned-start-input").value =
+      milestone.plannedStart
+        ? formatDateForInput(milestone.plannedStart, true)
+        : "";
+
+    document.getElementById("milestone-planned-end-input").value =
+      milestone.plannedEnd
+        ? formatDateForInput(milestone.plannedEnd, true)
+        : "";
+
+    document.getElementById("milestone-estimated-hours-input").value =
+      milestone.estimatedHours ?? "";
+
+    document.getElementById("milestone-required-role-input").value =
+      milestone.requiredRole || "";
+
+    document.getElementById("milestone-description-input").value =
+      milestone.description || "";
+
+    document.getElementById("milestone-is-locked-input").checked =
+      !!milestone.isLocked;
+  } else {
+    // מצב יצירה
+    editingMilestoneId = null;
+
+    document.getElementById("milestone-form-title").textContent =
+      "אבן דרך חדשה";
+
+    document.getElementById("milestone-title-input").value = "";
+    document.getElementById("milestone-status-input").value = "Planned";
+    document.getElementById("milestone-billing-type-input").value = "Internal";
+    document.getElementById("milestone-priority-input").value = "";
+    document.getElementById("milestone-planned-start-input").value = "";
+    document.getElementById("milestone-planned-end-input").value = "";
+    document.getElementById("milestone-estimated-hours-input").value = "";
+    document.getElementById("milestone-required-role-input").value = "";
+    document.getElementById("milestone-description-input").value = "";
+    document.getElementById("milestone-is-locked-input").checked = false;
+  }
+}
+
+function closeMilestoneForm() {
+  const formCard = document.getElementById("milestone-form-card");
+  if (!formCard) return;
+
+  formCard.style.display = "none";
+  editingMilestoneId = null;
+}
+
+const milestoneAddBtn = document.getElementById("milestone-add-btn");
+const milestoneCancelBtn = document.getElementById("milestone-cancel-btn");
+
+if (milestoneAddBtn) {
+  milestoneAddBtn.addEventListener("click", () => {
+    openMilestoneForm();
+  });
+}
+
+if (milestoneCancelBtn) {
+  milestoneCancelBtn.addEventListener("click", () => {
+    closeMilestoneForm();
+  });
+}
+
+function collectMilestoneFormData() {
+  const title =
+    document.getElementById("milestone-title-input")?.value.trim() || "";
+  const status =
+    document.getElementById("milestone-status-input")?.value || "Planned";
+  const billingType =
+    document.getElementById("milestone-billing-type-input")?.value ||
+    "Internal";
+  const priority =
+    document.getElementById("milestone-priority-input")?.value || null;
+  const plannedStart =
+    document.getElementById("milestone-planned-start-input")?.value || null;
+  const plannedEnd =
+    document.getElementById("milestone-planned-end-input")?.value || null;
+  const estimatedHoursValue =
+    document.getElementById("milestone-estimated-hours-input")?.value || "";
+  const requiredRole =
+    document.getElementById("milestone-required-role-input")?.value.trim() ||
+    null;
+  const description =
+    document.getElementById("milestone-description-input")?.value.trim() ||
+    null;
+  const isLocked =
+    document.getElementById("milestone-is-locked-input")?.checked || false;
+
+  if (!title) {
+    alert("יש להזין שם אבן דרך");
+    return null;
+  }
+
+  if (plannedStart && plannedEnd) {
+    const startDate = new Date(plannedStart);
+    const endDate = new Date(plannedEnd);
+
+    if (Number.isNaN(startDate.getTime()) || Number.isNaN(endDate.getTime())) {
+      alert("אחד מתאריכי התכנון אינו תקין");
+      return null;
+    }
+
+    if (endDate < startDate) {
+      alert("תאריך סיום מתוכנן לא יכול להיות לפני תאריך התחלה מתוכנן");
+      return null;
+    }
+  }
+
+  const currentProject = projectRows[currentProjectId];
+
+  if (!currentProject || !currentProject.workItemId) {
+    alert("לא נמצא פרויקט פעיל");
+    return null;
+  }
+
+  const raw = currentProject.raw || {};
+
+  const customerId = Number(raw.customerId || currentProject.customerId || 0);
+  const siteId = Number(raw.siteId || currentProject.siteId || 0);
+
+  if (customerId <= 0) {
+    alert("חסר לקוח בפרויקט");
+    return null;
+  }
+
+  if (siteId <= 0) {
+    alert("חסר אתר בפרויקט");
+    return null;
+  }
+
+  return {
+    title,
+    description,
+    status,
+    billingType,
+    customerId,
+    siteId,
+    plannedStart,
+    plannedEnd,
+    estimatedHours: estimatedHoursValue ? Number(estimatedHoursValue) : null,
+    priority,
+    requiredRole,
+    isLocked,
+    employees: [],
+    contractors: [],
+  };
+}
+
+async function saveMilestoneFromForm() {
+  const saveBtn = document.getElementById("milestone-save-btn");
+
+  const formData = collectMilestoneFormData();
+  if (!formData) return;
+
+  const currentProject = projectRows[currentProjectId];
+
+  if (!currentProject || !currentProject.workItemId) {
+    alert("לא נמצא פרויקט פעיל");
+    return;
+  }
+
+  try {
+    if (saveBtn) {
+      saveBtn.disabled = true;
+      saveBtn.textContent = "שומר...";
+    }
+
+    if (editingMilestoneId) {
+      await updateMilestoneApi(editingMilestoneId, formData);
+      alert("אבן הדרך עודכנה בהצלחה");
+    } else {
+      await createMilestoneApi(currentProject.workItemId, formData);
+      alert("אבן הדרך נוספה בהצלחה");
+    }
+
+    closeMilestoneForm();
+
+    currentProjectMilestones =
+      await loadProjectMilestonesFromApi(currentProjectId);
+
+    renderProjectMilestones(currentProjectMilestones);
+  } catch (error) {
+    console.error("Save milestone failed:", error);
+    alert(error.message || "שמירת אבן הדרך נכשלה");
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.textContent = "שמור אבן דרך";
+    }
+  }
+}
+
+const milestoneSaveBtn = document.getElementById("milestone-save-btn");
+
+if (milestoneSaveBtn) {
+  milestoneSaveBtn.addEventListener("click", () => {
+    saveMilestoneFromForm();
+  });
+}
+
+async function createMilestoneApi(projectId, data) {
+  const response = await apiRequest(`/WorkItems/${projectId}/milestones`, {
+    method: "POST",
+    body: JSON.stringify({
+      title: data.title,
+      description: data.description,
+      status: data.status,
+      billingType: data.billingType,
+      customerId: data.customerId,
+      siteId: data.siteId,
+      plannedStart: data.plannedStart,
+      plannedEnd: data.plannedEnd,
+      estimatedHours: data.estimatedHours,
+      priority: data.priority,
+      requiredRole: data.requiredRole,
+      isLocked: data.isLocked,
+      employees: data.employees || [],
+      contractors: data.contractors || [],
+    }),
+  });
+
+  return response;
+}
+
+async function updateMilestoneApi(milestoneId, data) {
+  await apiRequest(`/WorkItems/milestones/${milestoneId}`, {
+    method: "PUT",
+    body: JSON.stringify({
+      workItemId: milestoneId,
+      title: data.title,
+      description: data.description,
+      status: data.status,
+      billingType: data.billingType,
+      customerId: data.customerId,
+      siteId: data.siteId,
+      plannedStart: data.plannedStart,
+      plannedEnd: data.plannedEnd,
+      estimatedHours: data.estimatedHours,
+      priority: data.priority,
+      requiredRole: data.requiredRole,
+      isLocked: data.isLocked,
+      employees: data.employees || [],
+      contractors: data.contractors || [],
+    }),
   });
 }
 
@@ -1488,6 +1897,8 @@ async function loadProjectsFromApi() {
               title: project.title || "",
               status: project.status || "",
               createdAt: project.createdAt || null,
+              customerId: project.customerId || null,
+              siteId: project.siteId || null,
               customerName: project.customerName || "",
               siteName: project.siteName || "",
               projectManagerName: project.projectManagerName || "",
@@ -2432,7 +2843,10 @@ document.querySelectorAll(".project-drawer-tabs .tab").forEach((tab) => {
       .querySelectorAll(".tab-content")
       .forEach((c) => c.classList.remove("active"));
     tab.classList.add("active");
-    document.getElementById(key + "-content").classList.add("active");
+    const content = document.getElementById(key + "-content");
+    if (content) {
+      content.classList.add("active");
+    }
   });
 });
 
@@ -2492,8 +2906,6 @@ if (stageMenu) {
   });
 }
 
-lucide.createIcons();
-
 function handleProjectDeepLink() {
   const urlParams = new URLSearchParams(window.location.search);
   const rawProjectId = urlParams.get("projectId");
@@ -2527,6 +2939,8 @@ function handleProjectDeepLink() {
     row.scrollIntoView({ behavior: "smooth", block: "center" });
   }
 }
+
+if (window.lucide) lucide.createIcons();
 
 window.bootProtectedPage(() => {
   loadProjectsFromApi();
