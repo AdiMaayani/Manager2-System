@@ -5,6 +5,7 @@ using Microsoft.Data.SqlClient;
 
 namespace ManageR2.Infrastructure.Repositories;
 
+// Repository implementation that isolates lifecycle DB access from API/controller layers.
 public class ProjectLifecycleRepository : IProjectLifecycleRepository
 {
     private readonly DBServices _dbServices;
@@ -19,6 +20,7 @@ public class ProjectLifecycleRepository : IProjectLifecycleRepository
         await using var connection = _dbServices.CreateConnection();
         await connection.OpenAsync();
 
+        // Uses one stored procedure to fetch the full lifecycle as multiple ordered result sets.
         await using var command = new SqlCommand("dbo.sp_GetProjectLifecycle", connection)
         {
             CommandType = CommandType.StoredProcedure
@@ -29,15 +31,19 @@ public class ProjectLifecycleRepository : IProjectLifecycleRepository
 
         if (!await reader.ReadAsync())
         {
+            // First result set is project header; no row means project was not found.
             return null;
         }
 
+        // Result set 1: project.
         var project = MapProject(reader);
+        // Result set containers for lifecycle sections.
         var milestones = new List<ProjectLifecycleMilestoneModel>();
         var assignments = new List<ProjectLifecycleAssignmentModel>();
         var reports = new List<ProjectLifecycleReportModel>();
         var summary = new ProjectLifecycleSummaryModel();
 
+        // Result set 2: milestones.
         if (await reader.NextResultAsync())
         {
             while (await reader.ReadAsync())
@@ -46,6 +52,7 @@ public class ProjectLifecycleRepository : IProjectLifecycleRepository
             }
         }
 
+        // Result set 3: assignments.
         if (await reader.NextResultAsync())
         {
             while (await reader.ReadAsync())
@@ -54,6 +61,7 @@ public class ProjectLifecycleRepository : IProjectLifecycleRepository
             }
         }
 
+        // Result set 4: reports.
         if (await reader.NextResultAsync())
         {
             while (await reader.ReadAsync())
@@ -62,11 +70,13 @@ public class ProjectLifecycleRepository : IProjectLifecycleRepository
             }
         }
 
+        // Result set 5: single summary row with progress, risk, and health indicators.
         if (await reader.NextResultAsync() && await reader.ReadAsync())
         {
             summary = MapSummary(reader);
         }
 
+        // Combines all mapped sections into one domain model for API mapping.
         return new ProjectLifecycleModel
         {
             Project = project,
@@ -79,6 +89,7 @@ public class ProjectLifecycleRepository : IProjectLifecycleRepository
 
     private static ProjectLifecycleProjectModel MapProject(SqlDataReader reader)
     {
+        // Maps project columns from DB to infrastructure model.
         return new ProjectLifecycleProjectModel
         {
             WorkItemId = Convert.ToInt32(reader["WorkItemId"]),
@@ -100,6 +111,7 @@ public class ProjectLifecycleRepository : IProjectLifecycleRepository
 
     private static ProjectLifecycleMilestoneModel MapMilestone(SqlDataReader reader)
     {
+        // Maps milestone columns from DB to infrastructure model.
         return new ProjectLifecycleMilestoneModel
         {
             WorkItemId = reader["WorkItemId"] != DBNull.Value ? Convert.ToInt32(reader["WorkItemId"]) : 0,
@@ -120,8 +132,10 @@ public class ProjectLifecycleRepository : IProjectLifecycleRepository
 
     private static ProjectLifecycleAssignmentModel MapAssignment(SqlDataReader reader)
     {
+        // AssignmentType fallback avoids null string values in downstream layers.
         var assignmentType = GetStringOrNull(reader, "AssignmentType") ?? string.Empty;
 
+        // Maps assignment columns from DB to infrastructure model.
         return new ProjectLifecycleAssignmentModel
         {
             WorkItemId = reader["WorkItemId"] != DBNull.Value ? Convert.ToInt32(reader["WorkItemId"]) : 0,
@@ -138,6 +152,7 @@ public class ProjectLifecycleRepository : IProjectLifecycleRepository
 
     private static ProjectLifecycleReportModel MapReport(SqlDataReader reader)
     {
+        // Maps report columns from DB to infrastructure model.
         return new ProjectLifecycleReportModel
         {
             WorkReportId = reader["WorkReportId"] != DBNull.Value ? Convert.ToInt32(reader["WorkReportId"]) : 0,
@@ -154,6 +169,8 @@ public class ProjectLifecycleRepository : IProjectLifecycleRepository
 
     private static ProjectLifecycleSummaryModel MapSummary(SqlDataReader reader)
     {
+        // Maps aggregated summary values computed by the stored procedure.
+        // RiskLevel, HealthStatus, and RiskReason are business indicators for lifecycle monitoring.
         return new ProjectLifecycleSummaryModel
         {
             TotalMilestones = reader["TotalMilestones"] != DBNull.Value ? Convert.ToInt32(reader["TotalMilestones"]) : 0,
@@ -175,16 +192,19 @@ public class ProjectLifecycleRepository : IProjectLifecycleRepository
 
     private static string? GetStringOrNull(SqlDataReader reader, string columnName)
     {
+        // Converts DB nulls to C# null for optional text fields.
         return reader[columnName] == DBNull.Value ? null : reader[columnName]?.ToString();
     }
 
     private static DateTime? GetDateTimeOrNull(SqlDataReader reader, string columnName)
     {
+        // Converts DB nulls to nullable DateTime for optional dates.
         return reader[columnName] == DBNull.Value ? null : Convert.ToDateTime(reader[columnName]);
     }
 
     private static decimal? GetDecimalOrNull(SqlDataReader reader, string columnName)
     {
+        // Converts DB nulls to nullable decimal for optional numeric fields.
         return reader[columnName] == DBNull.Value ? null : Convert.ToDecimal(reader[columnName]);
     }
 }

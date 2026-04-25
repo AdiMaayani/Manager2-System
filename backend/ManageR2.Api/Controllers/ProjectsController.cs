@@ -6,6 +6,7 @@ namespace ManageR2.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+// Thin controller: handles HTTP concerns and delegates lifecycle data loading to the repository.
 public class ProjectsController : ControllerBase
 {
     private readonly IProjectLifecycleRepository _projectLifecycleRepository;
@@ -16,8 +17,10 @@ public class ProjectsController : ControllerBase
     }
 
     [HttpGet("{id:int}/lifecycle")]
+    // Returns the full project lifecycle view for one project id.
     public async Task<ActionResult<ProjectLifecycleDto>> GetLifecycle(int id)
     {
+        // Repository pattern keeps data access and stored procedure details outside the controller.
         var lifecycle = await _projectLifecycleRepository.GetProjectLifecycleAsync(id);
 
         if (lifecycle == null)
@@ -25,8 +28,10 @@ public class ProjectsController : ControllerBase
             return NotFound(new { message = $"Project with id {id} was not found." });
         }
 
+        // Maps Infrastructure model objects to API DTOs returned to the frontend.
         var dto = new ProjectLifecycleDto
         {
+            // Project header section.
             Project = new ProjectLifecycleProjectDto
             {
                 WorkItemId = lifecycle.Project.WorkItemId,
@@ -44,6 +49,7 @@ public class ProjectsController : ControllerBase
                 FinanceProjectNumber = lifecycle.Project.FinanceProjectNumber,
                 InvoiceNumber = lifecycle.Project.InvoiceNumber
             },
+            // Milestone list section.
             Milestones = lifecycle.Milestones.Select(m => new ProjectLifecycleMilestoneDto
             {
                 WorkItemId = m.WorkItemId,
@@ -60,6 +66,7 @@ public class ProjectsController : ControllerBase
                 RequiredRole = m.RequiredRole,
                 IsLocked = m.IsLocked
             }).ToList(),
+            // Assignment list section.
             Assignments = lifecycle.Assignments.Select(a => new ProjectLifecycleAssignmentDto
             {
                 WorkItemId = a.WorkItemId,
@@ -72,6 +79,7 @@ public class ProjectsController : ControllerBase
                 EmployeeName = a.EmployeeName,
                 ContractorName = a.ContractorName
             }).ToList(),
+            // Work report list section.
             Reports = lifecycle.Reports.Select(r => new ProjectLifecycleReportDto
             {
                 WorkReportId = r.WorkReportId,
@@ -84,6 +92,7 @@ public class ProjectsController : ControllerBase
                 Status = r.Status,
                 FollowUpRequired = r.FollowUpRequired
             }).ToList(),
+            // Summary section includes progress, risk, and health indicators.
             Summary = new ProjectLifecycleSummaryDto
             {
                 TotalMilestones = lifecycle.Summary.TotalMilestones,

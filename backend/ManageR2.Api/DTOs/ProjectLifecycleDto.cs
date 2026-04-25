@@ -1,14 +1,21 @@
 namespace ManageR2.Api.DTOs;
 
+// API response contract for the project lifecycle endpoint.
 public class ProjectLifecycleDto
 {
+    // Core project details.
     public ProjectLifecycleProjectDto Project { get; set; } = new();
+    // Related milestones in the lifecycle.
     public List<ProjectLifecycleMilestoneDto> Milestones { get; set; } = new();
+    // Related assignments across project and milestones.
     public List<ProjectLifecycleAssignmentDto> Assignments { get; set; } = new();
+    // Related work reports used for timeline and follow-up visibility.
     public List<ProjectLifecycleReportDto> Reports { get; set; } = new();
+    // Aggregated lifecycle indicators such as progress, risk, and health.
     public ProjectLifecycleSummaryDto Summary { get; set; } = new();
 }
 
+// DTO for top-level project metadata shown in lifecycle view.
 public class ProjectLifecycleProjectDto
 {
     public int WorkItemId { get; set; }
@@ -27,6 +34,7 @@ public class ProjectLifecycleProjectDto
     public string? InvoiceNumber { get; set; }
 }
 
+// DTO for milestone-level lifecycle information.
 public class ProjectLifecycleMilestoneDto
 {
     public int WorkItemId { get; set; }
@@ -44,6 +52,7 @@ public class ProjectLifecycleMilestoneDto
     public bool IsLocked { get; set; }
 }
 
+// DTO for employee or contractor assignment details.
 public class ProjectLifecycleAssignmentDto
 {
     public int WorkItemId { get; set; }
@@ -57,6 +66,7 @@ public class ProjectLifecycleAssignmentDto
     public string? ContractorName { get; set; }
 }
 
+// DTO for work report history linked to lifecycle tracking.
 public class ProjectLifecycleReportDto
 {
     public int WorkReportId { get; set; }
@@ -70,6 +80,7 @@ public class ProjectLifecycleReportDto
     public bool FollowUpRequired { get; set; }
 }
 
+// DTO for aggregated counts and status indicators returned to the UI summary.
 public class ProjectLifecycleSummaryDto
 {
     public int TotalMilestones { get; set; }

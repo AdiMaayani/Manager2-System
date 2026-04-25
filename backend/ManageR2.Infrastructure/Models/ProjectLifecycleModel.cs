@@ -1,14 +1,21 @@
 namespace ManageR2.Infrastructure.Models;
 
+// Domain model built from DB results before mapping to API DTOs.
 public class ProjectLifecycleModel
 {
+    // Project row from the first result set.
     public ProjectLifecycleProjectModel Project { get; set; } = new();
+    // Milestone rows from the second result set.
     public List<ProjectLifecycleMilestoneModel> Milestones { get; set; } = new();
+    // Assignment rows from the third result set.
     public List<ProjectLifecycleAssignmentModel> Assignments { get; set; } = new();
+    // Report rows from the fourth result set.
     public List<ProjectLifecycleReportModel> Reports { get; set; } = new();
+    // Summary row from the final result set.
     public ProjectLifecycleSummaryModel Summary { get; set; } = new();
 }
 
+// Infrastructure model for top-level project lifecycle fields.
 public class ProjectLifecycleProjectModel
 {
     public int WorkItemId { get; set; }
@@ -27,6 +34,7 @@ public class ProjectLifecycleProjectModel
     public string? InvoiceNumber { get; set; }
 }
 
+// Infrastructure model for milestone lifecycle fields.
 public class ProjectLifecycleMilestoneModel
 {
     public int WorkItemId { get; set; }
@@ -44,6 +52,7 @@ public class ProjectLifecycleMilestoneModel
     public bool IsLocked { get; set; }
 }
 
+// Infrastructure model for assignment lifecycle fields.
 public class ProjectLifecycleAssignmentModel
 {
     public int WorkItemId { get; set; }
@@ -57,6 +66,7 @@ public class ProjectLifecycleAssignmentModel
     public string? ContractorName { get; set; }
 }
 
+// Infrastructure model for work report lifecycle fields.
 public class ProjectLifecycleReportModel
 {
     public int WorkReportId { get; set; }
@@ -70,6 +80,7 @@ public class ProjectLifecycleReportModel
     public bool FollowUpRequired { get; set; }
 }
 
+// Infrastructure model for aggregated lifecycle summary values.
 public class ProjectLifecycleSummaryModel
 {
     public int TotalMilestones { get; set; }
