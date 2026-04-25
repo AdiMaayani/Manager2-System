@@ -208,8 +208,8 @@
                         <div class="filter-dropdown-item" data-stage="all">
                           הכל
                         </div>
-                        <div class="filter-dropdown-item" data-stage="תכנון">
-                          תכנון
+                        <div class="filter-dropdown-item" data-stage="בתכנון">
+                          בתכנון
                         </div>
                         <div class="filter-dropdown-item" data-stage="תוכניות">
                           תוכניות
@@ -592,27 +592,6 @@
                       <div class="details-field-value" id="proj-finance-number">
                         -
                       </div>
-                      <div class="details-field">
-                        <div class="details-field-label">מספר חשבונית</div>
-                        <div
-                          class="details-field-value"
-                          id="proj-invoice-number"
-                        >
-                          -
-                        </div>
-                        <div
-                          class="details-field-edit"
-                          id="proj-invoice-number-edit"
-                          style="display: none"
-                        >
-                          <input
-                            type="text"
-                            class="input"
-                            id="proj-invoice-number-input"
-                            placeholder="מספר חשבונית"
-                          />
-                        </div>
-                      </div>
                       <div
                         class="details-field-edit"
                         id="proj-finance-number-edit"
@@ -623,6 +602,25 @@
                           class="input"
                           id="proj-finance-number-input"
                           placeholder="מספר פרויקט בהנהלת חשבונות"
+                        />
+                      </div>
+                    </div>
+
+                    <div class="details-field">
+                      <div class="details-field-label">מספר חשבונית</div>
+                      <div class="details-field-value" id="proj-invoice-number">
+                        -
+                      </div>
+                      <div
+                        class="details-field-edit"
+                        id="proj-invoice-number-edit"
+                        style="display: none"
+                      >
+                        <input
+                          type="text"
+                          class="input"
+                          id="proj-invoice-number-input"
+                          placeholder="מספר חשבונית"
                         />
                       </div>
                     </div>
@@ -778,17 +776,194 @@
                     </div>
                   </div>
                 </div>
-
                 <div class="tab-content" id="milestones-content">
                   <div class="details-section">
+                    <div class="milestones-header">
+                      <div>
+                        <h3 class="section-title">אבני דרך</h3>
+                        <div class="text-sm text-neutral-600">
+                          ניהול שלבי התכנון והביצוע של הפרויקט
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        class="btn btn-primary btn-sm"
+                        id="milestone-add-btn"
+                      >
+                        <i
+                          data-lucide="plus"
+                          class="icon"
+                          aria-hidden="true"
+                        ></i>
+                        הוסף אבן דרך
+                      </button>
+                    </div>
+
+                    <div
+                      class="card milestone-form-card"
+                      id="milestone-form-card"
+                      style="display: none"
+                    >
+                      <div class="milestone-form-header">
+                        <div>
+                          <div class="milestone-form-kicker">ניהול אבן דרך</div>
+                          <div
+                            class="milestone-form-title"
+                            id="milestone-form-title"
+                          >
+                            אבן דרך חדשה
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="milestone-form-section">
+                        <h4 class="milestone-section-title">פרטים בסיסיים</h4>
+
+                        <div class="milestone-form-grid">
+                          <div class="details-field">
+                            <div class="details-field-label">
+                              שם אבן הדרך <span class="required">*</span>
+                            </div>
+                            <input
+                              type="text"
+                              class="input"
+                              id="milestone-title-input"
+                              placeholder="לדוגמה: תכנון חשמל חכם"
+                            />
+                          </div>
+
+                          <div class="details-field">
+                            <div class="details-field-label">
+                              סטטוס <span class="required">*</span>
+                            </div>
+                            <select class="input" id="milestone-status-input">
+                              <option value="Planned">בתכנון</option>
+                              <option value="Execution">ביצוע</option>
+                              <option value="Closed">סיום</option>
+                            </select>
+                          </div>
+
+                          <div class="details-field">
+                            <div class="details-field-label">
+                              סוג חיוב <span class="required">*</span>
+                            </div>
+                            <select
+                              class="input"
+                              id="milestone-billing-type-input"
+                            >
+                              <option value="Internal">פנימי</option>
+                              <option value="Fixed">קבוע</option>
+                              <option value="Hourly">שעתי</option>
+                            </select>
+                          </div>
+
+                          <div class="details-field">
+                            <div class="details-field-label">עדיפות</div>
+                            <select class="input" id="milestone-priority-input">
+                              <option value="">ללא</option>
+                              <option value="Low">נמוכה</option>
+                              <option value="Medium">בינונית</option>
+                              <option value="High">גבוהה</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="milestone-form-section">
+                        <h4 class="milestone-section-title">תכנון וזמנים</h4>
+
+                        <div class="milestone-form-grid">
+                          <div class="details-field">
+                            <div class="details-field-label">תחילה מתוכננת</div>
+                            <input
+                              type="datetime-local"
+                              class="input"
+                              id="milestone-planned-start-input"
+                            />
+                          </div>
+
+                          <div class="details-field">
+                            <div class="details-field-label">סיום מתוכנן</div>
+                            <input
+                              type="datetime-local"
+                              class="input"
+                              id="milestone-planned-end-input"
+                            />
+                          </div>
+
+                          <div class="details-field">
+                            <div class="details-field-label">הערכת שעות</div>
+                            <input
+                              type="number"
+                              class="input"
+                              id="milestone-estimated-hours-input"
+                              min="0"
+                              step="0.5"
+                              placeholder="לדוגמה: 8"
+                            />
+                          </div>
+
+                          <div class="details-field">
+                            <div class="details-field-label">תפקיד נדרש</div>
+                            <input
+                              type="text"
+                              class="input"
+                              id="milestone-required-role-input"
+                              placeholder="לדוגמה: חשמלאי / מתכנן"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="milestone-form-section">
+                        <h4 class="milestone-section-title">תיאור ובקרה</h4>
+
+                        <div class="details-field">
+                          <div class="details-field-label">תיאור</div>
+                          <textarea
+                            class="input"
+                            id="milestone-description-input"
+                            rows="4"
+                            placeholder="תיאור קצר של העבודה הנדרשת באבן הדרך"
+                          ></textarea>
+                        </div>
+
+                        <label class="milestone-lock-row">
+                          <input
+                            type="checkbox"
+                            id="milestone-is-locked-input"
+                          />
+                          <span>
+                            <strong>נעול לתכנון</strong>
+                            <small
+                              >סימון זה מיועד לאבני דרך שאינן אמורות להשתנות
+                              לאחר אישור.</small
+                            >
+                          </span>
+                        </label>
+                      </div>
+
+                      <div class="milestone-form-footer">
+                        <button id="milestone-save-btn" class="btn btn-primary">
+                          שמור אבן דרך
+                        </button>
+
+                        <button
+                          id="milestone-cancel-btn"
+                          class="btn btn-outline"
+                        >
+                          בטל שמירה
+                        </button>
+                      </div>
+                    </div>
+
                     <div
                       class="flex flex-col gap-md"
                       id="project-milestones-list"
                     >
                       <div class="card">
-                        <div class="font-semibold mb-sm">
-                          אבני דרך / משימות פרויקט
-                        </div>
+                        <div class="font-semibold mb-sm">אבני דרך</div>
                         <div class="text-sm text-neutral-600">
                           טוען אבני דרך...
                         </div>
@@ -796,7 +971,6 @@
                     </div>
                   </div>
                 </div>
-
                 <div class="tab-content" id="quote-content">
                   <div class="details-section">
                     <div class="card">

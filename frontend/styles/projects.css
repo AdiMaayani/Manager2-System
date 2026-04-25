@@ -255,7 +255,6 @@ html[dir="rtl"] .tabbar__arrow--end svg {
   transform: rotate(180deg);
 }
 
-
 .project-drawer-tabs {
   display: inline-flex;
   gap: var(--spacing-md);
@@ -292,7 +291,8 @@ html[dir="rtl"] .tabbar__arrow--end svg {
 }
 
 @keyframes scrollIndicatorBounce {
-  0%, 100% {
+  0%,
+  100% {
     transform: translateX(-50%) translateY(0);
   }
   50% {
@@ -560,4 +560,215 @@ body.drawer-open {
   border-left: 3px solid var(--color-primary-600);
   position: relative;
   box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.1);
+}
+
+.milestone-form-header {
+  padding: var(--spacing-lg);
+  border-bottom: 1px solid var(--color-neutral-200);
+  background: var(--color-neutral-50);
+}
+
+.milestone-form-kicker {
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-500);
+  margin-bottom: var(--spacing-xs);
+}
+
+.milestone-form-title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-900);
+}
+
+.milestone-form-section {
+  padding: var(--spacing-lg);
+  border-bottom: 1px solid var(--color-neutral-200);
+}
+
+.milestone-section-title {
+  margin: 0 0 var(--spacing-md);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-800);
+}
+
+.milestone-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--spacing-md);
+}
+
+.required {
+  color: var(--color-danger-600);
+}
+
+.milestone-lock-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-md);
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-md);
+  background: var(--color-neutral-50);
+  cursor: pointer;
+}
+
+.milestone-lock-row small {
+  display: block;
+  margin-top: 2px;
+  color: var(--color-neutral-500);
+  font-size: var(--font-size-sm);
+}
+
+@media (max-width: 768px) {
+  .milestone-form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.milestone-form-footer {
+  position: sticky;
+  bottom: 0;
+  background: #fff;
+  padding: 16px;
+  border-top: 1px solid #eee;
+
+  display: flex;
+  justify-content: flex-start; /* RTL */
+  gap: 12px;
+
+  z-index: 10;
+
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.05);
+}
+/* Milestones header - title right, action button left */
+.milestones-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+/* Force add milestone button to the left side in RTL layout */
+.milestones-header #milestone-add-btn {
+  margin-inline-start: auto;
+  flex-shrink: 0;
+}
+
+/* Milestones list separation from active form */
+#project-milestones-list {
+  padding-top: var(--spacing-lg);
+  border-top: 1px solid var(--color-neutral-200);
+}
+
+/* Better spacing between milestone cards */
+#project-milestones-list > .card {
+  margin-bottom: var(--spacing-md);
+}
+
+.milestone-form-card {
+  padding: 0;
+  overflow: hidden;
+  border: 2px solid var(--color-primary-200);
+  box-shadow:
+    0 0 0 1px rgba(79, 70, 229, 0.08),
+    0 12px 28px rgba(15, 23, 42, 0.08);
+  margin-bottom: var(--spacing-xl);
+}
+
+.milestone-card {
+  padding: var(--spacing-lg);
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+}
+
+.milestone-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--spacing-lg);
+  margin-bottom: var(--spacing-lg);
+}
+
+.milestone-card-main {
+  min-width: 0;
+}
+
+.milestone-card-title-row {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+  margin-bottom: var(--spacing-xs);
+}
+
+.milestone-card-title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-900);
+}
+
+.milestone-card-description {
+  color: var(--color-neutral-600);
+  font-size: var(--font-size-sm);
+}
+
+.milestone-card-actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-shrink: 0;
+}
+
+.milestone-card-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--spacing-lg);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--color-neutral-200);
+}
+
+.milestone-card-section-title {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-800);
+  margin-bottom: var(--spacing-sm);
+}
+
+.milestone-info-row {
+  display: grid;
+  grid-template-columns: 120px 1fr;
+  gap: var(--spacing-sm);
+  align-items: center;
+}
+
+.milestone-info-row span {
+  color: var(--color-neutral-500);
+  min-width: 110px;
+}
+
+.milestone-info-row strong {
+  color: var(--color-neutral-900);
+  font-weight: var(--font-weight-semibold);
+}
+
+.milestone-card-assignments {
+  margin-top: var(--spacing-md);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--color-neutral-200);
+}
+
+@media (max-width: 768px) {
+  .milestone-card-header,
+  .milestone-card-grid {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+
+  .milestone-card-actions {
+    width: 100%;
+    justify-content: flex-start;
+  }
 }
