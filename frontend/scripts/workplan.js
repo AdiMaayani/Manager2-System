@@ -2831,6 +2831,64 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let currentWorkPlanData = null;
 
+  function formatGanttDate(value) {
+    if (!value) {
+      return null;
+    }
+
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return null;
+    }
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  function hideWorkPlanGantt() {
+    const section = document.getElementById("workplan-gantt-section");
+    const emptyState = document.getElementById("workplan-gantt-empty-state");
+    const container = document.getElementById("workplan-gantt-container");
+
+    if (!section || !emptyState || !container) {
+      return;
+    }
+
+    section.classList.remove("is-empty", "is-error");
+    section.classList.add("is-hidden");
+    emptyState.textContent = "";
+    container.innerHTML = "";
+  }
+
+  function showWorkPlanGanttMessage(message, stateClass) {
+    const section = document.getElementById("workplan-gantt-section");
+    const emptyState = document.getElementById("workplan-gantt-empty-state");
+    const container = document.getElementById("workplan-gantt-container");
+
+    if (!section || !emptyState || !container) {
+      return;
+    }
+
+    section.classList.remove("is-hidden");
+    section.classList.remove("is-empty", "is-error");
+    if (stateClass === "is-empty" || stateClass === "is-error") {
+      section.classList.add(stateClass);
+    }
+
+    emptyState.textContent = message || "";
+    container.innerHTML = "";
+  }
+
+  function renderWorkPlanGantt(workPlanData) {
+    void workPlanData;
+    // Frappe Gantt remains as a future project timeline option.
+    // The primary scheduler is the existing employee/resource WorkPlan grid.
+    hideWorkPlanGantt();
+    return;
+  }
+
   function clearWorkPlanViews() {
     const weeklyGrid = document.getElementById("weekly-grid");
     const monthlyGrid = document.getElementById("monthly-grid");
@@ -2893,6 +2951,7 @@ document.addEventListener("DOMContentLoaded", () => {
         window.WorkPlanState.setCurrentWorkPlanData(null);
       }
       clearWorkPlanViews();
+      renderWorkPlanGantt(null);
       console.warn("No projects available for WorkPlan");
       console.log("Selected projectId source:", projectIdSource);
       return;
@@ -2934,6 +2993,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       clearWorkPlanViews();
       renderTasksFromAPI(currentWorkPlanData);
+      renderWorkPlanGantt(null);
       updateWorkplanTitle();
 
       console.groupCollapsed("📦 [MAPPED DATA]");
@@ -2958,6 +3018,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!workPlan) {
       setLatestAlgorithmOutput(null);
       clearWorkPlanViews();
+      renderWorkPlanGantt(currentWorkPlanData);
       console.warn("No work plan returned from API");
       console.log("Selected projectId source:", projectIdSource);
       return;
@@ -3004,6 +3065,7 @@ document.addEventListener("DOMContentLoaded", () => {
     renderWeeklyView();
     renderMonthlyView();
     renderYearlyView();
+    renderWorkPlanGantt(workPlan);
     updateWorkplanTitle();
 
     console.groupCollapsed("📦 [MAPPED DATA]");

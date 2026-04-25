@@ -9,6 +9,73 @@
   background-color: var(--color-neutral-50);
 }
 
+.workplan-gantt-card {
+  padding: var(--spacing-lg);
+}
+
+.workplan-gantt-header {
+  display: flex;
+  justify-content: flex-start;
+  align-items: center;
+  margin-bottom: var(--spacing-md);
+}
+
+.workplan-gantt-title {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-900);
+}
+
+.workplan-gantt-scroll {
+  width: 100%;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.workplan-gantt-container {
+  min-width: 900px;
+  min-height: 220px;
+}
+
+.workplan-gantt-empty-state {
+  display: none;
+  margin-bottom: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-md);
+  background: var(--color-neutral-50);
+  color: var(--color-neutral-700);
+  font-size: var(--font-size-sm);
+  text-align: right;
+}
+
+#workplan-gantt-section.is-hidden {
+  display: none;
+}
+
+#workplan-gantt-section.is-empty .workplan-gantt-empty-state,
+#workplan-gantt-section.is-error .workplan-gantt-empty-state {
+  display: block;
+}
+
+#workplan-gantt-section.is-empty .workplan-gantt-container,
+#workplan-gantt-section.is-error .workplan-gantt-container {
+  min-height: 0;
+}
+
+.gantt-task-project .bar {
+  fill: #2563eb;
+}
+
+.gantt-task-locked .bar {
+  fill: #dc2626;
+}
+
+.gantt-task-normal .bar {
+  fill: #16a34a;
+}
+
 .workplan-shell {
   overflow-x: auto;
   overflow-y: hidden;
