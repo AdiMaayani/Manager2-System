@@ -193,6 +193,78 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  const newTaskButton = document.getElementById("btn-new-task");
+  if (newTaskButton) {
+  newTaskButton.addEventListener("click", async () => {
+      console.groupCollapsed("➕ [NEW TASK BUTTON CLICKED]");
+      console.log("currentWorkPlanData:", currentWorkPlanData);
+      console.log("selectedWorkPlanId:", selectedWorkPlanId);
+      console.log("latestBackendAssignmentResult:", latestBackendAssignmentResult);
+      console.groupEnd();
+
+    const projectId = currentWorkPlanData?.project?.workItemId;
+    if (!projectId) {
+      console.warn("Cannot run smart assignment: current projectId is missing.");
+      return;
+    }
+
+    try {
+      const result = await window.WorkPlanApi.getSmartAssignmentRecommendations({
+        projectId: projectId,
+        includeLockedTasks: false,
+        saveRun: false,
+      });
+
+      console.groupCollapsed("🧠 [NEW TASK SMART ASSIGNMENT]");
+      console.log("projectId:", projectId);
+      console.log("recommendation:", result);
+      console.groupEnd();
+
+      const employeeLoad = Array.isArray(result?.employeeLoad)
+        ? result.employeeLoad
+        : [];
+      const eligibleEmployees = employeeLoad
+        .filter((employee) => employee && employee.employeeId != null)
+        .sort((a, b) => (a.loadPercentage || 0) - (b.loadPercentage || 0));
+      const selectedEmployeeForNewTask = eligibleEmployees[0] || null;
+      latestNewTaskRecommendation = selectedEmployeeForNewTask;
+      if (selectedEmployeeForNewTask) {
+        newTaskDraftContext = {
+          projectId: projectId,
+          recommendedEmployeeId: selectedEmployeeForNewTask?.employeeId || null,
+          recommendedEmployeeName: selectedEmployeeForNewTask?.employeeName || null,
+          loadPercentage: selectedEmployeeForNewTask?.loadPercentage ?? null,
+          generatedAt: new Date().toISOString(),
+          source: "smart-assignment"
+        };
+      }
+
+      if (selectedEmployeeForNewTask) {
+        console.groupCollapsed("🎯 [NEW TASK SELECTED EMPLOYEE]");
+        console.log("selectedEmployeeForNewTask:", selectedEmployeeForNewTask);
+        console.log("latestNewTaskRecommendation:", latestNewTaskRecommendation);
+        console.log("newTaskDraftContext:", newTaskDraftContext);
+        console.groupEnd();
+
+        const newTaskPayloadDraft = buildNewTaskPayloadFromDraft();
+
+        console.groupCollapsed("🧾 [NEW TASK PAYLOAD DRAFT]");
+        console.log("newTaskPayloadDraft:", newTaskPayloadDraft);
+        console.groupEnd();
+
+        const newTaskCreateDryRun = runNewTaskCreateDryRun(newTaskPayloadDraft);
+
+        console.log("newTaskCreateDryRun:", newTaskCreateDryRun);
+        await createNewTaskFromDryRun(newTaskCreateDryRun);
+      } else {
+        console.warn("No employee load data available for new task recommendation.");
+      }
+    } catch (error) {
+      console.error("Failed to get smart assignment recommendation for new task.", error);
+    }
+    });
+  }
+
   function toggleConditionalDropdowns(scope) {
     if (viewModeDropdown) {
       if (scope === "employee") {
@@ -908,10 +980,177 @@ document.addEventListener("DOMContentLoaded", () => {
   let editModeAssigned = [];
   let latestAlgorithmOutput = null;
   let latestAlgorithmTaskResultsById = new Map();
+  let latestBackendAssignmentResult = null;
+  let latestBackendTaskResultsById = new Map();
+  let latestNewTaskRecommendation = null;
+  let newTaskDraftContext = null;
 
   function normalizeTaskId(value) {
     if (value == null) return "";
     return String(value).trim();
+  }
+
+  function buildNewTaskPayloadFromDraft() {
+    if (!newTaskDraftContext) {
+      return null;
+    }
+
+    return {
+      title: "",
+      description: "",
+      workType: "Task",
+      status: "Planned",
+      billingType: currentWorkPlanData?.project?.billingType || "Internal",
+      customerId: currentWorkPlanData?.project?.customerId || null,
+      siteId: currentWorkPlanData?.project?.siteId || null,
+      parentWorkItemId: newTaskDraftContext.projectId,
+      assignedEmployeeId: newTaskDraftContext.recommendedEmployeeId,
+      assignedEmployeeName: newTaskDraftContext.recommendedEmployeeName,
+      source: newTaskDraftContext.source,
+      recommendationGeneratedAt: newTaskDraftContext.generatedAt
+    };
+  }
+
+  function validateNewTaskPayloadDraft(payload) {
+    const errors = [];
+
+    if (!payload) {
+      errors.push("Payload draft is missing.");
+      return errors;
+    }
+
+    if (!payload.parentWorkItemId) {
+      errors.push("parentWorkItemId is required.");
+    }
+
+    if (!payload.customerId) {
+      errors.push("customerId is required.");
+    }
+
+    if (!payload.workType || payload.workType !== "Task") {
+      errors.push("workType must be Task.");
+    }
+
+    if (!payload.status) {
+      errors.push("status is required.");
+    }
+
+    if (!payload.assignedEmployeeId) {
+      errors.push("assignedEmployeeId is missing from smart assignment recommendation.");
+    }
+
+    return errors;
+  }
+
+  function runNewTaskCreateDryRun(payload) {
+    const validationErrors = validateNewTaskPayloadDraft(payload);
+    const hasCreateApiHelper =
+      typeof window.WorkPlanApi?.createWorkItem === "function";
+
+    console.groupCollapsed("🧪 [NEW TASK CREATE DRY RUN]");
+    console.log("payload:", payload);
+    console.log("validationErrors:", validationErrors);
+    console.log("hasCreateApiHelper:", hasCreateApiHelper);
+    console.log("willCallCreateApi:", false);
+    console.groupEnd();
+
+    return {
+      isValid: validationErrors.length === 0 && hasCreateApiHelper,
+      validationErrors: validationErrors,
+      hasCreateApiHelper: hasCreateApiHelper,
+      payload: payload
+    };
+  }
+
+  async function createNewTaskFromDryRun(dryRunResult) {
+    if (!dryRunResult || !dryRunResult.isValid) {
+      console.warn("New task creation skipped: dry-run result is invalid.", dryRunResult);
+      return null;
+    }
+
+    const confirmed = window.confirm(
+      "Create a new task using the smart assignment recommendation?"
+    );
+
+    if (!confirmed) {
+      console.log("New task creation cancelled by user.");
+      return null;
+    }
+
+    const createRequest = {
+      title: "New Smart Assigned Task",
+      description: "Created from Smart Assignment draft.",
+      workType: dryRunResult.payload.workType,
+      status: dryRunResult.payload.status,
+      billingType: dryRunResult.payload.billingType,
+      customerId: dryRunResult.payload.customerId,
+      siteId: dryRunResult.payload.siteId,
+      parentWorkItemId: dryRunResult.payload.parentWorkItemId
+    };
+
+    console.groupCollapsed("🚀 [NEW TASK CREATE REQUEST]");
+    console.log("createRequest:", createRequest);
+    console.log("assignedEmployeeId:", dryRunResult.payload.assignedEmployeeId);
+    console.log("assignedEmployeeName:", dryRunResult.payload.assignedEmployeeName);
+    console.groupEnd();
+
+    try {
+      const createdWorkItem = await window.WorkPlanApi.createWorkItem(createRequest);
+
+      console.groupCollapsed("✅ [NEW TASK CREATED]");
+      console.log("createdWorkItem:", createdWorkItem);
+      console.log("recommendedAssignment:", {
+        employeeId: dryRunResult.payload.assignedEmployeeId,
+        employeeName: dryRunResult.payload.assignedEmployeeName
+      });
+      console.groupEnd();
+      
+      const createdWorkItemId = createdWorkItem?.workItemId;
+      
+      if (!createdWorkItemId || !dryRunResult.payload.assignedEmployeeId) {
+        console.warn("Employee assignment skipped: created work item id or employee id is missing.", {
+          createdWorkItemId: createdWorkItemId,
+          assignedEmployeeId: dryRunResult.payload.assignedEmployeeId
+        });
+      
+        return createdWorkItem;
+      }
+      
+      const assignRequest = {
+        employeeId: dryRunResult.payload.assignedEmployeeId,
+        assignmentRole: "Executor"
+      };
+      
+      console.groupCollapsed("👤 [NEW TASK ASSIGN EMPLOYEE REQUEST]");
+      console.log("createdWorkItemId:", createdWorkItemId);
+      console.log("assignRequest:", assignRequest);
+      console.groupEnd();
+      
+      const assignmentResult = await window.WorkPlanApi.assignEmployeeToWorkItem(
+        createdWorkItemId,
+        assignRequest
+      );
+      
+      console.groupCollapsed("✅ [NEW TASK EMPLOYEE ASSIGNED]");
+      console.log("assignmentResult:", assignmentResult);
+      console.log("assignedEmployeeName:", dryRunResult.payload.assignedEmployeeName);
+      console.groupEnd();
+
+      console.groupCollapsed("🔄 [NEW TASK WORKPLAN RELOAD]");
+      console.log("projectId:", dryRunResult.payload.parentWorkItemId);
+      console.groupEnd();
+
+      await loadWorkPlanFromApi(dryRunResult.payload.parentWorkItemId);
+
+      return {
+        createdWorkItem: createdWorkItem,
+        assignmentResult: assignmentResult,
+        reloadedProjectId: dryRunResult.payload.parentWorkItemId
+      };
+    } catch (error) {
+      console.error("Failed to create new smart assigned task.", error);
+      return null;
+    }
   }
 
   function getInsightsUiText() {
@@ -964,6 +1203,23 @@ document.addEventListener("DOMContentLoaded", () => {
     latestAlgorithmTaskResultsById = buildAlgorithmTaskResultsLookup(
       latestAlgorithmOutput,
     );
+  }
+
+  function setLatestBackendAssignmentResult(result) {
+    latestBackendAssignmentResult = result || null;
+
+    latestBackendTaskResultsById = new Map();
+
+    const taskResults = Array.isArray(result?.taskResults)
+      ? result.taskResults
+      : [];
+
+    taskResults.forEach((taskResult) => {
+      const taskId = String(taskResult.workItemId || "").trim();
+      if (!taskId) return;
+
+      latestBackendTaskResultsById.set(taskId, taskResult);
+    });
   }
 
   function buildCombinedAlgorithmOutputFromWorkPlans(workPlans, mappedEmployees) {
@@ -2575,6 +2831,64 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let currentWorkPlanData = null;
 
+  function formatGanttDate(value) {
+    if (!value) {
+      return null;
+    }
+
+    const date = value instanceof Date ? value : new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return null;
+    }
+
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  }
+
+  function hideWorkPlanGantt() {
+    const section = document.getElementById("workplan-gantt-section");
+    const emptyState = document.getElementById("workplan-gantt-empty-state");
+    const container = document.getElementById("workplan-gantt-container");
+
+    if (!section || !emptyState || !container) {
+      return;
+    }
+
+    section.classList.remove("is-empty", "is-error");
+    section.classList.add("is-hidden");
+    emptyState.textContent = "";
+    container.innerHTML = "";
+  }
+
+  function showWorkPlanGanttMessage(message, stateClass) {
+    const section = document.getElementById("workplan-gantt-section");
+    const emptyState = document.getElementById("workplan-gantt-empty-state");
+    const container = document.getElementById("workplan-gantt-container");
+
+    if (!section || !emptyState || !container) {
+      return;
+    }
+
+    section.classList.remove("is-hidden");
+    section.classList.remove("is-empty", "is-error");
+    if (stateClass === "is-empty" || stateClass === "is-error") {
+      section.classList.add(stateClass);
+    }
+
+    emptyState.textContent = message || "";
+    container.innerHTML = "";
+  }
+
+  function renderWorkPlanGantt(workPlanData) {
+    void workPlanData;
+    // Frappe Gantt remains as a future project timeline option.
+    // The primary scheduler is the existing employee/resource WorkPlan grid.
+    hideWorkPlanGantt();
+    return;
+  }
+
   function clearWorkPlanViews() {
     const weeklyGrid = document.getElementById("weekly-grid");
     const monthlyGrid = document.getElementById("monthly-grid");
@@ -2637,6 +2951,7 @@ document.addEventListener("DOMContentLoaded", () => {
         window.WorkPlanState.setCurrentWorkPlanData(null);
       }
       clearWorkPlanViews();
+      renderWorkPlanGantt(null);
       console.warn("No projects available for WorkPlan");
       console.log("Selected projectId source:", projectIdSource);
       return;
@@ -2678,6 +2993,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       clearWorkPlanViews();
       renderTasksFromAPI(currentWorkPlanData);
+      renderWorkPlanGantt(null);
       updateWorkplanTitle();
 
       console.groupCollapsed("📦 [MAPPED DATA]");
@@ -2702,6 +3018,7 @@ document.addEventListener("DOMContentLoaded", () => {
     if (!workPlan) {
       setLatestAlgorithmOutput(null);
       clearWorkPlanViews();
+      renderWorkPlanGantt(currentWorkPlanData);
       console.warn("No work plan returned from API");
       console.log("Selected projectId source:", projectIdSource);
       return;
@@ -2721,10 +3038,34 @@ document.addEventListener("DOMContentLoaded", () => {
     setLatestAlgorithmOutput(algorithmOutput);
     console.log("algorithmOutput:", algorithmOutput);
 
+    const backendProjectIdFromWorkPlan =
+      Number(currentWorkPlanData?.project?.workItemId) ||
+      Number(currentWorkPlanData?.project?.id) ||
+      null;
+
+    if (backendProjectIdFromWorkPlan && backendProjectIdFromWorkPlan > 0) {
+      try {
+        const backendResult =
+          await window.WorkPlanApi.getSmartAssignmentRecommendations({
+            projectId: backendProjectIdFromWorkPlan,
+            includeLockedTasks: false,
+            saveRun: false,
+          });
+
+        console.groupCollapsed("🧠 [BACKEND SMART ASSIGNMENT RESULT]");
+        console.log("backendSmartAssignmentResult:", backendResult);
+        setLatestBackendAssignmentResult(backendResult);
+        console.groupEnd();
+      } catch (error) {
+        console.warn("Backend Smart Assignment debug call failed.", error);
+      }
+    }
+
     renderTasksFromAPI(workPlan);
     renderWeeklyView();
     renderMonthlyView();
     renderYearlyView();
+    renderWorkPlanGantt(workPlan);
     updateWorkplanTitle();
 
     console.groupCollapsed("📦 [MAPPED DATA]");

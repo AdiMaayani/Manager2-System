@@ -9,6 +9,7 @@
     <link rel="stylesheet" href="../styles/layout.css" />
     <link rel="stylesheet" href="../styles/components.css" />
     <link rel="stylesheet" href="../styles/utilities.css" />
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/frappe-gantt/dist/frappe-gantt.css" />
     <link rel="stylesheet" href="../styles/workplan.css" />
   </head>
   <body>
@@ -369,6 +370,25 @@
           <div class="workplan-title" id="workplan-title">
             תוכנית עבודה – חתך: כללי | תצוגה: יומית
           </div>
+
+          <section class="section is-hidden" id="workplan-gantt-section" aria-label="WorkPlan Gantt">
+            <div class="card workplan-gantt-card">
+              <div class="workplan-gantt-header">
+                <h2 class="workplan-gantt-title">Project Timeline (Gantt)</h2>
+              </div>
+              <div
+                id="workplan-gantt-empty-state"
+                class="workplan-gantt-empty-state"
+                role="status"
+                aria-live="polite"
+              >
+                Loading Gantt...
+              </div>
+              <div class="workplan-gantt-scroll">
+                <div id="workplan-gantt-container" class="workplan-gantt-container"></div>
+              </div>
+            </div>
+          </section>
 
           <!-- DAILY VIEW -->
           <section class="section workplan-view active" data-range="daily">
@@ -1057,6 +1077,7 @@
     <script src="../scripts/workplan/workplan-api.js"></script>
     <script src="../scripts/workplan/workplan-gantt-adapter.js"></script>
     <script src="../scripts/workplan/workplan-algorithm-model.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/frappe-gantt/dist/frappe-gantt.umd.js"></script>
     <script src="../scripts/workplan.js"></script>
     <script src="../scripts/sidebar-active.js"></script>
     <script>

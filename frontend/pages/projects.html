@@ -208,8 +208,8 @@
                         <div class="filter-dropdown-item" data-stage="all">
                           הכל
                         </div>
-                        <div class="filter-dropdown-item" data-stage="תכנון">
-                          תכנון
+                        <div class="filter-dropdown-item" data-stage="בתכנון">
+                          בתכנון
                         </div>
                         <div class="filter-dropdown-item" data-stage="תוכניות">
                           תוכניות
@@ -508,287 +508,544 @@
 
               <div class="details-panel-body" id="project-drawer-body">
                 <div class="tab-content active" id="overview-content">
-                  <div class="details-section">
-                    <div class="details-field">
-                      <div class="details-field-label">שם הפרויקט</div>
-                      <div class="details-field-value" id="proj-name">-</div>
-                      <div
-                        class="details-field-edit"
-                        id="proj-name-edit"
-                        style="display: none"
-                      >
-                        <input
-                          type="text"
-                          class="input"
-                          id="proj-name-input"
-                          placeholder="שם הפרויקט"
-                        />
+                  <div class="details-section overview-cards-layout">
+                    <!-- פרטים כלליים -->
+                    <section class="overview-card">
+                      <div class="overview-card-header">
+                        <h3 class="overview-card-title">פרטים כלליים</h3>
                       </div>
-                    </div>
-                    <div class="details-field">
-                      <div class="details-field-label">שם הלקוח</div>
-                      <div class="details-field-value" id="proj-customer">
-                        -
-                      </div>
-                      <div
-                        class="details-field-edit"
-                        id="proj-customer-edit"
-                        style="display: none"
-                      >
-                        <select class="input" id="proj-customer-select">
-                          <option value="">בחר לקוח</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div class="details-field">
-                      <div class="details-field-label">סטטוס</div>
-                      <div class="details-field-value" id="proj-status">-</div>
-                      <div
-                        class="details-field-edit"
-                        id="proj-status-edit"
-                        style="display: none"
-                      >
-                        <select class="input" id="proj-status-select">
-                          <option value="Open">פתוח</option>
-                          <option value="Planned">בתכנון</option>
-                          <option value="Design">תוכניות</option>
-                          <option value="Wiring">השחלה</option>
-                          <option value="Execution">ביצוע</option>
-                          <option value="Closed">סיום</option>
-                        </select>
-                      </div>
-                    </div>
-                    <div class="details-field">
-                      <div class="details-field-label">תאריך פתיחה</div>
-                      <div class="details-field-value" id="proj-open-date">
-                        -
-                      </div>
-                    </div>
-                    <div class="details-field">
-                      <div class="details-field-label">תאריך סגירת העסקה</div>
-                      <div class="details-field-value" id="proj-close-date">
-                        -
-                      </div>
-                      <div
-                        class="details-field-edit"
-                        id="proj-close-date-edit"
-                        style="display: none"
-                      >
-                        <input
-                          type="date"
-                          class="input"
-                          id="proj-close-date-input"
-                        />
-                      </div>
-                    </div>
-                    <div class="details-field">
-                      <div class="details-field-label">מספר פרויקט</div>
-                      <div class="details-field-value" id="proj-number">-</div>
-                    </div>
-                    <div class="details-field">
-                      <div class="details-field-label">
-                        מספר פרויקט בהנהלת חשבונות
-                      </div>
-                      <div class="details-field-value" id="proj-finance-number">
-                        -
-                      </div>
-                      <div class="details-field">
-                        <div class="details-field-label">מספר חשבונית</div>
-                        <div
-                          class="details-field-value"
-                          id="proj-invoice-number"
-                        >
-                          -
-                        </div>
-                        <div
-                          class="details-field-edit"
-                          id="proj-invoice-number-edit"
-                          style="display: none"
-                        >
-                          <input
-                            type="text"
-                            class="input"
-                            id="proj-invoice-number-input"
-                            placeholder="מספר חשבונית"
-                          />
-                        </div>
-                      </div>
-                      <div
-                        class="details-field-edit"
-                        id="proj-finance-number-edit"
-                        style="display: none"
-                      >
-                        <input
-                          type="text"
-                          class="input"
-                          id="proj-finance-number-input"
-                          placeholder="מספר פרויקט בהנהלת חשבונות"
-                        />
-                      </div>
-                    </div>
-                    <div class="details-field">
-                      <div class="details-field-label">סוג חיוב</div>
-                      <div class="details-field-value" id="proj-billing-type">
-                        -
-                      </div>
-                      <div
-                        class="details-field-edit"
-                        id="proj-billing-type-edit"
-                        style="display: none"
-                      >
-                        <select class="input" id="proj-billing-type-select">
-                          <option value="Fixed">קבוע</option>
-                          <option value="Internal">פנימי</option>
-                          <option value="Hourly">שעתי</option>
-                        </select>
-                      </div>
-                    </div>
 
-                    <div class="details-field">
-                      <div class="details-field-label">אתר</div>
-                      <div class="details-field-value" id="proj-site-id">-</div>
-                      <div
-                        class="details-field-edit"
-                        id="proj-site-id-edit"
-                        style="display: none"
-                      >
-                        <div class="flex flex-col gap-sm">
-                          <div class="flex gap-sm align-items-center">
-                            <select class="input" id="proj-site-id-select">
-                              <option value="">בחר אתר</option>
-                            </select>
-                            <button
-                              type="button"
-                              class="btn btn-outline btn-sm"
-                              id="proj-site-add-toggle"
-                            >
-                              הוסף אתר
-                            </button>
+                      <div class="overview-card-body">
+                        <div class="details-field">
+                          <div class="details-field-label">שם הפרויקט</div>
+                          <div class="details-field-value" id="proj-name">
+                            -
                           </div>
+                          <div
+                            class="details-field-edit"
+                            id="proj-name-edit"
+                            style="display: none"
+                          >
+                            <input
+                              type="text"
+                              class="input"
+                              id="proj-name-input"
+                              placeholder="שם הפרויקט"
+                            />
+                          </div>
+                        </div>
 
-                          <div id="proj-site-add-form" style="display: none">
-                            <div class="card">
-                              <div class="details-field">
-                                <div class="details-field-label">שם אתר</div>
-                                <input
-                                  type="text"
-                                  class="input"
-                                  id="new-site-name-input"
-                                  placeholder="שם האתר"
-                                />
-                              </div>
+                        <div class="details-field">
+                          <div class="details-field-label">שם הלקוח</div>
+                          <div class="details-field-value" id="proj-customer">
+                            -
+                          </div>
+                          <div
+                            class="details-field-edit"
+                            id="proj-customer-edit"
+                            style="display: none"
+                          >
+                            <select class="input" id="proj-customer-select">
+                              <option value="">בחר לקוח</option>
+                            </select>
+                          </div>
+                        </div>
 
-                              <div class="details-field">
-                                <div class="details-field-label">כתובת</div>
-                                <input
-                                  type="text"
-                                  class="input"
-                                  id="new-site-address-input"
-                                  placeholder="כתובת האתר"
-                                />
-                              </div>
+                        <div class="details-field">
+                          <div class="details-field-label">סטטוס</div>
+                          <div class="details-field-value" id="proj-status">
+                            -
+                          </div>
+                          <div
+                            class="details-field-edit"
+                            id="proj-status-edit"
+                            style="display: none"
+                          >
+                            <select class="input" id="proj-status-select">
+                              <option value="Open">פתוח</option>
+                              <option value="Planned">בתכנון</option>
+                              <option value="Design">תוכניות</option>
+                              <option value="Wiring">השחלה</option>
+                              <option value="Execution">ביצוע</option>
+                              <option value="Closed">סיום</option>
+                            </select>
+                          </div>
+                        </div>
 
-                              <div class="details-field">
-                                <div class="details-field-label">עיר</div>
-                                <input
-                                  type="text"
-                                  class="input"
-                                  id="new-site-city-input"
-                                  placeholder="עיר"
-                                />
-                              </div>
+                        <div class="details-field">
+                          <div class="details-field-label">סוג חיוב</div>
+                          <div
+                            class="details-field-value"
+                            id="proj-billing-type"
+                          >
+                            -
+                          </div>
+                          <div
+                            class="details-field-edit"
+                            id="proj-billing-type-edit"
+                            style="display: none"
+                          >
+                            <select class="input" id="proj-billing-type-select">
+                              <option value="Fixed">קבוע</option>
+                              <option value="Internal">פנימי</option>
+                              <option value="Hourly">שעתי</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+                    </section>
 
-                              <div class="details-field">
-                                <div class="details-field-label">הערות</div>
-                                <input
-                                  type="text"
-                                  class="input"
-                                  id="new-site-notes-input"
-                                  placeholder="הערות"
-                                />
-                              </div>
+                    <!-- תאריכים -->
+                    <section class="overview-card">
+                      <div class="overview-card-header">
+                        <h3 class="overview-card-title">תאריכים</h3>
+                      </div>
 
-                              <div class="details-field">
-                                <label class="flex gap-sm align-items-center">
-                                  <input
-                                    type="checkbox"
-                                    id="new-site-is-primary-input"
-                                  />
-                                  <span>אתר ראשי</span>
-                                </label>
-                              </div>
+                      <div class="overview-card-body">
+                        <div class="details-field">
+                          <div class="details-field-label">תאריך פתיחה</div>
+                          <div class="details-field-value" id="proj-open-date">
+                            -
+                          </div>
+                        </div>
 
-                              <div class="flex gap-sm mt-md">
-                                <button
-                                  type="button"
-                                  class="btn btn-primary btn-sm"
-                                  id="new-site-save-btn"
-                                >
-                                  שמור אתר
-                                </button>
+                        <div class="details-field">
+                          <div class="details-field-label">
+                            תאריך סגירת העסקה
+                          </div>
+                          <div class="details-field-value" id="proj-close-date">
+                            -
+                          </div>
+                          <div
+                            class="details-field-edit"
+                            id="proj-close-date-edit"
+                            style="display: none"
+                          >
+                            <input
+                              type="date"
+                              class="input"
+                              id="proj-close-date-input"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </section>
+
+                    <!-- מזהים -->
+                    <section class="overview-card">
+                      <div class="overview-card-header">
+                        <h3 class="overview-card-title">מזהים</h3>
+                      </div>
+
+                      <div class="overview-card-body">
+                        <div class="details-field">
+                          <div class="details-field-label">מספר פרויקט</div>
+                          <div class="details-field-value" id="proj-number">
+                            -
+                          </div>
+                        </div>
+
+                        <div class="details-field">
+                          <div class="details-field-label">
+                            מספר פרויקט בהנהלת חשבונות
+                          </div>
+                          <div
+                            class="details-field-value"
+                            id="proj-finance-number"
+                          >
+                            -
+                          </div>
+                          <div
+                            class="details-field-edit"
+                            id="proj-finance-number-edit"
+                            style="display: none"
+                          >
+                            <input
+                              type="text"
+                              class="input"
+                              id="proj-finance-number-input"
+                              placeholder="מספר פרויקט בהנהלת חשבונות"
+                            />
+                          </div>
+                        </div>
+
+                        <div class="details-field">
+                          <div class="details-field-label">מספר חשבונית</div>
+                          <div
+                            class="details-field-value"
+                            id="proj-invoice-number"
+                          >
+                            -
+                          </div>
+                          <div
+                            class="details-field-edit"
+                            id="proj-invoice-number-edit"
+                            style="display: none"
+                          >
+                            <input
+                              type="text"
+                              class="input"
+                              id="proj-invoice-number-input"
+                              placeholder="מספר חשבונית"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </section>
+
+                    <!-- אתר ותיאור -->
+                    <section class="overview-card overview-card-wide">
+                      <div class="overview-card-header">
+                        <h3 class="overview-card-title">אתר ותיאור</h3>
+                      </div>
+
+                      <div class="overview-card-body">
+                        <div class="details-field">
+                          <div class="details-field-label">אתר</div>
+                          <div class="details-field-value" id="proj-site-id">
+                            -
+                          </div>
+                          <div
+                            class="details-field-edit"
+                            id="proj-site-id-edit"
+                            style="display: none"
+                          >
+                            <div class="flex flex-col gap-sm">
+                              <div class="flex gap-sm align-items-center">
+                                <select class="input" id="proj-site-id-select">
+                                  <option value="">בחר אתר</option>
+                                </select>
                                 <button
                                   type="button"
                                   class="btn btn-outline btn-sm"
-                                  id="new-site-cancel-btn"
+                                  id="proj-site-add-toggle"
                                 >
-                                  בטל
+                                  הוסף אתר
                                 </button>
+                              </div>
+
+                              <div
+                                id="proj-site-add-form"
+                                style="display: none"
+                              >
+                                <div class="card">
+                                  <div class="details-field">
+                                    <div class="details-field-label">
+                                      שם אתר
+                                    </div>
+                                    <input
+                                      type="text"
+                                      class="input"
+                                      id="new-site-name-input"
+                                      placeholder="שם האתר"
+                                    />
+                                  </div>
+
+                                  <div class="details-field">
+                                    <div class="details-field-label">כתובת</div>
+                                    <input
+                                      type="text"
+                                      class="input"
+                                      id="new-site-address-input"
+                                      placeholder="כתובת האתר"
+                                    />
+                                  </div>
+
+                                  <div class="details-field">
+                                    <div class="details-field-label">עיר</div>
+                                    <input
+                                      type="text"
+                                      class="input"
+                                      id="new-site-city-input"
+                                      placeholder="עיר"
+                                    />
+                                  </div>
+
+                                  <div class="details-field">
+                                    <div class="details-field-label">הערות</div>
+                                    <input
+                                      type="text"
+                                      class="input"
+                                      id="new-site-notes-input"
+                                      placeholder="הערות"
+                                    />
+                                  </div>
+
+                                  <div class="details-field">
+                                    <label
+                                      class="flex gap-sm align-items-center"
+                                    >
+                                      <input
+                                        type="checkbox"
+                                        id="new-site-is-primary-input"
+                                      />
+                                      <span>אתר ראשי</span>
+                                    </label>
+                                  </div>
+
+                                  <div class="flex gap-sm mt-md">
+                                    <button
+                                      type="button"
+                                      class="btn btn-primary btn-sm"
+                                      id="new-site-save-btn"
+                                    >
+                                      שמור אתר
+                                    </button>
+                                    <button
+                                      type="button"
+                                      class="btn btn-outline btn-sm"
+                                      id="new-site-cancel-btn"
+                                    >
+                                      בטל
+                                    </button>
+                                  </div>
+                                </div>
                               </div>
                             </div>
                           </div>
                         </div>
-                      </div>
-                    </div>
 
-                    <div class="details-field">
-                      <div class="details-field-label">תיאור</div>
-                      <div class="details-field-value" id="proj-description">
-                        -
-                      </div>
-                      <div
-                        class="details-field-edit"
-                        id="proj-description-edit"
-                        style="display: none"
-                      >
-                        <textarea
-                          class="input"
-                          id="proj-description-input"
-                          rows="4"
-                          placeholder="תיאור פרויקט"
-                        ></textarea>
-                      </div>
-                    </div>
-                    <!-- צוות הפרויקט section -->
-                    <div class="project-team-section mt-lg">
-                      <h3 class="section-title">צוות הפרויקט</h3>
-
-                      <div class="details-field">
-                        <div class="details-field-label">מנהל פרויקט</div>
-                        <div class="details-field-value" id="proj-manager-view">
-                          -
+                        <div class="details-field">
+                          <div class="details-field-label">תיאור</div>
+                          <div
+                            class="details-field-value"
+                            id="proj-description"
+                          >
+                            -
+                          </div>
+                          <div
+                            class="details-field-edit"
+                            id="proj-description-edit"
+                            style="display: none"
+                          >
+                            <textarea
+                              class="input"
+                              id="proj-description-input"
+                              rows="4"
+                              placeholder="תיאור פרויקט"
+                            ></textarea>
+                          </div>
                         </div>
                       </div>
+                    </section>
 
-                      <div class="details-field">
-                        <div class="details-field-label">עובדים משויכים</div>
-                        <div class="details-field-value" id="proj-team-view">
-                          -
+                    <!-- צוות הפרויקט -->
+                    <section
+                      class="overview-card overview-card-wide project-team-section"
+                    >
+                      <div class="overview-card-header">
+                        <h3 class="overview-card-title">צוות הפרויקט</h3>
+                      </div>
+
+                      <div class="overview-card-body">
+                        <div class="details-field">
+                          <div class="details-field-label">מנהל פרויקט</div>
+                          <div
+                            class="details-field-value"
+                            id="proj-manager-view"
+                          >
+                            -
+                          </div>
+                        </div>
+
+                        <div class="details-field">
+                          <div class="details-field-label">עובדים משויכים</div>
+                          <div class="details-field-value" id="proj-team-view">
+                            -
+                          </div>
                         </div>
                       </div>
-                    </div>
+                    </section>
                   </div>
                 </div>
-
                 <div class="tab-content" id="milestones-content">
                   <div class="details-section">
+                    <div class="milestones-header">
+                      <div>
+                        <h3 class="section-title">אבני דרך</h3>
+                        <div class="text-sm text-neutral-600">
+                          ניהול שלבי התכנון והביצוע של הפרויקט
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        class="btn btn-primary btn-sm"
+                        id="milestone-add-btn"
+                      >
+                        <i
+                          data-lucide="plus"
+                          class="icon"
+                          aria-hidden="true"
+                        ></i>
+                        הוסף אבן דרך
+                      </button>
+                    </div>
+
+                    <div
+                      class="card milestone-form-card"
+                      id="milestone-form-card"
+                      style="display: none"
+                    >
+                      <div class="milestone-form-header">
+                        <div>
+                          <div class="milestone-form-kicker">ניהול אבן דרך</div>
+                          <div
+                            class="milestone-form-title"
+                            id="milestone-form-title"
+                          >
+                            אבן דרך חדשה
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="milestone-form-section">
+                        <h4 class="milestone-section-title">פרטים בסיסיים</h4>
+
+                        <div class="milestone-form-grid">
+                          <div class="details-field">
+                            <div class="details-field-label">
+                              שם אבן הדרך <span class="required">*</span>
+                            </div>
+                            <input
+                              type="text"
+                              class="input"
+                              id="milestone-title-input"
+                              placeholder="לדוגמה: תכנון חשמל חכם"
+                            />
+                          </div>
+
+                          <div class="details-field">
+                            <div class="details-field-label">
+                              סטטוס <span class="required">*</span>
+                            </div>
+                            <select class="input" id="milestone-status-input">
+                              <option value="Planned">בתכנון</option>
+                              <option value="Execution">ביצוע</option>
+                              <option value="Closed">סיום</option>
+                            </select>
+                          </div>
+
+                          <div class="details-field">
+                            <div class="details-field-label">
+                              סוג חיוב <span class="required">*</span>
+                            </div>
+                            <select
+                              class="input"
+                              id="milestone-billing-type-input"
+                            >
+                              <option value="Internal">פנימי</option>
+                              <option value="Fixed">קבוע</option>
+                              <option value="Hourly">שעתי</option>
+                            </select>
+                          </div>
+
+                          <div class="details-field">
+                            <div class="details-field-label">עדיפות</div>
+                            <select class="input" id="milestone-priority-input">
+                              <option value="">ללא</option>
+                              <option value="Low">נמוכה</option>
+                              <option value="Medium">בינונית</option>
+                              <option value="High">גבוהה</option>
+                            </select>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="milestone-form-section">
+                        <h4 class="milestone-section-title">תכנון וזמנים</h4>
+
+                        <div class="milestone-form-grid">
+                          <div class="details-field">
+                            <div class="details-field-label">תחילה מתוכננת</div>
+                            <input
+                              type="datetime-local"
+                              class="input"
+                              id="milestone-planned-start-input"
+                            />
+                          </div>
+
+                          <div class="details-field">
+                            <div class="details-field-label">סיום מתוכנן</div>
+                            <input
+                              type="datetime-local"
+                              class="input"
+                              id="milestone-planned-end-input"
+                            />
+                          </div>
+
+                          <div class="details-field">
+                            <div class="details-field-label">הערכת שעות</div>
+                            <input
+                              type="number"
+                              class="input"
+                              id="milestone-estimated-hours-input"
+                              min="0"
+                              step="0.5"
+                              placeholder="לדוגמה: 8"
+                            />
+                          </div>
+
+                          <div class="details-field">
+                            <div class="details-field-label">תפקיד נדרש</div>
+                            <input
+                              type="text"
+                              class="input"
+                              id="milestone-required-role-input"
+                              placeholder="לדוגמה: חשמלאי / מתכנן"
+                            />
+                          </div>
+                        </div>
+                      </div>
+
+                      <div class="milestone-form-section">
+                        <h4 class="milestone-section-title">תיאור ובקרה</h4>
+
+                        <div class="details-field">
+                          <div class="details-field-label">תיאור</div>
+                          <textarea
+                            class="input"
+                            id="milestone-description-input"
+                            rows="4"
+                            placeholder="תיאור קצר של העבודה הנדרשת באבן הדרך"
+                          ></textarea>
+                        </div>
+
+                        <label class="milestone-lock-row">
+                          <input
+                            type="checkbox"
+                            id="milestone-is-locked-input"
+                          />
+                          <span>
+                            <strong>נעול לתכנון</strong>
+                            <small
+                              >סימון זה מיועד לאבני דרך שאינן אמורות להשתנות
+                              לאחר אישור.</small
+                            >
+                          </span>
+                        </label>
+                      </div>
+
+                      <div class="milestone-form-footer">
+                        <button id="milestone-save-btn" class="btn btn-primary">
+                          שמור אבן דרך
+                        </button>
+
+                        <button
+                          id="milestone-cancel-btn"
+                          class="btn btn-outline"
+                        >
+                          בטל שמירה
+                        </button>
+                      </div>
+                    </div>
+
                     <div
                       class="flex flex-col gap-md"
                       id="project-milestones-list"
                     >
                       <div class="card">
-                        <div class="font-semibold mb-sm">
-                          אבני דרך / משימות פרויקט
-                        </div>
+                        <div class="font-semibold mb-sm">אבני דרך</div>
                         <div class="text-sm text-neutral-600">
                           טוען אבני דרך...
                         </div>
@@ -796,7 +1053,6 @@
                     </div>
                   </div>
                 </div>
-
                 <div class="tab-content" id="quote-content">
                   <div class="details-section">
                     <div class="card">
