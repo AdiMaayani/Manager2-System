@@ -5,6 +5,7 @@ using Microsoft.Data.SqlClient;
 
 namespace ManageR2.Infrastructure.Repositories;
 
+// Repository implementation for work report create/read flows.
 public class WorkReportRepository : IWorkReportRepository
 {
     private readonly DBServices _dbServices;
@@ -16,6 +17,7 @@ public class WorkReportRepository : IWorkReportRepository
 
     public async Task<int> CreateAsync(WorkReportCreateModel request)
     {
+        // Uses one transaction so report header and related child rows are saved together.
         await using var connection = _dbServices.CreateConnection();
         await connection.OpenAsync();
 
@@ -25,6 +27,7 @@ public class WorkReportRepository : IWorkReportRepository
         {
             int newWorkReportId;
 
+            // Stored procedure inserts report header and returns WorkReportId.
             await using (var command = new SqlCommand("sp_CreateWorkReport", connection, transaction))
             {
                 command.CommandType = CommandType.StoredProcedure;
@@ -58,6 +61,7 @@ command.Parameters.AddWithValue("@WorkersCount", request.RelatedWorkers?.Count ?
                 throw new Exception("Failed to create work report.");
             }
 
+            // Stores system names linked to the created report.
             if (request.Systems != null && request.Systems.Count > 0)
             {
                 foreach (var systemName in request.Systems)
@@ -79,6 +83,7 @@ command.Parameters.AddWithValue("@WorkersCount", request.RelatedWorkers?.Count ?
                 }
             }
 
+            // Stores related employee assignments linked to the created report.
             if (request.RelatedWorkers != null && request.RelatedWorkers.Count > 0)
             {
                 foreach (var worker in request.RelatedWorkers)
@@ -110,6 +115,7 @@ command.Parameters.AddWithValue("@WorkersCount", request.RelatedWorkers?.Count ?
 
     private static DateTime? ParseReportDate(string? date)
     {
+        // Accepts nullable date text from API payload and normalizes it for DB storage.
         if (string.IsNullOrWhiteSpace(date))
         {
             return null;
@@ -125,6 +131,7 @@ command.Parameters.AddWithValue("@WorkersCount", request.RelatedWorkers?.Count ?
 
     public async Task<List<WorkReportListItemModel>> GetAllAsync()
 {
+    // Returns lightweight report rows for list screens.
     var reports = new List<WorkReportListItemModel>();
 
     await using var connection = _dbServices.CreateConnection();
@@ -166,6 +173,7 @@ command.Parameters.AddWithValue("@WorkersCount", request.RelatedWorkers?.Count ?
 
 public async Task<WorkReportDetailsModel?> GetByIdAsync(int workReportId)
 {
+    // Loads full report details plus related systems and workers.
     await using var connection = _dbServices.CreateConnection();
     await connection.OpenAsync();
 
@@ -229,6 +237,7 @@ public async Task<WorkReportDetailsModel?> GetByIdAsync(int workReportId)
         return null;
     }
 
+    // Loads child system records linked to this report.
     await using (var systemsCommand = new SqlCommand(
         @"SELECT SystemName
           FROM dbo.WorkReportSystems
@@ -251,6 +260,7 @@ public async Task<WorkReportDetailsModel?> GetByIdAsync(int workReportId)
         }
     }
 
+    // Loads child worker records linked to this report.
     await using (var workersCommand = new SqlCommand(
         @"SELECT 
               EmployeeId,

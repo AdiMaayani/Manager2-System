@@ -3,8 +3,10 @@ using ManageR2.Infrastructure.Models;
 
 namespace ManageR2.Infrastructure.Repositories
 {
+    // Repository contract for work item lifecycle, work plan, milestones, and assignment operations.
     public interface IWorkItemRepository
     {
+        // Basic work item queries.
         Task<List<WorkItem>> GetAllAsync();
         Task<WorkItem?> GetByIdAsync(int id);
         Task<List<WorkItem>> GetByTypeAsync(string workType);
@@ -29,6 +31,7 @@ namespace ManageR2.Infrastructure.Repositories
 
         Task<List<ProjectListItemResult>> GetProjectsListAsync();
 
+        // Work plan queries combine project + tasks + assignments.
         Task<WorkPlanResult?> GetWorkPlanAsync(int projectId);
         Task<List<WorkPlanResult>> GetAllWorkPlansAsync();
 

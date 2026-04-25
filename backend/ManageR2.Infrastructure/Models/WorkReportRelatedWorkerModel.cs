@@ -1,5 +1,6 @@
 namespace ManageR2.Infrastructure.Models;
 
+// Related employee model linked to a work report entry.
 public class WorkReportRelatedWorkerModel
 {
     public int? Id { get; set; }

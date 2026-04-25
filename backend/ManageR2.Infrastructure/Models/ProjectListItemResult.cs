@@ -1,5 +1,6 @@
 namespace ManageR2.Infrastructure.Models;
 
+// Repository result model for project list rows built from WorkItems.
 public class ProjectListItemResult
 {
     public int WorkItemId { get; set; }

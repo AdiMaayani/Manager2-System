@@ -5,6 +5,7 @@ namespace ManageR2.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+// Employee lookup endpoints used when validating and displaying work item assignments.
 public class EmployeesController : ControllerBase
 {
     private readonly IEmployeeRepository _employeeRepository;
@@ -15,6 +16,7 @@ public class EmployeesController : ControllerBase
     }
 
     [HttpGet]
+    // Returns all employees that can be assigned to work items.
     public async Task<IActionResult> GetAll()
     {
         var employees = await _employeeRepository.GetAllAsync();
@@ -22,6 +24,7 @@ public class EmployeesController : ControllerBase
     }
 
     [HttpGet("{id:int}")]
+    // Returns one employee used in assignment validation flows.
     public async Task<IActionResult> GetById(int id)
     {
         var employee = await _employeeRepository.GetByIdAsync(id);

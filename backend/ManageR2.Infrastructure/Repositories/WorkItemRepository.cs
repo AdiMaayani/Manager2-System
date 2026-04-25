@@ -6,6 +6,7 @@ using Microsoft.Data.SqlClient;
 
 namespace ManageR2.Infrastructure.Repositories;
 
+// Repository implementation that encapsulates DB access for work items, plans, and assignments.
 public class WorkItemRepository : IWorkItemRepository
 {
     private readonly DBServices _dbServices;
@@ -17,6 +18,7 @@ public class WorkItemRepository : IWorkItemRepository
 
     public async Task<List<WorkItem>> GetAllAsync()
     {
+        // Calls stored procedure that returns all work items.
         var workItems = new List<WorkItem>();
 
         await using var connection = _dbServices.CreateConnection();
@@ -38,6 +40,7 @@ public class WorkItemRepository : IWorkItemRepository
 
     public async Task<WorkItem?> GetByIdAsync(int workItemId)
     {
+        // Calls stored procedure for one work item details row.
         await using var connection = _dbServices.CreateConnection();
         await using var command = new SqlCommand("sp_GetWorkItemDetails", connection)
         {
@@ -59,6 +62,7 @@ public class WorkItemRepository : IWorkItemRepository
 
     public async Task<List<WorkItem>> GetByTypeAsync(string workType)
     {
+        // Filters by WorkType (for example Project, Task, or ServiceCall).
         var workItems = new List<WorkItem>();
 
         await using var connection = _dbServices.CreateConnection();
@@ -82,6 +86,7 @@ public class WorkItemRepository : IWorkItemRepository
 
     public async Task<List<WorkItem>> GetTasksByParentIdAsync(int parentWorkItemId)
     {
+        // Returns child work items under a parent project/task.
         var workItems = new List<WorkItem>();
 
         await using var connection = _dbServices.CreateConnection();
@@ -105,6 +110,7 @@ public class WorkItemRepository : IWorkItemRepository
 
     public async Task<int> CreateAsync(WorkItem workItem)
     {
+        // Persists work item through one stored procedure and returns new id.
         await using var connection = _dbServices.CreateConnection();
         await using var command = new SqlCommand("sp_CreateWorkItem", connection)
         {
@@ -139,11 +145,13 @@ public class WorkItemRepository : IWorkItemRepository
 
     public async Task<int> CreateMilestoneAsync(WorkItem workItem)
     {
+        // Milestones use the same persistence flow as other work items.
         return await CreateAsync(workItem);
     }
 
     public async Task<bool> UpdateAsync(int id, WorkItem workItem)
     {
+        // Updates editable work item fields through stored procedure.
         await using var connection = _dbServices.CreateConnection();
         await using var command = new SqlCommand("sp_UpdateWorkItem", connection)
         {
@@ -179,11 +187,13 @@ public class WorkItemRepository : IWorkItemRepository
 
     public async Task<bool> UpdateMilestoneAsync(int milestoneId, WorkItem workItem)
     {
+        // Milestone update reuses shared work item update logic.
         return await UpdateAsync(milestoneId, workItem);
     }
 
     public async Task<bool> CloseAsync(int workItemId)
     {
+        // Soft-close flow handled in DB to keep status logic centralized.
         await using var connection = _dbServices.CreateConnection();
         await using var command = new SqlCommand("sp_CloseWorkItem", connection)
         {
@@ -202,11 +212,13 @@ public class WorkItemRepository : IWorkItemRepository
 
     public async Task<bool> SoftDeleteMilestoneAsync(int milestoneId)
     {
+        // Milestone cancel uses the same close behavior.
         return await CloseAsync(milestoneId);
     }
 
     public async Task<bool> AssignEmployeeToWorkAsync(int workItemId, int employeeId, string assignmentRole)
     {
+        // Creates employee assignment link for a specific work item.
         await using var connection = _dbServices.CreateConnection();
         await using var command = new SqlCommand("sp_AssignEmployeeToWork", connection)
         {
@@ -225,6 +237,7 @@ public class WorkItemRepository : IWorkItemRepository
 
     public async Task<bool> AssignContractorToWorkAsync(int workItemId, int contractorId, string assignmentRole)
     {
+        // Creates contractor assignment link for a specific work item.
         await using var connection = _dbServices.CreateConnection();
         await using var command = new SqlCommand("sp_AssignContractorToWork", connection)
         {
@@ -243,6 +256,7 @@ public class WorkItemRepository : IWorkItemRepository
 
     public async Task<bool> EmployeeExistsAsync(int employeeId)
     {
+        // Lightweight existence check used before creating assignment links.
         await using var connection = _dbServices.CreateConnection();
         await using var command = new SqlCommand(
             "SELECT COUNT(1) FROM dbo.Employees WHERE EmployeeId = @EmployeeId",
@@ -263,6 +277,7 @@ public class WorkItemRepository : IWorkItemRepository
 
     public async Task<bool> ContractorExistsAsync(int contractorId)
     {
+        // Lightweight existence check used before creating contractor links.
         await using var connection = _dbServices.CreateConnection();
         await using var command = new SqlCommand(
             "SELECT COUNT(1) FROM dbo.Contractors WHERE ContractorId = @ContractorId",
@@ -283,6 +298,7 @@ public class WorkItemRepository : IWorkItemRepository
 
     public async Task<WorkPlanResult?> GetWorkPlanAsync(int projectId)
     {
+        // Work plan data flow: load project, then tasks, then assignments.
         await using var connection = _dbServices.CreateConnection();
         await connection.OpenAsync();
 
@@ -290,6 +306,7 @@ public class WorkItemRepository : IWorkItemRepository
         var tasks = new List<WorkItem>();
         var assignments = new List<WorkPlanAssignmentResult>();
 
+        // Stored procedure: project header row.
         await using (var projectCommand = new SqlCommand("sp_GetWorkPlanProject", connection))
         {
             projectCommand.CommandType = CommandType.StoredProcedure;
@@ -308,6 +325,7 @@ public class WorkItemRepository : IWorkItemRepository
             return null;
         }
 
+        // Stored procedure: child tasks/milestones under project.
         await using (var tasksCommand = new SqlCommand("sp_GetWorkPlanTasks", connection))
         {
             tasksCommand.CommandType = CommandType.StoredProcedure;
@@ -321,6 +339,7 @@ public class WorkItemRepository : IWorkItemRepository
             }
         }
 
+        // Stored procedure: assignment links to employees/contractors.
         await using (var assignmentsCommand = new SqlCommand("sp_GetWorkPlanAssignments", connection))
         {
             assignmentsCommand.CommandType = CommandType.StoredProcedure;
@@ -344,6 +363,7 @@ public class WorkItemRepository : IWorkItemRepository
 
     public async Task<List<WorkPlanResult>> GetAllWorkPlansAsync()
     {
+        // Loads all projects, then builds each project work plan.
         var results = new List<WorkPlanResult>();
 
         await using var connection = _dbServices.CreateConnection();
@@ -376,6 +396,7 @@ public class WorkItemRepository : IWorkItemRepository
     }
     private static WorkItem MapWorkItem(SqlDataReader reader)
     {
+        // Reader-to-entity mapping for shared work item shape across procedures.
         return new WorkItem
         {
             WorkItemId = GetIntValue(reader, "WorkItemId"),
@@ -404,6 +425,7 @@ public class WorkItemRepository : IWorkItemRepository
 
     private static WorkPlanAssignmentResult MapWorkPlanAssignment(SqlDataReader reader)
     {
+        // Reader-to-model mapping for assignment rows in work plan responses.
         return new WorkPlanAssignmentResult
         {
             WorkItemId = GetIntValue(reader, "WorkItemId"),
@@ -420,6 +442,7 @@ public class WorkItemRepository : IWorkItemRepository
 
     private static bool HasColumn(SqlDataReader reader, string columnName)
     {
+        // Protects shared mapping code when different procedures return different columns.
         for (int i = 0; i < reader.FieldCount; i++)
         {
             if (string.Equals(reader.GetName(i), columnName, StringComparison.OrdinalIgnoreCase))
@@ -473,6 +496,7 @@ public class WorkItemRepository : IWorkItemRepository
 
     public async Task<List<ProjectListItemResult>> GetProjectsListAsync()
     {
+        // Returns summarized project rows for projects-list endpoint.
         var projects = new List<ProjectListItemResult>();
 
         await using var connection = _dbServices.CreateConnection();
@@ -507,6 +531,7 @@ public class WorkItemRepository : IWorkItemRepository
 
     public async Task<List<ProjectMilestoneResult>> GetProjectMilestonesAsync(int projectId)
     {
+        // Builds milestone view with nested employees and contractors from flat DB rows.
         var milestonesDictionary = new Dictionary<int, ProjectMilestoneResult>();
 
         await using var connection = _dbServices.CreateConnection();
@@ -524,6 +549,7 @@ public class WorkItemRepository : IWorkItemRepository
         {
             var workItemId = GetIntValue(reader, "WorkItemId");
 
+            // First row for a milestone creates the milestone container once.
             if (!milestonesDictionary.TryGetValue(workItemId, out var milestone))
             {
                 milestone = new ProjectMilestoneResult
@@ -549,6 +575,7 @@ public class WorkItemRepository : IWorkItemRepository
                 milestonesDictionary.Add(workItemId, milestone);
             }
 
+            // Employee assignment rows are grouped under the milestone.
             var employeeId = GetNullableIntValue(reader, "EmployeeId");
             if (employeeId.HasValue && employeeId.Value > 0)
             {
@@ -567,6 +594,7 @@ public class WorkItemRepository : IWorkItemRepository
                 }
             }
 
+            // Contractor assignment rows are grouped under the milestone.
             var contractorId = GetNullableIntValue(reader, "ContractorId");
             if (contractorId.HasValue && contractorId.Value > 0)
             {
@@ -618,6 +646,7 @@ public class WorkItemRepository : IWorkItemRepository
 
     public async Task<bool> DeleteEmployeeAssignmentsByWorkItemIdAsync(int workItemId)
     {
+        // Clears employee links before re-adding updated assignment list.
         await using var connection = _dbServices.CreateConnection();
         await using var command = new SqlCommand("sp_DeleteEmployeeAssignmentsByWorkItemId", connection)
         {
@@ -636,6 +665,7 @@ public class WorkItemRepository : IWorkItemRepository
 
     public async Task<bool> DeleteContractorAssignmentsByWorkItemIdAsync(int workItemId)
     {
+        // Clears contractor links before re-adding updated assignment list.
         await using var connection = _dbServices.CreateConnection();
         await using var command = new SqlCommand("sp_DeleteContractorAssignmentsByWorkItemId", connection)
         {

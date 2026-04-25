@@ -1,5 +1,6 @@
 namespace ManageR2.Infrastructure.Models;
 
+// Lightweight report list row used for reports table endpoints.
 public class WorkReportListItemModel
 {
     public int WorkReportId { get; set; }

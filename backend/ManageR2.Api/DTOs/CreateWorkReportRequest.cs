@@ -1,5 +1,6 @@
 namespace ManageR2.Api.DTOs;
 
+// Request contract for creating a report linked to a work item/project.
 public class CreateWorkReportRequest
 {
     public string? ReportType { get; set; }
@@ -7,6 +8,7 @@ public class CreateWorkReportRequest
     public int? ProjectId { get; set; }
     public string? ProjectName { get; set; }
     public string? CustomerName { get; set; }
+    // Optional service-call linkage when report is for a specific service call.
     public int? ServiceCallId { get; set; }
     public string? ServiceCallTitle { get; set; }
     public string? Site { get; set; }
@@ -19,6 +21,7 @@ public class CreateWorkReportRequest
     public string? Role { get; set; }
     public string? Status { get; set; }
     public List<string> Systems { get; set; } = new();
+    // Employees related to this report (not Users).
     public List<WorkReportRelatedWorkerDto> RelatedWorkers { get; set; } = new();
     public bool Followup { get; set; }
     public string? FollowupReason { get; set; }

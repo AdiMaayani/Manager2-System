@@ -3,6 +3,7 @@ using System.Collections.Generic;
 
 namespace ManageR2.Api.DTOs
 {
+    // Response contract for work plan endpoint: project + tasks + assignments.
     public class WorkPlanDto
     {
         public ProjectSummaryDto Project { get; set; } = new ProjectSummaryDto();
@@ -10,6 +11,7 @@ namespace ManageR2.Api.DTOs
         public List<WorkAssignmentDto> Assignments { get; set; } = new List<WorkAssignmentDto>();
     }
 
+    // Project header section in the work plan response.
     public class ProjectSummaryDto
     {
         public int WorkItemId { get; set; }
@@ -28,6 +30,7 @@ namespace ManageR2.Api.DTOs
         public string? InvoiceNumber { get; set; }
     }
 
+    // Task/milestone section in the work plan response.
     public class TaskSummaryDto
     {
         public int WorkItemId { get; set; }
@@ -52,6 +55,7 @@ namespace ManageR2.Api.DTOs
         public string? InvoiceNumber { get; set; }
     }
 
+    // Assignment section that links employees/contractors to work items.
     public class WorkAssignmentDto
     {
         public int WorkItemId { get; set; }

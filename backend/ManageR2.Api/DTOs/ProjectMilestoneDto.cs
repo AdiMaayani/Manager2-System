@@ -3,6 +3,7 @@ using System.Collections.Generic;
 
 namespace ManageR2.Api.DTOs;
 
+// Milestone response contract including linked assignment participants.
 public class ProjectMilestoneDto
 {
     public int WorkItemId { get; set; }
@@ -42,6 +43,7 @@ public class ProjectMilestoneDto
     public List<ProjectMilestoneContractorDto> Contractors { get; set; } = new();
 }
 
+// Employee assignment details under a milestone.
 public class ProjectMilestoneEmployeeDto
 {
     public int EmployeeId { get; set; }
@@ -55,6 +57,7 @@ public class ProjectMilestoneEmployeeDto
     public bool? IsManualAssignment { get; set; }
 }
 
+// Contractor assignment details under a milestone.
 public class ProjectMilestoneContractorDto
 {
     public int ContractorId { get; set; }

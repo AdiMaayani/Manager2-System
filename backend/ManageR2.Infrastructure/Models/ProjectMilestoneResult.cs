@@ -3,6 +3,7 @@ using System.Collections.Generic;
 
 namespace ManageR2.Infrastructure.Models;
 
+// Repository result model for milestone details under a project.
 public class ProjectMilestoneResult
 {
     public int WorkItemId { get; set; }
@@ -42,6 +43,7 @@ public class ProjectMilestoneResult
     public List<ProjectMilestoneContractorAssignmentResult> Contractors { get; set; } = new();
 }
 
+// Employee assignment row under a milestone result.
 public class ProjectMilestoneEmployeeAssignmentResult
 {
     public int EmployeeId { get; set; }
@@ -55,6 +57,7 @@ public class ProjectMilestoneEmployeeAssignmentResult
     public bool? IsManualAssignment { get; set; }
 }
 
+// Contractor assignment row under a milestone result.
 public class ProjectMilestoneContractorAssignmentResult
 {
     public int ContractorId { get; set; }

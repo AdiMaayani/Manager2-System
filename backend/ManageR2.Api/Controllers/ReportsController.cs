@@ -7,6 +7,7 @@ namespace ManageR2.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+// Thin API controller for creating and reading work reports linked to work items.
 public class ReportsController : ControllerBase
 {
     private readonly IWorkReportRepository _workReportRepository;
@@ -17,6 +18,7 @@ public class ReportsController : ControllerBase
     }
 
     [HttpGet]
+// Returns all reports for list pages and recent activity views.
 public async Task<IActionResult> GetAll()
 {
     var reports = await _workReportRepository.GetAllAsync();
@@ -24,6 +26,7 @@ public async Task<IActionResult> GetAll()
 }
 
 [HttpGet("{id:int}")]
+// Returns one full report with details by report id.
 public async Task<IActionResult> GetById(int id)
 {
     var report = await _workReportRepository.GetByIdAsync(id);
@@ -37,6 +40,7 @@ public async Task<IActionResult> GetById(int id)
 }
 
     [HttpPost]
+    // Creates a report and delegates persistence to the report repository.
     public async Task<IActionResult> Create([FromBody] CreateWorkReportRequest request)
     {
         if (request == null)
@@ -44,6 +48,7 @@ public async Task<IActionResult> GetById(int id)
             return BadRequest("Request is null");
         }
 
+        // Maps incoming API request fields to infrastructure create model.
         var model = MapToModel(request);
 
         var newId = await _workReportRepository.CreateAsync(model);
@@ -59,6 +64,7 @@ public async Task<IActionResult> GetById(int id)
 
     private static WorkReportCreateModel MapToModel(CreateWorkReportRequest request)
     {
+        // Keeps controller thin by centralizing DTO-to-model mapping in one place.
         return new WorkReportCreateModel
         {
             ReportType = request.ReportType,

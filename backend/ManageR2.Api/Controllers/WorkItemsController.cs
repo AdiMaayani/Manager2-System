@@ -8,6 +8,7 @@ namespace ManageR2.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+// API layer for work items (projects, tasks, milestones) and assignment-related work-plan views.
 public class WorkItemsController : ControllerBase
 {
     private readonly IWorkItemRepository _workItemRepository;
@@ -18,6 +19,7 @@ public class WorkItemsController : ControllerBase
     }
 
     [HttpGet]
+    // Returns all work items for management screens.
     public async Task<ActionResult<List<WorkItem>>> GetAll()
     {
         var workItems = await _workItemRepository.GetAllAsync();
@@ -25,10 +27,12 @@ public class WorkItemsController : ControllerBase
     }
 
     [HttpGet("projects-list")]
+    // Returns project-focused list data for project tables.
     public async Task<ActionResult<List<ProjectListItemDto>>> GetProjectsList()
     {
         var projects = await _workItemRepository.GetProjectsListAsync();
 
+        // Maps repository result to API DTO used by the frontend list view.
         var result = projects.Select(project => new ProjectListItemDto
         {
             WorkItemId = project.WorkItemId,
@@ -57,6 +61,7 @@ public class WorkItemsController : ControllerBase
     }
 
     [HttpGet("{id}")]
+    // Returns one work item by id (can be project, task, milestone, or service call).
     public async Task<ActionResult<WorkItem>> GetById(int id)
     {
         var workItem = await _workItemRepository.GetByIdAsync(id);
@@ -70,6 +75,7 @@ public class WorkItemsController : ControllerBase
     }
 
     [HttpGet("type/{workType}")]
+    // Filters work items by type to support type-specific views.
     public async Task<ActionResult<List<WorkItem>>> GetByType(string workType)
     {
         var workItems = await _workItemRepository.GetByTypeAsync(workType);
@@ -77,6 +83,7 @@ public class WorkItemsController : ControllerBase
     }
 
     [HttpGet("{id}/tasks")]
+    // Returns child tasks/milestones under a parent work item.
     public async Task<ActionResult<List<WorkItem>>> GetTasksByParentId(int id)
     {
         var parentWorkItem = await _workItemRepository.GetByIdAsync(id);
@@ -90,6 +97,7 @@ public class WorkItemsController : ControllerBase
     }
 
     [HttpGet("{id}/work-plan")]
+    // Builds one project work plan: project header + child tasks + assignments.
     public async Task<ActionResult<WorkPlanDto>> GetWorkPlan(int id)
     {
         var workItem = await _workItemRepository.GetByIdAsync(id);
@@ -98,6 +106,7 @@ public class WorkItemsController : ControllerBase
             return NotFound($"Work item with ID {id} was not found.");
         }
 
+        // Work plan endpoint is intentionally limited to project root work items.
         if (!string.Equals(workItem.WorkType, "Project", StringComparison.OrdinalIgnoreCase))
         {
             return BadRequest($"Work plan is only available for projects. WorkItem {id} is of type '{workItem.WorkType}'.");
@@ -110,8 +119,10 @@ public class WorkItemsController : ControllerBase
             return NotFound($"Project with ID {id} was not found.");
         }
 
+        // Maps DB/repository model into API contract for defense-friendly presentation.
         var response = new WorkPlanDto
         {
+            // Project section of the work plan.
             Project = new ProjectSummaryDto
             {
                 WorkItemId = workPlanResult.Project.WorkItemId,
@@ -126,6 +137,7 @@ public class WorkItemsController : ControllerBase
                 ClosedAt = workPlanResult.Project.ClosedAt,
                 ParentWorkItemId = workPlanResult.Project.ParentWorkItemId
             },
+            // Task/milestone section linked under the project.
             Tasks = workPlanResult.Tasks.Select(task => new TaskSummaryDto
             {
                 WorkItemId = task.WorkItemId,
@@ -146,6 +158,7 @@ public class WorkItemsController : ControllerBase
                 ClosedAt = task.ClosedAt,
                 ParentWorkItemId = task.ParentWorkItemId
             }).ToList(),
+            // Assignment section linking employees/contractors to work items.
             Assignments = workPlanResult.Assignments.Select(assignment => new WorkAssignmentDto
             {
                 WorkItemId = assignment.WorkItemId,
@@ -164,10 +177,12 @@ public class WorkItemsController : ControllerBase
     }
 
     [HttpGet("work-plan/all")]
+    // Returns work plans for all projects to support portfolio-level planning views.
     public async Task<ActionResult<List<WorkPlanDto>>> GetAllWorkPlans()
     {
         var workPlans = await _workItemRepository.GetAllWorkPlansAsync();
 
+        // Converts repository results into response DTOs for each project work plan.
         var response = workPlans.Select(workPlanResult => new WorkPlanDto
         {
             Project = new ProjectSummaryDto
@@ -222,6 +237,7 @@ public class WorkItemsController : ControllerBase
     }
 
     [HttpGet("{id}/milestones")]
+    // Returns milestone details and assignment participants for one project.
     public async Task<ActionResult<List<ProjectMilestoneDto>>> GetProjectMilestones(int id)
     {
         var workItem = await _workItemRepository.GetByIdAsync(id);
@@ -231,6 +247,7 @@ public class WorkItemsController : ControllerBase
             return NotFound($"Work item with ID {id} was not found.");
         }
 
+        // Milestones are modeled as task-type children under a project.
         if (!string.Equals(workItem.WorkType, "Project", StringComparison.OrdinalIgnoreCase))
         {
             return BadRequest($"Milestones are only available for projects. WorkItem {id} is of type '{workItem.WorkType}'.");
@@ -238,6 +255,7 @@ public class WorkItemsController : ControllerBase
 
         var milestones = await _workItemRepository.GetProjectMilestonesAsync(id);
 
+        // Maps milestone result rows into nested DTOs for employees and contractors.
         var response = milestones.Select(milestone => new ProjectMilestoneDto
         {
             WorkItemId = milestone.WorkItemId,
@@ -276,6 +294,7 @@ public class WorkItemsController : ControllerBase
     }
 
     [HttpPost]
+    // Creates a generic work item. WorkType defines if it is project/task/service call.
     public async Task<IActionResult> Create([FromBody] WorkItem workItem)
     {
         if (workItem == null)
@@ -313,6 +332,7 @@ public class WorkItemsController : ControllerBase
             return BadRequest("SiteId must be greater than 0.");
         }
 
+        // Validates hierarchy links so child work items reference an existing parent.
         if (workItem.ParentWorkItemId.HasValue)
         {
             var parentWorkItem = await _workItemRepository.GetByIdAsync(workItem.ParentWorkItemId.Value);
@@ -337,6 +357,7 @@ public class WorkItemsController : ControllerBase
     }
 
     [HttpPost("project")]
+    // Creates a top-level project work item.
     public async Task<IActionResult> CreateProject([FromBody] CreateProjectRequest request)
     {
         if (request == null)
@@ -369,6 +390,7 @@ public class WorkItemsController : ControllerBase
             return BadRequest("SiteId must be greater than 0.");
         }
 
+        // WorkType is fixed to Project for consistent project classification.
         var project = new WorkItem
         {
             Title = request.Title,
@@ -399,6 +421,7 @@ public class WorkItemsController : ControllerBase
     }
 
     [HttpPost("task")]
+    // Creates a task under an existing project.
     public async Task<IActionResult> CreateTask([FromBody] CreateTaskRequest request)
     {
         if (request == null)
@@ -436,12 +459,14 @@ public class WorkItemsController : ControllerBase
             return BadRequest("ParentWorkItemId is required for task creation.");
         }
 
+        // Task must be linked to an existing parent project.
         var parentWorkItem = await _workItemRepository.GetByIdAsync(request.ParentWorkItemId.Value);
         if (parentWorkItem == null)
         {
             return NotFound($"Parent project with ID {request.ParentWorkItemId.Value} was not found.");
         }
 
+        // WorkType is fixed to Task for child planning items.
         var task = new WorkItem
         {
             Title = request.Title,
@@ -472,6 +497,7 @@ public class WorkItemsController : ControllerBase
     }
 
     [HttpPut("{id}")]
+    // Updates core fields of an existing work item.
     public async Task<IActionResult> Update(int id, [FromBody] WorkItem workItem)
     {
         if (workItem == null)
@@ -496,6 +522,7 @@ public class WorkItemsController : ControllerBase
     }
 
     [HttpPut("{id}/close")]
+    // Soft-closes a work item by status/date handling in the repository and DB layer.
     public async Task<IActionResult> Close(int id)
     {
         var existingWorkItem = await _workItemRepository.GetByIdAsync(id);
@@ -515,6 +542,7 @@ public class WorkItemsController : ControllerBase
     }
 
     [HttpPost("{id}/assign-employee")]
+    // Links an employee to a work item through assignment records.
     public async Task<IActionResult> AssignEmployee(int id, [FromBody] AssignEmployeeRequest request)
     {
         if (request == null || request.EmployeeId <= 0 || string.IsNullOrWhiteSpace(request.AssignmentRole))
@@ -545,6 +573,7 @@ public class WorkItemsController : ControllerBase
     }
 
     [HttpPost("{id}/assign-contractor")]
+    // Links a contractor to a work item through assignment records.
     public async Task<IActionResult> AssignContractor(int id, [FromBody] AssignContractorRequest request)
     {
         if (request == null || request.ContractorId <= 0 || string.IsNullOrWhiteSpace(request.AssignmentRole))
@@ -575,6 +604,7 @@ public class WorkItemsController : ControllerBase
     }
 
     [HttpPost("{projectId}/milestones")]
+    // Creates a milestone (stored as task type) under a project and attaches assignments.
     public async Task<IActionResult> CreateMilestone(int projectId, [FromBody] CreateMilestoneRequest request)
     {
         if (request == null)
@@ -646,7 +676,7 @@ public class WorkItemsController : ControllerBase
             return BadRequest("Failed to create milestone.");
         }
 
-        // Assign Employees
+        // Adds employee assignments after milestone creation.
         if (request.Employees != null && request.Employees.Any())
         {
             foreach (var employee in request.Employees)
@@ -665,7 +695,7 @@ public class WorkItemsController : ControllerBase
             }
         }
 
-        // Assign Contractors
+        // Adds contractor assignments after milestone creation.
         if (request.Contractors != null && request.Contractors.Any())
         {
             foreach (var contractor in request.Contractors)
@@ -692,6 +722,7 @@ public class WorkItemsController : ControllerBase
     }
 
     [HttpPut("milestones/{milestoneId}")]
+    // Updates a milestone and refreshes its assignment links.
     public async Task<IActionResult> UpdateMilestone(int milestoneId, [FromBody] UpdateMilestoneRequest request)
     {
         if (request == null)
@@ -764,6 +795,7 @@ public class WorkItemsController : ControllerBase
             return BadRequest("Failed to update milestone.");
         }
 
+        // Rebuilds assignment lists to match the updated payload exactly.
         var deletedEmployees = await _workItemRepository.DeleteEmployeeAssignmentsByWorkItemIdAsync(milestoneId);
         if (!deletedEmployees)
         {
@@ -819,6 +851,7 @@ public class WorkItemsController : ControllerBase
     }
 
     [HttpPut("milestones/{milestoneId}/cancel")]
+    // Cancels a milestone using repository soft-delete behavior.
     public async Task<IActionResult> SoftDeleteMilestone(int milestoneId)
     {
         var existingMilestone = await _workItemRepository.GetByIdAsync(milestoneId);

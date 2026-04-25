@@ -4,6 +4,7 @@ using ManageR2.Domain.Entities;
 
 namespace ManageR2.Infrastructure.Models
 {
+    // Repository result model used before mapping to WorkPlanDto.
     public class WorkPlanResult
     {
         public WorkItem Project { get; set; } = new WorkItem();
@@ -13,6 +14,7 @@ namespace ManageR2.Infrastructure.Models
         public List<WorkPlanAssignmentResult> Assignments { get; set; } = new List<WorkPlanAssignmentResult>();
     }
 
+    // Assignment row model returned from work plan assignment query.
     public class WorkPlanAssignmentResult
     {
         public int WorkItemId { get; set; }

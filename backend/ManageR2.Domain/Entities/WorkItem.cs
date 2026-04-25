@@ -1,5 +1,6 @@
 namespace ManageR2.Domain.Entities;
 
+// Core domain entity for any managed unit of work: project, task/milestone, or service-call item.
 public class WorkItem
 {
     public int WorkItemId { get; set; }
@@ -21,6 +22,7 @@ public class WorkItem
     public int SiteId { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? ClosedAt { get; set; }
+    // Parent link builds the hierarchy (project -> child tasks/milestones).
     public int? ParentWorkItemId { get; set; }
 
     public DateTime? DealCloseDate { get; set; }

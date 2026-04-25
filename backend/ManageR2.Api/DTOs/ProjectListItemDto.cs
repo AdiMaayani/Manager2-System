@@ -1,5 +1,6 @@
 namespace ManageR2.Api.DTOs;
 
+// Lightweight project list contract based on WorkItems with WorkType=Project.
 public class ProjectListItemDto
 {
     public int WorkItemId { get; set; }

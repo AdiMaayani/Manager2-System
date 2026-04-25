@@ -1,10 +1,12 @@
 namespace ManageR2.Infrastructure.Models;
 
+// Full report details model returned by repository for report details endpoint.
 public class WorkReportDetailsModel
 {
     public int WorkReportId { get; set; }
     public string? ReportType { get; set; }
     public DateTime? ReportDate { get; set; }
+    // Linked WorkItem id (project/task/service-call context for the report).
     public int? ProjectId { get; set; }
     public string? ProjectName { get; set; }
     public string? CustomerName { get; set; }

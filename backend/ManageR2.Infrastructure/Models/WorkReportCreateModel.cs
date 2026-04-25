@@ -1,9 +1,11 @@
 namespace ManageR2.Infrastructure.Models;
 
+// Infrastructure create model used by repository to persist report data.
 public class WorkReportCreateModel
 {
     public string? ReportType { get; set; }
     public string? Date { get; set; }
+    // WorkItem link for project/service-call context.
     public int? ProjectId { get; set; }
     public string? ProjectName { get; set; }
     public string? CustomerName { get; set; }

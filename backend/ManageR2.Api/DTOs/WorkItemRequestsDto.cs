@@ -3,6 +3,7 @@ using System.Collections.Generic;
 
 namespace ManageR2.Api.DTOs;
 
+// Request payload for creating a top-level project work item.
 public class CreateProjectRequest
 {
     public string Title { get; set; } = string.Empty;
@@ -16,6 +17,7 @@ public class CreateProjectRequest
     public string? InvoiceNumber { get; set; }
 }
 
+// Request payload for creating a child task under a project.
 public class CreateTaskRequest
 {
     public string Title { get; set; } = string.Empty;
@@ -30,18 +32,21 @@ public class CreateTaskRequest
     public string? InvoiceNumber { get; set; }
 }
 
+// Request payload for assigning an employee to a work item.
 public class AssignEmployeeRequest
 {
     public int EmployeeId { get; set; }
     public string AssignmentRole { get; set; } = string.Empty;
 }
 
+// Request payload for assigning a contractor to a work item.
 public class AssignContractorRequest
 {
     public int ContractorId { get; set; }
     public string AssignmentRole { get; set; } = string.Empty;
 }
 
+// Request payload for creating a milestone/task with optional assignments.
 public class CreateMilestoneRequest
 {
     public string Title { get; set; } = string.Empty;
@@ -62,6 +67,7 @@ public class CreateMilestoneRequest
     public List<CreateMilestoneContractorAssignmentRequest> Contractors { get; set; } = new();
 }
 
+// Request payload for updating milestone fields and assignment lists.
 public class UpdateMilestoneRequest
 {
     public string Title { get; set; } = string.Empty;
@@ -82,12 +88,14 @@ public class UpdateMilestoneRequest
     public List<CreateMilestoneContractorAssignmentRequest> Contractors { get; set; } = new();
 }
 
+// Employee assignment item inside milestone create/update payloads.
 public class CreateMilestoneEmployeeAssignmentRequest
 {
     public int EmployeeId { get; set; }
     public string AssignmentRole { get; set; } = string.Empty;
 }
 
+// Contractor assignment item inside milestone create/update payloads.
 public class CreateMilestoneContractorAssignmentRequest
 {
     public int ContractorId { get; set; }
