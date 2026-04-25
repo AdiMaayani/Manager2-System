@@ -1,7 +1,7 @@
 USE [igroup30_prod];
 GO
 
-CREATE OR ALTER PROCEDURE dbo.sp_GetProjectLifecycle
+CREATE OR ALTER PROCEDURE [dbo].[sp_GetProjectLifecycle]
     @ProjectId INT
 AS
 BEGIN
@@ -116,47 +116,117 @@ BEGIN
         ISNULL(wr.FollowUpRequired, 0) AS FollowUpRequired
     FROM dbo.WorkReports wr
     INNER JOIN @RelatedWorkItems r ON r.WorkItemId = wr.WorkItemId
-    ORDER BY
-        wr.ReportDate DESC,
-        wr.WorkReportId DESC;
+    ORDER BY wr.ReportDate DESC, wr.WorkReportId DESC;
 
+    ;WITH MilestoneStats AS
+    (
+        SELECT
+            COUNT(1) AS TotalMilestones,
+
+            SUM(CASE WHEN Status = 'Closed' THEN 1 ELSE 0 END) AS ClosedMilestones,
+
+            SUM(CASE WHEN Status NOT IN ('Closed', 'Cancelled') THEN 1 ELSE 0 END) AS OpenMilestones,
+
+            SUM(CASE WHEN Status = 'Cancelled' THEN 1 ELSE 0 END) AS CancelledMilestones,
+
+            SUM(CASE WHEN IsLocked = 1 THEN 1 ELSE 0 END) AS LockedMilestones,
+
+            SUM(
+                CASE
+                    WHEN Status NOT IN ('Closed', 'Cancelled')
+                         AND PlannedEnd IS NOT NULL
+                         AND PlannedEnd < GETDATE()
+                    THEN 1 ELSE 0
+                END
+            ) AS DelayedMilestones,
+
+            SUM(
+                CASE
+                    WHEN PlannedStart IS NOT NULL
+                         AND PlannedEnd IS NOT NULL
+                         AND PlannedEnd < PlannedStart
+                    THEN 1 ELSE 0
+                END
+            ) AS InvalidScheduleMilestones,
+
+            SUM(
+                CASE
+                    WHEN Status NOT IN ('Closed', 'Cancelled')
+                         AND PlannedStart IS NOT NULL
+                         AND PlannedStart >= GETDATE()
+                    THEN 1 ELSE 0
+                END
+            ) AS UpcomingMilestones
+        FROM dbo.WorkItems
+        WHERE ParentWorkItemId = @ProjectId
+          AND WorkType = 'Task'
+    ),
+    ReportStats AS
+    (
+        SELECT
+            COUNT(1) AS TotalReports,
+            CAST(
+                CASE
+                    WHEN SUM(CASE WHEN ISNULL(FollowUpRequired, 0) = 1 THEN 1 ELSE 0 END) > 0
+                    THEN 1 ELSE 0
+                END AS BIT
+            ) AS HasFollowUps
+        FROM dbo.WorkReports wr
+        INNER JOIN @RelatedWorkItems r ON r.WorkItemId = wr.WorkItemId
+    )
     SELECT
-        COUNT(1) AS TotalMilestones,
-        SUM(CASE WHEN wi.Status = 'Closed' OR wi.ClosedAt IS NOT NULL THEN 1 ELSE 0 END) AS ClosedMilestones,
-        SUM(CASE WHEN NOT (wi.Status = 'Closed' OR wi.ClosedAt IS NOT NULL) THEN 1 ELSE 0 END) AS OpenMilestones,
-        SUM(CASE WHEN wi.IsLocked = 1 THEN 1 ELSE 0 END) AS LockedMilestones,
+        ms.TotalMilestones,
+        ms.ClosedMilestones,
+        ms.OpenMilestones,
+        ms.LockedMilestones,
         CAST(
             CASE
-                WHEN COUNT(1) = 0 THEN 0
-                ELSE ROUND(
-                    CAST(SUM(CASE WHEN wi.Status = 'Closed' OR wi.ClosedAt IS NOT NULL THEN 1 ELSE 0 END) AS DECIMAL(10,2))
-                    / CAST(COUNT(1) AS DECIMAL(10,2)) * 100,
-                    2
-                )
+                WHEN (ms.TotalMilestones - ms.CancelledMilestones) <= 0 THEN 0
+                ELSE (CAST(ms.ClosedMilestones AS DECIMAL(10,2)) / CAST((ms.TotalMilestones - ms.CancelledMilestones) AS DECIMAL(10,2))) * 100
             END
             AS DECIMAL(10,2)
         ) AS ProgressPercent,
-        (
-            SELECT COUNT(1)
-            FROM dbo.WorkReports wr
-            INNER JOIN @RelatedWorkItems r ON r.WorkItemId = wr.WorkItemId
-        ) AS TotalReports,
+        rs.TotalReports,
+        rs.HasFollowUps,
+
+        ms.CancelledMilestones,
+        ms.DelayedMilestones,
+        ms.InvalidScheduleMilestones,
+        ms.UpcomingMilestones,
+
         CAST(
             CASE
-                WHEN EXISTS (
-                    SELECT 1
-                    FROM dbo.WorkReports wr
-                    INNER JOIN @RelatedWorkItems r ON r.WorkItemId = wr.WorkItemId
-                    WHERE ISNULL(wr.FollowUpRequired, 0) = 1
-                )
-                THEN 1
-                ELSE 0
+                WHEN ms.InvalidScheduleMilestones > 0 THEN 'High'
+                WHEN ms.DelayedMilestones > 0 AND rs.HasFollowUps = 1 THEN 'High'
+                WHEN ms.DelayedMilestones > 0 THEN 'Medium'
+                WHEN rs.HasFollowUps = 1 THEN 'Medium'
+                ELSE 'Low'
             END
-            AS BIT
-        ) AS HasFollowUps
-    FROM dbo.WorkItems wi
-    WHERE wi.ParentWorkItemId = @ProjectId
-      AND wi.WorkType = 'Task';
+            AS NVARCHAR(20)
+        ) AS RiskLevel,
 
+        CAST(
+            CASE
+                WHEN ms.InvalidScheduleMilestones > 0 THEN 'Data Issue'
+                WHEN ms.DelayedMilestones > 0 OR rs.HasFollowUps = 1 THEN 'At Risk'
+                WHEN ms.OpenMilestones = 0 AND ms.TotalMilestones > 0 THEN 'Completed'
+                ELSE 'On Track'
+            END
+            AS NVARCHAR(50)
+        ) AS HealthStatus,
+
+        CAST(
+            CASE
+                WHEN ms.InvalidScheduleMilestones > 0 THEN 'Project contains milestones with invalid planned date ranges.'
+                WHEN ms.DelayedMilestones > 0 AND rs.HasFollowUps = 1 THEN 'Project has delayed milestones and open follow-up reports.'
+                WHEN ms.DelayedMilestones > 0 THEN 'Project has delayed milestones.'
+                WHEN rs.HasFollowUps = 1 THEN 'Project has reports that require follow-up.'
+                WHEN ms.OpenMilestones = 0 AND ms.TotalMilestones > 0 THEN 'All active milestones are completed.'
+                ELSE 'Project is currently on track.'
+            END
+            AS NVARCHAR(500)
+        ) AS RiskReason
+    FROM MilestoneStats ms
+    CROSS JOIN ReportStats rs;
 END;
 GO

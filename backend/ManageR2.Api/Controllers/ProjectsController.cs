@@ -90,6 +90,13 @@ public class ProjectsController : ControllerBase
                 OpenMilestones = lifecycle.Summary.OpenMilestones,
                 ClosedMilestones = lifecycle.Summary.ClosedMilestones,
                 LockedMilestones = lifecycle.Summary.LockedMilestones,
+                CancelledMilestones = lifecycle.Summary.CancelledMilestones,
+                DelayedMilestones = lifecycle.Summary.DelayedMilestones,
+                InvalidScheduleMilestones = lifecycle.Summary.InvalidScheduleMilestones,
+                UpcomingMilestones = lifecycle.Summary.UpcomingMilestones,
+                RiskLevel = lifecycle.Summary.RiskLevel,
+                HealthStatus = lifecycle.Summary.HealthStatus,
+                RiskReason = lifecycle.Summary.RiskReason,
                 ProgressPercent = lifecycle.Summary.ProgressPercent,
                 TotalReports = lifecycle.Summary.TotalReports,
                 HasFollowUps = lifecycle.Summary.HasFollowUps

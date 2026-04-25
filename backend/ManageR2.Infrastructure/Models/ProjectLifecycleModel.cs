@@ -76,6 +76,13 @@ public class ProjectLifecycleSummaryModel
     public int OpenMilestones { get; set; }
     public int ClosedMilestones { get; set; }
     public int LockedMilestones { get; set; }
+    public int CancelledMilestones { get; set; }
+    public int DelayedMilestones { get; set; }
+    public int InvalidScheduleMilestones { get; set; }
+    public int UpcomingMilestones { get; set; }
+    public string RiskLevel { get; set; } = string.Empty;
+    public string HealthStatus { get; set; } = string.Empty;
+    public string RiskReason { get; set; } = string.Empty;
     public decimal ProgressPercent { get; set; }
     public int TotalReports { get; set; }
     public bool HasFollowUps { get; set; }

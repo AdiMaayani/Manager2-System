@@ -160,6 +160,13 @@ public class ProjectLifecycleRepository : IProjectLifecycleRepository
             OpenMilestones = reader["OpenMilestones"] != DBNull.Value ? Convert.ToInt32(reader["OpenMilestones"]) : 0,
             ClosedMilestones = reader["ClosedMilestones"] != DBNull.Value ? Convert.ToInt32(reader["ClosedMilestones"]) : 0,
             LockedMilestones = reader["LockedMilestones"] != DBNull.Value ? Convert.ToInt32(reader["LockedMilestones"]) : 0,
+            CancelledMilestones = reader["CancelledMilestones"] != DBNull.Value ? Convert.ToInt32(reader["CancelledMilestones"]) : 0,
+            DelayedMilestones = reader["DelayedMilestones"] != DBNull.Value ? Convert.ToInt32(reader["DelayedMilestones"]) : 0,
+            InvalidScheduleMilestones = reader["InvalidScheduleMilestones"] != DBNull.Value ? Convert.ToInt32(reader["InvalidScheduleMilestones"]) : 0,
+            UpcomingMilestones = reader["UpcomingMilestones"] != DBNull.Value ? Convert.ToInt32(reader["UpcomingMilestones"]) : 0,
+            RiskLevel = reader["RiskLevel"]?.ToString() ?? string.Empty,
+            HealthStatus = reader["HealthStatus"]?.ToString() ?? string.Empty,
+            RiskReason = reader["RiskReason"]?.ToString() ?? string.Empty,
             ProgressPercent = GetDecimalOrNull(reader, "ProgressPercent") ?? 0m,
             TotalReports = reader["TotalReports"] != DBNull.Value ? Convert.ToInt32(reader["TotalReports"]) : 0,
             HasFollowUps = reader["HasFollowUps"] != DBNull.Value && Convert.ToBoolean(reader["HasFollowUps"])
