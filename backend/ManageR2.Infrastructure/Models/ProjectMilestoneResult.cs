@@ -35,6 +35,12 @@ public class ProjectMilestoneResult
 
     public decimal? EstimatedHours { get; set; }
 
+    public DateTime? ActualStart { get; set; }
+
+    public DateTime? ActualEnd { get; set; }
+
+    public decimal? ActualHours { get; set; }
+
     public bool IsLocked { get; set; }
 
     public List<ProjectMilestoneEmployeeAssignmentResult> Employees { get; set; } = new();

@@ -254,6 +254,9 @@ public class WorkItemsController : ControllerBase
             ClosedAt = milestone.ClosedAt,
             Priority = milestone.Priority,
             EstimatedHours = milestone.EstimatedHours,
+            ActualStart = milestone.ActualStart,
+            ActualEnd = milestone.ActualEnd,
+            ActualHours = milestone.ActualHours,
             RequiredRole = milestone.RequiredRole,
             IsLocked = milestone.IsLocked,
             Employees = milestone.Employees.Select(employee => new ProjectMilestoneEmployeeDto
@@ -607,6 +610,22 @@ public class WorkItemsController : ControllerBase
             return BadRequest("SiteId must be greater than 0.");
         }
 
+        if (request.PlannedStart.HasValue && request.PlannedEnd.HasValue)
+        {
+            if (request.PlannedEnd <= request.PlannedStart)
+            {
+                return BadRequest("PlannedEnd must be after PlannedStart.");
+            }
+        }
+
+        if (request.ActualStart.HasValue && request.ActualEnd.HasValue)
+        {
+            if (request.ActualEnd <= request.ActualStart)
+            {
+                return BadRequest("ActualEnd must be after ActualStart.");
+            }
+        }
+
         // לוודא שהפרויקט קיים
         var project = await _workItemRepository.GetByIdAsync(projectId);
         if (project == null)
@@ -633,7 +652,13 @@ public class WorkItemsController : ControllerBase
 
             PlannedStart = request.PlannedStart,
             PlannedEnd = request.PlannedEnd,
-            EstimatedHours = request.EstimatedHours,
+            EstimatedHours = CalculateHours(request.PlannedStart, request.PlannedEnd)
+                 ?? request.EstimatedHours,
+
+            ActualStart = request.ActualStart,
+            ActualEnd = request.ActualEnd,
+            ActualHours = CalculateHours(request.ActualStart, request.ActualEnd)
+              ?? request.ActualHours,
             Priority = request.Priority,
             RequiredRole = request.RequiredRole,
             IsLocked = request.IsLocked
@@ -724,6 +749,22 @@ public class WorkItemsController : ControllerBase
             return BadRequest("SiteId must be greater than 0.");
         }
 
+        if (request.PlannedStart.HasValue && request.PlannedEnd.HasValue)
+        {
+            if (request.PlannedEnd <= request.PlannedStart)
+            {
+                return BadRequest("PlannedEnd must be after PlannedStart.");
+            }
+        }
+
+        if (request.ActualStart.HasValue && request.ActualEnd.HasValue)
+        {
+            if (request.ActualEnd <= request.ActualStart)
+            {
+                return BadRequest("ActualEnd must be after ActualStart.");
+            }
+        }
+
         var existingMilestone = await _workItemRepository.GetByIdAsync(milestoneId);
         if (existingMilestone == null)
         {
@@ -751,7 +792,14 @@ public class WorkItemsController : ControllerBase
 
             PlannedStart = request.PlannedStart,
             PlannedEnd = request.PlannedEnd,
-            EstimatedHours = request.EstimatedHours,
+            EstimatedHours = CalculateHours(request.PlannedStart, request.PlannedEnd)
+                 ?? request.EstimatedHours,
+
+            ActualStart = request.ActualStart,
+            ActualEnd = request.ActualEnd,
+            ActualHours = CalculateHours(request.ActualStart, request.ActualEnd)
+              ?? request.ActualHours,
+
             Priority = request.Priority,
             RequiredRole = request.RequiredRole,
             IsLocked = request.IsLocked
@@ -844,6 +892,23 @@ public class WorkItemsController : ControllerBase
         {
             message = "Milestone cancelled successfully."
         });
+    }
+
+    private static decimal? CalculateHours(DateTime? start, DateTime? end)
+    {
+        if (!start.HasValue || !end.HasValue)
+        {
+            return null;
+        }
+
+        if (end <= start)
+        {
+            return null;
+        }
+
+        var totalHours = (decimal)(end.Value - start.Value).TotalHours;
+
+        return Math.Round(totalHours, 2);
     }
 }
 

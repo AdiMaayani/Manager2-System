@@ -125,6 +125,9 @@ public class WorkItemRepository : IWorkItemRepository
         command.Parameters.AddWithValue("@PlannedStart", (object?)workItem.PlannedStart ?? DBNull.Value);
         command.Parameters.AddWithValue("@PlannedEnd", (object?)workItem.PlannedEnd ?? DBNull.Value);
         command.Parameters.AddWithValue("@EstimatedHours", (object?)workItem.EstimatedHours ?? DBNull.Value);
+        command.Parameters.AddWithValue("@ActualStart", (object?)workItem.ActualStart ?? DBNull.Value);
+        command.Parameters.AddWithValue("@ActualEnd", (object?)workItem.ActualEnd ?? DBNull.Value);
+        command.Parameters.AddWithValue("@ActualHours", (object?)workItem.ActualHours ?? DBNull.Value);
         command.Parameters.AddWithValue("@Priority", (object?)workItem.Priority ?? DBNull.Value);
         command.Parameters.AddWithValue("@RequiredRole", (object?)workItem.RequiredRole ?? DBNull.Value);
         command.Parameters.AddWithValue("@IsLocked", workItem.IsLocked);
@@ -164,6 +167,9 @@ public class WorkItemRepository : IWorkItemRepository
         command.Parameters.AddWithValue("@PlannedStart", (object?)workItem.PlannedStart ?? DBNull.Value);
         command.Parameters.AddWithValue("@PlannedEnd", (object?)workItem.PlannedEnd ?? DBNull.Value);
         command.Parameters.AddWithValue("@EstimatedHours", (object?)workItem.EstimatedHours ?? DBNull.Value);
+        command.Parameters.AddWithValue("@ActualStart", (object?)workItem.ActualStart ?? DBNull.Value);
+        command.Parameters.AddWithValue("@ActualEnd", (object?)workItem.ActualEnd ?? DBNull.Value);
+        command.Parameters.AddWithValue("@ActualHours", (object?)workItem.ActualHours ?? DBNull.Value);
         command.Parameters.AddWithValue("@Priority", (object?)workItem.Priority ?? DBNull.Value);
         command.Parameters.AddWithValue("@RequiredRole", (object?)workItem.RequiredRole ?? DBNull.Value);
         command.Parameters.AddWithValue("@IsLocked", workItem.IsLocked);
@@ -385,6 +391,9 @@ public class WorkItemRepository : IWorkItemRepository
             BillingType = GetStringValue(reader, "BillingType"),
             Status = GetStringValue(reader, "Status"),
             EstimatedHours = GetDecimalValue(reader, "EstimatedHours"),
+            ActualStart = GetDateTimeValue(reader, "ActualStart"),
+            ActualEnd = GetDateTimeValue(reader, "ActualEnd"),
+            ActualHours = GetDecimalValue(reader, "ActualHours"),
             Priority = GetStringValue(reader, "Priority"),
             PlannedStart = GetDateTimeValue(reader, "PlannedStart"),
             PlannedEnd = GetDateTimeValue(reader, "PlannedEnd"),
@@ -543,6 +552,9 @@ public class WorkItemRepository : IWorkItemRepository
                     Priority = GetStringValue(reader, "Priority"),
                     RequiredRole = GetStringValue(reader, "RequiredRole"),
                     EstimatedHours = GetDecimalValue(reader, "EstimatedHours"),
+                    ActualStart = GetDateTimeValue(reader, "ActualStart"),
+                    ActualEnd = GetDateTimeValue(reader, "ActualEnd"),
+                    ActualHours = GetDecimalValue(reader, "ActualHours"),
                     IsLocked = GetBoolValue(reader, "IsLocked")
                 };
 
