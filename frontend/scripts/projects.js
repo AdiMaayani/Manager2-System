@@ -83,7 +83,7 @@ async function openProject(id) {
   document.getElementById("proj-status").textContent = p.status || "-";
   document.getElementById("proj-open-date").textContent = p.openDate || "-";
   document.getElementById("proj-close-date").textContent = p.raw?.dealCloseDate
-    ? formatProjectDate(p.raw.dealCloseDate)
+    ? formatDate(p.raw.dealCloseDate)
     : "-";
   document.getElementById("proj-number").textContent = p.number || "-";
   document.getElementById("proj-finance-number").textContent =
@@ -1050,8 +1050,9 @@ function switchOverviewToEdit(project) {
     project?.raw?.billingType || "Fixed";
   document.getElementById("proj-description-input").value =
     project?.raw?.description || "";
-  document.getElementById("proj-close-date-input").value = formatDateForInput(
+  document.getElementById("proj-close-date-input").value = formatDate(
     project?.raw?.dealCloseDate,
+    { target: "input" },
   );
   document.getElementById("proj-finance-number-input").value =
     project?.raw?.financeProjectNumber || "";
@@ -1218,37 +1219,35 @@ function resetProjectCreateState() {
   isCreateMode = false;
 }
 
-function formatDateForInput(dateValue, includeTime = false) {
-  if (!dateValue) return "";
+function formatDate(dateValue, options = {}) {
+  const {
+    target = "display", // "display" | "input"
+    includeTime = false,
+    emptyValue = "-",
+  } = options;
+
+  if (!dateValue) return target === "input" ? "" : emptyValue;
 
   const date = new Date(dateValue);
-  if (Number.isNaN(date.getTime())) return "";
+  if (Number.isNaN(date.getTime())) {
+    return target === "input" ? "" : emptyValue;
+  }
 
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
-
-  if (!includeTime) {
-    return `${year}-${month}-${day}`;
-  }
-
   const hours = String(date.getHours()).padStart(2, "0");
   const minutes = String(date.getMinutes()).padStart(2, "0");
 
-  return `${year}-${month}-${day}T${hours}:${minutes}`;
-}
+  if (target === "input") {
+    return includeTime
+      ? `${year}-${month}-${day}T${hours}:${minutes}`
+      : `${year}-${month}-${day}`;
+  }
 
-function formatProjectDate(dateValue) {
-  if (!dateValue) return "-";
-
-  const date = new Date(dateValue);
-  if (Number.isNaN(date.getTime())) return "-";
-
-  const day = String(date.getDate()).padStart(2, "0");
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const year = date.getFullYear();
-
-  return `${day}/${month}/${year}`;
+  return includeTime
+    ? `${day}/${month}/${year} ${hours}:${minutes}`
+    : `${day}/${month}/${year}`;
 }
 
 function getProjectStatusMeta(statusCode) {
@@ -1429,17 +1428,17 @@ function renderProjectMilestones(milestones) {
     const assignedContractorsText =
       contractorNames.length > 0 ? contractorNames.join(", ") : "-";
 
-    const plannedStartText = milestone.plannedStart
-      ? formatProjectDate(milestone.plannedStart)
-      : "-";
+    const plannedStartText = formatDate(milestone.plannedStart, {
+      includeTime: true,
+    });
 
-    const plannedEndText = milestone.plannedEnd
-      ? formatProjectDate(milestone.plannedEnd)
-      : "-";
+    const plannedEndText = formatDate(milestone.plannedEnd, {
+      includeTime: true,
+    });
 
-    const closedAtText = milestone.closedAt
-      ? formatProjectDate(milestone.closedAt)
-      : "-";
+    const closedAtText = formatDate(milestone.closedAt, {
+      includeTime: true,
+    });
 
     const estimatedHoursText =
       milestone.estimatedHours != null ? String(milestone.estimatedHours) : "-";
@@ -1499,7 +1498,7 @@ function renderProjectMilestones(milestones) {
 
     <div class="milestone-card-section">
       <div class="milestone-card-section-title">תאריכים</div>
-      <div class="milestone-info-row"><span>תאריך יצירה</span><strong>${escapeHtml(formatProjectDate(milestone.createdAt))}</strong></div>
+      <div class="milestone-info-row"><span>תאריך יצירה</span><strong>${escapeHtml(formatDate(milestone.createdAt))}</strong></div>
       <div class="milestone-info-row"><span>תחילה מתוכננת</span><strong>${escapeHtml(plannedStartText)}</strong></div>
       <div class="milestone-info-row"><span>סיום מתוכנן</span><strong>${escapeHtml(plannedEndText)}</strong></div>
       <div class="milestone-info-row"><span>תאריך סגירה</span><strong>${escapeHtml(closedAtText)}</strong></div>
@@ -1610,12 +1609,18 @@ function openMilestoneForm(milestone = null) {
 
     document.getElementById("milestone-planned-start-input").value =
       milestone.plannedStart
-        ? formatDateForInput(milestone.plannedStart, true)
+        ? formatDate(milestone.plannedStart, {
+            target: "input",
+            includeTime: true,
+          })
         : "";
 
     document.getElementById("milestone-planned-end-input").value =
       milestone.plannedEnd
-        ? formatDateForInput(milestone.plannedEnd, true)
+        ? formatDate(milestone.plannedEnd, {
+            target: "input",
+            includeTime: true,
+          })
         : "";
 
     document.getElementById("milestone-estimated-hours-input").value =
@@ -1881,10 +1886,10 @@ async function loadProjectsFromApi() {
             status: statusInfo.display,
             statusCode: statusInfo.code,
             statusBadgeClass: statusInfo.badgeClass,
-            openDate: formatProjectDate(project.createdAt),
+            openDate: formatDate(project.createdAt),
             area: project.siteName || "-",
             closeDate: project.dealCloseDate
-              ? formatProjectDate(project.dealCloseDate)
+              ? formatDate(project.dealCloseDate)
               : "-",
             number: project.projectNumber || `P-${project.workItemId}`,
             financeNumber: project.financeProjectNumber || "-",
@@ -1990,9 +1995,9 @@ async function loadProjectDetailsFromApi(projectId) {
         : [],
       status: statusInfo.display,
       statusCode: statusInfo.code,
-      openDate: formatProjectDate(workItem.createdAt),
+      openDate: formatDate(workItem.createdAt),
       closeDate: workItem.dealCloseDate
-        ? formatProjectDate(workItem.dealCloseDate)
+        ? formatDate(workItem.dealCloseDate)
         : "-",
       number: `P-${workItem.workItemId}`,
       financeNumber: workItem.financeProjectNumber || "-",
@@ -2260,7 +2265,7 @@ if (drawingAddConfirm) {
     }
 
     const dateStr = date
-      ? formatDateForDisplay(date)
+      ? formatDate(date)
       : new Date().toLocaleDateString("he-IL");
     const icon = type === "PDF" ? "file-text" : "drafting-compass";
     const newId = `draw-${Date.now()}`;
@@ -2287,15 +2292,6 @@ if (drawingAddConfirm) {
     document.getElementById("drawing-date-input").value = "";
     document.getElementById("drawing-note-input").value = "";
   });
-}
-
-function formatDateForDisplay(dateStr) {
-  // Convert YYYY-MM-DD to DD/MM/YYYY
-  const date = new Date(dateStr);
-  const day = String(date.getDate()).padStart(2, "0");
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const year = date.getFullYear();
-  return `${day}/${month}/${year}`;
 }
 
 // Equipment/Products editing functions
