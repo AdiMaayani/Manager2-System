@@ -6,6 +6,12 @@ using ManageR2.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
+using AdvancedSmartAssignmentService = ManageR2.Infrastructure.Services.SmartAssignment.SmartAssignmentService;
+using AdvancedSmartAssignmentRepository = ManageR2.Infrastructure.Repositories.SmartAssignment.SmartAssignmentRepository;
+using ManageR2.Infrastructure.Services.SmartAssignment;
+
+
+
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -88,8 +94,10 @@ builder.Services.AddScoped<IPasswordService, PasswordService>();
 builder.Services.AddScoped<IUserAuthorizationService, UserAuthorizationService>();
 builder.Services.AddScoped<IWorkReportRepository, WorkReportRepository>();
 builder.Services.AddScoped<IEmployeeRepository, EmployeeRepository>();
-builder.Services.AddScoped<ISmartAssignmentRepository, SmartAssignmentRepository>();
-builder.Services.AddScoped<ISmartAssignmentService, SmartAssignmentService>();
+//builder.Services.AddScoped<ISmartAssignmentRepository, SmartAssignmentRepository>();
+//builder.Services.AddScoped<ISmartAssignmentService, SmartAssignmentService>();
+builder.Services.AddScoped<AdvancedSmartAssignmentRepository>();
+builder.Services.AddScoped<IAdvancedSmartAssignmentService, AdvancedSmartAssignmentService>();
 
 var app = builder.Build();
 
