@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace ManageR2.Infrastructure.Repositories;
 
+// Customer persistence: ADO.NET (SqlConnection/Command/Reader), dbo stored procedures, domain Customer out to controllers.
 public class CustomerRepository : ICustomerRepository
 {
     private readonly DBServices _dbServices;
@@ -19,6 +20,7 @@ public class CustomerRepository : ICustomerRepository
         _logger = logger;
     }
 
+    // sp_GetCustomers: full table projection; SqlDataReader rows mapped in MapCustomer.
     public async Task<IEnumerable<Customer>> GetAllAsync()
     {
         _logger.LogInformation("GetAllAsync started for Customers.");
@@ -52,6 +54,7 @@ public class CustomerRepository : ICustomerRepository
         }
     }
 
+    // sp_GetCustomerById: single-row lookup or null when id missing.
     public async Task<Customer?> GetByIdAsync(int customerId)
     {
         _logger.LogInformation("GetByIdAsync started for CustomerId={CustomerId}.", customerId);
@@ -89,6 +92,7 @@ public class CustomerRepository : ICustomerRepository
         }
     }
 
+    // sp_CreateCustomer: ExecuteScalar returns new CustomerId; duplicate/FK issues become UserValidationException.
     public async Task<int> CreateAsync(Customer customer)
     {
         _logger.LogInformation(
@@ -143,6 +147,7 @@ public class CustomerRepository : ICustomerRepository
         }
     }
 
+    // sp_UpdateCustomer: scalar row count; false when no row updated.
     public async Task<bool> UpdateAsync(Customer customer)
     {
         _logger.LogInformation(
@@ -207,6 +212,7 @@ public class CustomerRepository : ICustomerRepository
         }
     }
 
+    // sp_DeactivateCustomer: logical deactivate with audit user; constraint violations bubble as domain validation.
     public async Task<bool> DeactivateAsync(int customerId, int updatedByUserId)
     {
         _logger.LogInformation(
@@ -261,6 +267,7 @@ public class CustomerRepository : ICustomerRepository
         }
     }
 
+    // Maps current reader row to Customer; helper getters tolerate absent columns from flexible SP shapes.
     private static Customer MapCustomer(SqlDataReader reader)
     {
         return new Customer

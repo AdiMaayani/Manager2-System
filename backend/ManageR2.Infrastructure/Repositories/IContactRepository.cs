@@ -2,6 +2,7 @@ using ManageR2.Domain.Entities;
 
 namespace ManageR2.Infrastructure.Interfaces;
 
+// Implemented by ContactRepository; surfaces domain Contact aggregates to ContactsController.
 public interface IContactRepository
 {
     Task<IEnumerable<Contact>> GetAllAsync();

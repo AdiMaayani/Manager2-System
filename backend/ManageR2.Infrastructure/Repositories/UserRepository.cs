@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 
 namespace ManageR2.Infrastructure.Repositories;
 
+// User/role/department persistence for auth and admin: stored procedures + reader mapping into User domain entity (includes hash/salt).
 public class UserRepository : IUserRepository
 {
     private readonly DBServices _dbServices;
@@ -18,6 +19,7 @@ public class UserRepository : IUserRepository
         _logger = logger;
     }
 
+    // sp_GetUsers: admin directory; each row mapped via MapUser (credentials stay server-side until DTO mapping).
     public async Task<IEnumerable<User>> GetUsersAsync()
     {
         _logger.LogInformation("GetUsersAsync started.");
@@ -52,6 +54,7 @@ public class UserRepository : IUserRepository
         }
     }
 
+    // sp_GetUserById: profile load after authorization checks in the controller/service layer.
     public async Task<User?> GetUserByIdAsync(int userId)
     {
         _logger.LogInformation("GetUserByIdAsync started for UserId={UserId}.", userId);
@@ -90,6 +93,7 @@ public class UserRepository : IUserRepository
         }
     }
 
+    // sp_GetUserByEmail: login lookup path before PasswordService verification issues JWT.
     public async Task<User?> GetUserByEmailAsync(string email)
     {
         _logger.LogInformation("GetUserByEmailAsync started for Email={Email}.", email);
@@ -128,6 +132,7 @@ public class UserRepository : IUserRepository
         }
     }
 
+    // sp_CreateUser: expects pre-hashed password from API service; translates unique constraint violations to UserValidationException.
     public async Task<int> CreateUserAsync(User user)
     {
         _logger.LogInformation(
@@ -194,6 +199,7 @@ public class UserRepository : IUserRepository
         }
     }
 
+    // sp_UpdateUser: persists profile + optional new hash/salt prepared upstream.
     public async Task<bool> UpdateUserAsync(User user)
     {
         _logger.LogInformation(
@@ -269,6 +275,7 @@ public class UserRepository : IUserRepository
         }
     }
 
+    // sp_DeleteUser: hard delete; FK 547 → UserValidationException for safe API responses.
     public async Task<bool> DeleteUserAsync(int userId)
     {
         _logger.LogInformation("DeleteUserAsync started for UserId={UserId}.", userId);
@@ -320,6 +327,7 @@ public class UserRepository : IUserRepository
         }
     }
 
+    // sp_GetUserRoles: role names for JWT claim building and admin UI (separate from Users header row).
     public async Task<List<string>> GetUserRolesAsync(int userId)
     {
         _logger.LogInformation("GetUserRolesAsync started for UserId={UserId}.", userId);
@@ -356,6 +364,7 @@ public class UserRepository : IUserRepository
         }
     }
 
+    // sp_GetUserDepartments: names feed UserAuthorizationService shared-department checks.
     public async Task<List<string>> GetUserDepartmentsAsync(int userId)
     {
         _logger.LogInformation("GetUserDepartmentsAsync started for UserId={UserId}.", userId);
@@ -392,6 +401,7 @@ public class UserRepository : IUserRepository
         }
     }
 
+    // sp_UpdateUserLastLogin: called after successful password verification on login.
     public async Task UpdateLastLoginAtAsync(int userId)
     {
         _logger.LogInformation("UpdateLastLoginAtAsync started for UserId={UserId}.", userId);
@@ -430,6 +440,7 @@ public class UserRepository : IUserRepository
         }
     }
 
+    // Rebuilds role links via dbo.sp_UpsertUserRole per role name (transactional pattern in method body).
     public async Task SetUserRolesAsync(int userId, List<string> roles)
     {
         _logger.LogInformation("SetUserRolesAsync started for UserId={UserId}.", userId);
@@ -480,6 +491,7 @@ public class UserRepository : IUserRepository
         }
     }
 
+    // Rebuilds department membership via dbo.sp_UpsertUserDepartment for authorization and directory filters.
     public async Task SetUserDepartmentsAsync(int userId, List<string> departments)
     {
         _logger.LogInformation("SetUserDepartmentsAsync started for UserId={UserId}.", userId);
@@ -530,6 +542,7 @@ public class UserRepository : IUserRepository
         }
     }
 
+    // sp_GetAllRoleNames: lookup catalog for create-user UI.
     public async Task<List<string>> GetAllRoleNamesAsync()
     {
         _logger.LogInformation("GetAllRoleNamesAsync started.");
@@ -564,6 +577,7 @@ public class UserRepository : IUserRepository
         }
     }
 
+    // sp_GetAllDepartmentNames: lookup catalog for create-user UI.
     public async Task<List<string>> GetAllDepartmentNamesAsync()
     {
         _logger.LogInformation("GetAllDepartmentNamesAsync started.");
@@ -598,6 +612,7 @@ public class UserRepository : IUserRepository
         }
     }
 
+    // Reader → User including password material consumed only on server (never forwarded to API DTOs).
     private static User MapUser(SqlDataReader reader)
     {
         return new User

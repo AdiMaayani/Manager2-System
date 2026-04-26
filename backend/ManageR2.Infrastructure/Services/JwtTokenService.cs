@@ -8,6 +8,7 @@ using Microsoft.IdentityModel.Tokens;
 
 namespace ManageR2.Infrastructure.Services;
 
+// Issues signed JWTs after login; token validation (signature, issuer, audience) is configured in API Program.cs middleware.
 public class JwtTokenService : IJwtTokenService
 {
     private readonly IConfiguration _configuration;
@@ -19,6 +20,7 @@ public class JwtTokenService : IJwtTokenService
         _logger = logger;
     }
 
+    // Builds JwtSecurityToken with sub/email/userId/employeeId + role claims for [Authorize] and policy checks downstream.
     public string GenerateToken(User user, List<string> roles)
     {
         _logger.LogInformation("GenerateToken started for UserId={UserId}.", user.UserId);

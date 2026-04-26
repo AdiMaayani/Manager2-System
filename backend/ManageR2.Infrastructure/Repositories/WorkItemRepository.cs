@@ -6,6 +6,7 @@ using Microsoft.Data.SqlClient;
 
 namespace ManageR2.Infrastructure.Repositories;
 
+// WorkItemsController → IWorkItemRepository → here: SP-heavy writes/reads + selective inline SQL; returns WorkItem / plan models.
 // Repository implementation that encapsulates DB access for work items, plans, and assignments.
 public class WorkItemRepository : IWorkItemRepository
 {

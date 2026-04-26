@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 
 namespace ManageR2.Infrastructure.Repositories;
 
+// Site CRUD via dbo SPs and DBServices; maps rows to Site entities for SitesController.
 public class SiteRepository : ISiteRepository
 {
     private readonly DBServices _dbServices;
@@ -18,6 +19,7 @@ public class SiteRepository : ISiteRepository
         _logger = logger;
     }
 
+    // sp_GetSites: all sites for pickers and admin lists.
     public async Task<IEnumerable<Site>> GetAllAsync()
     {
         _logger.LogInformation("GetAllAsync started for Sites.");
@@ -51,6 +53,7 @@ public class SiteRepository : ISiteRepository
         }
     }
 
+    // sp_GetSiteById: single-site read.
     public async Task<Site?> GetByIdAsync(int siteId)
     {
         _logger.LogInformation("GetByIdAsync started for SiteId={SiteId}.", siteId);
@@ -88,6 +91,7 @@ public class SiteRepository : ISiteRepository
         }
     }
 
+    // sp_CreateSite: scalar new SiteId; FK violations mapped to UserValidationException.
     public async Task<int> CreateAsync(Site site)
     {
         _logger.LogInformation(
@@ -137,6 +141,7 @@ public class SiteRepository : ISiteRepository
         }
     }
 
+    // sp_UpdateSite: scalar row count semantics for success/failure.
     public async Task<bool> UpdateAsync(Site site)
     {
         _logger.LogInformation(
@@ -196,6 +201,7 @@ public class SiteRepository : ISiteRepository
         }
     }
 
+    // Reader → Site entity for API mapping layer.
     private static Site MapSite(SqlDataReader reader)
     {
         return new Site

@@ -2,6 +2,7 @@ using ManageR2.Domain.Entities;
 
 namespace ManageR2.Infrastructure.Repositories;
 
+// Identity persistence contract: user rows, roles, departments, login timestamp (UserRepository + stored procedures).
 public interface IUserRepository
 {
     Task<IEnumerable<User>> GetUsersAsync();

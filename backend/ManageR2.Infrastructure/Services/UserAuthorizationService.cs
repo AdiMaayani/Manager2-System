@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 
 namespace ManageR2.Infrastructure.Services;
 
+// Fine-grained user visibility: complements role-based [Authorize] by comparing departments from IUserRepository.
 public class UserAuthorizationService : IUserAuthorizationService
 {
     private readonly IUserRepository _userRepository;
@@ -14,6 +15,7 @@ public class UserAuthorizationService : IUserAuthorizationService
         _logger = logger;
     }
 
+    // Admin/self always allowed; managers/leaders require overlapping department names with the target user.
     public async Task<bool> CanViewUserAsync(int currentUserId, List<string> currentRoles, int targetUserId)
     {
         _logger.LogInformation(

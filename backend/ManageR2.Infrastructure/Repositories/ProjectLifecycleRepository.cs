@@ -5,6 +5,7 @@ using Microsoft.Data.SqlClient;
 
 namespace ManageR2.Infrastructure.Repositories;
 
+// ProjectsController lifecycle: ADO.NET reader over multi-result SP → ProjectLifecycleModel for DTO mapping upstream.
 // Repository implementation that isolates lifecycle DB access from API/controller layers.
 public class ProjectLifecycleRepository : IProjectLifecycleRepository
 {
@@ -15,6 +16,7 @@ public class ProjectLifecycleRepository : IProjectLifecycleRepository
         _dbServices = dbServices;
     }
 
+    // Single round-trip: dbo.sp_GetProjectLifecycle returns ordered result sets consumed via NextResultAsync + mappers.
     public async Task<ProjectLifecycleModel?> GetProjectLifecycleAsync(int projectId)
     {
         await using var connection = _dbServices.CreateConnection();

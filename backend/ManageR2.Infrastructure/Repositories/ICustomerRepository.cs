@@ -2,6 +2,7 @@ using ManageR2.Domain.Entities;
 
 namespace ManageR2.Infrastructure.Interfaces;
 
+// DI abstraction implemented by CustomerRepository; keeps API free of ADO.NET types.
 public interface ICustomerRepository
 {
     Task<IEnumerable<Customer>> GetAllAsync();

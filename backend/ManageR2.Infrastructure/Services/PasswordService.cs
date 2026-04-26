@@ -2,8 +2,10 @@ using System.Security.Cryptography;
 
 namespace ManageR2.Infrastructure.Services;
 
+// PBKDF2-SHA256 password hashing used by UsersController before persistence; verification uses constant-time compare.
 public class PasswordService : IPasswordService
 {
+    // Generates random salt + derived key for storage as base64 strings on the User entity.
     public void CreatePasswordHash(string password, out string hashBase64, out string saltBase64)
     {
         byte[] salt = RandomNumberGenerator.GetBytes(16);
@@ -17,6 +19,7 @@ public class PasswordService : IPasswordService
         saltBase64 = Convert.ToBase64String(salt);
     }
 
+    // Re-derives hash from candidate password and compares to stored hash without early exit (timing attack mitigation).
     public bool VerifyPassword(string password, string storedHashBase64, string storedSaltBase64)
     {
         byte[] salt = Convert.FromBase64String(storedSaltBase64);

@@ -2,6 +2,7 @@
 
 namespace ManageR2.Infrastructure.Services.SmartAssignment
 {
+    // English: single work-item ranked recommendations (AdvancedSmartAssignmentController → this → SmartAssignmentRepository).
     // Interface לשירות האלגוריתם המתקדם .
     // מגדיר מה ה-Service חייב לדעת לבצע.
     public interface IAdvancedSmartAssignmentService

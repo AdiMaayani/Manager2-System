@@ -8,6 +8,7 @@ using ManageR2.Infrastructure.Repositories.SmartAssignment; // שימוש ב-Rep
 
 namespace ManageR2.Infrastructure.Services.SmartAssignment
 {
+    // English: advanced assignment—repository loads raw facts; this class scores, filters eligibility, ranks employees.
     // Service = שכבת הלוגיקה העסקית.
     // כאן מתבצע האלגוריתם עצמו:
     // חישוב ציונים, קביעת כשירות, מיון ודירוג עובדים.
@@ -27,6 +28,7 @@ namespace ManageR2.Infrastructure.Services.SmartAssignment
         // הפונקציה הראשית של האלגוריתם.
         // קלט: workItemId = מזהה המשימה שעבורה רוצים לקבל המלצות.
         // פלט: רשימת עובדים עם ציונים, כשירות ודירוג.
+        // English: orchestrates load → score → rank; controller maps EmployeeCandidateModel list to API DTOs.
         public async Task<List<EmployeeCandidateModel>> GetRecommendationsAsync(int workItemId)
         {
             // מביאים מה-Repository את כל הנתונים שהאלגוריתם צריך.

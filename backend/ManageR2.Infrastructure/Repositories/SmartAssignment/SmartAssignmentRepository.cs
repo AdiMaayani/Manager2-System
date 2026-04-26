@@ -5,6 +5,7 @@ using ManageR2.Infrastructure.Models.SmartAssignment; // מאפשר להשתמש
 
 namespace ManageR2.Infrastructure.Repositories.SmartAssignment
 {
+    // English: loads algorithm input only—Rec_GetTaskRecommendationInput multi-result → TaskRecommendationInputModel (no scoring here).
     // Repository = שכבה שתפקידה לדבר עם בסיס הנתונים בלבד
     // כאן לא מחשבים ציונים
     // כאן לא מדרגים עובדים
@@ -23,6 +24,7 @@ namespace ManageR2.Infrastructure.Repositories.SmartAssignment
         // פעולה זו מביאה את כל הקלט הדרוש לאלגוריתם עבור משימה מסוימת
         // היא קוראת ל-SP המאוחד: Rec_GetTaskRecommendationInput
         // ה-SP מחזיר כמה Result Sets, וכל אחד מהם נכנס למודל המתאים
+        // English: one SP call hydrates TaskRecommendationInputModel lists consumed by SmartAssignmentService scoring.
         public async Task<TaskRecommendationInputModel> GetTaskRecommendationInputAsync(int workItemId)
         {
             // אובייקט מאוחד שאליו נכניס את כל הנתונים שחוזרים מה-SP

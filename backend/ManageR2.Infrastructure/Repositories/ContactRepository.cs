@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 
 namespace ManageR2.Infrastructure.Repositories;
 
+// Contact persistence: same ADO.NET + stored procedure pattern as customers; SqlException wrapped as UserValidationException for API.
 public class ContactRepository : IContactRepository
 {
     private readonly DBServices _dbServices;
@@ -19,6 +20,7 @@ public class ContactRepository : IContactRepository
         _logger = logger;
     }
 
+    // sp_GetContacts: directory listing for ContactsController GET.
     public async Task<IEnumerable<Contact>> GetAllAsync()
     {
         _logger.LogInformation("GetAllAsync started for Contacts.");
@@ -52,6 +54,7 @@ public class ContactRepository : IContactRepository
         }
     }
 
+    // sp_GetContactById: detail/edit load.
     public async Task<Contact?> GetByIdAsync(int contactId)
     {
         _logger.LogInformation("GetByIdAsync started for ContactId={ContactId}.", contactId);
@@ -89,6 +92,7 @@ public class ContactRepository : IContactRepository
         }
     }
 
+    // sp_GetContactsByCustomerId: CRM drill-down from a customer record.
     public async Task<IEnumerable<Contact>> GetByCustomerIdAsync(int customerId)
     {
         _logger.LogInformation("GetByCustomerIdAsync started for CustomerId={CustomerId}.", customerId);
@@ -127,6 +131,7 @@ public class ContactRepository : IContactRepository
         }
     }
 
+    // sp_CreateContact: inserts with CreatedByUserId from JWT upstream; returns new id via scalar.
     public async Task<int> CreateAsync(Contact contact)
     {
         _logger.LogInformation(
@@ -185,6 +190,7 @@ public class ContactRepository : IContactRepository
         }
     }
 
+    // sp_UpdateContact: persists merged entity including UpdatedByUserId.
     public async Task<bool> UpdateAsync(Contact contact)
     {
         _logger.LogInformation(
@@ -253,6 +259,7 @@ public class ContactRepository : IContactRepository
         }
     }
 
+    // sp_DeactivateContact: soft delete path for referential safety.
     public async Task<bool> DeactivateAsync(int contactId, int updatedByUserId)
     {
         _logger.LogInformation(
@@ -307,6 +314,7 @@ public class ContactRepository : IContactRepository
         }
     }
 
+    // Reader → Contact; HasColumn guards optional columns when SP/view shape varies.
     private static Contact MapContact(SqlDataReader reader)
     {
         return new Contact

@@ -5,6 +5,7 @@ using Microsoft.Data.SqlClient;
 
 namespace ManageR2.Infrastructure.Repositories;
 
+// ReportsController → this → SQL: transactional SP writes; reads use plain SELECT + manual reader→model mapping.
 // Repository implementation for work report create/read flows.
 public class WorkReportRepository : IWorkReportRepository
 {
@@ -15,6 +16,7 @@ public class WorkReportRepository : IWorkReportRepository
         _dbServices = dbServices;
     }
 
+    // sp_CreateWorkReport + child SPs inside one SqlTransaction; returns new WorkReportId scalar to the API.
     public async Task<int> CreateAsync(WorkReportCreateModel request)
     {
         // Uses one transaction so report header and related child rows are saved together.
@@ -129,6 +131,7 @@ command.Parameters.AddWithValue("@WorkersCount", request.RelatedWorkers?.Count ?
         return null;
     }
 
+    // Ad-hoc SELECT for list grids; maps rows to WorkReportListItemModel (not domain entities).
     public async Task<List<WorkReportListItemModel>> GetAllAsync()
 {
     // Returns lightweight report rows for list screens.
@@ -171,6 +174,7 @@ command.Parameters.AddWithValue("@WorkersCount", request.RelatedWorkers?.Count ?
     return reports;
 }
 
+// Header SELECT plus follow-up queries for systems and related workers; builds WorkReportDetailsModel graph.
 public async Task<WorkReportDetailsModel?> GetByIdAsync(int workReportId)
 {
     // Loads full report details plus related systems and workers.

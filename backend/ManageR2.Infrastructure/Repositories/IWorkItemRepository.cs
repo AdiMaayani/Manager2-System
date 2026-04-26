@@ -3,6 +3,7 @@ using ManageR2.Infrastructure.Models;
 
 namespace ManageR2.Infrastructure.Repositories
 {
+    // WorkItemsController depends on this; WorkItemRepository fulfills with stored procedures + WorkItem/plan models.
     // Repository contract for work item lifecycle, work plan, milestones, and assignment operations.
     public interface IWorkItemRepository
     {
@@ -35,6 +36,7 @@ namespace ManageR2.Infrastructure.Repositories
         Task<WorkPlanResult?> GetWorkPlanAsync(int projectId);
         Task<List<WorkPlanResult>> GetAllWorkPlansAsync();
 
+        // Milestone tree with embedded participants for project drill-down endpoints.
         Task<List<ProjectMilestoneResult>> GetProjectMilestonesAsync(int projectId);
 
     }

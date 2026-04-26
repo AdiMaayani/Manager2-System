@@ -5,6 +5,7 @@ using Microsoft.Data.SqlClient;
 
 namespace ManageR2.Infrastructure.Repositories;
 
+// Read-only employee catalog: parameterized SQL (no SP) against dbo.Employees for assignment UI validation.
 public class EmployeeRepository : IEmployeeRepository
 {
     private readonly DBServices _dbServices;
@@ -14,6 +15,7 @@ public class EmployeeRepository : IEmployeeRepository
         _dbServices = dbServices;
     }
 
+    // SELECT all active roster rows ordered for dropdowns.
     public async Task<List<Employee>> GetAllAsync()
     {
         var employees = new List<Employee>();
@@ -48,6 +50,7 @@ public class EmployeeRepository : IEmployeeRepository
         return employees;
     }
 
+    // SELECT by primary key for single-employee views.
     public async Task<Employee?> GetByIdAsync(int employeeId)
     {
         await using var connection = _dbServices.CreateConnection();
@@ -82,6 +85,7 @@ public class EmployeeRepository : IEmployeeRepository
         return null;
     }
 
+    // Reader → Employee; keeps Infrastructure aligned with Employees table columns.
     private static Employee MapEmployee(SqlDataReader reader)
     {
         return new Employee
