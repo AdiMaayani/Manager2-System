@@ -5,10 +5,12 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ManageR2.Api.Controllers;
 
+// Batch smart assignment: builds recommendations for a project or explicit work item set (legacy service path).
 [ApiController]
 [Route("api/[controller]")]
 public class SmartAssignmentController : ControllerBase
 {
+    // Orchestrates recommendation generation, optional persistence of a run, and load balancing summary.
     private readonly ISmartAssignmentService _smartAssignmentService;
 
     public SmartAssignmentController(ISmartAssignmentService smartAssignmentService)
@@ -16,6 +18,7 @@ public class SmartAssignmentController : ControllerBase
         _smartAssignmentService = smartAssignmentService;
     }
 
+    // POST: map DTO to service model, run algorithm, map rich service response back to API DTO for the UI.
     [HttpPost("recommend")]
     public async Task<IActionResult> Recommend([FromBody] SmartAssignmentRequestDto request)
     {
@@ -31,6 +34,7 @@ public class SmartAssignmentController : ControllerBase
             return BadRequest(new { message = "Either ProjectId or WorkItemIds must be provided." });
         }
 
+        // Service layer owns planning date, locked-task inclusion, and optional save-run side effects.
         var serviceRequest = new SmartAssignmentRequestModel
         {
             ProjectId = request.ProjectId,
@@ -41,6 +45,7 @@ public class SmartAssignmentController : ControllerBase
         };
 
         var serviceResponse = await _smartAssignmentService.GenerateRecommendationsAsync(serviceRequest);
+        // Flatten nested service result into DTO graph (tasks, per-task violations/warnings, employee load).
         var response = new SmartAssignmentResponseDto
         {
             RecommendationRunId = serviceResponse.RecommendationRunId,

@@ -8,10 +8,12 @@ namespace ManageR2.Api.Controllers
     /// <summary>
     /// Controller להפעלת האלגוריתם והחזרת DTO נקי למנהל
     /// </summary>
+    // Exposes ranked employee recommendations for one work item; delegates scoring to IAdvancedSmartAssignmentService.
     [ApiController]
     [Route("api/[controller]")]
     public class AdvancedSmartAssignmentController : ControllerBase
     {
+        // Application service encapsulates algorithm + data access; controller only shapes HTTP responses.
         private readonly IAdvancedSmartAssignmentService _service;
 
         public AdvancedSmartAssignmentController(IAdvancedSmartAssignmentService service)
@@ -22,6 +24,7 @@ namespace ManageR2.Api.Controllers
         /// <summary>
         /// מחזיר רשימת עובדים מדורגת (DTO בלבד)
         /// </summary>
+        // GET: ranked candidates for assignment planning UI (domain models mapped to slim API DTOs).
         [HttpGet("{workItemId}")]
         public async Task<IActionResult> GetRecommendations(int workItemId)
         {
@@ -31,6 +34,7 @@ namespace ManageR2.Api.Controllers
                 var candidates = await _service.GetRecommendationsAsync(workItemId);
 
                 // מיפוי ל-DTO (רק מה שצריך למנהל)
+                // Map service candidates to API DTO: hides internal scoring breakdown, keeps rank and eligibility.
                 var result = candidates
                     .Select(c => new AdvancedSmartAssignmentRecommendationDto
                     {

@@ -17,6 +17,7 @@ public class ReportsController : ControllerBase
         _workReportRepository = workReportRepository;
     }
 
+    // GET handlers return persisted work reports for dashboards (no DTO mapping on read paths).
     [HttpGet]
 // Returns all reports for list pages and recent activity views.
 public async Task<IActionResult> GetAll()

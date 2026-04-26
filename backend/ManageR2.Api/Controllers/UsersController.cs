@@ -9,13 +9,18 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ManageR2.Api.Controllers;
 
+// User accounts: login/token issuance, profile CRUD, and admin directory endpoints over IUserRepository + security services.
 [ApiController]
 [Route("api/[controller]")]
 public class UsersController : ControllerBase
 {
+    // Persistence for users, roles, departments; used by both admin screens and login flow.
     private readonly IUserRepository _userRepository;
+    // Builds signed JWT after successful authentication (claims include userId and roles).
     private readonly IJwtTokenService _jwtTokenService;
+    // Hashing/verification only; raw passwords never stored beyond the request boundary.
     private readonly IPasswordService _passwordService;
+    // Fine-grained rules (e.g. who may view another user's record) beyond simple role checks.
     private readonly IUserAuthorizationService _userAuthorizationService;
     private readonly ILogger<UsersController> _logger;
 
@@ -33,6 +38,7 @@ public class UsersController : ControllerBase
         _logger = logger;
     }
 
+    // Shapes a User entity into a response DTO without exposing password hash/salt.
     private async Task<UserResponseDto> ToSafeUserAsync(User u)
     {
         var roles = await _userRepository.GetUserRolesAsync(u.UserId);
@@ -54,6 +60,7 @@ public class UsersController : ControllerBase
         };
     }
 
+    // Shared input cleanup for role/department name lists (trim, dedupe, case-insensitive).
     private static List<string> NormalizeNamesList(List<string>? values)
     {
         if (values == null || values.Count == 0)
@@ -68,6 +75,7 @@ public class UsersController : ControllerBase
             .ToList();
     }
 
+    // Centralized create validation to keep action methods focused on orchestration and HTTP status mapping.
     private static string? ValidateCreateUserDto(CreateUserDto? dto)
     {
         if (dto == null)
@@ -110,6 +118,7 @@ public class UsersController : ControllerBase
         return null;
     }
 
+    // Update validation mirrors create rules except password is optional on edit.
     private static string? ValidateUpdateUserDto(UpdateUserDto? dto)
     {
         if (dto == null)
@@ -147,6 +156,7 @@ public class UsersController : ControllerBase
         return null;
     }
 
+    // Admin directory: enumerate all users with roles/departments for back-office management.
     [Authorize(Roles = "Admin")]
     [HttpGet]
     public async Task<IActionResult> GetUsers()
@@ -163,6 +173,7 @@ public class UsersController : ControllerBase
         return Ok(response);
     }
 
+    // Lookup list for role assignment UI (admin only).
     [Authorize(Roles = "Admin")]
     [HttpGet("roles")]
     public async Task<IActionResult> GetAllRoles()
@@ -171,6 +182,7 @@ public class UsersController : ControllerBase
         return Ok(roles);
     }
 
+    // Lookup list for department assignment UI (admin only).
     [Authorize(Roles = "Admin")]
     [HttpGet("departments")]
     public async Task<IActionResult> GetAllDepartments()
@@ -179,6 +191,7 @@ public class UsersController : ControllerBase
         return Ok(departments);
     }
 
+    // Self-service or admin view: authorization service decides visibility before repository load.
     [Authorize]
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetUserById(int id)
@@ -203,6 +216,7 @@ public class UsersController : ControllerBase
         return Ok(await ToSafeUserAsync(user));
     }
 
+    // Create user + hash password + persist role/department links in a single transactional flow (repository).
     [Authorize]
     [HttpPost]
     public async Task<IActionResult> CreateUser([FromBody] CreateUserDto dto)
@@ -247,6 +261,7 @@ public class UsersController : ControllerBase
         }
     }
 
+    // Update profile fields; optional password rotation re-hashes via IPasswordService then updates role/department sets.
     [Authorize]
     [HttpPut("{id:int}")]
     public async Task<IActionResult> UpdateUser(int id, [FromBody] UpdateUserDto dto)
@@ -301,6 +316,7 @@ public class UsersController : ControllerBase
         }
     }
 
+    // Hard delete user row through repository (guarded by domain validation exceptions).
     [Authorize]
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> DeleteUser(int id)
@@ -320,6 +336,7 @@ public class UsersController : ControllerBase
         }
     }
 
+    // Public login: verify credentials, block inactive users, refresh last login, return JWT + role/department claims payload.
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequestDto dto)
     {

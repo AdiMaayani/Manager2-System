@@ -8,11 +8,13 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ManageR2.Api.Controllers;
 
+// Customer contact directory: authenticated CRUD; persistence and validation rules live in IContactRepository.
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
 public class ContactsController : ControllerBase
 {
+    // Repository performs SQL access via DBServices; controller maps entities to ContactDto for the client.
     private readonly IContactRepository _repository;
 
     public ContactsController(IContactRepository repository)
@@ -20,6 +22,7 @@ public class ContactsController : ControllerBase
         _repository = repository;
     }
 
+    // List flow: load all contacts then project to DTOs (no secrets in response model).
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
@@ -52,6 +55,7 @@ public class ContactsController : ControllerBase
         }
     }
 
+    // Detail flow: single contact by id or 404 if missing.
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int id)
     {
@@ -89,6 +93,7 @@ public class ContactsController : ControllerBase
         }
     }
 
+    // Create flow: validate input, stamp CreatedByUserId from JWT, insert via repository, return 201 + body.
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] ContactDto dto)
     {
@@ -167,6 +172,7 @@ public class ContactsController : ControllerBase
         }
     }
 
+    // Update flow: merge DTO onto existing row, set UpdatedByUserId from JWT, persist through repository.
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, [FromBody] ContactDto dto)
     {
@@ -253,6 +259,7 @@ public class ContactsController : ControllerBase
         }
     }
 
+    // Soft-delete flow: deactivate contact for audit trail (repository receives acting user id).
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {

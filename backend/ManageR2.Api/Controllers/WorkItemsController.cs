@@ -11,8 +11,10 @@ namespace ManageR2.Api.Controllers;
 // API layer for work items (projects, tasks, milestones) and assignment-related work-plan views.
 public class WorkItemsController : ControllerBase
 {
+    // Single entry point to work-item graph: hierarchy, assignments, milestones, and work-plan projections.
     private readonly IWorkItemRepository _workItemRepository;
 
+    // IWorkItemRepository is the bridge from HTTP to SQL/stored procedures for operational planning data.
     public WorkItemsController(IWorkItemRepository workItemRepository)
     {
         _workItemRepository = workItemRepository;

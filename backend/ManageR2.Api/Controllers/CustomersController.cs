@@ -8,11 +8,13 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ManageR2.Api.Controllers;
 
+// Customer master data: CRUD for organizations served by the system; backed by ICustomerRepository.
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
 public class CustomersController : ControllerBase
 {
+    // Data access isolated in repository; controller enforces HTTP validation and DTO mapping.
     private readonly ICustomerRepository _repository;
 
     public CustomersController(ICustomerRepository repository)
@@ -20,6 +22,7 @@ public class CustomersController : ControllerBase
         _repository = repository;
     }
 
+    // List customers for CRM-style screens.
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
@@ -50,6 +53,7 @@ public class CustomersController : ControllerBase
         }
     }
 
+    // Customer detail for edit forms and linked entities (sites, contacts).
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int id)
     {
@@ -83,6 +87,7 @@ public class CustomersController : ControllerBase
         }
     }
 
+    // Create customer with audit user from JWT; repository enforces business rules (throws UserValidationException).
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CustomerDto dto)
     {
@@ -148,6 +153,7 @@ public class CustomersController : ControllerBase
         }
     }
 
+    // Update existing customer row and refresh DTO from database after successful save.
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, [FromBody] CustomerDto dto)
     {
@@ -221,6 +227,7 @@ public class CustomersController : ControllerBase
         }
     }
 
+    // Deactivate customer (logical delete) while recording which user performed the change.
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {

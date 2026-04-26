@@ -15,9 +15,11 @@ using ManageR2.Infrastructure.Services.SmartAssignment;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// API composition root: registers controllers, auth, CORS, Swagger, and Infrastructure services for the ManageR2 web API.
 // Add services to the container.
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+// OpenAPI document with Bearer JWT scheme so Swagger UI can authorize test calls.
 builder.Services.AddSwaggerGen(options =>
 {
     options.AddSecurityDefinition("Bearer", new OpenApiSecurityScheme
@@ -46,7 +48,7 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-// CORS
+// CORS: allow the static frontend (Live Server on port 5500) to call this API with credentials/headers.
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend",
@@ -59,10 +61,12 @@ builder.Services.AddCors(options =>
         });
 });
 
+// JWT signing and validation parameters from configuration (fail fast if misconfigured).
 var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("JWT key is missing.");
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? throw new InvalidOperationException("JWT issuer is missing.");
 var jwtAudience = builder.Configuration["Jwt:Audience"] ?? throw new InvalidOperationException("JWT audience is missing.");
 
+// ASP.NET Core JWT bearer authentication validates the Authorization header on each request.
 builder.Services
     .AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
     .AddJwtBearer(options =>
@@ -80,8 +84,10 @@ builder.Services
         };
     });
 
+// Supports [Authorize] and role checks on controllers after authentication succeeds.
 builder.Services.AddAuthorization();
 
+// DI: scoped lifetime ties one DBServices + repositories per HTTP request (safe for SqlConnection usage).
 // DI
 builder.Services.AddScoped<DBServices>();
 builder.Services.AddScoped<IWorkItemRepository, WorkItemRepository>();
@@ -97,14 +103,17 @@ builder.Services.AddScoped<IProjectLifecycleRepository, ProjectLifecycleReposito
 builder.Services.AddScoped<IEmployeeRepository, EmployeeRepository>();
 //builder.Services.AddScoped<ISmartAssignmentRepository, SmartAssignmentRepository>();
 //builder.Services.AddScoped<ISmartAssignmentService, SmartAssignmentService>();
+// Advanced ranked recommendations: concrete repository + service from SmartAssignment module (aliased at top of file).
 builder.Services.AddScoped<AdvancedSmartAssignmentRepository>();
 builder.Services.AddScoped<IAdvancedSmartAssignmentService, AdvancedSmartAssignmentService>();
 
 var app = builder.Build();
 
+// HTTP pipeline order: CORS early, then TLS, then auth middleware, then endpoint routing to controllers.
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
 {
+    // Interactive API docs only in Development to avoid exposing metadata in production.
     app.UseSwagger();
     app.UseSwaggerUI();
 }
@@ -113,9 +122,11 @@ app.UseCors("AllowFrontend");
 
 app.UseHttpsRedirection();
 
+// Populates HttpContext.User from JWT; UseAuthorization enforces policies/roles on endpoints.
 app.UseAuthentication();
 app.UseAuthorization();
 
+// Discovers controller actions under ManageR2.Api.Controllers and maps routes (e.g. api/[controller]).
 app.MapControllers();
 
 app.Run();

@@ -8,6 +8,7 @@ namespace ManageR2.Api.Controllers;
 // Employee lookup endpoints used when validating and displaying work item assignments.
 public class EmployeesController : ControllerBase
 {
+    // Read-only employee queries; registered in Program.cs and implemented in Infrastructure repositories.
     private readonly IEmployeeRepository _employeeRepository;
 
     public EmployeesController(IEmployeeRepository employeeRepository)

@@ -7,11 +7,13 @@ using Microsoft.AspNetCore.Mvc;
 
 namespace ManageR2.Api.Controllers;
 
+// Physical customer sites/locations; links to CustomerId; CRUD via ISiteRepository under JWT auth.
 [ApiController]
 [Route("api/[controller]")]
 [Authorize]
 public class SitesController : ControllerBase
 {
+    // Site persistence and validation are centralized in the repository layer (uses DBServices internally).
     private readonly ISiteRepository _repository;
 
     public SitesController(ISiteRepository repository)
@@ -19,6 +21,7 @@ public class SitesController : ControllerBase
         _repository = repository;
     }
 
+    // List all sites for dropdowns and site management pages.
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
@@ -47,6 +50,7 @@ public class SitesController : ControllerBase
         }
     }
 
+    // Single site record for detail/edit views.
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int id)
     {
@@ -78,6 +82,7 @@ public class SitesController : ControllerBase
         }
     }
 
+    // Create site under a valid customer; repository assigns timestamps and enforces referential rules.
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] SiteDto dto)
     {
@@ -130,6 +135,7 @@ public class SitesController : ControllerBase
         }
     }
 
+    // Update site fields; full replace pattern on entity loaded from repository before save.
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, [FromBody] SiteDto dto)
     {

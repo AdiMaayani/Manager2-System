@@ -9,6 +9,7 @@ namespace ManageR2.Api.Controllers;
 // Thin controller: handles HTTP concerns and delegates lifecycle data loading to the repository.
 public class ProjectsController : ControllerBase
 {
+    // Aggregates project header, milestones, assignments, reports, and KPI summary (often via stored procedures).
     private readonly IProjectLifecycleRepository _projectLifecycleRepository;
 
     public ProjectsController(IProjectLifecycleRepository projectLifecycleRepository)
