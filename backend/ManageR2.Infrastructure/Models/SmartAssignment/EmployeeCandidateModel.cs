@@ -2,6 +2,7 @@
 
 namespace ManageR2.Infrastructure.Models.SmartAssignment
 {
+    // English: same instance accumulates DB roster fields then algorithm scores/eligibility before AdvancedSmartAssignmentController maps to DTOs.
     // מחלקה זו מייצגת עובד מועמד לשיבוץ
     // מגיע מ-Result Set של עובדים מתוך ה-SP המאוחד
     public class EmployeeCandidateModel
@@ -45,6 +46,7 @@ namespace ManageR2.Infrastructure.Models.SmartAssignment
          * כרגע הם כאן כהכנה לשלב הבא
          */
 
+        // English: scoring/eligibility block — populated in SmartAssignmentService, never sent as-is to the client.
         // ציון התאמה מקצועית
         public decimal? ProfessionalScore { get; set; }
 

@@ -2,6 +2,7 @@
 
 namespace ManageR2.Infrastructure.Models.SmartAssignment
 {
+    // English: hydrated by SmartAssignmentRepository from Rec_GetTaskRecommendationInput; consumed only inside Infrastructure services.
     // מחלקה זו מייצגת את כל הקלט לאלגוריתם Smart Assignment
     // זהו אובייקט מאוחד שמכיל את כל הנתונים שהגיעו מה-SP
     public class TaskRecommendationInputModel

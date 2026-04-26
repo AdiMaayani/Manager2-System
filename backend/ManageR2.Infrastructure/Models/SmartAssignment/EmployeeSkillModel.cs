@@ -2,6 +2,7 @@
 
 namespace ManageR2.Infrastructure.Models.SmartAssignment
 {
+    // English: one employee–skill edge from SP output; used for professional match scoring vs RequiredSkillModel.
     // מחלקה זו מייצגת כישור של עובד
     // מגיעה מ-Result Set של Employee Skills מתוך ה-SP המאוחד
     public class EmployeeSkillModel

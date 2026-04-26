@@ -2,6 +2,7 @@
 
 namespace ManageR2.Infrastructure.Models.SmartAssignment
 {
+    // English: effective-dated weekly capacity feeding workload balance against assigned hours.
     // מחלקה זו מייצגת קיבולת עבודה של עובד
     // מגיעה מ-Result Set של Capacity מתוך ה-SP המאוחד
     public class EmployeeCapacityModel

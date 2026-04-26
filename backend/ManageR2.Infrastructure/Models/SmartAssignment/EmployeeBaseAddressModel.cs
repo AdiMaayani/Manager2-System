@@ -1,5 +1,6 @@
 ﻿namespace ManageR2.Infrastructure.Models.SmartAssignment
 {
+    // English: home-base location row for geographic leg of scoring (paired with RouteEstimateModel).
     // מחלקה זו מייצגת כתובת בסיס של עובד
     // מגיעה מ-Result Set של Employee Base Addresses מתוך ה-SP המאוחד
     public class EmployeeBaseAddressModel

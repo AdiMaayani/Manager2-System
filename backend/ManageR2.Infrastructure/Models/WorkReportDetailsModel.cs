@@ -1,5 +1,6 @@
 namespace ManageR2.Infrastructure.Models;
 
+// Read aggregate: header query plus child lists (systems, workers); stays in Infrastructure until controller exposes JSON shape if needed.
 // Full report details model returned by repository for report details endpoint.
 public class WorkReportDetailsModel
 {
@@ -23,6 +24,7 @@ public class WorkReportDetailsModel
     public string? Status { get; set; }
     public bool Followup { get; set; }
     public string? FollowupReason { get; set; }
+    // Populated from child tables after the main WorkReports row is loaded.
     public List<string> Systems { get; set; } = new();
     public List<WorkReportRelatedWorkerModel> RelatedWorkers { get; set; } = new();
 }

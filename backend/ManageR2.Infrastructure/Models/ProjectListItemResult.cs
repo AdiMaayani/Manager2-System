@@ -1,5 +1,6 @@
 namespace ManageR2.Infrastructure.Models;
 
+// Denormalized list row (customer, PM, site labels from joins); differs from WorkItem entity which does not carry display names alone.
 // Repository result model for project list rows built from WorkItems.
 public class ProjectListItemResult
 {

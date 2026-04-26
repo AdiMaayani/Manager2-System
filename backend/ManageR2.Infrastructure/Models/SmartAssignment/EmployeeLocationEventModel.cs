@@ -2,6 +2,7 @@
 
 namespace ManageR2.Infrastructure.Models.SmartAssignment
 {
+    // English: last-known / telemetry-style point used when choosing origin for distance estimates.
     // מחלקה זו מייצגת אירוע מיקום של עובד
     // מגיעה מ-Result Set של Location Events מתוך ה-SP המאוחד
     public class EmployeeLocationEventModel

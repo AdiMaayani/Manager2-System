@@ -3,6 +3,7 @@ using System.Collections.Generic;
 
 namespace ManageR2.Infrastructure.Models;
 
+// One milestone row plus nested assignment participants from GetProjectMilestonesAsync; mapped to ProjectMilestoneDto at API edge.
 // Repository result model for milestone details under a project.
 public class ProjectMilestoneResult
 {
@@ -44,11 +45,13 @@ public class ProjectMilestoneResult
 
     public bool IsLocked { get; set; }
 
+    // Child collections avoid extra round-trips compared to returning bare WorkItem rows only.
     public List<ProjectMilestoneEmployeeAssignmentResult> Employees { get; set; } = new();
 
     public List<ProjectMilestoneContractorAssignmentResult> Contractors { get; set; } = new();
 }
 
+// Employee slice under one milestone result (repository-filled before DTO projection).
 // Employee assignment row under a milestone result.
 public class ProjectMilestoneEmployeeAssignmentResult
 {
@@ -63,6 +66,7 @@ public class ProjectMilestoneEmployeeAssignmentResult
     public bool? IsManualAssignment { get; set; }
 }
 
+// Contractor slice under one milestone result.
 // Contractor assignment row under a milestone result.
 public class ProjectMilestoneContractorAssignmentResult
 {

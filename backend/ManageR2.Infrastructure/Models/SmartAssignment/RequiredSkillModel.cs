@@ -1,5 +1,6 @@
 ﻿namespace ManageR2.Infrastructure.Models.SmartAssignment
 {
+    // English: task demand side of skill matching (contrasts with EmployeeSkillModel on the supply side).
     // מחלקה זו מייצגת כישור נדרש למשימה
     // מגיע מ-Result Set 2 ב-SP המאוחד
     public class RequiredSkillModel

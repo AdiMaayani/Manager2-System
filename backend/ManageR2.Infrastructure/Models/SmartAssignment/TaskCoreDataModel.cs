@@ -2,6 +2,7 @@
 
 namespace ManageR2.Infrastructure.Models.SmartAssignment
 {
+    // English: first result set row shape for one work item; richer than a minimal DTO but still not the full WorkItem entity graph.
     // מחלקה זו מייצגת את נתוני הליבה של משימה כפי שהם מגיעים מה-DB
     // מדובר ב-Result Set הראשון מתוך ה-SP המאוחד
     public class TaskCoreDataModel

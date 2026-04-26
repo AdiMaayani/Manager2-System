@@ -2,6 +2,7 @@
 
 namespace ManageR2.Infrastructure.Models.SmartAssignment
 {
+    // English: planned route stop for an employee (origin option for travel-time scoring toward the task site).
     // מחלקה זו מייצגת תחנה מתוכננת של עובד באותו יום
     // מגיעה מ-Result Set של Planned Stops מתוך ה-SP המאוחד
     public class EmployeePlannedStopModel

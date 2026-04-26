@@ -1,5 +1,6 @@
 namespace ManageR2.Infrastructure.Models;
 
+// Maps from CreateWorkReportRequest DTO; holds string dates and loose fields the SP layer expects (not a Domain entity).
 // Infrastructure create model used by repository to persist report data.
 public class WorkReportCreateModel
 {

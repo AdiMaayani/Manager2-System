@@ -1,5 +1,6 @@
 ﻿namespace ManageR2.Infrastructure.Models.SmartAssignment
 {
+    // English: task site destination row for travel scoring vs employee origins.
     // מחלקה זו מייצגת כתובת אתר של משימה
     // מגיעה מ-Result Set של Site Address מתוך ה-SP המאוחד
     public class SiteAddressModel

@@ -1,5 +1,6 @@
 namespace ManageR2.Infrastructure.Models;
 
+// Infrastructure aggregate from sp_GetProjectLifecycle (multi result set); API maps to ProjectLifecycleDto, not ManageR2.Domain entities.
 // Domain model built from DB results before mapping to API DTOs.
 public class ProjectLifecycleModel
 {
@@ -15,6 +16,7 @@ public class ProjectLifecycleModel
     public ProjectLifecycleSummaryModel Summary { get; set; } = new();
 }
 
+// First result set row from sp_GetProjectLifecycle (header fields + customer/site display names).
 // Infrastructure model for top-level project lifecycle fields.
 public class ProjectLifecycleProjectModel
 {
@@ -34,6 +36,7 @@ public class ProjectLifecycleProjectModel
     public string? InvoiceNumber { get; set; }
 }
 
+// Milestone/task slice from second result set (schedule + lock flags for lifecycle UI).
 // Infrastructure model for milestone lifecycle fields.
 public class ProjectLifecycleMilestoneModel
 {
@@ -52,6 +55,7 @@ public class ProjectLifecycleMilestoneModel
     public bool IsLocked { get; set; }
 }
 
+// Third result set: who is assigned to which work item (employee or contractor).
 // Infrastructure model for assignment lifecycle fields.
 public class ProjectLifecycleAssignmentModel
 {
@@ -66,6 +70,7 @@ public class ProjectLifecycleAssignmentModel
     public string? ContractorName { get; set; }
 }
 
+// Fourth result set: report history rows tied to the project/milestones narrative.
 // Infrastructure model for work report lifecycle fields.
 public class ProjectLifecycleReportModel
 {
@@ -80,6 +85,7 @@ public class ProjectLifecycleReportModel
     public bool FollowUpRequired { get; set; }
 }
 
+// Fifth result set: KPI counters and risk/health strings computed in SQL for the summary card.
 // Infrastructure model for aggregated lifecycle summary values.
 public class ProjectLifecycleSummaryModel
 {

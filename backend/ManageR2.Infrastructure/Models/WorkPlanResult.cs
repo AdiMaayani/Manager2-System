@@ -4,9 +4,11 @@ using ManageR2.Domain.Entities;
 
 namespace ManageR2.Infrastructure.Models
 {
+    // Aggregated work-plan graph from WorkItemRepository (separate SPs); WorkItemsController maps this to WorkPlanDto (not raw SQL in API).
     // Repository result model used before mapping to WorkPlanDto.
     public class WorkPlanResult
     {
+        // Reuses domain WorkItem for project/task rows; assignment links use a flatter join shape below.
         public WorkItem Project { get; set; } = new WorkItem();
 
         public List<WorkItem> Tasks { get; set; } = new List<WorkItem>();
@@ -14,6 +16,7 @@ namespace ManageR2.Infrastructure.Models
         public List<WorkPlanAssignmentResult> Assignments { get; set; } = new List<WorkPlanAssignmentResult>();
     }
 
+    // Employee/contractor assignment join row (names denormalized for UI); not the same as a single WorkItem entity.
     // Assignment row model returned from work plan assignment query.
     public class WorkPlanAssignmentResult
     {

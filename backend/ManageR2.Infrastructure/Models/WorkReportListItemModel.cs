@@ -1,5 +1,6 @@
 namespace ManageR2.Infrastructure.Models;
 
+// Read model from WorkReportRepository.GetAllAsync (plain SELECT); smaller than WorkReportDetailsModel used on drill-down.
 // Lightweight report list row used for reports table endpoints.
 public class WorkReportListItemModel
 {
