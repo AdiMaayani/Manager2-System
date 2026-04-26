@@ -1,5 +1,6 @@
 namespace ManageR2.Domain.Entities;
 
+// Customer site/location; WorkItem.SiteId scopes operational work to a physical place under that customer.
 public class Site
 {
     public int SiteId { get; set; }

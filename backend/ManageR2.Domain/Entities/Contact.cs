@@ -1,5 +1,6 @@
 namespace ManageR2.Domain.Entities;
 
+// External contact person (customer-facing); optional CustomerId link—different from User (internal system operators).
 public class Contact
 {
     public int ContactId { get; set; }

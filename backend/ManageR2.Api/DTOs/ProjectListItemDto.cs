@@ -1,5 +1,6 @@
 namespace ManageR2.Api.DTOs;
 
+// WorkItemsController projects-list: denormalized labels (customer, site, PM) not stored on WorkItem row alone.
 // Lightweight project list contract based on WorkItems with WorkType=Project.
 public class ProjectListItemDto
 {

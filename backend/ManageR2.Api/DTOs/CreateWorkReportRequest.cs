@@ -1,5 +1,6 @@
 namespace ManageR2.Api.DTOs;
 
+// ReportsController POST maps this to Infrastructure WorkReportCreateModel (string dates vs typed DB fields).
 // Request contract for creating a report linked to a work item/project.
 public class CreateWorkReportRequest
 {

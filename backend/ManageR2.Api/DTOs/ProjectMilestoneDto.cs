@@ -3,6 +3,7 @@ using System.Collections.Generic;
 
 namespace ManageR2.Api.DTOs;
 
+// WorkItemsController milestones GET: nested employees/contractors for Gantt-style views (not the flat domain WorkItem).
 // Milestone response contract including linked assignment participants.
 public class ProjectMilestoneDto
 {

@@ -1,5 +1,6 @@
 namespace ManageR2.Api.DTOs;
 
+// API contract for SitesController; mirrors Site entity without audit columns the client does not edit.
 public class SiteDto
 {
     public int SiteId { get; set; }

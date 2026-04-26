@@ -1,5 +1,6 @@
 namespace ManageR2.Api.DTOs;
 
+// Request/response shape for ContactsController; omits CreatedBy/UpdatedBy audit ids present on Contact entity.
 public class ContactDto
 {
     public int ContactId { get; set; }

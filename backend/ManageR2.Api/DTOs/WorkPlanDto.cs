@@ -3,6 +3,7 @@ using System.Collections.Generic;
 
 namespace ManageR2.Api.DTOs
 {
+    // WorkItemsController work-plan GET: denormalized tree for scheduling UI (domain stays row-per WorkItem in DB).
     // Response contract for work plan endpoint: project + tasks + assignments.
     public class WorkPlanDto
     {

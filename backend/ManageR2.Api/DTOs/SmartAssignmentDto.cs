@@ -3,6 +3,7 @@ using System.Collections.Generic;
 
 namespace ManageR2.Api.DTOs
 {
+    // SmartAssignmentController POST body: planning inputs only (no per-task results until service runs).
     public class SmartAssignmentRequestDto
     {
         public int? ProjectId { get; set; }
@@ -12,6 +13,7 @@ namespace ManageR2.Api.DTOs
         public bool SaveRun { get; set; }
     }
 
+    // Batch recommendation outcome: summary + per-task rows + capacity snapshot for the same HTTP response.
     public class SmartAssignmentResponseDto
     {
         public int? RecommendationRunId { get; set; }
@@ -21,6 +23,7 @@ namespace ManageR2.Api.DTOs
         public List<SmartAssignmentEmployeeLoadDto> EmployeeLoad { get; set; } = new List<SmartAssignmentEmployeeLoadDto>();
     }
 
+    // High-level counts and narrative message for the assignment run UI.
     public class SmartAssignmentSummaryDto
     {
         public int TotalTasks { get; set; }
@@ -30,6 +33,7 @@ namespace ManageR2.Api.DTOs
         public string Message { get; set; } = string.Empty;
     }
 
+    // One work item’s recommendation row: current vs suggested assignee plus rule violations/warnings.
     public class SmartAssignmentTaskResultDto
     {
         public int WorkItemId { get; set; }
@@ -44,6 +48,7 @@ namespace ManageR2.Api.DTOs
         public List<string> Reasons { get; set; } = new List<string>();
     }
 
+    // Capacity slice for fairness charts alongside task-level recommendations.
     public class SmartAssignmentEmployeeLoadDto
     {
         public int EmployeeId { get; set; }

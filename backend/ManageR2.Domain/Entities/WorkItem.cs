@@ -6,6 +6,7 @@ public class WorkItem
     public int WorkItemId { get; set; }
     public string Title { get; set; } = string.Empty;
     public string? Description { get; set; }
+    // WorkType string discriminates Project vs Task (milestones often stored as Task) vs Service Call, etc.
     public string? WorkType { get; set; }
     public string? BillingType { get; set; }
     public string? Status { get; set; }

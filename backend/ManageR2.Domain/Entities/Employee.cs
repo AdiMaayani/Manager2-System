@@ -1,5 +1,6 @@
 namespace ManageR2.Domain.Entities;
 
+// Workforce master: assignment algorithms and WorkItem assignments reference EmployeeId; User links login to this row.
 public class Employee
 {
     public int EmployeeId { get; set; }

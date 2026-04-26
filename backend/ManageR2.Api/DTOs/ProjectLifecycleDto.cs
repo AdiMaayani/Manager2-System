@@ -1,5 +1,6 @@
 namespace ManageR2.Api.DTOs;
 
+// ProjectsController lifecycle GET: stable JSON contract vs richer internal graph from IProjectLifecycleRepository.
 // API response contract for the project lifecycle endpoint.
 public class ProjectLifecycleDto
 {

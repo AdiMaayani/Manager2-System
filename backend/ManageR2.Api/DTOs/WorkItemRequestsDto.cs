@@ -3,6 +3,7 @@ using System.Collections.Generic;
 
 namespace ManageR2.Api.DTOs;
 
+// Typed POST bodies for WorkItemsController (narrower than sending a full WorkItem graph from the client).
 // Request payload for creating a top-level project work item.
 public class CreateProjectRequest
 {

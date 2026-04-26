@@ -1,5 +1,6 @@
 namespace ManageR2.Domain.Entities;
 
+// CRM account root: Sites and Contacts reference CustomerId; WorkItems carry customer context for billing.
 public class Customer
 {
     public int CustomerId { get; set; }
@@ -24,6 +25,7 @@ public class Customer
 
     public bool IsActive { get; set; }
 
+    // Audit columns used by repositories; CustomerDto hides these from typical API responses.
     public DateTime CreatedAt { get; set; }
 
     public int CreatedByUserId { get; set; }

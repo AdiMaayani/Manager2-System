@@ -1,5 +1,6 @@
 ﻿namespace ManageR2.Api.DTOs
 {
+    // One ranked row returned by AdvancedSmartAssignmentController; hides full algorithm breakdown kept in service models.
     // DTO שמייצג עובד אחד ברשימת ההמלצות למנהל
     // המטרה: להחזיר ל-Frontend רק את המידע שצריך להציג,
     // ולא לחשוף את כל ציוני הביניים של האלגוריתם.

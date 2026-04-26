@@ -1,5 +1,6 @@
 namespace ManageR2.Api.DTOs;
 
+// CustomersController uses this for list/detail/create/update; excludes audit timestamps and user ids from domain Customer.
 public class CustomerDto
 {
     public int CustomerId { get; set; }
