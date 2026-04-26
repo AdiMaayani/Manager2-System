@@ -11,7 +11,7 @@ namespace ManageR2.Infrastructure.Services.SmartAssignment
     // Service = שכבת הלוגיקה העסקית.
     // כאן מתבצע האלגוריתם עצמו:
     // חישוב ציונים, קביעת כשירות, מיון ודירוג עובדים.
-    public class SmartAssignmentService
+    public class SmartAssignmentService : IAdvancedSmartAssignmentService
     {
         // Repository הוא האובייקט שמדבר עם ה-DB.
         // השירות לא פונה ישירות ל-SQL אלא מבקש מה-Repository להביא לו נתונים.
