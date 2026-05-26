@@ -1,0 +1,1 @@
+export { WorkPlanGantt } from './WorkPlanGantt';

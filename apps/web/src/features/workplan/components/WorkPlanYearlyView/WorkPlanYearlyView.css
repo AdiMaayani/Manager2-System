@@ -1,0 +1,47 @@
+.workPlanYearlyView {
+  padding: var(--spacing-lg);
+}
+
+.workPlanYearlyView__title {
+  margin: 0 0 var(--spacing-md);
+}
+
+.workPlanYearlyView__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.workPlanYearlyView__card {
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+  background: var(--color-neutral-50);
+}
+
+.workPlanYearlyView__card h4 {
+  margin: 0 0 var(--spacing-sm);
+}
+
+.workPlanYearlyView__card dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--spacing-sm);
+}
+
+.workPlanYearlyView__card dt {
+  font-size: var(--font-size-xs);
+  color: var(--color-neutral-600);
+}
+
+.workPlanYearlyView__card dd {
+  margin: 0;
+  font-weight: var(--font-weight-semibold);
+}
+
+.workPlanYearlyView__empty {
+  grid-column: 1 / -1;
+  text-align: center;
+  color: var(--color-neutral-600);
+}

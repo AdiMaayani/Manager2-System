@@ -1,0 +1,21 @@
+.newTaskModal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.newTaskModal__hint {
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-600);
+  margin: 0;
+}
+
+.newTaskModal__error {
+  color: var(--color-danger-600);
+  margin: 0;
+}
+
+.newTaskModal__actions {
+  display: flex;
+  gap: var(--spacing-sm);
+}

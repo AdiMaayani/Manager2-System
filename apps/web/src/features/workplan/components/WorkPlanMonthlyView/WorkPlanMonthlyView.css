@@ -1,0 +1,65 @@
+.workPlanMonthlyView {
+  padding: var(--spacing-lg);
+}
+
+.workPlanMonthlyView__title {
+  margin: 0 0 var(--spacing-md);
+}
+
+.workPlanMonthlyView__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.workPlanMonthlyView__project {
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-md);
+}
+
+.workPlanMonthlyView__projectHeader {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-sm);
+}
+
+.workPlanMonthlyView__projectHeader h4 {
+  margin: 0;
+}
+
+.workPlanMonthlyView__badge {
+  font-size: var(--font-size-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--color-neutral-100);
+  border-radius: var(--radius-full);
+}
+
+.workPlanMonthlyView__tasks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.workPlanMonthlyView__tasks li {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  align-items: center;
+  padding: var(--spacing-xs) 0;
+  border-bottom: 1px solid var(--color-neutral-100);
+}
+
+.workPlanMonthlyView__date {
+  font-size: var(--font-size-xs);
+  color: var(--color-neutral-600);
+}
+
+.workPlanMonthlyView__empty {
+  color: var(--color-neutral-600);
+  text-align: center;
+}

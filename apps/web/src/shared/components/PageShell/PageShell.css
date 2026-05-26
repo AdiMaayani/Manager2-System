@@ -1,0 +1,7 @@
+.pageShell__modeBanner {
+  background: var(--color-warning-100);
+  color: var(--color-warning-600);
+  text-align: center;
+  padding: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+}

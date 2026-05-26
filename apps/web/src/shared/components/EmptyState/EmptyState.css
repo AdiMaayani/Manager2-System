@@ -1,0 +1,16 @@
+.emptyState {
+  padding: var(--spacing-2xl);
+  text-align: center;
+  color: var(--color-neutral-500);
+}
+
+.emptyState__title {
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-neutral-700);
+}
+
+.emptyState__desc {
+  margin-top: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+}

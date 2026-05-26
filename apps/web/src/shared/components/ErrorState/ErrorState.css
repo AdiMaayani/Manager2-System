@@ -1,0 +1,27 @@
+.errorState {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-xl);
+  text-align: center;
+}
+
+.errorState__message {
+  color: var(--color-danger-600);
+  font-size: var(--font-size-base);
+}
+
+.errorState__retry {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  background: var(--color-primary-600);
+  color: #fff;
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  transition: background var(--transition-fast);
+}
+
+.errorState__retry:hover {
+  background: var(--color-primary-700);
+}

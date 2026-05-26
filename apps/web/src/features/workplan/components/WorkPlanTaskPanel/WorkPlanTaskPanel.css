@@ -1,0 +1,83 @@
+.workPlanTaskPanel {
+  position: fixed;
+  top: var(--spacing-lg);
+  inset-inline-start: var(--spacing-lg);
+  width: min(360px, calc(100vw - 2 * var(--spacing-lg)));
+  max-height: calc(100vh - 2 * var(--spacing-lg));
+  overflow: auto;
+  background: #fff;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  z-index: 100;
+  border: 1px solid var(--color-neutral-200);
+}
+
+.workPlanTaskPanel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid var(--color-neutral-200);
+}
+
+.workPlanTaskPanel__header h3 {
+  margin: 0;
+  font-size: var(--font-size-md);
+}
+
+.workPlanTaskPanel__close {
+  border: none;
+  background: transparent;
+  font-size: 1.5rem;
+  cursor: pointer;
+  line-height: 1;
+}
+
+.workPlanTaskPanel__body {
+  padding: var(--spacing-lg);
+}
+
+.workPlanTaskPanel__project {
+  font-size: var(--font-size-xs);
+  color: var(--color-neutral-600);
+  margin: 0 0 var(--spacing-xs);
+}
+
+.workPlanTaskPanel__title {
+  margin: 0 0 var(--spacing-md);
+}
+
+.workPlanTaskPanel__meta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  margin: 0 0 var(--spacing-md);
+}
+
+.workPlanTaskPanel__meta div {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+}
+
+.workPlanTaskPanel__meta dt {
+  color: var(--color-neutral-600);
+  font-size: var(--font-size-sm);
+}
+
+.workPlanTaskPanel__meta dd {
+  margin: 0;
+  text-align: left;
+}
+
+.workPlanTaskPanel__perms {
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-700);
+  margin-bottom: var(--spacing-md);
+}
+
+.workPlanTaskPanel__actions {
+  display: flex;
+  gap: var(--spacing-sm);
+  flex-wrap: wrap;
+}

@@ -1,0 +1,130 @@
+---
+description: ManageR2 monorepo layout, Clean Architecture backend layers, and frontend structure
+alwaysApply: true
+---
+
+# ManageR2 Architecture Rules
+
+## Monorepo Layout
+
+```
+ManageR2-System/
+  apps/
+    web/        # Vite + React + TypeScript SPA
+    api/        # ASP.NET Core C# backend (solution root)
+  database/SP/  # SQL stored procedures
+```
+
+---
+
+# Backend — Clean Architecture
+
+## Layer stack
+
+```
+ManageR2.Api  →  ManageR2.Infrastructure  →  ManageR2.Domain
+(HTTP/DTOs)      (Repos / Services / Models)   (Entities / Enums)
+```
+
+Forbidden: Domain → Api or Domain → Infrastructure.
+
+## Feature-based folders
+
+Each domain has its own folder in every layer:
+
+```
+apps/api/
+  ManageR2.Api/Features/<Domain>/
+    <Domain>Controller.cs
+    DTOs/
+  ManageR2.Infrastructure/Features/<Domain>/
+    Repositories/   Services/   Models/
+  ManageR2.Domain/Features/<Domain>/
+    Entities/   Exceptions/
+```
+
+Domains: Projects, WorkItems, Users, Employees, Customers, Sites, Contacts, Reports, SmartAssignment, AdvancedSmartAssignment.
+
+## Layer responsibilities
+
+**Api** — HTTP only: routing, model binding, DTOs, status codes. Controllers must be thin; call Services (or Repositories when no business logic). No SQL, no business logic.
+
+**Infrastructure** — Services (business logic) and Repositories (DB access only). Services call Repositories. Repositories use ADO.NET + Stored Procedures exclusively. No EF, no inline SQL.
+
+**Domain** — Entities, Enums, Exceptions, interfaces. No dependencies on Api or Infrastructure.
+
+## SQL Rules
+
+All SQL lives in SQL Server. Allowed objects: Stored Procedures, Functions, Views. Inline SQL in C# is forbidden. SQL scripts → `database/SP/sp_<Domain>_<Action>.sql`.
+
+## Dependency Injection
+
+Register in `ManageR2.Api/Program.cs`:
+- `AddScoped<IXRepository, XRepository>()`
+- `AddScoped<IXService, XService>()`
+
+---
+
+# Frontend — React (apps/web/src/)
+
+## Folder layout
+
+```
+apps/web/src/
+  app/                     # router, providers, ProtectedRoute, AppLayout
+  features/<domain>/       # one folder per business domain
+    components/<Name>/     # component folder (Name.tsx + Name.css + index.ts)
+    hooks/
+    pages/<Page>/
+    api/                   # <domain>ApiClient.ts
+    types.ts
+    index.ts
+  shared/
+    components/<Name>/     # common UI (Button, Modal, Spinner, Table, …)
+    hooks/   utils/
+  api/                     # client.ts, auth.ts
+  styles/                  # tokens.css, base.css, utilities.css
+```
+
+Dependency flow: `app` → `features` → `shared` → `api`. No cross-feature deep imports.
+
+## Component folder rule
+
+Every non-trivial component is a folder:
+
+```
+ComponentName/
+  ComponentName.tsx
+  ComponentName.css   ← scoped BEM styles
+  index.ts            ← re-export only
+```
+
+## Frontend conventions
+
+- Thin components: pages call hooks and render; hooks fetch and map.
+- All HTTP calls through `@api/client.ts → apiRequest<T>()`.
+- JWT in `sessionStorage` keys `manager2_*`. `ProtectedRoute` wraps all protected routes.
+- Reuse tokens from `src/styles/tokens.css` via CSS variables.
+- RTL layout: `<html dir="rtl">` + Hebrew text; do not hard-code directional values.
+
+---
+
+# Git Workflow
+
+Never commit directly to `dev`. Feature branches only:
+
+```
+feature/projects-react-page
+feature/workitems-service-layer
+```
+
+One focused task per branch.
+
+---
+
+# Cursor Behavior
+
+- Preserve architecture; avoid unnecessary rewrites.
+- Prefer patch-based changes; do not touch unrelated code.
+- Explain risky changes.
+- Keep controllers thin, repositories DB-only, components presentational.

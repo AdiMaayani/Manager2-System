@@ -1,0 +1,154 @@
+.workPlanShell {
+  overflow-x: auto;
+  width: 100%;
+}
+
+.workPlanDailyGrid__grid {
+  min-width: 1400px;
+  background: #fff;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  overflow: hidden;
+}
+
+.workPlanDailyGrid__header {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  background: var(--color-neutral-100);
+  border-bottom: 1px solid var(--color-neutral-200);
+}
+
+.workPlanDailyGrid__headerCell {
+  padding: var(--spacing-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-700);
+}
+
+.workPlanDailyGrid__hours {
+  display: grid;
+  grid-template-columns: repeat(24, minmax(48px, 1fr));
+}
+
+.workPlanDailyGrid__hour {
+  padding: var(--spacing-md) var(--spacing-xs);
+  text-align: center;
+  font-size: var(--font-size-xs);
+  color: var(--color-neutral-600);
+  border-inline-start: 1px solid var(--color-neutral-200);
+}
+
+.workPlanDailyGrid__row {
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  border-bottom: 1px solid var(--color-neutral-200);
+}
+
+.workPlanDailyGrid__stickyCol {
+  padding: var(--spacing-md);
+  background: #fff;
+  border-inline-start: 1px solid var(--color-neutral-200);
+}
+
+.workPlanDailyGrid__rowTitle {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-900);
+}
+
+.workPlanDailyGrid__rowSubtitle {
+  font-size: var(--font-size-xs);
+  color: var(--color-neutral-600);
+  margin-top: var(--spacing-xs);
+}
+
+.workPlanDailyGrid__track {
+  position: relative;
+  min-height: 92px;
+  background-image: linear-gradient(to left, var(--color-neutral-200) 1px, transparent 1px);
+  background-size: calc(100% / 24) 100%;
+}
+
+.workPlanDailyGrid__task {
+  position: absolute;
+  top: 14px;
+  height: 64px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-neutral-200);
+  box-shadow: var(--shadow-sm);
+  padding: var(--spacing-sm);
+  text-align: right;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  overflow: hidden;
+  z-index: 10;
+}
+
+.workPlanDailyGrid__task--locked {
+  background: color-mix(in srgb, var(--color-danger-500) 12%, white);
+  border-color: var(--color-danger-300, #fca5a5);
+}
+
+.workPlanDailyGrid__task--normal {
+  background: color-mix(in srgb, var(--color-success-500) 12%, white);
+  border-color: var(--color-success-300, #86efac);
+}
+
+.workPlanDailyGrid__task--warning {
+  box-shadow: 0 0 0 2px var(--color-warning-500, #f59e0b);
+}
+
+.workPlanDailyGrid__task--violation {
+  box-shadow: 0 0 0 2px var(--color-danger-500);
+}
+
+.workPlanDailyGrid__task--selected {
+  outline: 2px solid var(--color-primary-600);
+  outline-offset: 2px;
+}
+
+.workPlanDailyGrid__taskName {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.workPlanDailyGrid__taskMeta {
+  font-size: var(--font-size-xs);
+  color: var(--color-neutral-700);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.workPlanDailyGrid__taskIndicators {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+}
+
+.workPlanDailyGrid__indicator {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.workPlanDailyGrid__indicator--violation {
+  background: var(--color-danger-500);
+}
+
+.workPlanDailyGrid__indicator--warning {
+  background: var(--color-warning-500, #f59e0b);
+}
+
+.workPlanDailyGrid__indicator--suggestion {
+  background: var(--color-primary-500);
+}
+
+.workPlanDailyGrid__empty {
+  padding: var(--spacing-xl);
+  text-align: center;
+  color: var(--color-neutral-600);
+}

@@ -1,0 +1,31 @@
+.dashboardPage__hint {
+  margin-bottom: var(--spacing-lg);
+  color: var(--color-neutral-600);
+  font-size: var(--font-size-sm);
+}
+
+.dashboardPage__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: var(--spacing-lg);
+}
+
+.dashboardPage__card {
+  background: #fff;
+  padding: var(--spacing-xl);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.dashboardPage__value {
+  font-size: var(--font-size-3xl);
+  font-weight: var(--font-weight-bold);
+  color: var(--color-primary-700);
+}
+
+.dashboardPage__label {
+  color: var(--color-neutral-600);
+}

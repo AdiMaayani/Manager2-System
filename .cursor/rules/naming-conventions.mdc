@@ -1,0 +1,292 @@
+---
+description: Naming conventions for C#, SQL, API routes, and frontend code
+alwaysApply: true
+---
+
+# ManageR2 Naming Conventions
+
+# General Naming Rules
+
+Names must clearly describe purpose and behavior.
+
+Code should "tell the story" without requiring deep reading.
+
+Avoid vague names like:
+- data
+- info
+- temp
+- helper
+- manager
+- stuff
+
+Prefer descriptive names.
+
+Examples:
+
+Bad:
+ProcessData()
+
+Good:
+AssignEmployeeToWorkItemAsync()
+
+---
+
+# Async Methods
+
+All async methods MUST end with Async.
+
+Examples:
+
+GetUserByIdAsync
+CreateProjectAsync
+AssignContractorAsync
+
+Never omit Async suffix.
+
+---
+
+# Interfaces
+
+All interfaces must start with I.
+
+Examples:
+
+IUserRepository
+IProjectService
+ISmartAssignmentService
+
+---
+
+# Repository Naming
+
+Repositories must represent database access only.
+
+Examples:
+
+UserRepository
+ProjectRepository
+WorkItemRepository
+
+Avoid:
+- Helper
+- Manager
+- Processor
+
+---
+
+# Service Naming
+
+Services must represent business operations.
+
+Examples:
+
+UserAuthorizationService
+ProjectLifecycleService
+SmartAssignmentService
+
+Service names should describe business responsibility.
+
+---
+
+# DTO Naming
+
+Request DTOs:
+
+CreateWorkItemRequestDto
+UpdateProjectRequestDto
+
+Response DTOs:
+
+ProjectDetailsResponseDto
+WorkPlanResponseDto
+
+Avoid generic names like:
+- DataDto
+- ResultDto
+- InfoDto
+
+---
+
+# SQL Naming
+
+Stored Procedures:
+
+sp_Module_Action
+
+Examples:
+
+sp_WorkItems_Create
+sp_Projects_GetLifecycle
+sp_Users_Login
+
+Functions:
+
+fn_Module_Action
+
+Views:
+
+vw_Module_Purpose
+
+---
+
+# Variable Naming
+
+Variable names must be meaningful.
+
+Examples:
+
+employeeAssignments
+projectMilestones
+recommendedEmployees
+
+Avoid:
+- x
+- obj
+- item
+- temp
+
+except for very small loops.
+
+---
+
+# Boolean Naming
+
+Booleans should sound like true/false questions.
+
+Examples:
+
+isActive
+hasPermission
+canAssignEmployee
+
+Avoid:
+- flag
+- statusBool
+
+---
+
+# Collection Naming
+
+Collections should use plural names.
+
+Examples:
+
+employees
+projects
+workItems
+
+Single objects should use singular names.
+
+Examples:
+
+employee
+project
+workItem
+
+---
+
+# Controller Naming
+
+Controllers should follow:
+
+[Module]Controller
+
+Examples:
+
+UsersController
+ProjectsController
+WorkItemsController
+
+---
+
+# API Route Naming
+
+Routes should be REST-oriented.
+
+Examples:
+
+GET /api/projects
+GET /api/projects/{id}
+POST /api/workitems
+PUT /api/workitems/{id}
+
+Avoid:
+- /GetProjects
+- /CreateWorkItem
+
+---
+
+# Method Naming
+
+Method names should describe action clearly.
+
+Examples:
+
+GetProjectLifecycleAsync
+AssignEmployeeToTaskAsync
+GenerateWorkPlanAsync
+
+Avoid unclear names like:
+- Handle
+- Process
+- Execute
+- DoStuff
+
+unless context is extremely clear.
+
+---
+
+# Folder Naming
+
+Use feature-based organization where possible.
+
+Examples:
+
+Repositories/Projects
+Services/Users
+DTOs/Reports
+
+Avoid huge flat folders.
+
+---
+
+# React / TypeScript Naming
+
+Applies under `frontend/src/` when using React.
+
+| Kind | Convention | Example |
+|------|------------|---------|
+| Component | PascalCase | `ProjectDrawer`, `WorkPlanGantt` |
+| Component file | Match component name | `ProjectDrawer.tsx` |
+| Hook | `use` + PascalCase remainder | `useProjects`, `useWorkPlanState` |
+| Hook file | camelCase | `useProjects.ts` |
+| Props type | Component + `Props` | `ProjectDrawerProps` |
+| API function | verb + entity + `Async` | `getProjectLifecycleAsync` |
+| API module | `<domain>Client.ts` | `projectsClient.ts` |
+| Feature folder | plural domain, lowercase | `features/projects/` |
+| Event handler | `handle` + action | `handleSaveProject` |
+| Boolean props/state | `is` / `has` / `can` prefix | `isEditMode`, `hasPermission` |
+
+Avoid generic names: `Data`, `Item`, `Component`, `Wrapper` (unless truly generic).
+
+Types should mirror backend DTO names where they represent the same contract:
+
+- `CreateWorkItemRequest` ↔ `CreateWorkItemRequestDto`
+- `ProjectDetailsResponse` ↔ `ProjectDetailsResponseDto`
+
+---
+
+# Comment Rules
+
+Comments should explain WHY, not WHAT.
+
+Avoid obvious comments.
+
+Bad:
+
+// Increment i
+i++;
+
+Good:
+
+// Prevent assigning employees beyond daily capacity
