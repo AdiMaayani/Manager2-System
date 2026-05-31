@@ -18,4 +18,5 @@ public class ContactDto
     public string? Status { get; set; }
     public string? Notes { get; set; }
     public bool IsActive { get; set; }
+    public DateTime? UpdatedAt { get; set; }
 }

@@ -1,13 +1,18 @@
 import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Drawer } from '@shared/components/Drawer';
 import { Button } from '@shared/components/Button';
 import { Input } from '@shared/components/Input';
+import { getCustomersAsync } from '@features/customers';
 import { useContactMutations } from '../../hooks/useContacts';
 import type { Contact, CreateContactRequest } from '../../types';
 import './ContactDrawer.css';
 
-const CATEGORY_OPTIONS = ['לקוחות', 'ספקים', 'קבלנים', 'שותפים עסקיים', 'אחר'];
+const CATEGORY_OPTIONS = ['לקוחות', 'נציגי לקוחות', 'ספקים', 'קבלנים', 'שותפים עסקיים', 'אחר'];
 const PREFERRED_CHANNEL_OPTIONS = ['טלפון', 'מייל', 'וואטסאפ', 'פגישה'];
+
+/** Categories that require a linked Customer (DB CHECK constraint). */
+const CUSTOMER_LINK_CATEGORIES = ['לקוחות', 'נציגי לקוחות'];
 
 interface ContactDrawerProps {
   isOpen: boolean;
@@ -19,6 +24,7 @@ interface ContactFormState {
   fullName: string;
   jobTitle: string;
   contactCategory: string;
+  customerId: number | null;
   companyName: string;
   phone: string;
   secondaryPhone: string;
@@ -36,6 +42,7 @@ function buildInitialState(contact: Contact | null | undefined): ContactFormStat
     fullName: contact?.fullName ?? '',
     jobTitle: contact?.jobTitle ?? '',
     contactCategory: contact?.contactCategory ?? CATEGORY_OPTIONS[0],
+    customerId: contact?.customerId ?? null,
     companyName: contact?.companyName ?? '',
     phone: contact?.phone ?? '',
     secondaryPhone: contact?.secondaryPhone ?? '',
@@ -57,6 +64,15 @@ export function ContactDrawer({ isOpen, onClose, contact }: ContactDrawerProps) 
   const [error, setError] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
 
+  const requiresCustomer = CUSTOMER_LINK_CATEGORIES.includes(form.contactCategory);
+
+  const { data: customers = [] } = useQuery({
+    queryKey: ['customers'],
+    queryFn: getCustomersAsync,
+    enabled: requiresCustomer,
+    staleTime: 60_000,
+  });
+
   useEffect(() => {
     if (isOpen) {
       setForm(buildInitialState(contact));
@@ -69,10 +85,20 @@ export function ContactDrawer({ isOpen, onClose, contact }: ContactDrawerProps) 
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
+  function handleCategoryChange(value: string) {
+    setForm((prev) => ({
+      ...prev,
+      contactCategory: value,
+      // Clear the linked customer when switching to a category that does not require one
+      customerId: CUSTOMER_LINK_CATEGORIES.includes(value) ? prev.customerId : null,
+    }));
+  }
+
   function validate(): string | null {
     if (!form.fullName.trim()) return 'שם מלא הוא שדה חובה.';
     if (!form.contactCategory) return 'קטגוריה היא שדה חובה.';
     if (!form.phone.trim() && !form.email.trim()) return 'יש להזין טלפון או אימייל.';
+    if (requiresCustomer && !form.customerId) return 'יש לבחור לקוח עבור קטגוריה זו.';
     return null;
   }
 
@@ -89,6 +115,7 @@ export function ContactDrawer({ isOpen, onClose, contact }: ContactDrawerProps) 
       fullName: form.fullName.trim(),
       jobTitle: form.jobTitle.trim() || undefined,
       contactCategory: form.contactCategory,
+      customerId: form.customerId ?? undefined,
       companyName: form.companyName.trim() || undefined,
       phone: form.phone.trim() || undefined,
       email: form.email.trim() || undefined,
@@ -151,13 +178,33 @@ export function ContactDrawer({ isOpen, onClose, contact }: ContactDrawerProps) 
             <select
               className="contactDrawer__select"
               value={form.contactCategory}
-              onChange={(e) => setField('contactCategory', e.target.value)}
+              onChange={(e) => handleCategoryChange(e.target.value)}
             >
               {CATEGORY_OPTIONS.map((opt) => (
                 <option key={opt} value={opt}>{opt}</option>
               ))}
             </select>
           </div>
+
+          {requiresCustomer && (
+            <div className="contactDrawer__field">
+              <label className="contactDrawer__label">לקוח *</label>
+              <select
+                className="contactDrawer__select"
+                value={form.customerId ?? ''}
+                onChange={(e) =>
+                  setField('customerId', e.target.value ? Number(e.target.value) : null)
+                }
+              >
+                <option value="">-- בחר לקוח --</option>
+                {customers.map((c) => (
+                  <option key={c.customerId} value={c.customerId}>
+                    {c.customerName}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           <Input
             label="חברה"

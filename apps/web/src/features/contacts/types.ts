@@ -14,6 +14,7 @@ export interface Contact {
   status?: string;
   notes?: string;
   isActive: boolean;
+  updatedAt?: string | null;
 }
 
 export interface CreateContactRequest {

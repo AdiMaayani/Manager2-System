@@ -11,11 +11,19 @@ import { ContactDrawer } from '../../components/ContactDrawer';
 import type { Contact } from '../../types';
 import './ContactsPage.css';
 
-const SEGMENTS = ['הכל', 'לקוחות', 'ספקים', 'קבלנים'];
+const SEGMENTS = ['הכל', 'לקוחות', 'נציגי לקוחות', 'ספקים', 'קבלנים', 'שותפים עסקיים'];
+const ACTIVE_FILTERS = ['הכל', 'פעילים', 'לא פעילים'] as const;
+type ActiveFilter = (typeof ACTIVE_FILTERS)[number];
+
+function formatContactDate(value?: string | null) {
+  if (!value) return '—';
+  return value.split('T')[0];
+}
 
 export function ContactsPage() {
   const { data: contacts, isLoading, error, refetch } = useContacts();
   const [segment, setSegment] = useState('הכל');
+  const [activeFilter, setActiveFilter] = useState<ActiveFilter>('הכל');
   const [search, setSearch] = useState('');
   const [drawerContact, setDrawerContact] = useState<Contact | null | undefined>(undefined);
 
@@ -30,10 +38,15 @@ export function ContactsPage() {
         !q ||
         c.fullName.toLowerCase().includes(q) ||
         (c.companyName ?? '').toLowerCase().includes(q) ||
-        (c.phone ?? '').includes(q);
-      return matchSegment && matchSearch;
+        (c.phone ?? '').includes(q) ||
+        (c.email ?? '').toLowerCase().includes(q);
+      const matchActive =
+        activeFilter === 'הכל' ||
+        (activeFilter === 'פעילים' && c.isActive) ||
+        (activeFilter === 'לא פעילים' && !c.isActive);
+      return matchSegment && matchSearch && matchActive;
     });
-  }, [contacts, segment, search]);
+  }, [contacts, segment, search, activeFilter]);
 
   if (isLoading) return <PageShell title="אנשי קשר"><PageSpinner /></PageShell>;
   if (error) {
@@ -56,6 +69,18 @@ export function ContactsPage() {
               onClick={() => setSegment(s)}
             >
               {s}
+            </button>
+          ))}
+        </div>
+        <div className="contactsPage__segments">
+          {ACTIVE_FILTERS.map((f) => (
+            <button
+              key={f}
+              type="button"
+              className={`contactsPage__chip${activeFilter === f ? ' contactsPage__chip--active' : ''}`}
+              onClick={() => setActiveFilter(f)}
+            >
+              {f}
             </button>
           ))}
         </div>
@@ -82,8 +107,10 @@ export function ContactsPage() {
                 <th>שם</th>
                 <th>חברה</th>
                 <th>טלפון</th>
+                <th>מייל</th>
                 <th>קטגוריה</th>
                 <th>סטטוס</th>
+                <th>עודכן</th>
                 <th />
               </tr>
             </thead>
@@ -93,12 +120,14 @@ export function ContactsPage() {
                   <td>{c.fullName}</td>
                   <td>{c.companyName ?? '-'}</td>
                   <td>{c.phone ?? '-'}</td>
+                  <td>{c.email ?? '-'}</td>
                   <td>{c.contactCategory}</td>
                   <td>
                     <Badge variant={c.isActive ? 'success' : 'neutral'}>
                       {c.status ?? (c.isActive ? 'פעיל' : 'לא פעיל')}
                     </Badge>
                   </td>
+                  <td>{formatContactDate(c.updatedAt)}</td>
                   <td>
                     <Button variant="ghost" onClick={() => setDrawerContact(c)}>
                       עריכה

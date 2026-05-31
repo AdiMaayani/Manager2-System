@@ -46,7 +46,8 @@ public class ContactsController : ControllerBase
                 Address = c.Address,
                 Status = c.Status,
                 Notes = c.Notes,
-                IsActive = c.IsActive
+                IsActive = c.IsActive,
+                UpdatedAt = c.UpdatedAt
             }));
         }
         catch (UserValidationException ex)
@@ -84,7 +85,8 @@ public class ContactsController : ControllerBase
                 Address = contact.Address,
                 Status = contact.Status,
                 Notes = contact.Notes,
-                IsActive = contact.IsActive
+                IsActive = contact.IsActive,
+                UpdatedAt = contact.UpdatedAt
             });
         }
         catch (UserValidationException ex)
