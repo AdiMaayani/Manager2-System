@@ -85,3 +85,47 @@
 .projectMilestonesTab__empty {
   color: var(--color-neutral-500);
 }
+
+.projectMilestonesTab__assignments {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-md);
+  background: var(--color-neutral-50);
+}
+
+.projectMilestonesTab__assignmentsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+}
+
+.projectMilestonesTab__assignmentsHeader h4 {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.projectMilestonesTab__assignmentRow {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(140px, 180px) auto;
+  gap: var(--spacing-sm);
+  align-items: center;
+}
+
+.projectMilestonesTab__emptyAssignments {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-500);
+}
+
+.projectMilestonesTab__assignmentsView {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-700);
+}

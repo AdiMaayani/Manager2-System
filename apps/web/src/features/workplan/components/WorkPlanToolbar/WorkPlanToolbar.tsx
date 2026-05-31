@@ -23,7 +23,6 @@ interface WorkPlanToolbarProps {
   onProjectFilterChange: (projectId: WorkPlanProjectFilter) => void;
   onEmployeeFilterChange: (employeeId: string) => void;
   onNewTask: () => void;
-  onSmartAssignment: () => void;
 }
 
 const SCOPES: WorkPlanScope[] = ['company', 'personal', 'employee', 'project'];
@@ -43,7 +42,6 @@ export function WorkPlanToolbar({
   onProjectFilterChange,
   onEmployeeFilterChange,
   onNewTask,
-  onSmartAssignment,
 }: WorkPlanToolbarProps) {
   return (
     <div className="workPlanToolbar card">
@@ -52,9 +50,6 @@ export function WorkPlanToolbar({
           <Button type="button" onClick={onNewTask}>
             <PlusCircle size={18} aria-hidden />
             משימה חדשה
-          </Button>
-          <Button type="button" variant="secondary" onClick={onSmartAssignment}>
-            שיבוץ חכם
           </Button>
         </div>
 

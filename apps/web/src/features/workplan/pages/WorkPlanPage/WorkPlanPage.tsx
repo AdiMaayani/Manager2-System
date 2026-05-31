@@ -8,8 +8,6 @@ import { WorkPlanWeeklyView } from '../../components/WorkPlanWeeklyView';
 import { WorkPlanMonthlyView } from '../../components/WorkPlanMonthlyView';
 import { WorkPlanYearlyView } from '../../components/WorkPlanYearlyView';
 import { WorkPlanTaskPanel } from '../../components/WorkPlanTaskPanel';
-import { WorkPlanGantt } from '../../components/WorkPlanGantt';
-import { SmartAssignmentModal } from '../../components/SmartAssignmentModal';
 import { NewTaskModal } from '../../components/NewTaskModal';
 import { useWorkPlanPageState } from '../../hooks/useWorkPlanPageState';
 import { useWorkPlanScheduling } from '../../hooks/useWorkPlanData';
@@ -42,7 +40,6 @@ export function WorkPlanPage() {
   });
 
   const [selectedTask, setSelectedTask] = useState<WorkPlanTaskSelection | null>(null);
-  const [isSmartModalOpen, setIsSmartModalOpen] = useState(false);
   const [isNewTaskModalOpen, setIsNewTaskModalOpen] = useState(false);
 
   const effectiveProjectId = useMemo(() => {
@@ -107,7 +104,6 @@ export function WorkPlanPage() {
           onProjectFilterChange={pageState.setProjectFilter}
           onEmployeeFilterChange={pageState.setEmployeeFilterId}
           onNewTask={() => setIsNewTaskModalOpen(true)}
-          onSmartAssignment={() => setIsSmartModalOpen(true)}
         />
 
         {pageState.range === 'daily' && pageState.scope === 'project' && (
@@ -157,25 +153,10 @@ export function WorkPlanPage() {
           <WorkPlanYearlyView workPlans={scheduling.activeWorkPlans} />
         )}
 
-        {pageState.scope === 'project' &&
-          !pageState.isAllProjectsMode &&
-          scheduling.ganttTasks.length > 0 && (
-            <section className="workPlanPage__gantt card">
-              <h3 className="workPlanPage__ganttTitle">ציר זמן פרויקט</h3>
-              <WorkPlanGantt tasks={scheduling.ganttTasks} />
-            </section>
-          )}
-
         <WorkPlanTaskPanel
           task={selectedTask}
           onClose={() => setSelectedTask(null)}
           canEdit={canEditTask}
-        />
-
-        <SmartAssignmentModal
-          isOpen={isSmartModalOpen}
-          onClose={() => setIsSmartModalOpen(false)}
-          projectId={effectiveProjectId}
         />
 
         <NewTaskModal
@@ -183,6 +164,8 @@ export function WorkPlanPage() {
           onClose={() => setIsNewTaskModalOpen(false)}
           projectFilter={pageState.projectFilter}
           defaultProjectId={effectiveProjectId}
+          projectOptions={scheduling.projectOptions}
+          employees={scheduling.employees}
         />
       </div>
     </PageShell>

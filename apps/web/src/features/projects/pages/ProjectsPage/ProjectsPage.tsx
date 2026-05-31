@@ -146,11 +146,20 @@ export function ProjectsPage() {
                 return (
                   <tr
                     key={project.workItemId}
-                    className={
+                    role="button"
+                    tabIndex={0}
+                    className={`projectsPage__row ${
                       drawerState?.projectId === project.workItemId
                         ? 'projectsPage__row--selected'
                         : ''
-                    }
+                    }`.trim()}
+                    onClick={() => openProject(project)}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Enter' || event.key === ' ') {
+                        event.preventDefault();
+                        openProject(project);
+                      }
+                    }}
                   >
                     <td>{project.projectNumber}</td>
                     <td>{project.title}</td>
@@ -162,7 +171,13 @@ export function ProjectsPage() {
                     <td>{formatProjectDate(project.createdAt)}</td>
                     <td>{project.siteName}</td>
                     <td>
-                      <Button variant="ghost" onClick={() => openProject(project)}>
+                      <Button
+                        variant="ghost"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          openProject(project);
+                        }}
+                      >
                         פתח
                       </Button>
                     </td>

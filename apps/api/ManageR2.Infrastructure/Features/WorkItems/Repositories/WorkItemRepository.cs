@@ -131,10 +131,10 @@ public class WorkItemRepository : IWorkItemRepository
         command.Parameters.AddWithValue("@InvoiceNumber", (object?)workItem.InvoiceNumber ?? DBNull.Value);
         command.Parameters.AddWithValue("@PlannedStart", (object?)workItem.PlannedStart ?? DBNull.Value);
         command.Parameters.AddWithValue("@PlannedEnd", (object?)workItem.PlannedEnd ?? DBNull.Value);
-        command.Parameters.AddWithValue("@EstimatedHours", (object?)workItem.EstimatedHours ?? DBNull.Value);
+        AddDecimalHoursParameter(command, "@EstimatedHours", workItem.EstimatedHours);
         command.Parameters.AddWithValue("@ActualStart", (object?)workItem.ActualStart ?? DBNull.Value);
         command.Parameters.AddWithValue("@ActualEnd", (object?)workItem.ActualEnd ?? DBNull.Value);
-        command.Parameters.AddWithValue("@ActualHours", (object?)workItem.ActualHours ?? DBNull.Value);
+        AddDecimalHoursParameter(command, "@ActualHours", workItem.ActualHours);
         command.Parameters.AddWithValue("@Priority", (object?)workItem.Priority ?? DBNull.Value);
         command.Parameters.AddWithValue("@RequiredRole", (object?)workItem.RequiredRole ?? DBNull.Value);
         command.Parameters.AddWithValue("@IsLocked", workItem.IsLocked);
@@ -175,10 +175,10 @@ public class WorkItemRepository : IWorkItemRepository
         command.Parameters.AddWithValue("@InvoiceNumber", (object?)workItem.InvoiceNumber ?? DBNull.Value);
         command.Parameters.AddWithValue("@PlannedStart", (object?)workItem.PlannedStart ?? DBNull.Value);
         command.Parameters.AddWithValue("@PlannedEnd", (object?)workItem.PlannedEnd ?? DBNull.Value);
-        command.Parameters.AddWithValue("@EstimatedHours", (object?)workItem.EstimatedHours ?? DBNull.Value);
+        AddDecimalHoursParameter(command, "@EstimatedHours", workItem.EstimatedHours);
         command.Parameters.AddWithValue("@ActualStart", (object?)workItem.ActualStart ?? DBNull.Value);
         command.Parameters.AddWithValue("@ActualEnd", (object?)workItem.ActualEnd ?? DBNull.Value);
-        command.Parameters.AddWithValue("@ActualHours", (object?)workItem.ActualHours ?? DBNull.Value);
+        AddDecimalHoursParameter(command, "@ActualHours", workItem.ActualHours);
         command.Parameters.AddWithValue("@Priority", (object?)workItem.Priority ?? DBNull.Value);
         command.Parameters.AddWithValue("@RequiredRole", (object?)workItem.RequiredRole ?? DBNull.Value);
         command.Parameters.AddWithValue("@IsLocked", workItem.IsLocked);
@@ -601,6 +601,16 @@ public class WorkItemRepository : IWorkItemRepository
 
         return milestonesDictionary.Values.ToList();
     }
+    private static void AddDecimalHoursParameter(SqlCommand command, string parameterName, decimal? value)
+    {
+        command.Parameters.Add(new SqlParameter(parameterName, SqlDbType.Decimal)
+        {
+            Precision = 5,
+            Scale = 2,
+            Value = value.HasValue ? value.Value : DBNull.Value,
+        });
+    }
+
     private static decimal? GetDecimalValue(SqlDataReader reader, string columnName)
     {
         if (!HasColumn(reader, columnName) || reader[columnName] == DBNull.Value)

@@ -3,13 +3,16 @@ import { Button } from '@shared/components/Button';
 import { Input } from '@shared/components/Input';
 import type { Customer } from '@features/customers/types';
 import type {
+  ProjectEmployeeOption,
   ProjectLifecycle,
   ProjectOverviewForm,
+  ProjectTeamForm,
   Site,
 } from '../../../../types';
 import {
   BILLING_TYPE_OPTIONS,
   PROJECT_STATUS_OPTIONS,
+  aggregateProjectTeamFromLifecycle,
   formatProjectDate,
   getBillingTypeDisplay,
   getProjectNumber,
@@ -21,11 +24,14 @@ import './ProjectOverviewTab.css';
 interface ProjectOverviewTabProps {
   lifecycle: ProjectLifecycle | null;
   form: ProjectOverviewForm;
+  teamForm: ProjectTeamForm;
   isEditMode: boolean;
   isCreateMode: boolean;
   customers: Customer[];
   sites: Site[];
+  employees: ProjectEmployeeOption[];
   onChange: (form: ProjectOverviewForm) => void;
+  onTeamChange: (form: ProjectTeamForm) => void;
   onCreateSite: (payload: {
     customerId: number;
     siteName: string;
@@ -39,11 +45,14 @@ interface ProjectOverviewTabProps {
 export function ProjectOverviewTab({
   lifecycle,
   form,
+  teamForm,
   isEditMode,
   isCreateMode,
   customers,
   sites,
+  employees,
   onChange,
+  onTeamChange,
   onCreateSite,
 }: ProjectOverviewTabProps) {
   const [showSiteForm, setShowSiteForm] = useState(false);
@@ -55,19 +64,8 @@ export function ProjectOverviewTab({
   const project = lifecycle?.project;
   const projectId = project?.workItemId;
   const filteredSites = sites.filter((site) => site.customerId === form.customerId);
-
-  const projectManager = lifecycle?.assignments.find(
-    (assignment) =>
-      assignment.assignmentRole?.toLowerCase() === 'project manager' &&
-      assignment.workItemId === projectId,
-  );
-
-  const teamMembers = lifecycle?.assignments.filter(
-    (assignment) =>
-      assignment.workItemId === projectId &&
-      assignment.assignmentRole?.toLowerCase() !== 'project manager' &&
-      assignment.employeeName,
-  ) ?? [];
+  const aggregatedTeam = aggregateProjectTeamFromLifecycle(lifecycle);
+  const activeEmployees = employees.filter((employee) => employee.isActive !== false);
 
   const updateField = <K extends keyof ProjectOverviewForm>(
     key: K,
@@ -298,20 +296,72 @@ export function ProjectOverviewTab({
         </section>
 
         {!isCreateMode && (
-          <section className="projectOverviewTab__card">
+          <section className="projectOverviewTab__card projectOverviewTab__card--wide">
             <h3 className="projectOverviewTab__cardTitle">צוות הפרויקט</h3>
             <div className="projectOverviewTab__field">
               <span className="projectOverviewTab__label">מנהל פרויקט</span>
-              <span>{projectManager?.employeeName || '-'}</span>
+              {isEditMode ? (
+                <select
+                  className="projectOverviewTab__select"
+                  value={teamForm.projectManagerEmployeeId ?? ''}
+                  onChange={(event) =>
+                    onTeamChange({
+                      ...teamForm,
+                      projectManagerEmployeeId: event.target.value
+                        ? Number(event.target.value)
+                        : null,
+                    })
+                  }
+                >
+                  <option value="">בחר מנהל פרויקט</option>
+                  {activeEmployees.map((employee) => (
+                    <option key={employee.employeeId} value={employee.employeeId}>
+                      {employee.fullName}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span>
+                  {aggregatedTeam.managerNames.length > 0
+                    ? aggregatedTeam.managerNames.join(', ')
+                    : '-'}
+                </span>
+              )}
             </div>
             <div className="projectOverviewTab__field">
               <span className="projectOverviewTab__label">עובדים משויכים</span>
-              <span>
-                {teamMembers.length > 0
-                  ? teamMembers.map((member) => member.employeeName).join(', ')
-                  : '-'}
-              </span>
+              {isEditMode ? (
+                <select
+                  className="projectOverviewTab__select projectOverviewTab__select--multi"
+                  multiple
+                  value={teamForm.teamEmployeeIds.map(String)}
+                  onChange={(event) => {
+                    const selectedIds = Array.from(event.target.selectedOptions).map(
+                      (option) => Number(option.value),
+                    );
+                    onTeamChange({ ...teamForm, teamEmployeeIds: selectedIds });
+                  }}
+                >
+                  {activeEmployees.map((employee) => (
+                    <option key={employee.employeeId} value={employee.employeeId}>
+                      {employee.fullName}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <span>
+                  {aggregatedTeam.teamMemberNames.length > 0
+                    ? aggregatedTeam.teamMemberNames.join(', ')
+                    : '-'}
+                </span>
+              )}
             </div>
+            {isEditMode && (
+              <p className="projectOverviewTab__hint">
+                שיוך צוות נשמר עם הפרויקט. עובדים חדשים יתווספו לשיוך; הסרת עובדים קיימים
+                דורשת עדכון ידני במערכת.
+              </p>
+            )}
           </section>
         )}
       </div>

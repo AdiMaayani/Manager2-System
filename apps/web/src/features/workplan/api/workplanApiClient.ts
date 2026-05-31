@@ -6,6 +6,8 @@ import type {
   MappedWorkPlan,
   SmartAssignmentRequest,
   SmartAssignmentResponse,
+  UpdateTaskRequest,
+  WorkItemResponse,
   WorkPlanEmployee,
 } from '../types';
 
@@ -65,5 +67,35 @@ export async function assignEmployeeToWorkItemAsync(
   return apiRequest<AssignEmployeeResponse>(`/WorkItems/${workItemId}/assign-employee`, {
     method: 'POST',
     body: JSON.stringify(request),
+  });
+}
+
+export async function getWorkItemByIdAsync(workItemId: number): Promise<WorkItemResponse> {
+  return apiRequest<WorkItemResponse>(`/WorkItems/${workItemId}`);
+}
+
+export async function updateWorkItemAsync(
+  workItemId: number,
+  request: UpdateTaskRequest,
+): Promise<{ message?: string }> {
+  return apiRequest<{ message?: string }>(`/WorkItems/${workItemId}`, {
+    method: 'PUT',
+    body: JSON.stringify({
+      workItemId,
+      title: request.title,
+      description: request.description,
+      workType: request.workType,
+      billingType: request.billingType,
+      status: request.status,
+      customerId: request.customerId,
+      siteId: request.siteId,
+      plannedStart: request.plannedStart,
+      plannedEnd: request.plannedEnd,
+      estimatedHours: request.estimatedHours,
+      priority: request.priority,
+      requiredRole: request.requiredRole,
+      isLocked: request.isLocked,
+      parentWorkItemId: request.parentWorkItemId,
+    }),
   });
 }

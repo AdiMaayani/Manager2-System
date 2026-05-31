@@ -2,8 +2,11 @@ import type {
   ProjectBoqRow,
   ProjectDrawing,
   ProjectEquipmentItem,
+  ProjectLifecycle,
+  ProjectLifecycleAssignment,
   ProjectMilestoneForm,
   ProjectOverviewForm,
+  ProjectTeamForm,
 } from '../types';
 
 export interface StatusOption {
@@ -58,6 +61,121 @@ export const EQUIPMENT_STATUS_OPTIONS = [
 ];
 
 export const BOQ_UNIT_OPTIONS = ['יח׳', 'מ׳', 'מ״ר', 'סט'];
+
+export const PROJECT_ASSIGNMENT_ROLE_OPTIONS = [
+  'Project Manager',
+  'מתקין',
+  'מנהל פרויקט',
+  'טכנאי',
+];
+
+export const PROJECT_MANAGER_ROLE = 'Project Manager';
+
+export interface AggregatedProjectTeam {
+  managerNames: string[];
+  teamMemberNames: string[];
+}
+
+export function aggregateProjectTeamFromLifecycle(
+  lifecycle: ProjectLifecycle | null,
+): AggregatedProjectTeam {
+  if (!lifecycle) {
+    return { managerNames: [], teamMemberNames: [] };
+  }
+
+  const projectId = lifecycle.project.workItemId;
+  const relevantWorkItemIds = new Set<number>([
+    projectId,
+    ...lifecycle.milestones.map((milestone) => milestone.workItemId),
+  ]);
+
+  const managerNames: string[] = [];
+  const teamMemberNames = new Set<string>();
+
+  lifecycle.assignments.forEach((assignment) => {
+    if (
+      assignment.assignmentType !== 'Employee' ||
+      !assignment.employeeName ||
+      !relevantWorkItemIds.has(assignment.workItemId)
+    ) {
+      return;
+    }
+
+    const role = (assignment.assignmentRole ?? '').trim().toLowerCase();
+    const employeeName = assignment.employeeName.trim();
+
+    if (!employeeName) return;
+
+    if (role === 'project manager' || role === 'מנהל פרויקט') {
+      if (!managerNames.includes(employeeName)) {
+        managerNames.push(employeeName);
+      }
+      return;
+    }
+
+    teamMemberNames.add(employeeName);
+  });
+
+  return {
+    managerNames,
+    teamMemberNames: Array.from(teamMemberNames),
+  };
+}
+
+export function teamFormFromProjectAssignments(
+  lifecycle: ProjectLifecycle | null,
+): ProjectTeamForm {
+  if (!lifecycle) {
+    return { projectManagerEmployeeId: null, teamEmployeeIds: [] };
+  }
+
+  const projectId = lifecycle.project.workItemId;
+  const projectAssignments = lifecycle.assignments.filter(
+    (assignment) =>
+      assignment.workItemId === projectId &&
+      assignment.assignmentType === 'Employee' &&
+      assignment.employeeId != null,
+  );
+
+  const projectManager = projectAssignments.find((assignment) =>
+    isProjectManagerAssignment(assignment),
+  );
+
+  const teamEmployeeIds = projectAssignments
+    .filter((assignment) => !isProjectManagerAssignment(assignment))
+    .map((assignment) => assignment.employeeId!)
+    .filter((employeeId, index, items) => items.indexOf(employeeId) === index);
+
+  return {
+    projectManagerEmployeeId: projectManager?.employeeId ?? null,
+    teamEmployeeIds,
+  };
+}
+
+function isProjectManagerAssignment(assignment: ProjectLifecycleAssignment): boolean {
+  const role = (assignment.assignmentRole ?? '').trim().toLowerCase();
+  return role === 'project manager' || role === 'מנהל פרויקט';
+}
+
+export function createEmptyMilestoneForm(): ProjectMilestoneForm {
+  return {
+    title: '',
+    description: '',
+    status: 'Planned',
+    billingType: 'Internal',
+    plannedStart: '',
+    plannedEnd: '',
+    estimatedHours: '',
+    actualStart: '',
+    actualEnd: '',
+    actualHours: '',
+    priority: 'Medium',
+    requiredRole: '',
+    isLocked: false,
+    employees: [],
+    contractors: [],
+  };
+}
 
 export function getProjectStatusMeta(statusCode?: string | null): StatusOption {
   if (!statusCode) {
@@ -137,6 +255,32 @@ export function toDateTimeLocalValue(dateValue?: string | null): string {
   return `${year}-${month}-${day}T${hours}:${minutes}`;
 }
 
+export const MILESTONE_ESTIMATED_HOURS_MAX = 999.99;
+
+export function parseOptionalMilestoneEstimatedHours(value: string): {
+  value: number | undefined;
+  error?: string;
+} {
+  const trimmed = value.trim();
+  if (!trimmed) {
+    return { value: undefined };
+  }
+
+  const numeric = Number(trimmed);
+  if (Number.isNaN(numeric)) {
+    return { value: undefined, error: 'הערכת שעות חייבת להיות מספר.' };
+  }
+
+  if (numeric <= 0 || numeric > MILESTONE_ESTIMATED_HOURS_MAX) {
+    return {
+      value: undefined,
+      error: 'הערכת שעות חייבת להיות גדולה מ-0 ועד 999.99.',
+    };
+  }
+
+  return { value: Number(numeric.toFixed(2)) };
+}
+
 export function calculateHoursBetween(
   startValue?: string,
   endValue?: string,
@@ -193,24 +337,6 @@ export function createEmptyOverviewForm(): ProjectOverviewForm {
     dealCloseDate: '',
     financeProjectNumber: '',
     invoiceNumber: '',
-  };
-}
-
-export function createEmptyMilestoneForm(): ProjectMilestoneForm {
-  return {
-    title: '',
-    description: '',
-    status: 'Planned',
-    billingType: 'Internal',
-    plannedStart: '',
-    plannedEnd: '',
-    estimatedHours: '',
-    actualStart: '',
-    actualEnd: '',
-    actualHours: '',
-    priority: 'Medium',
-    requiredRole: '',
-    isLocked: false,
   };
 }
 

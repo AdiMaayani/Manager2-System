@@ -496,6 +496,11 @@ public class WorkItemsController : ControllerBase
             CustomerId = taskCustomerId,
             SiteId = taskSiteId,
             ParentWorkItemId = request.ParentWorkItemId,
+            PlannedStart = request.PlannedStart,
+            PlannedEnd = request.PlannedEnd,
+            EstimatedHours = request.EstimatedHours,
+            Priority = request.Priority,
+            RequiredRole = request.RequiredRole,
             DealCloseDate = request.DealCloseDate,
             FinanceProjectNumber = request.FinanceProjectNumber,
             InvoiceNumber = request.InvoiceNumber
@@ -662,6 +667,12 @@ public class WorkItemsController : ControllerBase
             }
         }
 
+        var estimatedHoursValidationError = ValidateMilestoneEstimatedHours(request.EstimatedHours);
+        if (estimatedHoursValidationError != null)
+        {
+            return BadRequest(estimatedHoursValidationError);
+        }
+
         // לוודא שהפרויקט קיים
         var project = await _workItemRepository.GetByIdAsync(projectId);
         if (project == null)
@@ -688,8 +699,7 @@ public class WorkItemsController : ControllerBase
 
             PlannedStart = request.PlannedStart,
             PlannedEnd = request.PlannedEnd,
-            EstimatedHours = CalculateHours(request.PlannedStart, request.PlannedEnd)
-                 ?? request.EstimatedHours,
+            EstimatedHours = request.EstimatedHours,
 
             ActualStart = request.ActualStart,
             ActualEnd = request.ActualEnd,
@@ -814,6 +824,12 @@ public class WorkItemsController : ControllerBase
             }
         }
 
+        var estimatedHoursValidationError = ValidateMilestoneEstimatedHours(request.EstimatedHours);
+        if (estimatedHoursValidationError != null)
+        {
+            return BadRequest(estimatedHoursValidationError);
+        }
+
         var existingMilestone = await _workItemRepository.GetByIdAsync(milestoneId);
         if (existingMilestone == null)
         {
@@ -841,8 +857,7 @@ public class WorkItemsController : ControllerBase
 
             PlannedStart = request.PlannedStart,
             PlannedEnd = request.PlannedEnd,
-            EstimatedHours = CalculateHours(request.PlannedStart, request.PlannedEnd)
-                 ?? request.EstimatedHours,
+            EstimatedHours = request.EstimatedHours,
 
             ActualStart = request.ActualStart,
             ActualEnd = request.ActualEnd,
@@ -955,6 +970,21 @@ public class WorkItemsController : ControllerBase
         {
             message = "Milestone cancelled successfully."
         });
+    }
+
+    private static string? ValidateMilestoneEstimatedHours(decimal? estimatedHours)
+    {
+        if (!estimatedHours.HasValue)
+        {
+            return null;
+        }
+
+        if (estimatedHours.Value <= 0 || estimatedHours.Value > 999.99m)
+        {
+            return "EstimatedHours must be greater than 0 and less than or equal to 999.99.";
+        }
+
+        return null;
     }
 
     private static decimal? CalculateHours(DateTime? start, DateTime? end)

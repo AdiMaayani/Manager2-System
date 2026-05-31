@@ -6,11 +6,13 @@ import { Button } from '@shared/components/Button';
 import { ErrorState } from '@shared/components/ErrorState';
 import { PageSpinner } from '@shared/components/PageSpinner';
 import {
+  useAssignProjectTeam,
   useCreateProject,
   useCreateSite,
   useMilestoneMutations,
   useProjectLifecycle,
   useProjectLookups,
+  teamFormFromProjectAssignments,
   useUpdateProject,
 } from '../../hooks/useProjectLifecycle';
 import type {
@@ -20,6 +22,7 @@ import type {
   ProjectDrawing,
   ProjectEquipmentItem,
   ProjectOverviewForm,
+  ProjectTeamForm,
 } from '../../types';
 import {
   DEFAULT_BOQ_ROWS,
@@ -45,7 +48,7 @@ const DRAWER_TABS: TabItem[] = [
   { id: 'quote', label: 'הצעת מחיר' },
   { id: 'boq', label: 'כתב כמויות' },
   { id: 'drawings', label: 'שרטוטים' },
-  { id: 'equipment', label: 'מוצרים / מערכות' },
+  { id: 'equipment', label: 'ציוד' },
 ];
 
 interface ProjectDrawerProps {
@@ -72,6 +75,14 @@ export function ProjectDrawer({
   const [overviewForm, setOverviewForm] = useState<ProjectOverviewForm>(
     createEmptyOverviewForm(),
   );
+  const [teamForm, setTeamForm] = useState<ProjectTeamForm>({
+    projectManagerEmployeeId: null,
+    teamEmployeeIds: [],
+  });
+  const [initialTeamForm, setInitialTeamForm] = useState<ProjectTeamForm>({
+    projectManagerEmployeeId: null,
+    teamEmployeeIds: [],
+  });
   const [boqRows, setBoqRows] = useState<ProjectBoqRow[]>(DEFAULT_BOQ_ROWS);
   const [drawings, setDrawings] = useState<ProjectDrawing[]>(DEFAULT_DRAWINGS);
   const [equipment, setEquipment] = useState<ProjectEquipmentItem[]>(DEFAULT_EQUIPMENT);
@@ -83,11 +94,15 @@ export function ProjectDrawer({
   const updateProject = useUpdateProject();
   const createSite = useCreateSite();
   const milestoneMutations = useMilestoneMutations(projectId);
+  const assignProjectTeam = useAssignProjectTeam(projectId);
 
   useEffect(() => {
     if (!isOpen) return;
 
-    setActiveTab(initialTab);
+    const nextTab = DRAWER_TABS.some((tab) => tab.id === initialTab)
+      ? initialTab
+      : 'overview';
+    setActiveTab(nextTab);
     setIsEditMode(isCreateMode);
     setIsMaximized(false);
     setSaveError(null);
@@ -97,12 +112,18 @@ export function ProjectDrawer({
 
     if (isCreateMode) {
       setOverviewForm(createEmptyOverviewForm());
+      const emptyTeam = { projectManagerEmployeeId: null, teamEmployeeIds: [] };
+      setTeamForm(emptyTeam);
+      setInitialTeamForm(emptyTeam);
     }
   }, [isOpen, isCreateMode, initialTab, projectId]);
 
   useEffect(() => {
     if (lifecycleQuery.data && !isCreateMode) {
       setOverviewForm(overviewFormFromLifecycle(lifecycleQuery.data));
+      const nextTeamForm = teamFormFromProjectAssignments(lifecycleQuery.data);
+      setTeamForm(nextTeamForm);
+      setInitialTeamForm(nextTeamForm);
     }
   }, [lifecycleQuery.data, isCreateMode]);
 
@@ -117,6 +138,7 @@ export function ProjectDrawer({
     }
 
     setOverviewForm(overviewFormFromLifecycle(lifecycle));
+    setTeamForm(initialTeamForm);
     setIsEditMode(false);
     setSaveError(null);
   };
@@ -175,6 +197,11 @@ export function ProjectDrawer({
         },
       });
 
+      await assignProjectTeam.mutateAsync({
+        teamForm,
+        previousTeamForm: initialTeamForm,
+      });
+
       setIsEditMode(false);
       onSaved(projectId);
     } catch (error) {
@@ -197,7 +224,7 @@ export function ProjectDrawer({
           <Button
             type="button"
             onClick={handleSaveProject}
-            disabled={createProject.isPending || updateProject.isPending}
+            disabled={createProject.isPending || updateProject.isPending || assignProjectTeam.isPending}
           >
             שמור
           </Button>
@@ -234,11 +261,14 @@ export function ProjectDrawer({
             <ProjectOverviewTab
               lifecycle={lifecycle}
               form={overviewForm}
+              teamForm={teamForm}
               isEditMode={isEditMode}
               isCreateMode={isCreateMode}
               customers={lookups.customers}
               sites={lookups.sites}
+              employees={lookups.employees}
               onChange={setOverviewForm}
+              onTeamChange={setTeamForm}
               onCreateSite={async (payload) => {
                 const site = await createSite.mutateAsync(payload);
                 setOverviewForm((current) => ({ ...current, siteId: site.siteId }));
@@ -257,6 +287,7 @@ export function ProjectDrawer({
             lifecycle={lifecycle}
             customerId={overviewForm.customerId || lifecycle?.project.customerId || 0}
             siteId={overviewForm.siteId || lifecycle?.project.siteId || 0}
+            employees={lookups.employees}
             onCreateMilestone={async (body) => {
               await milestoneMutations.createMutation.mutateAsync(body);
             }}

@@ -3,6 +3,7 @@ import type {
   CreateMilestoneRequest,
   CreateProjectRequest,
   CreateSiteRequest,
+  ProjectEmployeeOption,
   ProjectLifecycle,
   ProjectListItem,
   ProjectMilestone,
@@ -10,6 +11,13 @@ import type {
   UpdateMilestoneRequest,
   UpdateProjectRequest,
 } from '../types';
+
+interface RawEmployeeResponse {
+  employeeId?: number;
+  fullName?: string;
+  primaryRole?: string;
+  isActive?: boolean;
+}
 
 export function getProjectsListAsync(): Promise<ProjectListItem[]> {
   return apiRequest<ProjectListItem[]>('/WorkItems/projects-list');
@@ -77,5 +85,29 @@ export function createSiteAsync(body: CreateSiteRequest): Promise<Site> {
   return apiRequest<Site>('/Sites', {
     method: 'POST',
     body: JSON.stringify(body),
+  });
+}
+
+export function getProjectEmployeesAsync(): Promise<ProjectEmployeeOption[]> {
+  return apiRequest<RawEmployeeResponse[]>('/Employees').then((employees) =>
+    employees
+      .filter((employee) => employee.employeeId != null && employee.fullName)
+      .map((employee) => ({
+        employeeId: employee.employeeId!,
+        fullName: employee.fullName!,
+        primaryRole: employee.primaryRole,
+        isActive: employee.isActive,
+      })),
+  );
+}
+
+export function assignEmployeeToProjectAsync(
+  projectId: number,
+  employeeId: number,
+  assignmentRole: string,
+): Promise<{ message: string }> {
+  return apiRequest<{ message: string }>(`/WorkItems/${projectId}/assign-employee`, {
+    method: 'POST',
+    body: JSON.stringify({ employeeId, assignmentRole }),
   });
 }

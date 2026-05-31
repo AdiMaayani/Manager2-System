@@ -40,11 +40,16 @@
   background: #fff;
 }
 
-.projectOverviewTab__siteForm {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-sm);
-  padding: var(--spacing-md);
-  background: var(--color-neutral-50);
-  border-radius: var(--radius-md);
+.projectOverviewTab__card--wide {
+  grid-column: 1 / -1;
+}
+
+.projectOverviewTab__select--multi {
+  min-height: 120px;
+}
+
+.projectOverviewTab__hint {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-500);
 }

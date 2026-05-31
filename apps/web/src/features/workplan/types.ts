@@ -165,11 +165,51 @@ export interface CreateTaskRequest {
   customerId?: number;
   siteId?: number;
   parentWorkItemId?: number | null;
+  plannedStart?: string | null;
+  plannedEnd?: string | null;
+  estimatedHours?: number | null;
+  priority?: string | null;
+  requiredRole?: string | null;
 }
 
 export interface AssignEmployeeRequest {
   employeeId: number;
   assignmentRole: string;
+}
+
+export interface WorkItemResponse {
+  workItemId: number;
+  title: string;
+  description?: string | null;
+  workType?: string | null;
+  billingType?: string | null;
+  status?: string | null;
+  estimatedHours?: number | null;
+  priority?: string | null;
+  plannedStart?: string | null;
+  plannedEnd?: string | null;
+  requiredRole?: string | null;
+  isLocked: boolean;
+  customerId: number;
+  siteId: number;
+  parentWorkItemId?: number | null;
+}
+
+export interface UpdateTaskRequest {
+  title: string;
+  description?: string | null;
+  status: string;
+  billingType: string;
+  workType?: string | null;
+  customerId: number;
+  siteId: number;
+  plannedStart?: string | null;
+  plannedEnd?: string | null;
+  estimatedHours?: number | null;
+  priority?: string | null;
+  requiredRole?: string | null;
+  isLocked: boolean;
+  parentWorkItemId?: number | null;
 }
 
 export interface TaskInsightCounts {

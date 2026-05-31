@@ -262,6 +262,20 @@ export interface ProjectMilestoneForm {
   priority: string;
   requiredRole: string;
   isLocked: boolean;
+  employees: CreateMilestoneEmployeeAssignment[];
+  contractors: CreateMilestoneContractorAssignment[];
+}
+
+export interface ProjectTeamForm {
+  projectManagerEmployeeId: number | null;
+  teamEmployeeIds: number[];
+}
+
+export interface ProjectEmployeeOption {
+  employeeId: number;
+  fullName: string;
+  primaryRole?: string;
+  isActive?: boolean;
 }
 
 export type ProjectDrawerMode = 'view' | 'create';

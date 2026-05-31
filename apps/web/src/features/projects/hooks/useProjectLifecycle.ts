@@ -11,9 +11,11 @@ import {
 } from '@shared/mock';
 import {
   cancelMilestoneAsync,
+  assignEmployeeToProjectAsync,
   createMilestoneAsync,
   createProjectAsync,
   createSiteAsync,
+  getProjectEmployeesAsync,
   getProjectLifecycleAsync,
   getProjectMilestonesAsync,
   getSitesAsync,
@@ -24,9 +26,14 @@ import type {
   CreateMilestoneRequest,
   CreateProjectRequest,
   CreateSiteRequest,
+  ProjectTeamForm,
   UpdateMilestoneRequest,
   UpdateProjectRequest,
 } from '../types';
+import {
+  PROJECT_MANAGER_ROLE,
+  teamFormFromProjectAssignments,
+} from '../utils/projectDisplayUtils';
 
 export function useProjectLifecycle(projectId: number | null) {
   return useQuery({
@@ -74,12 +81,24 @@ export function useProjectLookups() {
     queryFn: () => resolveDataAsync(getSitesAsync, () => delayMock(mockSites)),
   });
 
+  const employeesQuery = useQuery({
+    queryKey: ['projectLookups', 'employees', isLocalDataMode],
+    queryFn: () => resolveDataAsync(getProjectEmployeesAsync, () => delayMock([])),
+  });
+
   return {
     customers: customersQuery.data ?? [],
     sites: sitesQuery.data ?? [],
-    isLoading: customersQuery.isLoading || sitesQuery.isLoading,
-    error: customersQuery.error ?? sitesQuery.error,
-    refetch: () => Promise.all([customersQuery.refetch(), sitesQuery.refetch()]),
+    employees: employeesQuery.data ?? [],
+    isLoading:
+      customersQuery.isLoading || sitesQuery.isLoading || employeesQuery.isLoading,
+    error: customersQuery.error ?? sitesQuery.error ?? employeesQuery.error,
+    refetch: () =>
+      Promise.all([
+        customersQuery.refetch(),
+        sitesQuery.refetch(),
+        employeesQuery.refetch(),
+      ]),
   };
 }
 
@@ -160,3 +179,53 @@ export function useCreateSite() {
     },
   });
 }
+
+export function useAssignProjectTeam(projectId: number | null) {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({
+      teamForm,
+      previousTeamForm,
+    }: {
+      teamForm: ProjectTeamForm;
+      previousTeamForm: ProjectTeamForm;
+    }) => {
+      if (projectId == null) {
+        throw new Error('Project id is required.');
+      }
+
+      const assignments: Array<Promise<{ message: string }>> = [];
+
+      if (
+        teamForm.projectManagerEmployeeId &&
+        teamForm.projectManagerEmployeeId !== previousTeamForm.projectManagerEmployeeId
+      ) {
+        assignments.push(
+          assignEmployeeToProjectAsync(
+            projectId,
+            teamForm.projectManagerEmployeeId,
+            PROJECT_MANAGER_ROLE,
+          ),
+        );
+      }
+
+      teamForm.teamEmployeeIds.forEach((employeeId) => {
+        if (previousTeamForm.teamEmployeeIds.includes(employeeId)) return;
+
+        assignments.push(
+          assignEmployeeToProjectAsync(projectId, employeeId, 'מתקין'),
+        );
+      });
+
+      await Promise.all(assignments);
+    },
+    onSuccess: () => {
+      if (projectId == null) return;
+      queryClient.invalidateQueries({ queryKey: ['projectLifecycle', projectId] });
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+    },
+  });
+}
+
+export { teamFormFromProjectAssignments };
