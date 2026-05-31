@@ -1,12 +1,14 @@
 using ManageR2.Api.DTOs;
 using ManageR2.Infrastructure.Models;
 using ManageR2.Infrastructure.Repositories;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ManageR2.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 // Thin API controller for creating and reading work reports linked to work items.
 public class ReportsController : ControllerBase
 {

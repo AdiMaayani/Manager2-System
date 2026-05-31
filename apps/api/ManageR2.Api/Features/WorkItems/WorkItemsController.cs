@@ -1,6 +1,7 @@
 using ManageR2.Api.DTOs;
 using ManageR2.Domain.Entities;
 using ManageR2.Infrastructure.Repositories;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ManageR2.Infrastructure.Models;
 
@@ -8,6 +9,7 @@ namespace ManageR2.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 // API layer for work items (projects, tasks, milestones) and assignment-related work-plan views.
 public class WorkItemsController : ControllerBase
 {

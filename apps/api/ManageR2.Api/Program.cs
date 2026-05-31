@@ -48,14 +48,18 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-// CORS: allow the static frontend (Live Server on port 5500) to call this API with credentials/headers.
+// CORS: allow local frontend dev servers to call this API with credentials/headers.
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend",
         policy =>
         {
             policy
-                .WithOrigins("http://127.0.0.1:5500", "http://localhost:5500")
+                .WithOrigins(
+                    "http://127.0.0.1:5500",
+                    "http://localhost:5500",
+                    "http://127.0.0.1:5173",
+                    "http://localhost:5173")
                 .AllowAnyHeader()
                 .AllowAnyMethod();
         });
@@ -101,8 +105,7 @@ builder.Services.AddScoped<IUserAuthorizationService, UserAuthorizationService>(
 builder.Services.AddScoped<IWorkReportRepository, WorkReportRepository>();
 builder.Services.AddScoped<IProjectLifecycleRepository, ProjectLifecycleRepository>();
 builder.Services.AddScoped<IEmployeeRepository, EmployeeRepository>();
-//builder.Services.AddScoped<ISmartAssignmentRepository, SmartAssignmentRepository>();
-//builder.Services.AddScoped<ISmartAssignmentService, SmartAssignmentService>();
+builder.Services.AddScoped<ISmartAssignmentService, SmartAssignmentBatchService>();
 // Advanced ranked recommendations: concrete repository + service from SmartAssignment module (aliased at top of file).
 builder.Services.AddScoped<AdvancedSmartAssignmentRepository>();
 builder.Services.AddScoped<IAdvancedSmartAssignmentService, AdvancedSmartAssignmentService>();
