@@ -28,7 +28,27 @@ export function ProjectsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const [stageFilter, setStageFilter] = useState('');
+  const [customerFilter, setCustomerFilter] = useState('');
+  const [pmFilter, setPmFilter] = useState('');
+  const [siteFilter, setSiteFilter] = useState('');
   const [drawerState, setDrawerState] = useState<DrawerState | null>(null);
+
+  const customerOptions = useMemo(
+    () => [...new Set((projects ?? []).map((p) => p.customerName))].sort(),
+    [projects],
+  );
+
+  const pmOptions = useMemo(
+    () =>
+      [...new Set((projects ?? []).map((p) => p.projectManagerName).filter((n) => n !== '-'))].sort(),
+    [projects],
+  );
+
+  const siteOptions = useMemo(
+    () =>
+      [...new Set((projects ?? []).map((p) => p.siteName).filter((s) => s !== '-'))].sort(),
+    [projects],
+  );
 
   const filtered = useMemo(() => {
     if (!projects) return [];
@@ -43,10 +63,13 @@ export function ProjectsPage() {
         project.title.toLowerCase().includes(query) ||
         project.customerName.toLowerCase().includes(query) ||
         project.projectNumber.toLowerCase().includes(query);
+      const matchesCustomer = !customerFilter || project.customerName === customerFilter;
+      const matchesPm = !pmFilter || project.projectManagerName === pmFilter;
+      const matchesSite = !siteFilter || project.siteName === siteFilter;
 
-      return matchesStage && matchesSearch;
+      return matchesStage && matchesSearch && matchesCustomer && matchesPm && matchesSite;
     });
-  }, [projects, search, stageFilter]);
+  }, [projects, search, stageFilter, customerFilter, pmFilter, siteFilter]);
 
   useEffect(() => {
     const projectIdParam = searchParams.get('projectId');
@@ -116,6 +139,51 @@ export function ProjectsPage() {
             {STAGE_FILTER_OPTIONS.map((option) => (
               <option key={option.code || 'all'} value={option.code}>
                 {option.display}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="projectsPage__filter">
+          <span>לקוח</span>
+          <select
+            className="projectsPage__select"
+            value={customerFilter}
+            onChange={(event) => setCustomerFilter(event.target.value)}
+          >
+            <option value="">הכל</option>
+            {customerOptions.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="projectsPage__filter">
+          <span>מנהל פרויקט</span>
+          <select
+            className="projectsPage__select"
+            value={pmFilter}
+            onChange={(event) => setPmFilter(event.target.value)}
+          >
+            <option value="">הכל</option>
+            {pmOptions.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="projectsPage__filter">
+          <span>אתר</span>
+          <select
+            className="projectsPage__select"
+            value={siteFilter}
+            onChange={(event) => setSiteFilter(event.target.value)}
+          >
+            <option value="">הכל</option>
+            {siteOptions.map((name) => (
+              <option key={name} value={name}>
+                {name}
               </option>
             ))}
           </select>
