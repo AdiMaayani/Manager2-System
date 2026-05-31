@@ -5,6 +5,18 @@
   margin-bottom: var(--spacing-lg);
 }
 
+.contactsPage__toolbarActions {
+  display: flex;
+  gap: var(--spacing-md);
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.contactsPage__toolbarActions > :first-child {
+  flex: 1;
+  min-width: 200px;
+}
+
 .contactsPage__segments {
   display: flex;
   flex-wrap: wrap;

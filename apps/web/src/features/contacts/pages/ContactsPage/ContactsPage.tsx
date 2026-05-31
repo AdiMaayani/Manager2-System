@@ -5,10 +5,9 @@ import { ErrorState } from '@shared/components/ErrorState';
 import { EmptyState } from '@shared/components/EmptyState';
 import { Button } from '@shared/components/Button';
 import { Input } from '@shared/components/Input';
-import { Modal } from '@shared/components/Modal';
 import { Badge } from '@shared/components/Badge';
-import { isLocalDataMode } from '@/config/appConfig';
-import { useContacts, useContactMutations } from '../../hooks/useContacts';
+import { useContacts } from '../../hooks/useContacts';
+import { ContactDrawer } from '../../components/ContactDrawer';
 import type { Contact } from '../../types';
 import './ContactsPage.css';
 
@@ -16,16 +15,16 @@ const SEGMENTS = ['הכל', 'לקוחות', 'ספקים', 'קבלנים'];
 
 export function ContactsPage() {
   const { data: contacts, isLoading, error, refetch } = useContacts();
-  const { deleteMutation } = useContactMutations();
   const [segment, setSegment] = useState('הכל');
   const [search, setSearch] = useState('');
-  const [selected, setSelected] = useState<Contact | null>(null);
+  const [drawerContact, setDrawerContact] = useState<Contact | null | undefined>(undefined);
+
+  const isDrawerOpen = drawerContact !== undefined;
 
   const filtered = useMemo(() => {
     if (!contacts) return [];
     return contacts.filter((c) => {
-      const matchSegment =
-        segment === 'הכל' || c.contactCategory === segment;
+      const matchSegment = segment === 'הכל' || c.contactCategory === segment;
       const q = search.trim().toLowerCase();
       const matchSearch =
         !q ||
@@ -60,17 +59,20 @@ export function ContactsPage() {
             </button>
           ))}
         </div>
-        <Input
-          placeholder="חיפוש איש קשר..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+        <div className="contactsPage__toolbarActions">
+          <Input
+            placeholder="חיפוש איש קשר..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+          />
+          <Button onClick={() => setDrawerContact(null)}>+ איש קשר חדש</Button>
+        </div>
       </div>
 
       {filtered.length === 0 ? (
         <EmptyState
           title="לא נמצאו אנשי קשר"
-          description={isLocalDataMode ? 'נסה לשנות סינון או להוסיף איש קשר חדש' : undefined}
+          description="נסה לשנות סינון או להוסיף איש קשר חדש"
         />
       ) : (
         <div className="contactsPage__tableWrap">
@@ -98,8 +100,8 @@ export function ContactsPage() {
                     </Badge>
                   </td>
                   <td>
-                    <Button variant="ghost" onClick={() => setSelected(c)}>
-                      פרטים
+                    <Button variant="ghost" onClick={() => setDrawerContact(c)}>
+                      עריכה
                     </Button>
                   </td>
                 </tr>
@@ -109,31 +111,11 @@ export function ContactsPage() {
         </div>
       )}
 
-      <Modal
-        isOpen={selected !== null}
-        onClose={() => setSelected(null)}
-        title={selected?.fullName}
-      >
-        {selected && (
-          <div className="contactsPage__detail">
-            <p><strong>תפקיד:</strong> {selected.jobTitle ?? '-'}</p>
-            <p><strong>אימייל:</strong> {selected.email ?? '-'}</p>
-            <p><strong>טלפון:</strong> {selected.phone ?? '-'}</p>
-            <p><strong>עיר:</strong> {selected.city ?? '-'}</p>
-            {isLocalDataMode && (
-              <Button
-                variant="danger"
-                onClick={async () => {
-                  await deleteMutation.mutateAsync(selected.contactId);
-                  setSelected(null);
-                }}
-              >
-                מחק
-              </Button>
-            )}
-          </div>
-        )}
-      </Modal>
+      <ContactDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => setDrawerContact(undefined)}
+        contact={drawerContact}
+      />
     </PageShell>
   );
 }

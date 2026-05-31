@@ -88,8 +88,14 @@ builder.Services
         };
     });
 
-// Supports [Authorize] and role checks on controllers after authentication succeeds.
-builder.Services.AddAuthorization();
+// Global fallback: every endpoint requires authentication unless it carries [AllowAnonymous].
+// The only intentionally public endpoint is POST /users/login, which is marked [AllowAnonymous].
+builder.Services.AddAuthorization(options =>
+{
+    options.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
 
 // DI: scoped lifetime ties one DBServices + repositories per HTTP request (safe for SqlConnection usage).
 // DI

@@ -1,6 +1,7 @@
 using ManageR2.Api.DTOs;
 using ManageR2.Infrastructure.Models;
 using ManageR2.Infrastructure.Services;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ManageR2.Api.Controllers;
@@ -8,6 +9,7 @@ namespace ManageR2.Api.Controllers;
 // Batch smart assignment: builds recommendations for a project or explicit work item set (legacy service path).
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 public class SmartAssignmentController : ControllerBase
 {
     // Orchestrates recommendation generation, optional persistence of a run, and load balancing summary.

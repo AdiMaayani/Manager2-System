@@ -217,7 +217,7 @@ public class UsersController : ControllerBase
     }
 
     // Create user + hash password + persist role/department links in a single transactional flow (repository).
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     [HttpPost]
     public async Task<IActionResult> CreateUser([FromBody] CreateUserDto dto)
     {
@@ -262,7 +262,7 @@ public class UsersController : ControllerBase
     }
 
     // Update profile fields; optional password rotation re-hashes via IPasswordService then updates role/department sets.
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     [HttpPut("{id:int}")]
     public async Task<IActionResult> UpdateUser(int id, [FromBody] UpdateUserDto dto)
     {
@@ -317,7 +317,7 @@ public class UsersController : ControllerBase
     }
 
     // Hard delete user row through repository (guarded by domain validation exceptions).
-    [Authorize]
+    [Authorize(Roles = "Admin")]
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> DeleteUser(int id)
     {
@@ -337,6 +337,7 @@ public class UsersController : ControllerBase
     }
 
     // Public login: verify credentials, block inactive users, refresh last login, return JWT + role/department claims payload.
+    [AllowAnonymous]
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequestDto dto)
     {

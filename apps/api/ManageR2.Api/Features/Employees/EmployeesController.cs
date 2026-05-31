@@ -1,10 +1,12 @@
 using ManageR2.Infrastructure.Repositories;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ManageR2.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 // Employee lookup endpoints used when validating and displaying work item assignments.
 public class EmployeesController : ControllerBase
 {

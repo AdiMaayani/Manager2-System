@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Mvc;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
 using ManageR2.Infrastructure.Services.SmartAssignment;
 using ManageR2.Infrastructure.Models.SmartAssignment;
 using ManageR2.Api.DTOs;
@@ -11,6 +12,7 @@ namespace ManageR2.Api.Controllers
     // Exposes ranked employee recommendations for one work item; delegates scoring to IAdvancedSmartAssignmentService.
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class AdvancedSmartAssignmentController : ControllerBase
     {
         // Application service encapsulates algorithm + data access; controller only shapes HTTP responses.

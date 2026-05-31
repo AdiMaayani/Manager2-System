@@ -1,11 +1,13 @@
 using ManageR2.Api.DTOs;
 using ManageR2.Infrastructure.Repositories;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ManageR2.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
+[Authorize]
 // Thin controller: handles HTTP concerns and delegates lifecycle data loading to the repository.
 public class ProjectsController : ControllerBase
 {
