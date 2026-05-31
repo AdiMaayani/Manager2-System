@@ -60,6 +60,7 @@ export function ProjectOverviewTab({
   const [newSiteCity, setNewSiteCity] = useState('');
   const [newSiteAddress, setNewSiteAddress] = useState('');
   const [newSiteNotes, setNewSiteNotes] = useState('');
+  const [siteError, setSiteError] = useState<string | null>(null);
 
   const project = lifecycle?.project;
   const projectId = project?.workItemId;
@@ -75,21 +76,40 @@ export function ProjectOverviewTab({
   };
 
   const handleCreateSite = async () => {
-    if (!form.customerId || !newSiteName.trim()) return;
+    setSiteError(null);
 
-    await onCreateSite({
-      customerId: form.customerId,
-      siteName: newSiteName.trim(),
-      addressLine: newSiteAddress.trim() || undefined,
-      city: newSiteCity.trim() || undefined,
-      notes: newSiteNotes.trim() || undefined,
-    });
+    if (!form.customerId) {
+      setSiteError('יש לבחור לקוח לפני יצירת אתר.');
+      return;
+    }
 
-    setShowSiteForm(false);
-    setNewSiteName('');
-    setNewSiteCity('');
-    setNewSiteAddress('');
-    setNewSiteNotes('');
+    if (!newSiteName.trim()) {
+      setSiteError('יש להזין שם אתר.');
+      return;
+    }
+
+    try {
+      await onCreateSite({
+        customerId: form.customerId,
+        siteName: newSiteName.trim(),
+        addressLine: newSiteAddress.trim() || undefined,
+        city: newSiteCity.trim() || undefined,
+        notes: newSiteNotes.trim() || undefined,
+      });
+
+      setSiteError(null);
+      setShowSiteForm(false);
+      setNewSiteName('');
+      setNewSiteCity('');
+      setNewSiteAddress('');
+      setNewSiteNotes('');
+    } catch (err) {
+      const message =
+        err instanceof Error && err.message
+          ? err.message
+          : 'יצירת האתר נכשלה. נסה שוב.';
+      setSiteError(message);
+    }
   };
 
   const statusMeta = getProjectStatusMeta(isEditMode ? form.status : project?.status);
@@ -275,6 +295,9 @@ export function ProjectOverviewTab({
                 value={newSiteNotes}
                 onChange={(event) => setNewSiteNotes(event.target.value)}
               />
+              {siteError && (
+                <p className="projectOverviewTab__siteError">{siteError}</p>
+              )}
               <Button type="button" variant="secondary" onClick={handleCreateSite}>
                 שמור אתר
               </Button>
@@ -295,75 +318,73 @@ export function ProjectOverviewTab({
           </div>
         </section>
 
-        {!isCreateMode && (
-          <section className="projectOverviewTab__card projectOverviewTab__card--wide">
-            <h3 className="projectOverviewTab__cardTitle">צוות הפרויקט</h3>
-            <div className="projectOverviewTab__field">
-              <span className="projectOverviewTab__label">מנהל פרויקט</span>
-              {isEditMode ? (
-                <select
-                  className="projectOverviewTab__select"
-                  value={teamForm.projectManagerEmployeeId ?? ''}
-                  onChange={(event) =>
-                    onTeamChange({
-                      ...teamForm,
-                      projectManagerEmployeeId: event.target.value
-                        ? Number(event.target.value)
-                        : null,
-                    })
-                  }
-                >
-                  <option value="">בחר מנהל פרויקט</option>
-                  {activeEmployees.map((employee) => (
-                    <option key={employee.employeeId} value={employee.employeeId}>
-                      {employee.fullName}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <span>
-                  {aggregatedTeam.managerNames.length > 0
-                    ? aggregatedTeam.managerNames.join(', ')
-                    : '-'}
-                </span>
-              )}
-            </div>
-            <div className="projectOverviewTab__field">
-              <span className="projectOverviewTab__label">עובדים משויכים</span>
-              {isEditMode ? (
-                <select
-                  className="projectOverviewTab__select projectOverviewTab__select--multi"
-                  multiple
-                  value={teamForm.teamEmployeeIds.map(String)}
-                  onChange={(event) => {
-                    const selectedIds = Array.from(event.target.selectedOptions).map(
-                      (option) => Number(option.value),
-                    );
-                    onTeamChange({ ...teamForm, teamEmployeeIds: selectedIds });
-                  }}
-                >
-                  {activeEmployees.map((employee) => (
-                    <option key={employee.employeeId} value={employee.employeeId}>
-                      {employee.fullName}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <span>
-                  {aggregatedTeam.teamMemberNames.length > 0
-                    ? aggregatedTeam.teamMemberNames.join(', ')
-                    : '-'}
-                </span>
-              )}
-            </div>
-            {isEditMode && (
-              <p className="projectOverviewTab__hint">
-                שיוך צוות נשמר עם הפרויקט. עובדים חדשים יתווספו לשיוך; הסרת עובדים קיימים
-                דורשת עדכון ידני במערכת.
-              </p>
+        <section className="projectOverviewTab__card projectOverviewTab__card--wide">
+          <h3 className="projectOverviewTab__cardTitle">צוות הפרויקט</h3>
+          <div className="projectOverviewTab__field">
+            <span className="projectOverviewTab__label">מנהל פרויקט</span>
+            {isEditMode ? (
+              <select
+                className="projectOverviewTab__select"
+                value={teamForm.projectManagerEmployeeId ?? ''}
+                onChange={(event) =>
+                  onTeamChange({
+                    ...teamForm,
+                    projectManagerEmployeeId: event.target.value
+                      ? Number(event.target.value)
+                      : null,
+                  })
+                }
+              >
+                <option value="">בחר מנהל פרויקט</option>
+                {activeEmployees.map((employee) => (
+                  <option key={employee.employeeId} value={employee.employeeId}>
+                    {employee.fullName}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span>
+                {aggregatedTeam.managerNames.length > 0
+                  ? aggregatedTeam.managerNames.join(', ')
+                  : '-'}
+              </span>
             )}
-          </section>
-        )}
+          </div>
+          <div className="projectOverviewTab__field">
+            <span className="projectOverviewTab__label">עובדים משויכים</span>
+            {isEditMode ? (
+              <select
+                className="projectOverviewTab__select projectOverviewTab__select--multi"
+                multiple
+                value={teamForm.teamEmployeeIds.map(String)}
+                onChange={(event) => {
+                  const selectedIds = Array.from(event.target.selectedOptions).map(
+                    (option) => Number(option.value),
+                  );
+                  onTeamChange({ ...teamForm, teamEmployeeIds: selectedIds });
+                }}
+              >
+                {activeEmployees.map((employee) => (
+                  <option key={employee.employeeId} value={employee.employeeId}>
+                    {employee.fullName}
+                  </option>
+                ))}
+              </select>
+            ) : (
+              <span>
+                {aggregatedTeam.teamMemberNames.length > 0
+                  ? aggregatedTeam.teamMemberNames.join(', ')
+                  : '-'}
+              </span>
+            )}
+          </div>
+          {isEditMode && !isCreateMode && (
+            <p className="projectOverviewTab__hint">
+              שיוך צוות נשמר עם הפרויקט. עובדים חדשים יתווספו לשיוך; הסרת עובדים קיימים
+              דורשת עדכון ידני במערכת.
+            </p>
+          )}
+        </section>
       </div>
     </div>
   );

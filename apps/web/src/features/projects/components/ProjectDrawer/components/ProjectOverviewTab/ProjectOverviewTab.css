@@ -53,3 +53,9 @@
   font-size: var(--font-size-sm);
   color: var(--color-neutral-500);
 }
+
+.projectOverviewTab__siteError {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-danger, #dc2626);
+}

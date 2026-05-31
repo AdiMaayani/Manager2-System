@@ -24,10 +24,12 @@ import type {
   ProjectOverviewForm,
   ProjectTeamForm,
 } from '../../types';
+import { assignEmployeeToProjectAsync } from '../../api/projectsApiClient';
 import {
   DEFAULT_BOQ_ROWS,
   DEFAULT_DRAWINGS,
   DEFAULT_EQUIPMENT,
+  PROJECT_MANAGER_ROLE,
   createEmptyOverviewForm,
 } from '../../utils/projectDisplayUtils';
 import { ProjectBoqTab } from './components/ProjectBoqTab';
@@ -170,8 +172,25 @@ export function ProjectDrawer({
           invoiceNumber: overviewForm.invoiceNumber.trim() || undefined,
         });
 
+        const newProjectId = result.workItemId;
+        const teamAssignments: Array<Promise<{ message: string }>> = [];
+
+        if (teamForm.projectManagerEmployeeId) {
+          teamAssignments.push(
+            assignEmployeeToProjectAsync(newProjectId, teamForm.projectManagerEmployeeId, PROJECT_MANAGER_ROLE),
+          );
+        }
+
+        teamForm.teamEmployeeIds.forEach((employeeId) => {
+          teamAssignments.push(
+            assignEmployeeToProjectAsync(newProjectId, employeeId, 'מתקין'),
+          );
+        });
+
+        await Promise.all(teamAssignments);
+
         setIsEditMode(false);
-        onSaved(result.workItemId);
+        onSaved(newProjectId);
         return;
       }
 
