@@ -27,9 +27,6 @@ namespace ManageR2.Infrastructure.Repositories
         Task<bool> DeleteEmployeeAssignmentsByWorkItemIdAsync(int workItemId);
         Task<bool> DeleteContractorAssignmentsByWorkItemIdAsync(int workItemId);
 
-        Task<bool> EmployeeExistsAsync(int employeeId);
-        Task<bool> ContractorExistsAsync(int contractorId);
-
         Task<List<ProjectListItemResult>> GetProjectsListAsync();
 
         // Work plan queries combine project + tasks + assignments.

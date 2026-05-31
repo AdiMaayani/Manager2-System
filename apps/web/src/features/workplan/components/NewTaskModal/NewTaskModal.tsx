@@ -35,25 +35,34 @@ export function NewTaskModal({
     mutationFn: async () => {
       if (!title.trim()) throw new Error('יש להזין כותרת משימה');
       if (!parentId) throw new Error('יש לבחור פרויקט לפני יצירת משימה');
-
       if (!isLocalDataMode) {
-        await new Promise((r) => setTimeout(r, 300));
-        return { ok: true };
+        throw new Error('יצירת משימות זמינה רק בחיבור לשרת אמיתי');
       }
 
-      const created = (await createWorkItemAsync({
+      const created = await createWorkItemAsync({
         title: title.trim(),
         status: 'מתוכנן',
         billingType: 'שעתי',
-        customerId: 1,
-        siteId: 1,
         parentWorkItemId: parentId,
-      })) as { workItemId?: number };
+      });
 
       const workItemId = created?.workItemId;
-      if (workItemId && employeeId) {
+      const assignmentEmployeeId = employeeId.trim();
+      const parsedEmployeeId = assignmentEmployeeId ? Number(assignmentEmployeeId) : null;
+      if (
+        assignmentEmployeeId &&
+        (parsedEmployeeId == null || !Number.isInteger(parsedEmployeeId) || parsedEmployeeId <= 0)
+      ) {
+        throw new Error('מזהה עובד חייב להיות מספר חיובי');
+      }
+
+      if (!workItemId || workItemId <= 0) {
+        throw new Error('השרת לא החזיר מזהה משימה תקין');
+      }
+
+      if (parsedEmployeeId) {
         await assignEmployeeToWorkItemAsync(workItemId, {
-          employeeId: Number(employeeId),
+          employeeId: parsedEmployeeId,
           assignmentRole: 'מבצע',
         });
       }
@@ -61,7 +70,6 @@ export function NewTaskModal({
       return created;
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['workplan'] });
       setTitle('');
       setEmployeeId('');
       setError(null);
@@ -69,6 +77,9 @@ export function NewTaskModal({
     },
     onError: (err) => {
       setError(err instanceof Error ? err.message : 'יצירת המשימה נכשלה');
+    },
+    onSettled: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['workplan'] });
     },
   });
 

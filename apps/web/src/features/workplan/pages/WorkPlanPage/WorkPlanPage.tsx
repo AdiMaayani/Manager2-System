@@ -71,6 +71,17 @@ export function WorkPlanPage() {
     );
   }
 
+  if (scheduling.error) {
+    const errorMessage =
+      scheduling.error instanceof Error ? scheduling.error.message : 'טעינת תוכנית העבודה נכשלה';
+
+    return (
+      <PageShell title={pageTitle} wide>
+        <ErrorState message={errorMessage} />
+      </PageShell>
+    );
+  }
+
   if (!scheduling.employees.length && !scheduling.allWorkPlans.length) {
     return (
       <PageShell title={pageTitle} wide>

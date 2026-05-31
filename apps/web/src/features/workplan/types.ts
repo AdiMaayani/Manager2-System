@@ -162,8 +162,8 @@ export interface CreateTaskRequest {
   description?: string;
   status: string;
   billingType: string;
-  customerId: number;
-  siteId: number;
+  customerId?: number;
+  siteId?: number;
   parentWorkItemId?: number | null;
 }
 

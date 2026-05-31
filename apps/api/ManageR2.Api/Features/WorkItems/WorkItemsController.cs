@@ -449,16 +449,6 @@ public class WorkItemsController : ControllerBase
             return BadRequest("BillingType is required.");
         }
 
-        if (request.CustomerId <= 0)
-        {
-            return BadRequest("CustomerId must be greater than 0.");
-        }
-
-        if (request.SiteId <= 0)
-        {
-            return BadRequest("SiteId must be greater than 0.");
-        }
-
         if (!request.ParentWorkItemId.HasValue || request.ParentWorkItemId.Value <= 0)
         {
             return BadRequest("ParentWorkItemId is required for task creation.");
@@ -471,6 +461,28 @@ public class WorkItemsController : ControllerBase
             return NotFound($"Parent project with ID {request.ParentWorkItemId.Value} was not found.");
         }
 
+        if (!string.Equals(parentWorkItem.WorkType, "Project", StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest($"Parent work item {request.ParentWorkItemId.Value} is not a project.");
+        }
+
+        var taskCustomerId = request.CustomerId.HasValue && request.CustomerId.Value > 0
+            ? request.CustomerId.Value
+            : parentWorkItem.CustomerId;
+        var taskSiteId = request.SiteId.HasValue && request.SiteId.Value > 0
+            ? request.SiteId.Value
+            : parentWorkItem.SiteId;
+
+        if (taskCustomerId <= 0)
+        {
+            return BadRequest("CustomerId must be greater than 0.");
+        }
+
+        if (taskSiteId <= 0)
+        {
+            return BadRequest("SiteId must be greater than 0.");
+        }
+
         // WorkType is fixed to Task for child planning items.
         var task = new WorkItem
         {
@@ -479,8 +491,8 @@ public class WorkItemsController : ControllerBase
             WorkType = "Task",
             Status = request.Status,
             BillingType = request.BillingType,
-            CustomerId = request.CustomerId,
-            SiteId = request.SiteId,
+            CustomerId = taskCustomerId,
+            SiteId = taskSiteId,
             ParentWorkItemId = request.ParentWorkItemId,
             DealCloseDate = request.DealCloseDate,
             FinanceProjectNumber = request.FinanceProjectNumber,
@@ -555,26 +567,21 @@ public class WorkItemsController : ControllerBase
             return BadRequest("Valid EmployeeId and AssignmentRole are required.");
         }
 
-        var existingWorkItem = await _workItemRepository.GetByIdAsync(id);
-        if (existingWorkItem == null)
+        try
         {
-            return NotFound($"Work item with ID {id} was not found.");
-        }
+            var assigned = await _workItemRepository.AssignEmployeeToWorkAsync(id, request.EmployeeId, request.AssignmentRole);
 
-        var employeeExists = await _workItemRepository.EmployeeExistsAsync(request.EmployeeId);
-        if (!employeeExists)
+            if (!assigned)
+            {
+                return BadRequest(new { message = "Failed to assign employee to work item." });
+            }
+
+            return Ok(new { message = "Employee assigned successfully." });
+        }
+        catch (InvalidOperationException ex)
         {
-            return NotFound($"Employee with ID {request.EmployeeId} was not found.");
+            return BadRequest(new { message = ex.Message });
         }
-
-        var assigned = await _workItemRepository.AssignEmployeeToWorkAsync(id, request.EmployeeId, request.AssignmentRole);
-
-        if (!assigned)
-        {
-            return BadRequest("Failed to assign employee to work item.");
-        }
-
-        return Ok(new { message = "Employee assigned successfully." });
     }
 
     [HttpPost("{id}/assign-contractor")]
@@ -586,26 +593,21 @@ public class WorkItemsController : ControllerBase
             return BadRequest("Valid ContractorId and AssignmentRole are required.");
         }
 
-        var existingWorkItem = await _workItemRepository.GetByIdAsync(id);
-        if (existingWorkItem == null)
+        try
         {
-            return NotFound($"Work item with ID {id} was not found.");
-        }
+            var assigned = await _workItemRepository.AssignContractorToWorkAsync(id, request.ContractorId, request.AssignmentRole);
 
-        var contractorExists = await _workItemRepository.ContractorExistsAsync(request.ContractorId);
-        if (!contractorExists)
+            if (!assigned)
+            {
+                return BadRequest(new { message = "Failed to assign contractor to work item." });
+            }
+
+            return Ok(new { message = "Contractor assigned successfully." });
+        }
+        catch (InvalidOperationException ex)
         {
-            return NotFound($"Contractor with ID {request.ContractorId} was not found.");
+            return BadRequest(new { message = ex.Message });
         }
-
-        var assigned = await _workItemRepository.AssignContractorToWorkAsync(id, request.ContractorId, request.AssignmentRole);
-
-        if (!assigned)
-        {
-            return BadRequest("Failed to assign contractor to work item.");
-        }
-
-        return Ok(new { message = "Contractor assigned successfully." });
     }
 
     [HttpPost("{projectId}/milestones")]
@@ -708,17 +710,23 @@ public class WorkItemsController : ControllerBase
         {
             foreach (var employee in request.Employees)
             {
-                var exists = await _workItemRepository.EmployeeExistsAsync(employee.EmployeeId);
-                if (!exists)
+                try
                 {
-                    return NotFound($"Employee with ID {employee.EmployeeId} was not found.");
-                }
+                    var assigned = await _workItemRepository.AssignEmployeeToWorkAsync(
+                        newMilestoneId,
+                        employee.EmployeeId,
+                        employee.AssignmentRole
+                    );
 
-                await _workItemRepository.AssignEmployeeToWorkAsync(
-                    newMilestoneId,
-                    employee.EmployeeId,
-                    employee.AssignmentRole
-                );
+                    if (!assigned)
+                    {
+                        return BadRequest(new { message = "Failed to assign employee to milestone." });
+                    }
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return BadRequest(new { message = ex.Message });
+                }
             }
         }
 
@@ -727,17 +735,23 @@ public class WorkItemsController : ControllerBase
         {
             foreach (var contractor in request.Contractors)
             {
-                var exists = await _workItemRepository.ContractorExistsAsync(contractor.ContractorId);
-                if (!exists)
+                try
                 {
-                    return NotFound($"Contractor with ID {contractor.ContractorId} was not found.");
-                }
+                    var assigned = await _workItemRepository.AssignContractorToWorkAsync(
+                        newMilestoneId,
+                        contractor.ContractorId,
+                        contractor.AssignmentRole
+                    );
 
-                await _workItemRepository.AssignContractorToWorkAsync(
-                    newMilestoneId,
-                    contractor.ContractorId,
-                    contractor.AssignmentRole
-                );
+                    if (!assigned)
+                    {
+                        return BadRequest(new { message = "Failed to assign contractor to milestone." });
+                    }
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return BadRequest(new { message = ex.Message });
+                }
             }
         }
 
@@ -862,17 +876,23 @@ public class WorkItemsController : ControllerBase
         {
             foreach (var employee in request.Employees)
             {
-                var exists = await _workItemRepository.EmployeeExistsAsync(employee.EmployeeId);
-                if (!exists)
+                try
                 {
-                    return NotFound($"Employee with ID {employee.EmployeeId} was not found.");
-                }
+                    var assigned = await _workItemRepository.AssignEmployeeToWorkAsync(
+                        milestoneId,
+                        employee.EmployeeId,
+                        employee.AssignmentRole
+                    );
 
-                await _workItemRepository.AssignEmployeeToWorkAsync(
-                    milestoneId,
-                    employee.EmployeeId,
-                    employee.AssignmentRole
-                );
+                    if (!assigned)
+                    {
+                        return BadRequest(new { message = "Failed to assign employee to milestone." });
+                    }
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return BadRequest(new { message = ex.Message });
+                }
             }
         }
 
@@ -880,17 +900,23 @@ public class WorkItemsController : ControllerBase
         {
             foreach (var contractor in request.Contractors)
             {
-                var exists = await _workItemRepository.ContractorExistsAsync(contractor.ContractorId);
-                if (!exists)
+                try
                 {
-                    return NotFound($"Contractor with ID {contractor.ContractorId} was not found.");
-                }
+                    var assigned = await _workItemRepository.AssignContractorToWorkAsync(
+                        milestoneId,
+                        contractor.ContractorId,
+                        contractor.AssignmentRole
+                    );
 
-                await _workItemRepository.AssignContractorToWorkAsync(
-                    milestoneId,
-                    contractor.ContractorId,
-                    contractor.AssignmentRole
-                );
+                    if (!assigned)
+                    {
+                        return BadRequest(new { message = "Failed to assign contractor to milestone." });
+                    }
+                }
+                catch (InvalidOperationException ex)
+                {
+                    return BadRequest(new { message = ex.Message });
+                }
             }
         }
 

@@ -226,81 +226,55 @@ public class WorkItemRepository : IWorkItemRepository
     public async Task<bool> AssignEmployeeToWorkAsync(int workItemId, int employeeId, string assignmentRole)
     {
         // Creates employee assignment link for a specific work item.
-        await using var connection = _dbServices.CreateConnection();
-        await using var command = new SqlCommand("sp_AssignEmployeeToWork", connection)
+        try
         {
-            CommandType = CommandType.StoredProcedure
-        };
+            await using var connection = _dbServices.CreateConnection();
+            await using var command = new SqlCommand("sp_AssignEmployeeToWork", connection)
+            {
+                CommandType = CommandType.StoredProcedure
+            };
 
-        command.Parameters.AddWithValue("@WorkItemId", workItemId);
-        command.Parameters.AddWithValue("@EmployeeId", employeeId);
-        command.Parameters.AddWithValue("@AssignmentRole", assignmentRole);
+            command.Parameters.AddWithValue("@WorkItemId", workItemId);
+            command.Parameters.AddWithValue("@EmployeeId", employeeId);
+            command.Parameters.AddWithValue("@AssignmentRole", assignmentRole);
 
-        await connection.OpenAsync();
-        await command.ExecuteNonQueryAsync();
+            await connection.OpenAsync();
+            var result = await command.ExecuteScalarAsync();
+            var rowsAffected = result != null ? Convert.ToInt32(result) : 0;
 
-        return true;
+            return rowsAffected > 0;
+        }
+        catch (SqlException ex)
+        {
+            throw new InvalidOperationException(ex.Message, ex);
+        }
     }
 
     public async Task<bool> AssignContractorToWorkAsync(int workItemId, int contractorId, string assignmentRole)
     {
         // Creates contractor assignment link for a specific work item.
-        await using var connection = _dbServices.CreateConnection();
-        await using var command = new SqlCommand("sp_AssignContractorToWork", connection)
+        try
         {
-            CommandType = CommandType.StoredProcedure
-        };
+            await using var connection = _dbServices.CreateConnection();
+            await using var command = new SqlCommand("sp_AssignContractorToWork", connection)
+            {
+                CommandType = CommandType.StoredProcedure
+            };
 
-        command.Parameters.AddWithValue("@WorkItemId", workItemId);
-        command.Parameters.AddWithValue("@ContractorId", contractorId);
-        command.Parameters.AddWithValue("@AssignmentRole", assignmentRole);
+            command.Parameters.AddWithValue("@WorkItemId", workItemId);
+            command.Parameters.AddWithValue("@ContractorId", contractorId);
+            command.Parameters.AddWithValue("@AssignmentRole", assignmentRole);
 
-        await connection.OpenAsync();
-        await command.ExecuteNonQueryAsync();
+            await connection.OpenAsync();
+            var result = await command.ExecuteScalarAsync();
+            var rowsAffected = result != null ? Convert.ToInt32(result) : 0;
 
-        return true;
-    }
-
-    public async Task<bool> EmployeeExistsAsync(int employeeId)
-    {
-        // Lightweight existence check used before creating assignment links.
-        await using var connection = _dbServices.CreateConnection();
-        await using var command = new SqlCommand(
-            "SELECT COUNT(1) FROM dbo.Employees WHERE EmployeeId = @EmployeeId",
-            connection)
+            return rowsAffected > 0;
+        }
+        catch (SqlException ex)
         {
-            CommandType = CommandType.Text
-        };
-
-        command.Parameters.AddWithValue("@EmployeeId", employeeId);
-
-        await connection.OpenAsync();
-
-        var result = await command.ExecuteScalarAsync();
-        var count = result != null ? Convert.ToInt32(result) : 0;
-
-        return count > 0;
-    }
-
-    public async Task<bool> ContractorExistsAsync(int contractorId)
-    {
-        // Lightweight existence check used before creating contractor links.
-        await using var connection = _dbServices.CreateConnection();
-        await using var command = new SqlCommand(
-            "SELECT COUNT(1) FROM dbo.Contractors WHERE ContractorId = @ContractorId",
-            connection)
-        {
-            CommandType = CommandType.Text
-        };
-
-        command.Parameters.AddWithValue("@ContractorId", contractorId);
-
-        await connection.OpenAsync();
-
-        var result = await command.ExecuteScalarAsync();
-        var count = result != null ? Convert.ToInt32(result) : 0;
-
-        return count > 0;
+            throw new InvalidOperationException(ex.Message, ex);
+        }
     }
 
     public async Task<WorkPlanResult?> GetWorkPlanAsync(int projectId)

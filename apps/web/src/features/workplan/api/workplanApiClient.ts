@@ -1,4 +1,4 @@
-import { apiRequest } from '@api/client';
+import { ApiError, apiRequest } from '@api/client';
 import { mapAllWorkPlansResponse, mapEmployeeResponse, mapWorkPlanResponse } from '../lib/workPlanMappers';
 import type {
   AssignEmployeeRequest,
@@ -9,12 +9,24 @@ import type {
   WorkPlanEmployee,
 } from '../types';
 
+interface CreateWorkItemResponse {
+  workItemId?: number;
+}
+
+interface AssignEmployeeResponse {
+  message?: string;
+}
+
 export async function getWorkPlanByIdAsync(projectId: number): Promise<MappedWorkPlan | null> {
   try {
     const response = await apiRequest<unknown>(`/WorkItems/${projectId}/work-plan`);
     return mapWorkPlanResponse(response as Parameters<typeof mapWorkPlanResponse>[0]);
-  } catch {
-    return null;
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      return null;
+    }
+
+    throw error;
   }
 }
 
@@ -37,8 +49,10 @@ export async function getSmartAssignmentRecommendationsAsync(
   });
 }
 
-export async function createWorkItemAsync(request: CreateTaskRequest): Promise<unknown> {
-  return apiRequest('/WorkItems', {
+export async function createWorkItemAsync(
+  request: CreateTaskRequest,
+): Promise<CreateWorkItemResponse> {
+  return apiRequest<CreateWorkItemResponse>('/WorkItems/task', {
     method: 'POST',
     body: JSON.stringify(request),
   });
@@ -47,8 +61,8 @@ export async function createWorkItemAsync(request: CreateTaskRequest): Promise<u
 export async function assignEmployeeToWorkItemAsync(
   workItemId: number,
   request: AssignEmployeeRequest,
-): Promise<unknown> {
-  return apiRequest(`/WorkItems/${workItemId}/assign-employee`, {
+): Promise<AssignEmployeeResponse> {
+  return apiRequest<AssignEmployeeResponse>(`/WorkItems/${workItemId}/assign-employee`, {
     method: 'POST',
     body: JSON.stringify(request),
   });

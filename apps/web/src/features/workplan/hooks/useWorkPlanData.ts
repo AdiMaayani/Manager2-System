@@ -66,13 +66,25 @@ export function useWorkPlanScheduling(options: {
   statusFilter: string;
   employeeFilterId: string;
 }) {
-  const { data: employees = [], isLoading: employeesLoading } = useWorkPlanEmployees();
-  const { data: allWorkPlans = [], isLoading: allLoading } = useAllWorkPlans();
+  const {
+    data: employees = [],
+    isLoading: employeesLoading,
+    error: employeesError,
+  } = useWorkPlanEmployees();
+  const {
+    data: allWorkPlans = [],
+    isLoading: allLoading,
+    error: allWorkPlansError,
+  } = useAllWorkPlans();
   const singleProjectId =
     !options.isAllProjectsMode && typeof options.projectFilter === 'number'
       ? options.projectFilter
       : null;
-  const { data: singleWorkPlan, isLoading: singleLoading } = useWorkPlanByProject(singleProjectId);
+  const {
+    data: singleWorkPlan,
+    isLoading: singleLoading,
+    error: singleWorkPlanError,
+  } = useWorkPlanByProject(singleProjectId);
 
   const activeWorkPlans = useMemo(() => {
     if (options.isAllProjectsMode) return allWorkPlans;
@@ -136,6 +148,7 @@ export function useWorkPlanScheduling(options: {
     projectOptions,
     insightMap,
     isLoading: employeesLoading || allLoading || (singleProjectId != null && singleLoading),
+    error: employeesError ?? allWorkPlansError ?? singleWorkPlanError ?? null,
   };
 }
 

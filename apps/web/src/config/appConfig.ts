@@ -1,6 +1,8 @@
 export type AppDataMode = 'local' | 'mock';
 
-export const appDataMode = (import.meta.env.VITE_APP_DATA_MODE ?? 'local') as AppDataMode;
+const requestedAppDataMode = import.meta.env.VITE_APP_DATA_MODE;
+
+export const appDataMode: AppDataMode = requestedAppDataMode === 'mock' ? 'mock' : 'local';
 
 export const isLocalDataMode = appDataMode === 'local';
 

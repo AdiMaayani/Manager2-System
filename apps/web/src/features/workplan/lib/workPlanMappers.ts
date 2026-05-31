@@ -81,7 +81,10 @@ export function mapWorkPlanResponse(response: RawWorkPlanResponse | null): Mappe
 }
 
 export function mapAllWorkPlansResponse(response: unknown): MappedWorkPlan[] {
-  if (!Array.isArray(response)) return [];
+  if (!Array.isArray(response)) {
+    throw new Error('מבנה נתוני תוכנית העבודה מהשרת אינו תקין');
+  }
+
   return response.map((item) => mapWorkPlanResponse(item as RawWorkPlanResponse));
 }
 

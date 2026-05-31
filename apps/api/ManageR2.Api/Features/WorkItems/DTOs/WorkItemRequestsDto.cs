@@ -25,8 +25,8 @@ public class CreateTaskRequest
     public string? Description { get; set; }
     public string Status { get; set; } = string.Empty;
     public string BillingType { get; set; } = string.Empty;
-    public int CustomerId { get; set; }
-    public int SiteId { get; set; }
+    public int? CustomerId { get; set; }
+    public int? SiteId { get; set; }
     public int? ParentWorkItemId { get; set; }
     public DateTime? DealCloseDate { get; set; }
     public string? FinanceProjectNumber { get; set; }
