@@ -21,6 +21,10 @@ import './ReportsPage.css';
 
 const QUICK_REPORT_KEY = 'manager2_quick_report_prefill';
 const SYSTEM_OPTIONS = ['חשמל חכם', 'בקרה', 'תקשורת', 'מולטימדיה', 'מצלמות ואבטחה'];
+const ROLE_OPTIONS = ['מתקין', 'מנהל פרויקט', 'טכנאי'];
+const LIST_STATUS_OPTIONS = ['הוגש', 'טיוטה'];
+
+type SubmitStatus = 'הוגש' | 'טיוטה';
 
 interface QuickReportPrefill {
   date?: string;
@@ -53,6 +57,7 @@ interface ReportFormState {
   followup: boolean;
   followupReason: string;
   systems: string[];
+  relatedWorkerIds: string[];
 }
 
 function todayYmd() {
@@ -77,6 +82,7 @@ function createInitialFormState(prefill?: QuickReportPrefill | null): ReportForm
     followup: false,
     followupReason: '',
     systems: [],
+    relatedWorkerIds: [],
   };
 }
 
@@ -101,6 +107,14 @@ export function ReportsPage() {
   const [selectedReportId, setSelectedReportId] = useState<number | null>(null);
   const [form, setForm] = useState<ReportFormState>(() => createInitialFormState());
   const [formError, setFormError] = useState<string | null>(null);
+  const [workerToAddId, setWorkerToAddId] = useState('');
+
+  // List filter state
+  const [filterSearch, setFilterSearch] = useState('');
+  const [filterProjectId, setFilterProjectId] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [filterDateFrom, setFilterDateFrom] = useState('');
+  const [filterDateTo, setFilterDateTo] = useState('');
 
   const { data: projects = [] } = useQuery({
     queryKey: ['reports', 'projects'],
@@ -122,6 +136,52 @@ export function ReportsPage() {
     [employees, form.reporterId],
   );
 
+  // Available workers for "related workers" section = active employees excluding the reporter
+  const availableRelatedWorkers = useMemo(
+    () =>
+      employees.filter(
+        (e) => e.isActive !== false && String(e.employeeId) !== form.reporterId,
+      ),
+    [employees, form.reporterId],
+  );
+
+  const selectedRelatedWorkers = useMemo(
+    () =>
+      form.relatedWorkerIds
+        .map((id) => employees.find((e) => String(e.employeeId) === id))
+        .filter((e): e is NonNullable<typeof e> => e != null),
+    [form.relatedWorkerIds, employees],
+  );
+
+  // Filtered reports list — all filters are client-side, no new API calls
+  const filteredReports = useMemo(() => {
+    if (!reports) return [];
+    return reports.filter((r) => {
+      if (filterSearch) {
+        const q = filterSearch.toLowerCase();
+        const matchesSearch =
+          (r.projectTitle ?? '').toLowerCase().includes(q) ||
+          (r.reportedByName ?? '').toLowerCase().includes(q) ||
+          (r.customerName ?? '').toLowerCase().includes(q) ||
+          String(r.reportId).includes(q);
+        if (!matchesSearch) return false;
+      }
+      if (filterProjectId) {
+        const selectedTitle =
+          projects.find((p) => String(p.workItemId) === filterProjectId)?.title ?? '';
+        if (r.projectTitle !== selectedTitle) return false;
+      }
+      if (filterStatus && r.status !== filterStatus) return false;
+      if (filterDateFrom && r.reportDate) {
+        if (formatReportDate(r.reportDate) < filterDateFrom) return false;
+      }
+      if (filterDateTo && r.reportDate) {
+        if (formatReportDate(r.reportDate) > filterDateTo) return false;
+      }
+      return true;
+    });
+  }, [reports, filterSearch, filterProjectId, filterStatus, filterDateFrom, filterDateTo, projects]);
+
   useEffect(() => {
     if (searchParams.get('quick') !== '1') return;
 
@@ -141,6 +201,7 @@ export function ReportsPage() {
 
   function openCreateModal() {
     setForm(createInitialFormState());
+    setWorkerToAddId('');
     setFormError(null);
     setIsCreateOpen(true);
   }
@@ -172,13 +233,29 @@ export function ReportsPage() {
     }));
   }
 
+  function handleAddRelatedWorker() {
+    if (!workerToAddId || form.relatedWorkerIds.includes(workerToAddId)) return;
+    updateForm({ relatedWorkerIds: [...form.relatedWorkerIds, workerToAddId] });
+    setWorkerToAddId('');
+  }
+
+  function handleRemoveRelatedWorker(employeeId: string) {
+    updateForm({
+      relatedWorkerIds: form.relatedWorkerIds.filter((id) => id !== employeeId),
+    });
+  }
+
   const createReport = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (submitStatus: SubmitStatus) => {
+      const isDraft = submitStatus === 'טיוטה';
+
       if (!form.date) throw new Error('יש להזין תאריך דיווח');
-      if (form.reportType === 'project' && !form.projectId) throw new Error('יש לבחור פרויקט');
-      if (!form.reporterId) throw new Error('יש לבחור מדווח');
-      if (!form.start || !form.end) throw new Error('יש להזין שעות עבודה');
-      if (!form.summary.trim()) throw new Error('יש להזין סיכום עבודה');
+      if (!isDraft) {
+        if (form.reportType === 'project' && !form.projectId) throw new Error('יש לבחור פרויקט');
+        if (!form.reporterId) throw new Error('יש לבחור מדווח');
+        if (!form.start || !form.end) throw new Error('יש להזין שעות עבודה');
+        if (!form.summary.trim()) throw new Error('יש להזין סיכום עבודה');
+      }
 
       const payload: CreateWorkReportRequest = {
         reportType: form.reportType,
@@ -191,14 +268,17 @@ export function ReportsPage() {
         site: form.site || null,
         start: form.start || null,
         end: form.end || null,
-        summary: form.summary.trim(),
+        summary: form.summary.trim() || null,
         notes: form.notes || null,
         reporterId: parseNullableInt(form.reporterId),
         reporterName: selectedReporter?.fullName || null,
         role: form.role || selectedReporter?.primaryRole || null,
-        status: 'הוגש',
+        status: submitStatus,
         systems: form.systems,
-        relatedWorkers: [],
+        relatedWorkers: form.relatedWorkerIds.map((id) => {
+          const emp = employees.find((e) => String(e.employeeId) === id);
+          return { id: emp?.employeeId ?? null, name: emp?.fullName ?? null };
+        }),
         followup: form.followup,
         followupReason: form.followup ? form.followupReason || null : null,
       };
@@ -208,6 +288,7 @@ export function ReportsPage() {
     onSuccess: async () => {
       setIsCreateOpen(false);
       setForm(createInitialFormState());
+      setWorkerToAddId('');
       setFormError(null);
       await queryClient.invalidateQueries({ queryKey: ['reports'] });
     },
@@ -233,25 +314,104 @@ export function ReportsPage() {
         </Button>
       </div>
 
-      {!reports?.length ? (
-        <EmptyState title="אין דיווחים" />
+      <div className="reportsPage__filterBar">
+        <Input
+          placeholder="חיפוש..."
+          value={filterSearch}
+          onChange={(e) => setFilterSearch(e.target.value)}
+        />
+        <label className="reportsPage__filterField">
+          <span>פרויקט</span>
+          <select
+            className="reportsPage__select"
+            value={filterProjectId}
+            onChange={(e) => setFilterProjectId(e.target.value)}
+          >
+            <option value="">הכל</option>
+            {projects.map((p) => (
+              <option key={p.workItemId} value={String(p.workItemId)}>
+                {p.title}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="reportsPage__filterField">
+          <span>סטטוס</span>
+          <select
+            className="reportsPage__select"
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+          >
+            <option value="">הכל</option>
+            {LIST_STATUS_OPTIONS.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </label>
+        <label className="reportsPage__filterField">
+          <span>מתאריך</span>
+          <input
+            type="date"
+            className="reportsPage__select"
+            value={filterDateFrom}
+            onChange={(e) => setFilterDateFrom(e.target.value)}
+          />
+        </label>
+        <label className="reportsPage__filterField">
+          <span>עד תאריך</span>
+          <input
+            type="date"
+            className="reportsPage__select"
+            value={filterDateTo}
+            onChange={(e) => setFilterDateTo(e.target.value)}
+          />
+        </label>
+      </div>
+
+      {filteredReports.length === 0 ? (
+        <EmptyState
+          title={
+            reports?.length
+              ? 'לא נמצאו דיווחים לפי הסינון הנוכחי'
+              : 'אין דיווחים'
+          }
+        />
       ) : (
-        <div className="reportsPage__list">
-          {reports.map((r) => (
-            <button
-              key={r.reportId}
-              type="button"
-              className="reportsPage__item reportsPage__item--clickable"
-              onClick={() => setSelectedReportId(r.reportId)}
-            >
-              <div>
-                <strong>{r.projectTitle ?? `דיווח #${r.reportId}`}</strong>
-                <p>{formatReportDate(r.reportDate)}</p>
-                {r.reportedByName && <span>{r.reportedByName}</span>}
-              </div>
-              <Badge variant="primary">{r.status ?? '—'}</Badge>
-            </button>
-          ))}
+        <div className="reportsPage__tableWrap">
+          <table className="reportsPage__table">
+            <thead>
+              <tr>
+                <th>תאריך</th>
+                <th>מס׳ דיווח</th>
+                <th>פרויקט</th>
+                <th>לקוח</th>
+                <th>מדווח</th>
+                <th>סטטוס</th>
+              </tr>
+            </thead>
+            <tbody>
+              {filteredReports.map((r) => (
+                <tr
+                  key={r.reportId}
+                  className="reportsPage__row"
+                  onClick={() => setSelectedReportId(r.reportId)}
+                >
+                  <td>{formatReportDate(r.reportDate) || '—'}</td>
+                  <td>#{r.reportId}</td>
+                  <td>{r.projectTitle ?? '—'}</td>
+                  <td>{r.customerName ?? '—'}</td>
+                  <td>{r.reportedByName ?? '—'}</td>
+                  <td>
+                    <Badge variant={r.status === 'הוגש' ? 'primary' : 'neutral'}>
+                      {r.status ?? '—'}
+                    </Badge>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -260,7 +420,7 @@ export function ReportsPage() {
           className="reportsPage__form"
           onSubmit={(event) => {
             event.preventDefault();
-            createReport.mutate();
+            createReport.mutate('הוגש');
           }}
         >
           <section className="reportsPage__formSection">
@@ -358,7 +518,9 @@ export function ReportsPage() {
                   className="reportsPage__select"
                   value={form.reporterId}
                   onChange={(event) => {
-                    const employee = employees.find((row) => String(row.employeeId) === event.target.value);
+                    const employee = employees.find(
+                      (row) => String(row.employeeId) === event.target.value,
+                    );
                     updateForm({
                       reporterId: event.target.value,
                       role: employee?.primaryRole || form.role,
@@ -376,11 +538,21 @@ export function ReportsPage() {
                     ))}
                 </select>
               </label>
-              <Input
-                label="תפקיד"
-                value={form.role}
-                onChange={(event) => updateForm({ role: event.target.value })}
-              />
+              <label className="reportsPage__field">
+                <span>תפקיד</span>
+                <select
+                  className="reportsPage__select"
+                  value={form.role}
+                  onChange={(event) => updateForm({ role: event.target.value })}
+                >
+                  <option value="">בחר תפקיד</option>
+                  {ROLE_OPTIONS.map((opt) => (
+                    <option key={opt} value={opt}>
+                      {opt}
+                    </option>
+                  ))}
+                </select>
+              </label>
             </div>
           </section>
 
@@ -405,13 +577,61 @@ export function ReportsPage() {
                 <button
                   key={system}
                   type="button"
-                  className={`reportsPage__chip ${form.systems.includes(system) ? 'reportsPage__chip--selected' : ''}`}
+                  className={`reportsPage__chip ${
+                    form.systems.includes(system) ? 'reportsPage__chip--selected' : ''
+                  }`}
                   onClick={() => toggleSystem(system)}
                 >
                   {system}
                 </button>
               ))}
             </div>
+          </section>
+
+          <section className="reportsPage__formSection">
+            <h3>עובדים קשורים</h3>
+            <div className="reportsPage__workerAdd">
+              <select
+                className="reportsPage__select reportsPage__workerSelect"
+                value={workerToAddId}
+                onChange={(e) => setWorkerToAddId(e.target.value)}
+                aria-label="בחר עובד להוספה"
+              >
+                <option value="">בחר עובד</option>
+                {availableRelatedWorkers
+                  .filter((e) => !form.relatedWorkerIds.includes(String(e.employeeId)))
+                  .map((e) => (
+                    <option key={e.employeeId} value={String(e.employeeId)}>
+                      {e.fullName}
+                    </option>
+                  ))}
+              </select>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={handleAddRelatedWorker}
+                disabled={!workerToAddId}
+              >
+                הוסף
+              </Button>
+            </div>
+            {selectedRelatedWorkers.length > 0 && (
+              <div className="reportsPage__workerChips">
+                {selectedRelatedWorkers.map((emp) => (
+                  <span key={emp.employeeId} className="reportsPage__workerChip">
+                    {emp.fullName}
+                    <button
+                      type="button"
+                      className="reportsPage__workerChipRemove"
+                      onClick={() => handleRemoveRelatedWorker(String(emp.employeeId))}
+                      aria-label={`הסר ${emp.fullName}`}
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
           </section>
 
           <section className="reportsPage__formSection">
@@ -448,7 +668,20 @@ export function ReportsPage() {
             <Button type="submit" disabled={createReport.isPending}>
               {createReport.isPending ? 'שולח...' : 'שלח דיווח'}
             </Button>
-            <Button type="button" variant="secondary" onClick={closeCreateModal}>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => createReport.mutate('טיוטה')}
+              disabled={createReport.isPending}
+            >
+              שמור טיוטה
+            </Button>
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={closeCreateModal}
+              disabled={createReport.isPending}
+            >
               ביטול
             </Button>
           </div>

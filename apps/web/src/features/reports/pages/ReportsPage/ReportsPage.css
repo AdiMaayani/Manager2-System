@@ -1,45 +1,86 @@
+/* ── Toolbar ─────────────────────────────────────────── */
 .reportsPage__toolbar {
   display: flex;
   justify-content: flex-start;
-  margin-bottom: var(--spacing-lg);
+  margin-bottom: var(--spacing-md);
 }
 
-.reportsPage__list {
+/* ── Filter bar ──────────────────────────────────────── */
+.reportsPage__filterBar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+  padding: var(--spacing-md) var(--spacing-lg);
+  background: #fff;
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-md);
+}
+
+.reportsPage__filterBar > * {
+  flex: 1 1 160px;
+  min-width: 140px;
+  max-width: 240px;
+}
+
+.reportsPage__filterField {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
+  gap: var(--spacing-xs);
+  color: var(--color-neutral-700);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
 }
 
-.reportsPage__item {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: #fff;
-  padding: var(--spacing-lg);
+/* ── Reports table ───────────────────────────────────── */
+.reportsPage__tableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-neutral-200);
   border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
+  background: #fff;
 }
 
-.reportsPage__item--clickable {
+.reportsPage__table {
   width: 100%;
-  border: none;
-  text-align: inherit;
-  cursor: pointer;
-  font: inherit;
-  color: inherit;
-}
-
-.reportsPage__item--clickable:hover {
-  box-shadow: var(--shadow-md);
-}
-
-.reportsPage__item span {
-  display: block;
-  margin-top: var(--spacing-xs);
-  color: var(--color-neutral-600);
+  border-collapse: collapse;
   font-size: var(--font-size-sm);
 }
 
+.reportsPage__table thead tr {
+  background: var(--color-neutral-50);
+  border-bottom: 1px solid var(--color-neutral-200);
+}
+
+.reportsPage__table th {
+  padding: var(--spacing-sm) var(--spacing-md);
+  text-align: right;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-600);
+  white-space: nowrap;
+}
+
+.reportsPage__table td {
+  padding: var(--spacing-sm) var(--spacing-md);
+  color: var(--color-neutral-800);
+  border-bottom: 1px solid var(--color-neutral-100);
+  vertical-align: middle;
+}
+
+.reportsPage__row {
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.reportsPage__row:hover {
+  background: var(--color-primary-50, #f0f7ff);
+}
+
+.reportsPage__row:last-child td {
+  border-bottom: none;
+}
+
+/* ── Create form ─────────────────────────────────────── */
 .reportsPage__form {
   display: flex;
   flex-direction: column;
@@ -106,6 +147,7 @@
   margin-inline-start: var(--spacing-xs);
 }
 
+/* ── System chips ────────────────────────────────────── */
 .reportsPage__chips {
   display: flex;
   flex-wrap: wrap;
@@ -118,6 +160,10 @@
   padding: var(--spacing-xs) var(--spacing-md);
   color: var(--color-neutral-700);
   background: #fff;
+  cursor: pointer;
+  font: inherit;
+  font-size: var(--font-size-sm);
+  transition: background 0.1s, border-color 0.1s;
 }
 
 .reportsPage__chip--selected {
@@ -126,6 +172,59 @@
   background: var(--color-primary-50);
 }
 
+/* ── Related workers ─────────────────────────────────── */
+.reportsPage__workerAdd {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.reportsPage__workerSelect {
+  flex: 1;
+  min-width: 0;
+}
+
+.reportsPage__workerChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-xs);
+}
+
+.reportsPage__workerChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  border: 1px solid var(--color-primary-300);
+  border-radius: var(--radius-full);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--color-primary-50);
+  color: var(--color-primary-700);
+  font-size: var(--font-size-sm);
+}
+
+.reportsPage__workerChipRemove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--color-primary-600);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  padding: 0;
+  line-height: 1;
+  transition: background 0.1s;
+}
+
+.reportsPage__workerChipRemove:hover {
+  background: var(--color-primary-100);
+}
+
+/* ── Error ───────────────────────────────────────────── */
 .reportsPage__error {
   margin: 0;
   color: var(--color-danger-600);
