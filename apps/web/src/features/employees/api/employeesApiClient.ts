@@ -1,6 +1,6 @@
 import { apiRequest } from '@api/client';
-import type { EmployeeUser } from '../types';
+import type { Employee } from '../types';
 
-export function getUsersAsync(): Promise<EmployeeUser[]> {
-  return apiRequest<EmployeeUser[]>('/Users');
+export function getEmployeesAsync(): Promise<Employee[]> {
+  return apiRequest<Employee[]>('/Employees');
 }

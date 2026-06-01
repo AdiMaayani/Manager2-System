@@ -1,11 +1,9 @@
-export interface EmployeeUser {
-  userId: number;
+export interface Employee {
   employeeId: number;
-  username: string;
-  email: string;
-  isActive: boolean;
-  roles: string[];
-  departments: string[];
+  fullName: string;
+  primaryRole: string;
   phone?: string;
-  notes?: string;
+  email?: string;
+  isActive: boolean;
+  isAssignable: boolean;
 }

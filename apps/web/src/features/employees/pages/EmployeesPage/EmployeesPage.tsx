@@ -18,8 +18,8 @@ export function EmployeesPage() {
     if (!q) return employees;
     return employees.filter(
       (e) =>
-        e.username.toLowerCase().includes(q) ||
-        e.email.toLowerCase().includes(q) ||
+        e.fullName.toLowerCase().includes(q) ||
+        (e.email ?? '').toLowerCase().includes(q) ||
         (e.phone ?? '').includes(q),
     );
   }, [employees, search]);
@@ -51,16 +51,22 @@ export function EmployeesPage() {
                 <th>אימייל</th>
                 <th>טלפון</th>
                 <th>תפקיד</th>
+                <th>ניתן לשיבוץ</th>
                 <th>סטטוס</th>
               </tr>
             </thead>
             <tbody>
               {filtered.map((e) => (
-                <tr key={e.userId}>
-                  <td>{e.username}</td>
-                  <td>{e.email}</td>
+                <tr key={e.employeeId}>
+                  <td>{e.fullName}</td>
+                  <td>{e.email ?? '-'}</td>
                   <td>{e.phone ?? '-'}</td>
-                  <td>{e.roles.join(', ') || '-'}</td>
+                  <td>{e.primaryRole || '-'}</td>
+                  <td>
+                    <Badge variant={e.isAssignable ? 'success' : 'neutral'}>
+                      {e.isAssignable ? 'כן' : 'לא'}
+                    </Badge>
+                  </td>
                   <td>
                     <Badge variant={e.isActive ? 'success' : 'neutral'}>
                       {e.isActive ? 'פעיל' : 'לא פעיל'}
