@@ -1,4 +1,4 @@
-import { HOUR_LABELS } from '../../constants';
+import { getWorkPlanStatusDisplay, HOUR_LABELS } from '../../constants';
 import { hourSpanToWidth, hourToPercent } from '../../lib/workPlanScheduling';
 import type { ScheduledTaskBar } from '../../types';
 import './WorkPlanDailyGrid.css';
@@ -53,7 +53,7 @@ function TaskBar({
     >
       <span className="workPlanDailyGrid__taskName">{task.title}</span>
       <span className="workPlanDailyGrid__taskMeta">
-        {task.projectTitle} · {task.status}
+        {task.projectTitle} · {getWorkPlanStatusDisplay(task.status)}
       </span>
       {(task.violationCount > 0 || task.warningCount > 0 || task.suggestionCount > 0) && (
         <span className="workPlanDailyGrid__taskIndicators" aria-hidden>

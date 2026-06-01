@@ -1,4 +1,5 @@
 import type { MappedWorkPlan } from '../../types';
+import { getWorkPlanStatusDisplay, isWorkPlanStatusDone } from '../../constants';
 import './WorkPlanYearlyView.css';
 
 interface WorkPlanYearlyViewProps {
@@ -20,9 +21,7 @@ export function WorkPlanYearlyView({ workPlans }: WorkPlanYearlyViewProps) {
               (sum, task) => sum + (task.estimatedHours ?? 0),
               0,
             );
-            const completed = workPlan.tasks.filter((t) =>
-              t.status.toLowerCase().includes('הושלם'),
-            ).length;
+            const completed = workPlan.tasks.filter((t) => isWorkPlanStatusDone(t.status)).length;
 
             return (
               <article key={workPlan.project.id} className="workPlanYearlyView__card">
@@ -42,7 +41,7 @@ export function WorkPlanYearlyView({ workPlans }: WorkPlanYearlyViewProps) {
                   </div>
                   <div>
                     <dt>סטטוס</dt>
-                    <dd>{workPlan.project.status}</dd>
+                    <dd>{getWorkPlanStatusDisplay(workPlan.project.status)}</dd>
                   </div>
                 </dl>
               </article>

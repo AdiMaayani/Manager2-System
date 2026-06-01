@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { Badge } from '@shared/components/Badge';
 import { Button } from '@shared/components/Button';
 import { EditTaskDrawer } from '../EditTaskDrawer';
+import { getWorkPlanPriorityDisplay, getWorkPlanStatusDisplay } from '../../constants';
+import { formatHourAsTime } from '../../lib/workPlanScheduling';
 import type { WorkPlanTaskSelection } from '../../types';
 import './WorkPlanTaskPanel.css';
 
@@ -31,8 +33,8 @@ export function WorkPlanTaskPanel({ task, onClose, canEdit }: WorkPlanTaskPanelP
       projectName: task.projectTitle,
       customerName: task.projectTitle,
       site: task.projectTitle,
-      start: `${String(task.startHour).padStart(2, '0')}:00`,
-      end: `${String(task.endHour).padStart(2, '0')}:00`,
+      start: formatHourAsTime(task.startHour),
+      end: formatHourAsTime(task.endHour),
       reporterName: task.assigneeName !== '—' ? task.assigneeName : '',
       reporterRole: task.requiredRole || '',
       taskAssigneeName: task.assigneeName,
@@ -64,19 +66,19 @@ export function WorkPlanTaskPanel({ task, onClose, canEdit }: WorkPlanTaskPanelP
           <div>
             <dt>שעות</dt>
             <dd>
-              {task.startHour}:00 – {task.endHour}:00
+              {formatHourAsTime(task.startHour)} – {formatHourAsTime(task.endHour)}
             </dd>
           </div>
           <div>
             <dt>סטטוס</dt>
             <dd>
-              <Badge variant="neutral">{task.status}</Badge>
+              <Badge variant="neutral">{getWorkPlanStatusDisplay(task.status)}</Badge>
             </dd>
           </div>
           {task.priority && (
             <div>
               <dt>עדיפות</dt>
-              <dd>{task.priority}</dd>
+              <dd>{getWorkPlanPriorityDisplay(task.priority)}</dd>
             </div>
           )}
           {task.requiredRole && (

@@ -1,6 +1,8 @@
 export type WorkPlanScope = 'company' | 'personal' | 'employee' | 'project';
 export type WorkPlanRange = 'daily' | 'weekly' | 'monthly' | 'yearly';
 export type WorkPlanProjectFilter = number | 'all';
+export type WorkPlanStatusCode = 'Planned' | 'Execution' | 'Done' | 'Closed' | 'Blocked';
+export type WorkPlanPriorityCode = 'Low' | 'Medium' | 'High' | 'Urgent';
 
 export interface WorkPlanProjectSummary {
   workItemId: number;
@@ -86,6 +88,11 @@ export interface ScheduledTaskBar {
   employeeId: string;
   startHour: number;
   endHour: number;
+  plannedStart?: string | null;
+  plannedEnd?: string | null;
+  estimatedHours?: number | null;
+  priority?: string | null;
+  requiredRole?: string | null;
   isLocked: boolean;
   isPersonal: boolean;
   assignmentSource: ResolvedAssignment['source'];
@@ -103,6 +110,8 @@ export interface WorkPlanTaskSelection {
   assigneeName: string;
   startHour: number;
   endHour: number;
+  plannedStart?: string | null;
+  plannedEnd?: string | null;
   isLocked: boolean;
   isPersonal: boolean;
   estimatedHours?: number | null;

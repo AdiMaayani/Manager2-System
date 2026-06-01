@@ -24,8 +24,13 @@ function scheduledToSelection(task: ScheduledTaskBar): WorkPlanTaskSelection {
     assigneeName: task.assigneeName,
     startHour: task.startHour,
     endHour: task.endHour,
+    plannedStart: task.plannedStart,
+    plannedEnd: task.plannedEnd,
     isLocked: task.isLocked,
     isPersonal: task.isPersonal,
+    estimatedHours: task.estimatedHours,
+    priority: task.priority,
+    requiredRole: task.requiredRole,
   };
 }
 
