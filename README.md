@@ -18,6 +18,52 @@ ManageR2-System/
 - .NET 8 SDK
 - SQL Server (for API data in `local` mode)
 
+## Configuration
+
+Committed configuration files must not contain real database credentials or JWT signing keys.
+
+### API secrets
+
+The API reads the same keys from ASP.NET Core configuration, so use user secrets, environment variables, or a local
+uncommitted `apps/api/ManageR2.Api/appsettings.Development.json`.
+
+Recommended local setup with user secrets:
+
+```bash
+dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Server=localhost;Database=ManageR2_Dev;User Id=YOUR_LOCAL_USER;Password=YOUR_LOCAL_PASSWORD;TrustServerCertificate=True;" --project apps/api/ManageR2.Api
+dotnet user-secrets set "Jwt:Key" "REPLACE_WITH_A_LOCAL_KEY_AT_LEAST_32_CHARACTERS" --project apps/api/ManageR2.Api
+```
+
+Equivalent environment variables:
+
+```bash
+ConnectionStrings__DefaultConnection=<your local or deployed SQL Server connection string>
+Jwt__Key=<your JWT signing key>
+```
+
+`Jwt:Issuer`, `Jwt:Audience`, and `Jwt:ExpirationMinutes` are non-secret defaults in `appsettings.json`; override them
+only when an environment needs different values. `apps/api/ManageR2.Api/appsettings.Development.example.json` shows the
+shape for a local uncommitted development file.
+
+### Web environment
+
+Copy `apps/web/.env.example` to `apps/web/.env.development` for local frontend overrides.
+
+```bash
+VITE_APP_DATA_MODE=local
+# VITE_API_BASE_URL=/api
+```
+
+`VITE_APP_DATA_MODE` valid values:
+
+| Value | Behavior |
+|-------|----------|
+| `local` | Real API via `apiRequest` (default and production-safe) |
+| `mock` | In-memory mock data for local UI work only; production builds fail when selected |
+
+Leave `VITE_API_BASE_URL` unset in local development to use the Vite proxy from `/api` to `http://localhost:5162`.
+Set it for production to the deployed API base path or origin, such as `/api` or `https://api.example.com/api`.
+
 ## Run locally (end-to-end)
 
 **Terminal 1 — API**
@@ -73,8 +119,8 @@ Configure in `apps/web/.env.development`:
 
 | `VITE_APP_DATA_MODE` | Behavior |
 |----------------------|----------|
-| `local` | Real API via `apiRequest` (default) |
-| `mock` | In-memory mock data — no API required |
+| `local` | Real API via `apiRequest` (default and production-safe) |
+| `mock` | In-memory mock data for local UI work only |
 
 Copy `apps/web/.env.example` to `.env.development` and adjust.
 
@@ -83,6 +129,9 @@ For UI-only work without SQL/API:
 ```
 VITE_APP_DATA_MODE=mock
 ```
+
+Do not use `mock` for production builds; the app fails the build/runtime startup guard when `mock` is selected in
+production mode.
 
 ## Scripts
 
