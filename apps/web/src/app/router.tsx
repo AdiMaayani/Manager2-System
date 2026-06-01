@@ -5,6 +5,7 @@ import { WorkPlanPage } from '@features/workplan';
 import { ProjectsPage } from '@features/projects';
 import { ReportsPage } from '@features/reports';
 import { EmployeesPage } from '@features/employees';
+import { UsersPage } from '@features/users';
 import { ContactsPage } from '@features/contacts';
 import { CustomersPage } from '@features/customers';
 import { QuotesPage } from '@features/quotes';
@@ -13,6 +14,7 @@ import { ServiceCallsPage } from '@features/serviceCalls';
 import { CashflowPage } from '@features/cashflow';
 import { SettingsPage } from '@features/settings';
 import { AppLayout } from '@shared/components/AppLayout';
+import { AdminRoute } from './AdminRoute';
 import { ProtectedRoute } from './ProtectedRoute';
 
 export const router = createBrowserRouter([
@@ -30,6 +32,14 @@ export const router = createBrowserRouter([
       { path: '/projects', element: <ProjectsPage /> },
       { path: '/reports', element: <ReportsPage /> },
       { path: '/employees', element: <EmployeesPage /> },
+      {
+        path: '/users',
+        element: (
+          <AdminRoute>
+            <UsersPage />
+          </AdminRoute>
+        ),
+      },
       { path: '/contacts', element: <ContactsPage /> },
       { path: '/customers', element: <CustomersPage /> },
       { path: '/quotes', element: <QuotesPage /> },

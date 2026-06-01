@@ -6,6 +6,13 @@ import '@shared/layout/layout.css';
 export function Sidebar() {
   const navigate = useNavigate();
   const user = getCurrentUser();
+  const userRoles = user?.roles ?? [];
+  const visibleMainNavItems = mainNavItems.filter(
+    (item) => !item.requiredRole || userRoles.includes(item.requiredRole),
+  );
+  const visibleBottomNavItems = bottomNavItems.filter(
+    (item) => !item.requiredRole || userRoles.includes(item.requiredRole),
+  );
 
   function handleLogout() {
     clearAuthSession();
@@ -30,7 +37,7 @@ export function Sidebar() {
         </div>
 
         <div className="sidebar__navMain">
-          {mainNavItems.map((item) => (
+          {visibleMainNavItems.map((item) => (
             <NavLink
               key={item.path}
               to={item.path}
@@ -46,7 +53,7 @@ export function Sidebar() {
         </div>
 
         <div className="sidebar__navBottom">
-          {bottomNavItems.map((item) => (
+          {visibleBottomNavItems.map((item) => (
             <NavLink
               key={item.path}
               to={item.path}

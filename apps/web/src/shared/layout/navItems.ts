@@ -17,6 +17,7 @@ export interface NavItem {
   path: string;
   label: string;
   icon: LucideIcon;
+  requiredRole?: string;
 }
 
 export const mainNavItems: NavItem[] = [
@@ -30,6 +31,7 @@ export const mainNavItems: NavItem[] = [
   { path: '/inventory', label: 'מלאי', icon: Package },
   { path: '/reports', label: 'דיווחים', icon: ClipboardList },
   { path: '/employees', label: 'עובדים', icon: Users },
+  { path: '/users', label: 'ניהול משתמשים', icon: Users, requiredRole: 'Admin' },
 ];
 
 export const bottomNavItems: NavItem[] = [
