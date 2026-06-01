@@ -6,11 +6,15 @@ import { Input } from '@shared/components/Input';
 import { PageSpinner } from '@shared/components/PageSpinner';
 import { isLocalDataMode } from '@/config/appConfig';
 import { getWorkItemByIdAsync, updateWorkItemAsync } from '../../api/workplanApiClient';
+import {
+  normalizeWorkPlanPriorityCode,
+  normalizeWorkPlanStatusCode,
+  WORKPLAN_PRIORITY_OPTIONS,
+  WORKPLAN_STATUS_OPTIONS,
+} from '../../constants';
 import type { WorkPlanTaskSelection } from '../../types';
 import './EditTaskDrawer.css';
 
-const STATUS_OPTIONS = ['מתוכנן', 'בביצוע', 'הושלם', 'תקוע'];
-const PRIORITY_OPTIONS = ['רגיל', 'גבוה', 'דחוף'];
 const ROLE_OPTIONS = ['מתקין', 'מנהל פרויקט', 'טכנאי'];
 
 interface EditTaskDrawerProps {
@@ -38,8 +42,8 @@ export function EditTaskDrawer({ isOpen, task, onClose }: EditTaskDrawerProps) {
   const [plannedStart, setPlannedStart] = useState('');
   const [plannedEnd, setPlannedEnd] = useState('');
   const [estimatedHours, setEstimatedHours] = useState('');
-  const [status, setStatus] = useState(STATUS_OPTIONS[0]);
-  const [priority, setPriority] = useState(PRIORITY_OPTIONS[0]);
+  const [status, setStatus] = useState<string>(WORKPLAN_STATUS_OPTIONS[0].code);
+  const [priority, setPriority] = useState<string>(WORKPLAN_PRIORITY_OPTIONS[1].code);
   const [requiredRole, setRequiredRole] = useState('');
   const [error, setError] = useState<string | null>(null);
 
@@ -64,8 +68,8 @@ export function EditTaskDrawer({ isOpen, task, onClose }: EditTaskDrawerProps) {
     setEstimatedHours(
       workItem.estimatedHours != null ? String(workItem.estimatedHours) : '',
     );
-    setStatus(workItem.status || STATUS_OPTIONS[0]);
-    setPriority(workItem.priority || PRIORITY_OPTIONS[0]);
+    setStatus(normalizeWorkPlanStatusCode(workItem.status) ?? WORKPLAN_STATUS_OPTIONS[0].code);
+    setPriority(normalizeWorkPlanPriorityCode(workItem.priority) ?? WORKPLAN_PRIORITY_OPTIONS[1].code);
     setRequiredRole(workItem.requiredRole || '');
     setError(null);
   }, [isOpen, workItemQuery.data]);
@@ -188,9 +192,9 @@ export function EditTaskDrawer({ isOpen, task, onClose }: EditTaskDrawerProps) {
                   value={status}
                   onChange={(event) => setStatus(event.target.value)}
                 >
-                  {STATUS_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
+                  {WORKPLAN_STATUS_OPTIONS.map((option) => (
+                    <option key={option.code} value={option.code}>
+                      {option.display}
                     </option>
                   ))}
                 </select>
@@ -202,9 +206,9 @@ export function EditTaskDrawer({ isOpen, task, onClose }: EditTaskDrawerProps) {
                   value={priority}
                   onChange={(event) => setPriority(event.target.value)}
                 >
-                  {PRIORITY_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
+                  {WORKPLAN_PRIORITY_OPTIONS.map((option) => (
+                    <option key={option.code} value={option.code}>
+                      {option.display}
                     </option>
                   ))}
                 </select>

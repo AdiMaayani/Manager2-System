@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { WEEKDAY_LABELS } from '../../constants';
+import { matchesWorkPlanStatusFilter, WEEKDAY_LABELS } from '../../constants';
 import type { MappedWorkPlan } from '../../types';
 import { resolveAssignment } from '../../lib/workPlanScheduling';
 import './WorkPlanWeeklyView.css';
@@ -8,15 +8,6 @@ interface WorkPlanWeeklyViewProps {
   workPlans: MappedWorkPlan[];
   statusFilter: string;
   onTaskClick?: (taskId: number, projectTitle: string, title: string) => void;
-}
-
-function matchesStatus(status: string, filter: string): boolean {
-  if (filter === 'all') return true;
-  const n = status.toLowerCase();
-  if (filter === 'planned') return n.includes('תכנון') || n.includes('מתוכנן');
-  if (filter === 'in-progress') return n.includes('ביצוע');
-  if (filter === 'done') return n.includes('הושלם') || n.includes('סיום');
-  return true;
 }
 
 export function WorkPlanWeeklyView({
@@ -38,7 +29,7 @@ export function WorkPlanWeeklyView({
 
     for (const workPlan of workPlans) {
       for (const task of workPlan.tasks) {
-        if (!matchesStatus(task.status, statusFilter)) continue;
+        if (!matchesWorkPlanStatusFilter(task.status, statusFilter)) continue;
         const assignment = resolveAssignment(task, workPlan);
         const assignee = assignment.displayName || 'לא משויך';
         if (!assigneeMap.has(assignee)) {
