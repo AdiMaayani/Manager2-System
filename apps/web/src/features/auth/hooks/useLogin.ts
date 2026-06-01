@@ -15,7 +15,7 @@ function mockLoginResponse(email: string): LoginResponse {
     username: 'משתמש דמו',
     email,
     isActive: true,
-    roles: ['מנהל'],
+    roles: ['Admin'],
     departments: ['ניהול'],
   };
 }
