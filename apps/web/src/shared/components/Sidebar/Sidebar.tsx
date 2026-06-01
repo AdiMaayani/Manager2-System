@@ -1,5 +1,5 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { clearAuthSession, getCurrentUser } from '@api/auth';
+import { clearAuthSession, getCurrentUser, getRoleDisplayLabel } from '@api/auth';
 import { bottomNavItems, mainNavItems } from '@shared/layout/navItems';
 import '@shared/layout/layout.css';
 
@@ -18,7 +18,7 @@ export function Sidebar() {
         <div className="sidebar__user">
           <div className="sidebar__userName">{user?.username ?? 'משתמש'}</div>
           <div className="sidebar__userRole">
-            {user?.roles?.[0] ?? 'מחובר'}
+            {getRoleDisplayLabel(user?.roles?.[0])}
           </div>
           <div className="sidebar__userStatus">
             <span className="sidebar__statusDot" aria-hidden="true" />

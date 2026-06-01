@@ -62,6 +62,19 @@ export function getCurrentUser(): AuthUser | null {
   }
 }
 
+export function getRoleDisplayLabel(role?: string | null): string {
+  const normalizedRole = String(role ?? '').trim();
+  if (!normalizedRole) return 'מחובר';
+
+  const roleLabels: Record<string, string> = {
+    Admin: 'מנהל',
+    DepartmentManager: 'מנהל מחלקה',
+    TeamLeader: 'ראש צוות',
+  };
+
+  return roleLabels[normalizedRole] ?? normalizedRole;
+}
+
 export function isTokenExpired(token: string): boolean {
   if (isMockDataMode && token === MOCK_TOKEN) return false;
   if (!token) return true;
