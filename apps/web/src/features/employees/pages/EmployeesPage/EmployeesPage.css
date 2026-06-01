@@ -1,0 +1,23 @@
+.employeesPage__tableWrap {
+  margin-top: var(--spacing-lg);
+  overflow-x: auto;
+  background: #fff;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+.employeesPage__table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.employeesPage__table th,
+.employeesPage__table td {
+  padding: var(--spacing-md);
+  text-align: right;
+  border-bottom: 1px solid var(--color-neutral-200);
+}
+
+.employeesPage__table th {
+  background: var(--color-neutral-50);
+}

@@ -1,0 +1,9 @@
+.quotesPage__list { display: flex; flex-direction: column; gap: var(--spacing-md); }
+.quotesPage__item {
+  display: grid;
+  grid-template-columns: 1fr 2fr 1fr 1fr;
+  gap: var(--spacing-md);
+  background: #fff;
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+}

@@ -1,0 +1,131 @@
+.projectMilestonesTab__toolbar {
+  margin-bottom: var(--spacing-md);
+}
+
+.projectMilestonesTab__formCard,
+.projectMilestonesTab__card {
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-md);
+  background: #fff;
+}
+
+.projectMilestonesTab__formCard {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-lg);
+}
+
+.projectMilestonesTab__formGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.projectMilestonesTab__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+}
+
+.projectMilestonesTab__select,
+.projectMilestonesTab__textarea {
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-neutral-300);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+}
+
+.projectMilestonesTab__checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.projectMilestonesTab__formActions {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.projectMilestonesTab__list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.projectMilestonesTab__cardHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  align-items: flex-start;
+}
+
+.projectMilestonesTab__badges {
+  display: flex;
+  gap: var(--spacing-xs);
+}
+
+.projectMilestonesTab__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-600);
+}
+
+.projectMilestonesTab__cardActions {
+  display: flex;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-md);
+}
+
+.projectMilestonesTab__empty {
+  color: var(--color-neutral-500);
+}
+
+.projectMilestonesTab__assignments {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-md);
+  background: var(--color-neutral-50);
+}
+
+.projectMilestonesTab__assignmentsHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+}
+
+.projectMilestonesTab__assignmentsHeader h4 {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+.projectMilestonesTab__assignmentRow {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(140px, 180px) auto;
+  gap: var(--spacing-sm);
+  align-items: center;
+}
+
+.projectMilestonesTab__emptyAssignments {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-500);
+}
+
+.projectMilestonesTab__assignmentsView {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-700);
+}

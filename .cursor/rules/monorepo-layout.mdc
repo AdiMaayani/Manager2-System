@@ -1,0 +1,55 @@
+---
+description: ManageR2 monorepo root structure — where new code goes, workspace boundaries, and dependency rules
+alwaysApply: true
+---
+
+# Monorepo Layout
+
+```
+ManageR2-System/          ← workspace root (npm workspaces)
+  package.json            ← { "workspaces": ["apps/*"] }
+  apps/
+    web/                  ← Vite + React + TypeScript (npm workspace)
+    api/                  ← ASP.NET Core C# (not an npm workspace)
+  database/
+    SP/                   ← all stored procedures (.sql files)
+  .cursor/
+    rules/
+    skills/
+```
+
+## Where new code goes
+
+| Type of change | Location |
+|---|---|
+| New React page or component | `apps/web/src/features/<domain>/` or `apps/web/src/shared/` |
+| New API hook or client function | `apps/web/src/features/<domain>/api/` or `apps/web/src/api/` |
+| New C# controller | `apps/api/ManageR2.Api/Features/<Domain>/` |
+| New C# repository/service | `apps/api/ManageR2.Infrastructure/Features/<Domain>/` |
+| New domain entity | `apps/api/ManageR2.Domain/Features/<Domain>/Entities/` |
+| New stored procedure | `database/SP/sp_<Domain>_<Action>.sql` |
+| New shared UI component | `apps/web/src/shared/components/<ComponentName>/` |
+
+## Dependency rules
+
+- `apps/web` and `apps/api` are fully independent workloads — no cross-app imports.
+- Inside `apps/web/src/`: `app` → `features` → `shared` → `api`. No reverse direction.
+- Inside `apps/api/`: `Api` → `Infrastructure` → `Domain`. No reverse direction.
+
+## Running the monorepo
+
+```bash
+# All commands from repo root
+npm run dev        # starts apps/web dev server (Vite)
+npm run build      # production build of apps/web
+
+# Backend — from apps/api/
+dotnet build ManageR2.Backend.sln
+dotnet run --project ManageR2.Api
+```
+
+## Never
+
+- Add `node_modules/` to version control.
+- Add a shared `package.json` dependency that only one workspace uses (install into that workspace).
+- Add UI outside `apps/web/src/` — all UI lives in the React SPA.

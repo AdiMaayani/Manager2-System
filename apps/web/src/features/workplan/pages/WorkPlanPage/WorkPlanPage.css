@@ -1,0 +1,15 @@
+.workPlanPage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.workPlanPage__gantt {
+  padding: var(--spacing-lg);
+  margin-top: var(--spacing-md);
+}
+
+.workPlanPage__ganttTitle {
+  margin: 0 0 var(--spacing-md);
+  font-size: var(--font-size-lg);
+}

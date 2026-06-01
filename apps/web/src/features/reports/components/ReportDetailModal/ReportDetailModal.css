@@ -1,0 +1,61 @@
+.reportDetailModal {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.reportDetailModal__section h3 {
+  margin: 0 0 var(--spacing-sm);
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+}
+
+.reportDetailModal__meta {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--spacing-md);
+  margin: 0;
+}
+
+.reportDetailModal__meta div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.reportDetailModal__meta dt {
+  margin: 0;
+  color: var(--color-neutral-600);
+  font-size: var(--font-size-sm);
+}
+
+.reportDetailModal__meta dd {
+  margin: 0;
+  color: var(--color-neutral-900);
+}
+
+.reportDetailModal__text {
+  margin: 0;
+  white-space: pre-wrap;
+  color: var(--color-neutral-800);
+}
+
+.reportDetailModal__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.reportDetailModal__chip {
+  display: inline-block;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-md);
+  background: var(--color-neutral-100);
+  color: var(--color-neutral-800);
+  font-size: var(--font-size-sm);
+}
+
+.reportDetailModal__actions {
+  display: flex;
+  justify-content: flex-start;
+}

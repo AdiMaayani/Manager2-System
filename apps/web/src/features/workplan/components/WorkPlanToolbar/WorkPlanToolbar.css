@@ -1,0 +1,113 @@
+.workPlanToolbar {
+  padding: var(--spacing-lg);
+  margin-bottom: var(--spacing-md);
+}
+
+.workPlanToolbar__layout {
+  display: flex;
+  flex-direction: row-reverse;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--spacing-md);
+  margin-bottom: var(--spacing-md);
+}
+
+.workPlanToolbar__left,
+.workPlanToolbar__right {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.workPlanToolbar__left {
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.workPlanToolbar__tabsRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-md);
+}
+
+.workPlanToolbar__conditional {
+  display: flex;
+  align-items: center;
+}
+
+.workPlanToolbar__select {
+  min-width: 200px;
+  height: 40px;
+  padding: var(--spacing-xs) var(--spacing-md);
+  border: 1px solid var(--color-neutral-300);
+  border-radius: var(--radius-md);
+  background: #fff;
+  font-size: var(--font-size-sm);
+}
+
+.workPlanToolbar__segment {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs);
+  background-color: var(--color-neutral-100);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-neutral-200);
+}
+
+.workPlanToolbar__segBtn {
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-700);
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+}
+
+.workPlanToolbar__segBtn--active {
+  background-color: var(--color-primary-600);
+  color: #fff;
+}
+
+.workPlanToolbar__filtersRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+}
+
+.workPlanToolbar__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+  font-size: var(--font-size-xs);
+  color: var(--color-neutral-600);
+}
+
+.workPlanToolbar__legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.workPlanToolbar__chip {
+  width: 12px;
+  height: 12px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+.workPlanToolbar__chip--locked {
+  background: var(--color-danger-500);
+}
+
+.workPlanToolbar__chip--normal {
+  background: var(--color-success-500);
+}
+
+.workPlanToolbar__chip--warning {
+  background: var(--color-warning-500, #f59e0b);
+}

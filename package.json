@@ -1,0 +1,21 @@
+{
+  "name": "manager2-system",
+  "version": "0.0.1",
+  "private": true,
+  "workspaces": [
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace=apps/web",
+    "dev:api": "dotnet run --project apps/api/ManageR2.Api --urls http://localhost:5162",
+    "dev:legacy:api": "dotnet run --project _temp/dev-ui/backend/ManageR2.Api",
+    "dev:legacy:ui": "npx --yes serve _temp/dev-ui -l 5500",
+    "build": "npm run build --workspace=apps/web",
+    "build:api": "dotnet build apps/api/ManageR2.Backend.sln",
+    "preview": "npm run preview --workspace=apps/web"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "npm": ">=10.0.0"
+  }
+}
