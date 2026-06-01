@@ -1,6 +1,6 @@
 import type { Contact } from '@features/contacts/types';
 import type { Customer } from '@features/customers/types';
-import type { EmployeeUser } from '@features/employees/types';
+import type { Employee } from '@features/employees/types';
 import type {
   ProjectLifecycle,
   ProjectListItem,
@@ -77,26 +77,24 @@ export const mockCustomers: Customer[] = [
   },
 ];
 
-export const mockEmployees: EmployeeUser[] = [
+export const mockEmployees: Employee[] = [
   {
-    userId: 1,
     employeeId: 1,
-    username: 'רביב מעיני',
+    fullName: 'רביב מעיני',
+    primaryRole: 'מנכ״ל',
     email: 'raviv@manager2.co.il',
-    isActive: true,
-    roles: ['מנכ״ל'],
-    departments: ['ניהול'],
     phone: '050-0000001',
+    isActive: true,
+    isAssignable: true,
   },
   {
-    userId: 2,
     employeeId: 2,
-    username: 'שרה לוי',
+    fullName: 'שרה לוי',
+    primaryRole: 'מנהלת פרויקטים',
     email: 'sara@manager2.co.il',
-    isActive: true,
-    roles: ['מנהלת פרויקטים'],
-    departments: ['פרויקטים'],
     phone: '050-0000002',
+    isActive: true,
+    isAssignable: true,
   },
 ];
 
