@@ -34,6 +34,34 @@ function combineDateAndTime(date: string, time: string): string | null {
   return `${date}T${time}:00`;
 }
 
+function validatePlannedTimeRange(date: string, startTime: string, endTime: string): {
+  plannedStart: string;
+  plannedEnd: string;
+} {
+  if (!date) throw new Error('יש להזין תאריך מתוכנן.');
+  if (!startTime) throw new Error('יש להזין זמן התחלה מתוכנן.');
+  if (!endTime) throw new Error('יש להזין זמן סיום מתוכנן.');
+
+  const plannedStart = combineDateAndTime(date, startTime);
+  const plannedEnd = combineDateAndTime(date, endTime);
+  const plannedStartDate = plannedStart ? new Date(plannedStart) : null;
+  const plannedEndDate = plannedEnd ? new Date(plannedEnd) : null;
+
+  if (!plannedStart || !plannedStartDate || Number.isNaN(plannedStartDate.getTime())) {
+    throw new Error('יש להזין זמן התחלה מתוכנן.');
+  }
+
+  if (!plannedEnd || !plannedEndDate || Number.isNaN(plannedEndDate.getTime())) {
+    throw new Error('יש להזין זמן סיום מתוכנן.');
+  }
+
+  if (plannedEndDate <= plannedStartDate) {
+    throw new Error('זמן הסיום חייב להיות אחרי זמן ההתחלה.');
+  }
+
+  return { plannedStart, plannedEnd };
+}
+
 export function EditTaskDrawer({ isOpen, task, onClose }: EditTaskDrawerProps) {
   const queryClient = useQueryClient();
   const [title, setTitle] = useState('');
@@ -86,6 +114,7 @@ export function EditTaskDrawer({ isOpen, task, onClose }: EditTaskDrawerProps) {
       }
 
       if (!title.trim()) throw new Error('יש להזין כותרת משימה');
+      const plannedTimeRange = validatePlannedTimeRange(plannedDate, plannedStart, plannedEnd);
 
       await updateWorkItemAsync(task.taskId, {
         title: title.trim(),
@@ -95,8 +124,8 @@ export function EditTaskDrawer({ isOpen, task, onClose }: EditTaskDrawerProps) {
         workType: workItem.workType,
         customerId: workItem.customerId,
         siteId: workItem.siteId,
-        plannedStart: combineDateAndTime(plannedDate, plannedStart),
-        plannedEnd: combineDateAndTime(plannedDate, plannedEnd),
+        plannedStart: plannedTimeRange.plannedStart,
+        plannedEnd: plannedTimeRange.plannedEnd,
         estimatedHours: estimatedHours ? Number(estimatedHours) : null,
         priority: priority || null,
         requiredRole: requiredRole || null,

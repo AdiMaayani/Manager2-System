@@ -48,6 +48,34 @@ function combineDateAndTime(date: string, time: string): string | null {
   return `${date}T${time}:00`;
 }
 
+function validatePlannedTimeRange(date: string, startTime: string, endTime: string): {
+  plannedStart: string;
+  plannedEnd: string;
+} {
+  if (!date) throw new Error('יש להזין תאריך מתוכנן.');
+  if (!startTime) throw new Error('יש להזין זמן התחלה מתוכנן.');
+  if (!endTime) throw new Error('יש להזין זמן סיום מתוכנן.');
+
+  const plannedStart = combineDateAndTime(date, startTime);
+  const plannedEnd = combineDateAndTime(date, endTime);
+  const plannedStartDate = plannedStart ? new Date(plannedStart) : null;
+  const plannedEndDate = plannedEnd ? new Date(plannedEnd) : null;
+
+  if (!plannedStart || !plannedStartDate || Number.isNaN(plannedStartDate.getTime())) {
+    throw new Error('יש להזין זמן התחלה מתוכנן.');
+  }
+
+  if (!plannedEnd || !plannedEndDate || Number.isNaN(plannedEndDate.getTime())) {
+    throw new Error('יש להזין זמן סיום מתוכנן.');
+  }
+
+  if (plannedEndDate <= plannedStartDate) {
+    throw new Error('זמן הסיום חייב להיות אחרי זמן ההתחלה.');
+  }
+
+  return { plannedStart, plannedEnd };
+}
+
 function formatRecommendationScore(score?: number | null): string {
   if (score == null || Number.isNaN(Number(score))) return '—';
   const numericScore = Number(score);
@@ -153,12 +181,7 @@ export function NewTaskModal({
   function validateDetails() {
     if (!parentId) throw new Error('יש לבחור פרויקט לפני יצירת משימה');
     if (!title.trim()) throw new Error('יש להזין כותרת משימה');
-    if (!plannedDate || !plannedStart || !plannedEnd) {
-      throw new Error('יש להזין תאריך ושעות עבודה מתוכננות');
-    }
-    if (plannedEnd <= plannedStart) {
-      throw new Error('שעת סיום חייבת להיות אחרי שעת התחלה');
-    }
+    validatePlannedTimeRange(plannedDate, plannedStart, plannedEnd);
   }
 
   function validateAssignment() {
@@ -211,14 +234,16 @@ export function NewTaskModal({
         }
       }
 
+      const plannedTimeRange = validatePlannedTimeRange(plannedDate, plannedStart, plannedEnd);
+
       const created = await createWorkItemAsync({
         title: title.trim(),
         description: description.trim() || undefined,
         status,
         billingType: 'Hourly',
         parentWorkItemId: parentId,
-        plannedStart: combineDateAndTime(plannedDate, plannedStart),
-        plannedEnd: combineDateAndTime(plannedDate, plannedEnd),
+        plannedStart: plannedTimeRange.plannedStart,
+        plannedEnd: plannedTimeRange.plannedEnd,
         estimatedHours: estimatedHours ? Number(estimatedHours) : null,
         priority,
         requiredRole: requiredRole || null,
