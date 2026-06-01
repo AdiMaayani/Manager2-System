@@ -17,7 +17,9 @@ database/
   schema/
     tables.sql                 # All tables, indexes, PKs, defaults, checks, foreign keys (verbatim DDL snapshot)
   functions/
-    <FunctionName>.sql         # One scalar function per file (9 files)
+    <FunctionName>.sql         # One scalar function per file (2 files)
+  cleanup/
+    2026-06-01_drop_legacy_functions.sql  # Manual cleanup for removed legacy functions
   SP/
     <ProcedureName>.sql        # One stored procedure per file (74 files)
     2026-04-20_workplan_algorithm_data_model_extension.sql   # historical migration (see notes)
@@ -32,13 +34,14 @@ Select your target database context once before running them (see Run Order).
 
 ## Object inventory
 
-Counts below were taken directly from `igroup30_prod.sql` object headers and match the files in this folder.
+Counts below are based on the exported `igroup30_prod.sql` object headers, with unrelated legacy functions removed
+from the repository baseline in the cleanup branch.
 
 | Object type | In dump | Scripts in repo |
 |---|---|---|
 | Tables | 31 | captured in `schema/tables.sql` |
 | Indexes (explicit) | 26 | captured in `schema/tables.sql` |
-| Scalar functions | 9 | 9 files in `functions/` |
+| Scalar functions | 9 | 2 files in `functions/` |
 | Stored procedures | 74 | 74 files in `SP/` |
 | Views | 0 | n/a |
 | Triggers | 0 | n/a |
@@ -54,9 +57,8 @@ Rec_TaskAssignmentRecommendations, Rec_WorkItemAlgorithmProfile, Rec_WorkItemReq
 Roles, Sites, UserDepartments, UserRoles, Users, WorkContractorAssignments, WorkEmployeeAssignments,
 WorkItems, WorkReportEmployeeAssignments, WorkReports, WorkReportSystems.
 
-### Scalar functions (9)
-fnGetAnimalType, fnGetGenderDescription, fnHasParticipant, funcAddLeadingZero, funcCalculate,
-funcCalculateGender, funcCalculateStatus, funcParseTaskPriority, funcParseTaskStatus.
+### Scalar functions (2)
+funcParseTaskPriority, funcParseTaskStatus.
 
 ### Stored procedures (74)
 **Rec_* (16):** Rec_CreateRecommendationRun, Rec_GetActiveAssignableEmployees,
@@ -98,6 +100,9 @@ so run it against an empty database).
 4. **Stored procedures** — run every file in `SP/` (order does not matter; `CREATE OR ALTER` does not require
    referenced objects to pre-exist at create time).
 
+The manual cleanup script in `cleanup/2026-06-01_drop_legacy_functions.sql` is not part of a fresh rebuild. Run it
+manually in SSMS against existing target databases that still contain the removed legacy functions.
+
 ### PowerShell helper (uses `sqlcmd`)
 
 ```powershell
@@ -133,14 +138,14 @@ FROM sys.objects
 WHERE is_ms_shipped = 0 AND schema_id = SCHEMA_ID('dbo')
 GROUP BY type_desc
 ORDER BY type_desc;
--- Expect: USER_TABLE = 31, SQL_STORED_PROCEDURE = 74, SQL_SCALAR_FUNCTION = 9, VIEW = 0
+-- Expect: USER_TABLE = 31, SQL_STORED_PROCEDURE = 74, SQL_SCALAR_FUNCTION = 2, VIEW = 0
 ```
 
 Repo-side validation (no DB required):
 
 ```powershell
 "SP files:        " + (Get-ChildItem .\database\SP\*.sql -Exclude '2026-*').Count        # expect 74
-"Function files:  " + (Get-ChildItem .\database\functions\*.sql).Count                    # expect 9
+"Function files:  " + (Get-ChildItem .\database\functions\*.sql).Count                    # expect 2
 "Schema snapshot: " + (Test-Path .\database\schema\tables.sql)                            # expect True
 ```
 
@@ -148,17 +153,11 @@ Repo-side validation (no DB required):
 
 ## Notes on legacy / unreferenced objects
 
-These objects are preserved exactly as they exist in production. They are documented here for awareness only —
-**nothing was removed**, and this baseline does not change their behavior.
+Legacy scalar functions from an unrelated previous project were removed from the repository baseline in the
+`chore/db-legacy-function-cleanup` branch. Existing databases are not changed by this repository update; run
+`cleanup/2026-06-01_drop_legacy_functions.sql` manually in SSMS against each target database that should drop them.
 
-### Legacy scalar functions (no current-table dependency)
-`fnGetAnimalType`, `fnGetGenderDescription`, `fnHasParticipant`, `funcCalculate`, `funcCalculateGender`,
-`funcCalculateStatus` return Hebrew pet/volunteer/charity labels and reference none of the current tables.
-They appear to originate from a previous (unrelated) system and are not used by the ManageR2 backend.
-Kept for fidelity; a future cleanup branch may evaluate removal.
-
-`funcAddLeadingZero`, `funcParseTaskPriority`, `funcParseTaskStatus` are generic helpers; verify usage in SP
-bodies before relying on or removing them.
+`funcParseTaskPriority` and `funcParseTaskStatus` remain in the active function inventory.
 
 ### Stored procedures present in the DB but not currently called by the backend
 (Confirmed against the current repositories; verify before relying on them.)
