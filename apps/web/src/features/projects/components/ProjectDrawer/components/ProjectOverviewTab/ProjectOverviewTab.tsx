@@ -138,8 +138,7 @@ export function ProjectOverviewTab({
                 value={form.customerId || ''}
                 onChange={(event) => {
                   const customerId = Number(event.target.value);
-                  updateField('customerId', customerId);
-                  updateField('siteId', 0);
+                  onChange({ ...form, customerId, siteId: 0 });
                 }}
               >
                 <option value="">בחר לקוח</option>
