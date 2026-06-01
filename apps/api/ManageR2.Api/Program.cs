@@ -66,7 +66,7 @@ builder.Services.AddCors(options =>
 });
 
 // JWT signing and validation parameters from configuration (fail fast if misconfigured).
-var jwtKey = builder.Configuration["Jwt:Key"] ?? throw new InvalidOperationException("JWT key is missing.");
+var jwtKey = GetRequiredSecretConfigurationValue(builder.Configuration, "Jwt:Key", "JWT key");
 var jwtIssuer = builder.Configuration["Jwt:Issuer"] ?? throw new InvalidOperationException("JWT issuer is missing.");
 var jwtAudience = builder.Configuration["Jwt:Audience"] ?? throw new InvalidOperationException("JWT audience is missing.");
 
@@ -139,3 +139,14 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+static string GetRequiredSecretConfigurationValue(IConfiguration configuration, string key, string displayName)
+{
+    var value = configuration[key];
+    if (string.IsNullOrWhiteSpace(value) || value.StartsWith("__SET_WITH_", StringComparison.Ordinal))
+    {
+        throw new InvalidOperationException($"{displayName} is missing. Configure {key} with user secrets or environment variables.");
+    }
+
+    return value;
+}
