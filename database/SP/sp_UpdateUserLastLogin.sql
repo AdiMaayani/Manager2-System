@@ -1,0 +1,17 @@
+﻿SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE OR ALTER PROCEDURE [dbo].[sp_UpdateUserLastLogin]
+    @UserId INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    UPDATE dbo.Users
+    SET LastLoginAt = SYSUTCDATETIME()
+    WHERE UserId = @UserId;
+
+    SELECT @@ROWCOUNT AS RowsAffected;
+END;
+GO
