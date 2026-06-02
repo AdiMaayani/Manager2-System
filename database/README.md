@@ -171,8 +171,7 @@ Legacy scalar functions from an unrelated previous project were removed from the
 
 ### Stored procedures present in the DB but not currently called by the backend
 (Confirmed against the current repositories; verify before relying on them.)
-`sp_GetActiveContacts`, `sp_GetActiveCustomers`, `sp_GetEmployees` (the backend currently reads employees with
-inline SQL), `sp_GetWorkEmployees`, `sp_GetProjectForWorkPlan`, `sp_GetProjectTasksForWorkPlan`,
+`sp_GetActiveContacts`, `sp_GetActiveCustomers`, `sp_GetWorkEmployees`, `sp_GetProjectForWorkPlan`, `sp_GetProjectTasksForWorkPlan`,
 `sp_Rec_GetAssignmentInput`, and several granular `Rec_Get*` candidate-loading procedures (the backend uses the
 bundled `Rec_GetTaskRecommendationInput`). These are kept because they are part of the live database.
 
@@ -181,6 +180,8 @@ bundled `Rec_GetTaskRecommendationInput`). These are kept because they are part 
   It creates `CompanySettings` plus `sp_Settings_GetCompanySettings` and `sp_Settings_UpsertCompanySettings`.
 - `migrations/2026-06-02_reports_lifecycle.sql` — idempotent manual migration for report lifecycle stored procedures.
   It does not alter tables; delete is physical because `WorkReports` has no soft-delete column.
+- `migrations/2026-06-02_employees_crud.sql` — idempotent manual migration for employee management stored procedures.
+  It updates `sp_GetEmployees` to return all roster fields and adds get-by-id, create, update, and active-status procedures.
 - `SP/2026-04-20_workplan_algorithm_data_model_extension.sql` — conditional `ALTER TABLE ADD COLUMN` migration for
   the work-plan algorithm. Its columns are already present in `schema/tables.sql`, so a fresh build does **not**
   need it. Retained as migration history.

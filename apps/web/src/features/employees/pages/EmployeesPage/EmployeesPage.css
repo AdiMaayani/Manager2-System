@@ -1,3 +1,31 @@
+.employeesPage__toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-md);
+  align-items: flex-end;
+  justify-content: space-between;
+}
+
+.employeesPage__readonlyNote,
+.employeesPage__success {
+  margin: var(--spacing-md) 0 0;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+}
+
+.employeesPage__readonlyNote {
+  color: var(--color-neutral-700);
+  background: var(--color-neutral-50);
+  border: 1px solid var(--color-neutral-200);
+}
+
+.employeesPage__success {
+  color: var(--color-success-700);
+  background: var(--color-success-50);
+  border: 1px solid var(--color-success-200);
+}
+
 .employeesPage__tableWrap {
   margin-top: var(--spacing-lg);
   overflow-x: auto;

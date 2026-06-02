@@ -5,7 +5,7 @@ using Microsoft.Data.SqlClient;
 
 namespace ManageR2.Infrastructure.Repositories;
 
-// Read-only employee catalog: parameterized SQL (no SP) against dbo.Employees for assignment UI validation.
+// Employee catalog persistence; all database access is through stored procedures.
 public class EmployeeRepository : IEmployeeRepository
 {
     private readonly DBServices _dbServices;
@@ -15,28 +15,14 @@ public class EmployeeRepository : IEmployeeRepository
         _dbServices = dbServices;
     }
 
-    // SELECT all active roster rows ordered for dropdowns.
     public async Task<List<Employee>> GetAllAsync()
     {
         var employees = new List<Employee>();
 
         await using var connection = _dbServices.CreateConnection();
-        await using var command = new SqlCommand(
-            @"SELECT
-                  EmployeeId,
-                  FullName,
-                  PrimaryRole,
-                  Phone,
-                  Email,
-                  DailyCapacityHours,
-                  IsAssignable,
-                  IsActive,
-                  CreatedAt
-              FROM dbo.Employees
-              ORDER BY FullName ASC",
-            connection)
+        await using var command = new SqlCommand("dbo.sp_GetEmployees", connection)
         {
-            CommandType = CommandType.Text
+            CommandType = CommandType.StoredProcedure
         };
 
         await connection.OpenAsync();
@@ -50,26 +36,12 @@ public class EmployeeRepository : IEmployeeRepository
         return employees;
     }
 
-    // SELECT by primary key for single-employee views.
     public async Task<Employee?> GetByIdAsync(int employeeId)
     {
         await using var connection = _dbServices.CreateConnection();
-        await using var command = new SqlCommand(
-            @"SELECT
-                  EmployeeId,
-                  FullName,
-                  PrimaryRole,
-                  Phone,
-                  Email,
-                  DailyCapacityHours,
-                  IsAssignable,
-                  IsActive,
-                  CreatedAt
-              FROM dbo.Employees
-              WHERE EmployeeId = @EmployeeId",
-            connection)
+        await using var command = new SqlCommand("dbo.sp_GetEmployeeById", connection)
         {
-            CommandType = CommandType.Text
+            CommandType = CommandType.StoredProcedure
         };
 
         command.Parameters.AddWithValue("@EmployeeId", employeeId);
@@ -83,6 +55,68 @@ public class EmployeeRepository : IEmployeeRepository
         }
 
         return null;
+    }
+
+    public async Task<int> CreateAsync(Employee employee)
+    {
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand("dbo.sp_CreateEmployee", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+
+        AddEditableEmployeeParameters(command, employee);
+
+        await connection.OpenAsync();
+        var result = await command.ExecuteScalarAsync();
+        return result != null && result != DBNull.Value ? Convert.ToInt32(result) : 0;
+    }
+
+    public async Task<bool> UpdateAsync(Employee employee)
+    {
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand("dbo.sp_UpdateEmployee", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+
+        command.Parameters.AddWithValue("@EmployeeId", employee.EmployeeId);
+        AddEditableEmployeeParameters(command, employee);
+
+        await connection.OpenAsync();
+        var result = await command.ExecuteScalarAsync();
+        var rowsAffected = result != null && result != DBNull.Value ? Convert.ToInt32(result) : 0;
+
+        return rowsAffected > 0;
+    }
+
+    public async Task<bool> SetActiveStatusAsync(int employeeId, bool isActive)
+    {
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand("dbo.sp_SetEmployeeActiveStatus", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+
+        command.Parameters.AddWithValue("@EmployeeId", employeeId);
+        command.Parameters.AddWithValue("@IsActive", isActive);
+
+        await connection.OpenAsync();
+        var result = await command.ExecuteScalarAsync();
+        var rowsAffected = result != null && result != DBNull.Value ? Convert.ToInt32(result) : 0;
+
+        return rowsAffected > 0;
+    }
+
+    private static void AddEditableEmployeeParameters(SqlCommand command, Employee employee)
+    {
+        command.Parameters.AddWithValue("@FullName", employee.FullName);
+        command.Parameters.AddWithValue("@PrimaryRole", employee.PrimaryRole);
+        command.Parameters.AddWithValue("@Phone", (object?)employee.Phone ?? DBNull.Value);
+        command.Parameters.AddWithValue("@Email", (object?)employee.Email ?? DBNull.Value);
+        command.Parameters.AddWithValue("@DailyCapacityHours", employee.DailyCapacityHours.HasValue ? employee.DailyCapacityHours.Value : DBNull.Value);
+        command.Parameters.AddWithValue("@IsAssignable", employee.IsAssignable);
+        command.Parameters.AddWithValue("@IsActive", employee.IsActive);
     }
 
     // Reader → Employee; keeps Infrastructure aligned with Employees table columns.
