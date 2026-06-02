@@ -230,10 +230,37 @@ export interface ProjectDrawing {
 }
 
 export interface ProjectEquipmentItem {
-  id: string;
+  projectEquipmentItemId: number;
+  projectId: number;
   name: string;
   status: string;
   location: string;
+  sortOrder: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateProjectEquipmentItemRequest {
+  equipmentName: string;
+  status: string;
+  location?: string;
+  sortOrder?: number;
+}
+
+export interface UpdateProjectEquipmentItemRequest {
+  equipmentName: string;
+  status: string;
+  location?: string;
+  sortOrder: number;
+}
+
+export interface ReorderProjectEquipmentItemRequest {
+  projectEquipmentItemId: number;
+  sortOrder: number;
+}
+
+export interface ReorderProjectEquipmentRequest {
+  items: ReorderProjectEquipmentItemRequest[];
 }
 
 export interface ProjectOverviewForm {

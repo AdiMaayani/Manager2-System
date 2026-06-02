@@ -1,15 +1,19 @@
 import { apiRequest } from '@api/client';
 import type {
   CreateMilestoneRequest,
+  CreateProjectEquipmentItemRequest,
   CreateProjectRequest,
   CreateSiteRequest,
   ProjectEmployeeOption,
+  ProjectEquipmentItem,
   ProjectLifecycle,
   ProjectListItem,
   ProjectMilestone,
+  ReorderProjectEquipmentRequest,
   SyncProjectEmployeeAssignmentsRequest,
   Site,
   UpdateMilestoneRequest,
+  UpdateProjectEquipmentItemRequest,
   UpdateProjectRequest,
 } from '../types';
 
@@ -18,6 +22,32 @@ interface RawEmployeeResponse {
   fullName?: string;
   primaryRole?: string;
   isActive?: boolean;
+}
+
+interface RawProjectEquipmentItemResponse {
+  projectEquipmentItemId: number;
+  projectId: number;
+  equipmentName: string;
+  status: string;
+  location?: string | null;
+  sortOrder: number;
+  createdAt?: string;
+  updatedAt?: string | null;
+}
+
+function mapProjectEquipmentItem(
+  equipmentItem: RawProjectEquipmentItemResponse,
+): ProjectEquipmentItem {
+  return {
+    projectEquipmentItemId: equipmentItem.projectEquipmentItemId,
+    projectId: equipmentItem.projectId,
+    name: equipmentItem.equipmentName,
+    status: equipmentItem.status,
+    location: equipmentItem.location ?? '',
+    sortOrder: equipmentItem.sortOrder,
+    createdAt: equipmentItem.createdAt,
+    updatedAt: equipmentItem.updatedAt ?? undefined,
+  };
 }
 
 export function getProjectsListAsync(): Promise<ProjectListItem[]> {
@@ -30,6 +60,12 @@ export function getProjectLifecycleAsync(projectId: number): Promise<ProjectLife
 
 export function getProjectMilestonesAsync(projectId: number): Promise<ProjectMilestone[]> {
   return apiRequest<ProjectMilestone[]>(`/WorkItems/${projectId}/milestones`);
+}
+
+export function getProjectEquipmentAsync(projectId: number): Promise<ProjectEquipmentItem[]> {
+  return apiRequest<RawProjectEquipmentItemResponse[]>(
+    `/Projects/${projectId}/equipment`,
+  ).then((equipmentItems) => equipmentItems.map(mapProjectEquipmentItem));
 }
 
 export function createProjectAsync(body: CreateProjectRequest): Promise<{ workItemId: number }> {
@@ -75,6 +111,49 @@ export function updateMilestoneAsync(
 export function cancelMilestoneAsync(milestoneId: number): Promise<{ message: string }> {
   return apiRequest<{ message: string }>(`/WorkItems/milestones/${milestoneId}/cancel`, {
     method: 'PUT',
+  });
+}
+
+export function createProjectEquipmentAsync(
+  projectId: number,
+  body: CreateProjectEquipmentItemRequest,
+): Promise<ProjectEquipmentItem> {
+  return apiRequest<RawProjectEquipmentItemResponse>(`/Projects/${projectId}/equipment`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  }).then(mapProjectEquipmentItem);
+}
+
+export function updateProjectEquipmentAsync(
+  projectId: number,
+  equipmentItemId: number,
+  body: UpdateProjectEquipmentItemRequest,
+): Promise<ProjectEquipmentItem> {
+  return apiRequest<RawProjectEquipmentItemResponse>(
+    `/Projects/${projectId}/equipment/${equipmentItemId}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    },
+  ).then(mapProjectEquipmentItem);
+}
+
+export function deleteProjectEquipmentAsync(
+  projectId: number,
+  equipmentItemId: number,
+): Promise<void> {
+  return apiRequest<void>(`/Projects/${projectId}/equipment/${equipmentItemId}`, {
+    method: 'DELETE',
+  });
+}
+
+export function reorderProjectEquipmentAsync(
+  projectId: number,
+  body: ReorderProjectEquipmentRequest,
+): Promise<void> {
+  return apiRequest<void>(`/Projects/${projectId}/equipment/order`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
   });
 }
 
