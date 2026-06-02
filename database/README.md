@@ -1,8 +1,10 @@
 # ManageR2 Database — Version-Controlled Baseline
 
 This folder is the version-controlled, reproducible definition of the ManageR2 SQL Server database.
-It was produced by exporting the live production dump `igroup30_prod.sql`
-(Script Date **31/05/2026**, SQL Server 2016, compatibility level 100) into one script per object.
+It was originally produced by exporting the live production dump `igroup30_prod.sql`
+(Script Date **31/05/2026**, SQL Server 2016, compatibility level 100) into one script per object,
+then reconciled with the completed baseline migrations for company settings, report lifecycle, employees CRUD,
+service calls, and project equipment persistence.
 
 > Goal of this baseline: the live database can be rebuilt from these scripts alone, with no access to the production server.
 > No DB logic was changed. The only modifications are **syntax-only, deploy-safety** changes:
@@ -15,16 +17,19 @@ It was produced by exporting the live production dump `igroup30_prod.sql`
 ```
 database/
   schema/
-    tables.sql                 # All tables, indexes, PKs, defaults, checks, foreign keys (verbatim DDL snapshot)
+    tables.sql                 # All current tables, indexes, PKs, defaults, checks, foreign keys
   functions/
     <FunctionName>.sql         # One scalar function per file (2 files)
   cleanup/
     2026-06-01_drop_legacy_functions.sql  # Manual cleanup for removed legacy functions
   migrations/
-    2026-06-01_company_settings.sql        # Manual migration for persisted company settings
-    2026-06-02_reports_lifecycle.sql       # Manual migration for report read/edit/delete procedures
+    2026-06-01_company_settings.sql        # Historical migration for persisted company settings
+    2026-06-02_reports_lifecycle.sql       # Historical migration for report read/edit/delete procedures
+    2026-06-02_employees_crud.sql          # Historical migration for employee management procedures
+    2026-06-02_service_calls_mvp.sql       # Historical migration for WorkItems-backed service calls
+    2026-06-02_project_equipment.sql       # Historical migration for project equipment persistence
   SP/
-    <ProcedureName>.sql        # One stored procedure per file (74 files)
+    <ProcedureName>.sql        # One stored procedure per file (93 canonical files)
     2026-04-20_workplan_algorithm_data_model_extension.sql   # historical migration (see notes)
     2026-04-20_seed_WorkPlanAlgorithmDemoData.sql            # demo seed data (see notes)
   README.md
@@ -37,23 +42,24 @@ Select your target database context once before running them (see Run Order).
 
 ## Object inventory
 
-Counts below are based on the exported `igroup30_prod.sql` object headers, with unrelated legacy functions removed
-from the repository baseline in the cleanup branch.
+Counts below are based on the exported `igroup30_prod.sql` object headers plus the reconciled baseline migrations.
+Unrelated legacy functions were removed from the repository baseline in the cleanup branch.
 
 | Object type | In dump | Scripts in repo |
 |---|---|---|
-| Tables | 31 | captured in `schema/tables.sql` |
-| Indexes (explicit) | 26 | captured in `schema/tables.sql` |
+| Tables | 33 | captured in `schema/tables.sql` |
+| Indexes (explicit) | 27 | captured in `schema/tables.sql` |
 | Scalar functions | 9 | 2 files in `functions/` |
-| Stored procedures | 74 | 74 files in `SP/` |
+| Stored procedures | 93 | 93 canonical files in `SP/` |
 | Views | 0 | n/a |
 | Triggers | 0 | n/a |
 
-`schema/tables.sql` also contains the primary keys, 53 foreign-key statements, default constraints,
-and 29 check constraints exactly as scripted by the dump.
+`schema/tables.sql` also contains the primary keys, 54 foreign-key statements, default constraints,
+and 32 check constraints.
 
-### Tables (31)
-Contacts, Contractors, Customers, Departments, Employees, Rec_EmployeeAvailability, Rec_EmployeeBaseAddress,
+### Tables (33)
+CompanySettings, Contacts, Contractors, Customers, Departments, Employees, ProjectEquipmentItems,
+Rec_EmployeeAvailability, Rec_EmployeeBaseAddress,
 Rec_EmployeeCapacity, Rec_EmployeeLocationEvents, Rec_EmployeePlannedStops, Rec_EmployeeSkills,
 Rec_EmployeeWorkZones, Rec_RecommendationRuns, Rec_RouteEstimates, Rec_SiteAddressProfile, Rec_Skills,
 Rec_TaskAssignmentRecommendations, Rec_WorkItemAlgorithmProfile, Rec_WorkItemRequiredSkills, Rec_WorkZones,
@@ -63,7 +69,7 @@ WorkItems, WorkReportEmployeeAssignments, WorkReports, WorkReportSystems.
 ### Scalar functions (2)
 funcParseTaskPriority, funcParseTaskStatus.
 
-### Stored procedures (74)
+### Stored procedures (93)
 **Rec_* (16):** Rec_CreateRecommendationRun, Rec_GetActiveAssignableEmployees,
 Rec_GetAllCandidateAvailabilityForRange, Rec_GetAllCandidateBaseAddresses, Rec_GetAllCandidateCapacities,
 Rec_GetAllCandidateEmployeeSkills, Rec_GetAllCandidateLastLocationEventsForDate,
@@ -71,19 +77,24 @@ Rec_GetAllCandidatePlannedStopsBeforeTask, Rec_GetAllCandidateWorkZones, Rec_Get
 Rec_GetLatestRecommendationsForTask, Rec_GetSiteAddressProfile, Rec_GetTaskCoreData,
 Rec_GetTaskRecommendationInput, Rec_GetWorkItemRequiredSkills, Rec_SaveTaskAssignmentRecommendation.
 
-**sp_* (58):** sp_AddWorkReportEmployeeAssignment, sp_AddWorkReportSystem, sp_AssignContractorToWork,
-sp_AssignEmployeeToWork, sp_CloseWorkItem, sp_CreateContact, sp_CreateCustomer, sp_CreateSite, sp_CreateUser,
+**sp_* (77):** sp_AddWorkReportEmployeeAssignment, sp_AddWorkReportSystem, sp_AssignContractorToWork,
+sp_AssignEmployeeToWork, sp_CloseWorkItem, sp_CreateContact, sp_CreateCustomer, sp_CreateEmployee, sp_CreateSite, sp_CreateUser,
 sp_CreateWorkItem, sp_CreateWorkReport, sp_DeactivateContact, sp_DeactivateCustomer,
 sp_DeactivateUserDepartments, sp_DeactivateUserRoles, sp_DeleteContractorAssignmentsByWorkItemId,
-sp_DeleteEmployeeAssignmentsByWorkItemId, sp_DeleteUser, sp_GetActiveContacts, sp_GetActiveCustomers,
+sp_DeleteEmployeeAssignmentsByWorkItemId, sp_DeleteUser, sp_GetActiveContacts, sp_GetActiveCustomers, sp_GetEmployeeById,
 sp_GetAllDepartmentNames, sp_GetAllProjectsForWorkPlans, sp_GetAllRoleNames, sp_GetContactById, sp_GetContacts,
 sp_GetContactsByCustomerId, sp_GetCustomerById, sp_GetCustomers, sp_GetEmployees, sp_GetProjectForWorkPlan,
 sp_GetProjectLifecycle, sp_GetProjectMilestones, sp_GetProjectsList, sp_GetProjectTasksForWorkPlan,
 sp_GetSiteById, sp_GetSites, sp_GetTasksByParentWorkItemId, sp_GetUserByEmail, sp_GetUserById,
 sp_GetUserDepartments, sp_GetUserRoles, sp_GetUsers, sp_GetWorkEmployees, sp_GetWorkItemDetails, sp_GetWorkItems,
 sp_GetWorkItemsByType, sp_GetWorkPlanAssignments, sp_GetWorkPlanProject, sp_GetWorkPlanTasks,
-sp_Rec_GetAssignmentInput, sp_UpdateContact, sp_UpdateCustomer, sp_UpdateSite, sp_UpdateUser,
-sp_UpdateUserLastLogin, sp_UpdateWorkItem, sp_UpsertUserDepartment, sp_UpsertUserRole.
+sp_ProjectEquipment_Create, sp_ProjectEquipment_Delete, sp_ProjectEquipment_GetByProject, sp_ProjectEquipment_Reorder,
+sp_ProjectEquipment_Update, sp_Rec_GetAssignmentInput, sp_SetEmployeeActiveStatus,
+sp_Settings_GetCompanySettings, sp_Settings_UpsertCompanySettings, sp_UpdateContact, sp_UpdateCustomer,
+sp_UpdateEmployee, sp_UpdateSite, sp_UpdateUser, sp_UpdateUserLastLogin, sp_UpdateWorkItem,
+sp_UpsertUserDepartment, sp_UpsertUserRole, sp_WorkReports_Delete, sp_WorkReports_DeleteEmployeeAssignments,
+sp_WorkReports_DeleteSystems, sp_WorkReports_GetById, sp_WorkReports_GetEmployeeAssignments,
+sp_WorkReports_GetList, sp_WorkReports_GetSystems, sp_WorkReports_Update.
 
 ---
 
@@ -106,12 +117,9 @@ so run it against an empty database).
 The manual cleanup script in `cleanup/2026-06-01_drop_legacy_functions.sql` is not part of a fresh rebuild. Run it
 manually in SSMS against existing target databases that still contain the removed legacy functions.
 
-The company settings migration in `migrations/2026-06-01_company_settings.sql` adds the single-row company profile
-table and Settings stored procedures used by the app. Run it manually in SSMS against each target database before using
-the persisted Settings company details screen.
-
-The reports lifecycle migration in `migrations/2026-06-02_reports_lifecycle.sql` adds stored procedures for report
-list/detail reads, edit, and physical delete. Run it manually in SSMS before using report edit/delete actions.
+The scripts in `migrations/` are retained as historical, idempotent migrations for existing databases that were created
+from an older baseline. A fresh rebuild from `schema/`, `functions/`, and `SP/` already includes the completed company
+settings, report lifecycle, employees CRUD, service calls, and project equipment objects.
 
 ### PowerShell helper (uses `sqlcmd`)
 
@@ -148,13 +156,13 @@ FROM sys.objects
 WHERE is_ms_shipped = 0 AND schema_id = SCHEMA_ID('dbo')
 GROUP BY type_desc
 ORDER BY type_desc;
--- Expect: USER_TABLE = 31, SQL_STORED_PROCEDURE = 74, SQL_SCALAR_FUNCTION = 2, VIEW = 0
+-- Expect: USER_TABLE = 33, SQL_STORED_PROCEDURE = 93, SQL_SCALAR_FUNCTION = 2, VIEW = 0
 ```
 
 Repo-side validation (no DB required):
 
 ```powershell
-"SP files:        " + (Get-ChildItem .\database\SP\*.sql -Exclude '2026-*').Count        # expect 74
+"SP files:        " + (Get-ChildItem .\database\SP\*.sql -Exclude '2026-*').Count        # expect 93
 "Function files:  " + (Get-ChildItem .\database\functions\*.sql).Count                    # expect 2
 "Schema snapshot: " + (Test-Path .\database\schema\tables.sql)                            # expect True
 ```
@@ -175,16 +183,22 @@ Legacy scalar functions from an unrelated previous project were removed from the
 `sp_Rec_GetAssignmentInput`, and several granular `Rec_Get*` candidate-loading procedures (the backend uses the
 bundled `Rec_GetTaskRecommendationInput`). These are kept because they are part of the live database.
 
-### Historical migration / seed scripts (kept, not part of the canonical export)
-- `migrations/2026-06-01_company_settings.sql` — idempotent manual migration for persisted company profile settings.
-  It creates `CompanySettings` plus `sp_Settings_GetCompanySettings` and `sp_Settings_UpsertCompanySettings`.
-- `migrations/2026-06-02_reports_lifecycle.sql` — idempotent manual migration for report lifecycle stored procedures.
-  It does not alter tables; delete is physical because `WorkReports` has no soft-delete column.
-- `migrations/2026-06-02_employees_crud.sql` — idempotent manual migration for employee management stored procedures.
-  It updates `sp_GetEmployees` to return all roster fields and adds get-by-id, create, update, and active-status procedures.
-- `migrations/2026-06-02_service_calls_mvp.sql` — idempotent manual migration for the Service Calls MVP.
-  It keeps Service Calls in `WorkItems` with `WorkType = 'ServiceCall'` and extends `sp_GetWorkItemsByType`
-  to return site name and scheduling fields for service-call list/detail screens.
+### Historical migration / seed scripts
+The `migrations/` files are retained for existing databases that were created before this reconciled baseline.
+A fresh rebuild already gets their final table/procedure state from `schema/tables.sql` and `SP/`.
+
+- `migrations/2026-06-01_company_settings.sql` — idempotent migration for persisted company profile settings.
+  Its final table and procedures are now part of the canonical baseline; the migration also contains the optional
+  single-row seed for existing databases.
+- `migrations/2026-06-02_reports_lifecycle.sql` — idempotent migration for report lifecycle stored procedures.
+  Its procedures are now split into canonical `SP/sp_WorkReports_*.sql` files.
+- `migrations/2026-06-02_employees_crud.sql` — idempotent migration for employee management stored procedures.
+  Its procedures are now represented by canonical employee SP files, and `sp_GetEmployees` has the current roster shape.
+- `migrations/2026-06-02_service_calls_mvp.sql` — idempotent migration for the Service Calls MVP.
+  It keeps Service Calls in `WorkItems` with `WorkType = 'ServiceCall'`; the current `sp_GetWorkItemsByType`
+  definition is now canonical under `SP/`.
+- `migrations/2026-06-02_project_equipment.sql` — idempotent migration for project equipment persistence.
+  Its table is now captured in `schema/tables.sql`; its five procedures are canonical under `SP/`.
 - `SP/2026-04-20_workplan_algorithm_data_model_extension.sql` — conditional `ALTER TABLE ADD COLUMN` migration for
   the work-plan algorithm. Its columns are already present in `schema/tables.sql`, so a fresh build does **not**
   need it. Retained as migration history.
