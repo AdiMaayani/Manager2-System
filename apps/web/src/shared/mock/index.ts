@@ -8,6 +8,7 @@ import type {
   Site,
 } from '@features/projects/types';
 import type { WorkReportListItem } from '@features/reports/types';
+import type { ServiceCallListItem } from '@features/serviceCalls/types';
 
 export const mockContacts: Contact[] = [
   {
@@ -480,9 +481,46 @@ export const mockInventory = [
   { id: 'INV-002', name: 'כבל 3x2.5', qty: 500, location: 'מחסן צפון' },
 ];
 
-export const mockServiceCalls = [
-  { id: 'SC-2455', customer: 'וילה רמת אביב', status: 'פתוח', priority: 'גבוה' },
-  { id: 'SC-2456', customer: 'חברת ABC', status: 'בטיפול', priority: 'רגיל' },
+export const mockServiceCalls: ServiceCallListItem[] = [
+  {
+    workItemId: 2455,
+    title: 'תקלה במערכת חשמל חכם',
+    description: 'בדיקת תקלה בבית הלקוח',
+    workType: 'ServiceCall',
+    customerId: 2,
+    customerName: 'וילה רמת אביב',
+    siteId: 1,
+    siteName: 'רמת אביב',
+    status: 'Open',
+    billingType: 'Hourly',
+    priority: 'High',
+    plannedStart: '2026-06-02T09:00:00',
+    plannedEnd: '2026-06-02T12:00:00',
+    estimatedHours: 3,
+    requiredRole: 'טכנאי',
+    isLocked: false,
+    createdAt: '2026-06-01T10:00:00',
+    closedAt: null,
+  },
+  {
+    workItemId: 2456,
+    title: 'החלפת בקר תקשורת',
+    workType: 'ServiceCall',
+    customerId: 1,
+    customerName: 'חברת ABC בע״מ',
+    siteId: 2,
+    siteName: 'מרכז תל אביב',
+    status: 'InProgress',
+    billingType: 'Warranty',
+    priority: 'Medium',
+    plannedStart: '2026-06-03T10:00:00',
+    plannedEnd: '2026-06-03T13:00:00',
+    estimatedHours: 2,
+    requiredRole: 'מתקין',
+    isLocked: false,
+    createdAt: '2026-06-01T14:00:00',
+    closedAt: null,
+  },
 ];
 
 export const mockCashflowItems = [

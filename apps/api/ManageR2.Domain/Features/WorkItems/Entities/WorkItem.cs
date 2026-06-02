@@ -25,6 +25,7 @@ public class WorkItem
     public int CustomerId { get; set; }
     public string? CustomerName { get; set; }
     public int SiteId { get; set; }
+    public string? SiteName { get; set; }
     public DateTime CreatedAt { get; set; }
     public DateTime? ClosedAt { get; set; }
     // Parent link builds the hierarchy (project -> child tasks/milestones).

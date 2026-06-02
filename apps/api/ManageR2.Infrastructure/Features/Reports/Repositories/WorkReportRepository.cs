@@ -286,11 +286,18 @@ public class WorkReportRepository : IWorkReportRepository
     private static void AddEditableReportParameters(SqlCommand command, WorkReportCreateModel request)
     {
         var parsedReportDate = ParseReportDate(request.Date);
+        var isServiceCallReport = string.Equals(request.ReportType, "service_call", StringComparison.OrdinalIgnoreCase);
+        var linkedWorkItemId = isServiceCallReport
+            ? request.ServiceCallId ?? request.ProjectId
+            : request.ProjectId;
+        var projectName = isServiceCallReport
+            ? request.ServiceCallTitle ?? request.ProjectName
+            : request.ProjectName;
 
-        command.Parameters.AddWithValue("@WorkItemId", request.ProjectId.HasValue ? request.ProjectId.Value : DBNull.Value);
+        command.Parameters.AddWithValue("@WorkItemId", linkedWorkItemId.HasValue ? linkedWorkItemId.Value : DBNull.Value);
         command.Parameters.AddWithValue("@ReportType", (object?)request.ReportType ?? DBNull.Value);
         command.Parameters.AddWithValue("@ReportDate", parsedReportDate.HasValue ? parsedReportDate.Value : DBNull.Value);
-        command.Parameters.AddWithValue("@ProjectName", (object?)request.ProjectName ?? DBNull.Value);
+        command.Parameters.AddWithValue("@ProjectName", (object?)projectName ?? DBNull.Value);
         command.Parameters.AddWithValue("@CustomerName", (object?)request.CustomerName ?? DBNull.Value);
         command.Parameters.AddWithValue("@Site", (object?)request.Site ?? DBNull.Value);
         command.Parameters.AddWithValue("@StartTime", (object?)request.Start ?? DBNull.Value);
@@ -308,14 +315,21 @@ public class WorkReportRepository : IWorkReportRepository
 
     private static WorkReportDetailsModel MapDetails(SqlDataReader reader)
     {
+        var reportType = GetStringValue(reader, "ReportType");
+        var linkedWorkItemId = GetNullableIntValue(reader, "WorkItemId");
+        var projectName = GetStringValue(reader, "ProjectName");
+        var isServiceCallReport = string.Equals(reportType, "service_call", StringComparison.OrdinalIgnoreCase);
+
         return new WorkReportDetailsModel
         {
             WorkReportId = GetIntValue(reader, "WorkReportId"),
-            ProjectId = GetNullableIntValue(reader, "WorkItemId"),
-            ReportType = GetStringValue(reader, "ReportType"),
+            ProjectId = linkedWorkItemId,
+            ReportType = reportType,
             ReportDate = GetDateTimeValue(reader, "ReportDate"),
-            ProjectName = GetStringValue(reader, "ProjectName"),
+            ProjectName = projectName,
             CustomerName = GetStringValue(reader, "CustomerName"),
+            ServiceCallId = isServiceCallReport ? linkedWorkItemId : null,
+            ServiceCallTitle = isServiceCallReport ? projectName : null,
             Site = GetStringValue(reader, "Site"),
             Start = GetStringValue(reader, "StartTime"),
             End = GetStringValue(reader, "EndTime"),

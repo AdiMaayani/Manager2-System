@@ -85,10 +85,12 @@ export function ReportDetailModal({
                   <Badge variant="primary">{report.status ?? '—'}</Badge>
                 </dd>
               </div>
-              <div>
-                <dt>פרויקט</dt>
-                <dd>{report.projectTitle ?? '—'}</dd>
-              </div>
+              {report.reportType !== 'service_call' && (
+                <div>
+                  <dt>פרויקט</dt>
+                  <dd>{report.projectTitle ?? '—'}</dd>
+                </div>
+              )}
               <div>
                 <dt>לקוח</dt>
                 <dd>{report.customerName ?? '—'}</dd>
