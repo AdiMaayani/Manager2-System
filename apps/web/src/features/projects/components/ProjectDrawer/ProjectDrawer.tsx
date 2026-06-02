@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Drawer } from '@shared/components/Drawer';
 import { Tabs } from '@shared/components/Tabs';
 import type { TabItem } from '@shared/components/Tabs';
@@ -14,6 +14,7 @@ import {
   useProjectLookups,
   teamFormFromProjectAssignments,
   useUpdateProject,
+  buildProjectTeamAssignments,
 } from '../../hooks/useProjectLifecycle';
 import type {
   ProjectBoqRow,
@@ -24,22 +25,19 @@ import type {
   ProjectOverviewForm,
   ProjectTeamForm,
 } from '../../types';
-import { assignEmployeeToProjectAsync } from '../../api/projectsApiClient';
+import { syncProjectEmployeeAssignmentsAsync } from '../../api/projectsApiClient';
 import {
   DEFAULT_BOQ_ROWS,
   DEFAULT_DRAWINGS,
   DEFAULT_EQUIPMENT,
-  PROJECT_MANAGER_ROLE,
   createEmptyOverviewForm,
+  overviewFormFromLifecycle,
 } from '../../utils/projectDisplayUtils';
 import { ProjectBoqTab } from './components/ProjectBoqTab';
 import { ProjectDrawingsTab } from './components/ProjectDrawingsTab';
 import { ProjectEquipmentTab } from './components/ProjectEquipmentTab';
 import { ProjectMilestonesTab } from './components/ProjectMilestonesTab';
-import {
-  ProjectOverviewTab,
-  overviewFormFromLifecycle,
-} from './components/ProjectOverviewTab';
+import { ProjectOverviewTab } from './components/ProjectOverviewTab';
 import { ProjectQuoteTab } from './components/ProjectQuoteTab';
 import { ProjectSummaryCard } from './components/ProjectSummaryCard';
 import './ProjectDrawer.css';
@@ -52,6 +50,19 @@ const DRAWER_TABS: TabItem[] = [
   { id: 'drawings', label: 'שרטוטים' },
   { id: 'equipment', label: 'ציוד' },
 ];
+
+function normalizeProjectTeamForm(teamForm: ProjectTeamForm): ProjectTeamForm {
+  const teamEmployeeIds = teamForm.teamEmployeeIds.filter(
+    (employeeId, index, employeeIds) =>
+      employeeId !== teamForm.projectManagerEmployeeId &&
+      employeeIds.indexOf(employeeId) === index,
+  );
+
+  return {
+    projectManagerEmployeeId: teamForm.projectManagerEmployeeId,
+    teamEmployeeIds,
+  };
+}
 
 interface ProjectDrawerProps {
   projectId: number | null;
@@ -89,51 +100,87 @@ export function ProjectDrawer({
   const [drawings, setDrawings] = useState<ProjectDrawing[]>(DEFAULT_DRAWINGS);
   const [equipment, setEquipment] = useState<ProjectEquipmentItem[]>(DEFAULT_EQUIPMENT);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const isEditModeRef = useRef(isEditMode);
 
-  const lifecycleQuery = useProjectLifecycle(isCreateMode ? null : projectId);
+  const lifecycleQuery = useProjectLifecycle(
+    isCreateMode ? null : projectId,
+    !isEditMode,
+  );
   const lookups = useProjectLookups();
   const createProject = useCreateProject();
   const updateProject = useUpdateProject();
   const createSite = useCreateSite();
   const milestoneMutations = useMilestoneMutations(projectId);
   const assignProjectTeam = useAssignProjectTeam(projectId);
+  const createSiteAsync = createSite.mutateAsync;
+  const createMilestoneAsync = milestoneMutations.createMutation.mutateAsync;
+  const updateMilestoneAsync = milestoneMutations.updateMutation.mutateAsync;
+  const cancelMilestoneAsync = milestoneMutations.cancelMutation.mutateAsync;
+  const refetchLookups = lookups.refetch;
+
+  useEffect(() => {
+    isEditModeRef.current = isEditMode;
+  }, [isEditMode]);
 
   useEffect(() => {
     if (!isOpen) return;
+    let isCancelled = false;
 
     const nextTab = DRAWER_TABS.some((tab) => tab.id === initialTab)
       ? initialTab
       : 'overview';
-    setActiveTab(nextTab);
-    setIsEditMode(isCreateMode);
-    setIsMaximized(false);
-    setSaveError(null);
-    setBoqRows(DEFAULT_BOQ_ROWS.map((row) => ({ ...row })));
-    setDrawings(DEFAULT_DRAWINGS.map((drawing) => ({ ...drawing })));
-    setEquipment(DEFAULT_EQUIPMENT.map((item) => ({ ...item })));
 
-    if (isCreateMode) {
-      setOverviewForm(createEmptyOverviewForm());
-      const emptyTeam = { projectManagerEmployeeId: null, teamEmployeeIds: [] };
-      setTeamForm(emptyTeam);
-      setInitialTeamForm(emptyTeam);
-    }
+    queueMicrotask(() => {
+      if (isCancelled) return;
+
+      setActiveTab(nextTab);
+      setIsEditMode(isCreateMode);
+      setIsMaximized(false);
+      setSaveError(null);
+      setBoqRows(DEFAULT_BOQ_ROWS.map((row) => ({ ...row })));
+      setDrawings(DEFAULT_DRAWINGS.map((drawing) => ({ ...drawing })));
+      setEquipment(DEFAULT_EQUIPMENT.map((item) => ({ ...item })));
+
+      if (isCreateMode) {
+        setOverviewForm(createEmptyOverviewForm());
+        const emptyTeam = { projectManagerEmployeeId: null, teamEmployeeIds: [] };
+        setTeamForm(emptyTeam);
+        setInitialTeamForm(emptyTeam);
+      }
+    });
+
+    return () => {
+      isCancelled = true;
+    };
   }, [isOpen, isCreateMode, initialTab, projectId]);
 
   useEffect(() => {
-    if (lifecycleQuery.data && !isCreateMode) {
-      setOverviewForm(overviewFormFromLifecycle(lifecycleQuery.data));
+    if (lifecycleQuery.data && !isCreateMode && !isEditModeRef.current) {
+      let isCancelled = false;
+      const nextOverviewForm = overviewFormFromLifecycle(lifecycleQuery.data);
       const nextTeamForm = teamFormFromProjectAssignments(lifecycleQuery.data);
-      setTeamForm(nextTeamForm);
-      setInitialTeamForm(nextTeamForm);
+
+      queueMicrotask(() => {
+        if (isCancelled || isEditModeRef.current) return;
+
+        setOverviewForm(nextOverviewForm);
+        setTeamForm(nextTeamForm);
+        setInitialTeamForm(nextTeamForm);
+      });
+
+      return () => {
+        isCancelled = true;
+      };
     }
+
+    return undefined;
   }, [lifecycleQuery.data, isCreateMode]);
 
   const lifecycle = lifecycleQuery.data ?? null;
   const title =
     isCreateMode ? 'פרויקט חדש' : lifecycle?.project.title ?? 'פרטי פרויקט';
 
-  const handleCancelEdit = () => {
+  const handleCancelEdit = useCallback(() => {
     if (isCreateMode) {
       onClose();
       return;
@@ -143,9 +190,49 @@ export function ProjectDrawer({
     setTeamForm(initialTeamForm);
     setIsEditMode(false);
     setSaveError(null);
-  };
+  }, [initialTeamForm, isCreateMode, lifecycle, onClose]);
 
-  const handleSaveProject = async () => {
+  const handleCreateProjectSite = useCallback(
+    async (payload: {
+      customerId: number;
+      siteName: string;
+      addressLine?: string;
+      city?: string;
+      notes?: string;
+      isPrimary?: boolean;
+    }) => {
+      const site = await createSiteAsync(payload);
+      setOverviewForm((current) => ({ ...current, siteId: site.siteId }));
+      await refetchLookups();
+    },
+    [createSiteAsync, refetchLookups],
+  );
+
+  const handleCreateMilestone = useCallback(
+    async (body: Parameters<typeof createMilestoneAsync>[0]) => {
+      await createMilestoneAsync(body);
+    },
+    [createMilestoneAsync],
+  );
+
+  const handleUpdateMilestone = useCallback(
+    async (
+      milestoneId: number,
+      body: Parameters<typeof updateMilestoneAsync>[0]['body'],
+    ) => {
+      await updateMilestoneAsync({ milestoneId, body });
+    },
+    [updateMilestoneAsync],
+  );
+
+  const handleCancelMilestone = useCallback(
+    async (milestoneId: number) => {
+      await cancelMilestoneAsync(milestoneId);
+    },
+    [cancelMilestoneAsync],
+  );
+
+  const handleSaveProject = useCallback(async () => {
     setSaveError(null);
 
     if (!overviewForm.title.trim()) {
@@ -160,6 +247,7 @@ export function ProjectDrawer({
 
     try {
       if (isCreateMode) {
+        const normalizedTeamForm = normalizeProjectTeamForm(teamForm);
         const result = await createProject.mutateAsync({
           title: overviewForm.title.trim(),
           description: overviewForm.description.trim() || undefined,
@@ -173,21 +261,10 @@ export function ProjectDrawer({
         });
 
         const newProjectId = result.workItemId;
-        const teamAssignments: Array<Promise<{ message: string }>> = [];
-
-        if (teamForm.projectManagerEmployeeId) {
-          teamAssignments.push(
-            assignEmployeeToProjectAsync(newProjectId, teamForm.projectManagerEmployeeId, PROJECT_MANAGER_ROLE),
-          );
-        }
-
-        teamForm.teamEmployeeIds.forEach((employeeId) => {
-          teamAssignments.push(
-            assignEmployeeToProjectAsync(newProjectId, employeeId, 'מתקין'),
-          );
-        });
-
-        await Promise.all(teamAssignments);
+        await syncProjectEmployeeAssignmentsAsync(
+          newProjectId,
+          buildProjectTeamAssignments(normalizedTeamForm),
+        );
 
         setIsEditMode(false);
         onSaved(newProjectId);
@@ -216,19 +293,29 @@ export function ProjectDrawer({
         },
       });
 
-      await assignProjectTeam.mutateAsync({
-        teamForm,
-        previousTeamForm: initialTeamForm,
-      });
+      const normalizedTeamForm = normalizeProjectTeamForm(teamForm);
+      await assignProjectTeam.mutateAsync(normalizedTeamForm);
 
       setIsEditMode(false);
+      setTeamForm(normalizedTeamForm);
+      setInitialTeamForm(normalizedTeamForm);
       onSaved(projectId);
     } catch (error) {
       setSaveError(error instanceof Error ? error.message : 'שמירת הפרויקט נכשלה.');
     }
-  };
+  }, [
+    assignProjectTeam,
+    createProject,
+    isCreateMode,
+    lifecycle,
+    onSaved,
+    overviewForm,
+    projectId,
+    teamForm,
+    updateProject,
+  ]);
 
-  const headerActions = (
+  const headerActions = useMemo(() => (
     <div className="projectDrawer__headerActions">
       {isEditMode && (
         <span className="projectDrawer__editIndicator">מצב עריכה</span>
@@ -253,7 +340,15 @@ export function ProjectDrawer({
         </>
       )}
     </div>
-  );
+  ), [
+    assignProjectTeam.isPending,
+    createProject.isPending,
+    handleCancelEdit,
+    handleSaveProject,
+    isCreateMode,
+    isEditMode,
+    updateProject.isPending,
+  ]);
 
   const renderTabContent = () => {
     if (!isCreateMode && lifecycleQuery.isLoading) {
@@ -288,11 +383,7 @@ export function ProjectDrawer({
               employees={lookups.employees}
               onChange={setOverviewForm}
               onTeamChange={setTeamForm}
-              onCreateSite={async (payload) => {
-                const site = await createSite.mutateAsync(payload);
-                setOverviewForm((current) => ({ ...current, siteId: site.siteId }));
-                await lookups.refetch();
-              }}
+              onCreateSite={handleCreateProjectSite}
             />
           </>
         );
@@ -307,15 +398,9 @@ export function ProjectDrawer({
             customerId={overviewForm.customerId || lifecycle?.project.customerId || 0}
             siteId={overviewForm.siteId || lifecycle?.project.siteId || 0}
             employees={lookups.employees}
-            onCreateMilestone={async (body) => {
-              await milestoneMutations.createMutation.mutateAsync(body);
-            }}
-            onUpdateMilestone={async (milestoneId, body) => {
-              await milestoneMutations.updateMutation.mutateAsync({ milestoneId, body });
-            }}
-            onCancelMilestone={async (milestoneId) => {
-              await milestoneMutations.cancelMutation.mutateAsync(milestoneId);
-            }}
+            onCreateMilestone={handleCreateMilestone}
+            onUpdateMilestone={handleUpdateMilestone}
+            onCancelMilestone={handleCancelMilestone}
             isSaving={
               milestoneMutations.createMutation.isPending ||
               milestoneMutations.updateMutation.isPending ||

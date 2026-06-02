@@ -250,6 +250,60 @@ public class WorkItemRepository : IWorkItemRepository
         }
     }
 
+    public async Task<bool> SyncEmployeeAssignmentsByWorkItemIdAsync(
+        int workItemId,
+        IReadOnlyCollection<(int EmployeeId, string AssignmentRole)> assignments)
+    {
+        await using var connection = _dbServices.CreateConnection();
+        await connection.OpenAsync();
+        await using var transaction = await connection.BeginTransactionAsync();
+
+        try
+        {
+            await using (var deleteCommand = new SqlCommand("sp_DeleteEmployeeAssignmentsByWorkItemId", connection))
+            {
+                deleteCommand.Transaction = (SqlTransaction)transaction;
+                deleteCommand.CommandType = CommandType.StoredProcedure;
+                deleteCommand.Parameters.AddWithValue("@WorkItemId", workItemId);
+                await deleteCommand.ExecuteScalarAsync();
+            }
+
+            foreach (var assignment in assignments)
+            {
+                await using var assignCommand = new SqlCommand("sp_AssignEmployeeToWork", connection)
+                {
+                    Transaction = (SqlTransaction)transaction,
+                    CommandType = CommandType.StoredProcedure
+                };
+
+                assignCommand.Parameters.AddWithValue("@WorkItemId", workItemId);
+                assignCommand.Parameters.AddWithValue("@EmployeeId", assignment.EmployeeId);
+                assignCommand.Parameters.AddWithValue("@AssignmentRole", assignment.AssignmentRole);
+
+                var result = await assignCommand.ExecuteScalarAsync();
+                var rowsAffected = result != null ? Convert.ToInt32(result) : 0;
+                if (rowsAffected <= 0)
+                {
+                    await transaction.RollbackAsync();
+                    return false;
+                }
+            }
+
+            await transaction.CommitAsync();
+            return true;
+        }
+        catch (SqlException ex)
+        {
+            await transaction.RollbackAsync();
+            throw new InvalidOperationException(ex.Message, ex);
+        }
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
+    }
+
     public async Task<bool> AssignContractorToWorkAsync(int workItemId, int contractorId, string assignmentRole)
     {
         // Creates contractor assignment link for a specific work item.

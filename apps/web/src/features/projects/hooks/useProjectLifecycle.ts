@@ -1,3 +1,4 @@
+import { useCallback, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { isLocalDataMode } from '@/config/appConfig';
 import { getCustomersAsync } from '@features/customers/api/customersApiClient';
@@ -11,7 +12,6 @@ import {
 } from '@shared/mock';
 import {
   cancelMilestoneAsync,
-  assignEmployeeToProjectAsync,
   createMilestoneAsync,
   createProjectAsync,
   createSiteAsync,
@@ -19,6 +19,7 @@ import {
   getProjectLifecycleAsync,
   getProjectMilestonesAsync,
   getSitesAsync,
+  syncProjectEmployeeAssignmentsAsync,
   updateMilestoneAsync,
   updateProjectAsync,
 } from '../api/projectsApiClient';
@@ -27,6 +28,7 @@ import type {
   CreateProjectRequest,
   CreateSiteRequest,
   ProjectTeamForm,
+  SyncProjectEmployeeAssignmentsRequest,
   UpdateMilestoneRequest,
   UpdateProjectRequest,
 } from '../types';
@@ -35,7 +37,36 @@ import {
   teamFormFromProjectAssignments,
 } from '../utils/projectDisplayUtils';
 
-export function useProjectLifecycle(projectId: number | null) {
+const TEAM_MEMBER_ROLE = 'מתקין';
+
+function buildProjectTeamAssignments(
+  teamForm: ProjectTeamForm,
+): SyncProjectEmployeeAssignmentsRequest {
+  const employees: SyncProjectEmployeeAssignmentsRequest['employees'] = [];
+  const assignedEmployeeIds = new Set<number>();
+
+  if (teamForm.projectManagerEmployeeId != null) {
+    employees.push({
+      employeeId: teamForm.projectManagerEmployeeId,
+      assignmentRole: PROJECT_MANAGER_ROLE,
+    });
+    assignedEmployeeIds.add(teamForm.projectManagerEmployeeId);
+  }
+
+  teamForm.teamEmployeeIds.forEach((employeeId) => {
+    if (assignedEmployeeIds.has(employeeId)) return;
+
+    employees.push({
+      employeeId,
+      assignmentRole: TEAM_MEMBER_ROLE,
+    });
+    assignedEmployeeIds.add(employeeId);
+  });
+
+  return { employees };
+}
+
+export function useProjectLifecycle(projectId: number | null, enabled = true) {
   return useQuery({
     queryKey: ['projectLifecycle', projectId, isLocalDataMode],
     queryFn: () => {
@@ -48,7 +79,7 @@ export function useProjectLifecycle(projectId: number | null) {
         () => delayMock(mockProjectLifecycle(projectId)),
       );
     },
-    enabled: projectId != null && projectId > 0,
+    enabled: enabled && projectId != null && projectId > 0,
   });
 }
 
@@ -85,21 +116,43 @@ export function useProjectLookups() {
     queryKey: ['projectLookups', 'employees', isLocalDataMode],
     queryFn: () => resolveDataAsync(getProjectEmployeesAsync, () => delayMock([])),
   });
+  const refetchCustomers = customersQuery.refetch;
+  const refetchSites = sitesQuery.refetch;
+  const refetchEmployees = employeesQuery.refetch;
 
-  return {
-    customers: customersQuery.data ?? [],
-    sites: sitesQuery.data ?? [],
-    employees: employeesQuery.data ?? [],
-    isLoading:
-      customersQuery.isLoading || sitesQuery.isLoading || employeesQuery.isLoading,
-    error: customersQuery.error ?? sitesQuery.error ?? employeesQuery.error,
-    refetch: () =>
+  const refetch = useCallback(
+    () =>
       Promise.all([
-        customersQuery.refetch(),
-        sitesQuery.refetch(),
-        employeesQuery.refetch(),
+        refetchCustomers(),
+        refetchSites(),
+        refetchEmployees(),
       ]),
-  };
+    [refetchCustomers, refetchEmployees, refetchSites],
+  );
+
+  return useMemo(
+    () => ({
+      customers: customersQuery.data ?? [],
+      sites: sitesQuery.data ?? [],
+      employees: employeesQuery.data ?? [],
+      isLoading:
+        customersQuery.isLoading || sitesQuery.isLoading || employeesQuery.isLoading,
+      error: customersQuery.error ?? sitesQuery.error ?? employeesQuery.error,
+      refetch,
+    }),
+    [
+      customersQuery.data,
+      customersQuery.error,
+      customersQuery.isLoading,
+      employeesQuery.data,
+      employeesQuery.error,
+      employeesQuery.isLoading,
+      refetch,
+      sitesQuery.data,
+      sitesQuery.error,
+      sitesQuery.isLoading,
+    ],
+  );
 }
 
 export function useCreateProject() {
@@ -184,41 +237,15 @@ export function useAssignProjectTeam(projectId: number | null) {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({
-      teamForm,
-      previousTeamForm,
-    }: {
-      teamForm: ProjectTeamForm;
-      previousTeamForm: ProjectTeamForm;
-    }) => {
+    mutationFn: async (teamForm: ProjectTeamForm) => {
       if (projectId == null) {
         throw new Error('Project id is required.');
       }
 
-      const assignments: Array<Promise<{ message: string }>> = [];
-
-      if (
-        teamForm.projectManagerEmployeeId &&
-        teamForm.projectManagerEmployeeId !== previousTeamForm.projectManagerEmployeeId
-      ) {
-        assignments.push(
-          assignEmployeeToProjectAsync(
-            projectId,
-            teamForm.projectManagerEmployeeId,
-            PROJECT_MANAGER_ROLE,
-          ),
-        );
-      }
-
-      teamForm.teamEmployeeIds.forEach((employeeId) => {
-        if (previousTeamForm.teamEmployeeIds.includes(employeeId)) return;
-
-        assignments.push(
-          assignEmployeeToProjectAsync(projectId, employeeId, 'מתקין'),
-        );
-      });
-
-      await Promise.all(assignments);
+      return syncProjectEmployeeAssignmentsAsync(
+        projectId,
+        buildProjectTeamAssignments(teamForm),
+      );
     },
     onSuccess: () => {
       if (projectId == null) return;
@@ -229,3 +256,4 @@ export function useAssignProjectTeam(projectId: number | null) {
 }
 
 export { teamFormFromProjectAssignments };
+export { buildProjectTeamAssignments };
