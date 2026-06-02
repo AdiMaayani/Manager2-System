@@ -1,17 +1,19 @@
-import { Button } from '@shared/components/Button';
+import { ComingSoonPanel } from '@shared/components/ComingSoonPanel';
 import './ProjectQuoteTab.css';
 
 export function ProjectQuoteTab() {
   return (
     <div className="projectQuoteTab">
-      <div className="projectQuoteTab__card">
-        <h3>הצעת מחיר</h3>
-        <p className="projectQuoteTab__summary">סכום משוער: ₪250,000</p>
-        <p className="projectQuoteTab__hint">תוכן זה הוא placeholder — כמו בממשק הישן.</p>
-        <Button type="button" variant="secondary" disabled>
-          צפייה בהצעת מחיר
-        </Button>
-      </div>
+      <ComingSoonPanel
+        title="הצעות מחיר לפרויקט"
+        description="מודול הצעות המחיר עדיין לא מחובר למסד הנתונים או ל-API, ולכן הוא מוסתר כיכולת מתוכננת במקום להציג סכומים מדומים."
+        plannedScope={[
+          'ניהול הצעת מחיר ראשית לפי פרויקט',
+          'שורות תמחור, מע״מ וסיכומים',
+          'תצוגת הדפסה או ייצוא לאחר אישור אפיון',
+        ]}
+        note="המשך העבודה דורש החלטת מוצר ועיצוב DB ייעודי."
+      />
     </div>
   );
 }

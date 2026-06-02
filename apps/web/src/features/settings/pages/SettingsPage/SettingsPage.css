@@ -125,6 +125,13 @@
   justify-content: space-between;
 }
 
+.settingsPage__integrationCard p {
+  margin: var(--spacing-xs) 0 0;
+  color: var(--color-neutral-600);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+}
+
 .settingsPage__warningList {
   display: flex;
   flex-direction: column;

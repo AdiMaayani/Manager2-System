@@ -1,1 +1,0 @@
-export { SmartAssignmentModal } from './SmartAssignmentModal';
