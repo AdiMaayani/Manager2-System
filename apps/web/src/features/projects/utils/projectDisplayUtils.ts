@@ -380,7 +380,28 @@ export const DEFAULT_DRAWINGS: ProjectDrawing[] = [
 ];
 
 export const DEFAULT_EQUIPMENT: ProjectEquipmentItem[] = [
-  { id: 'eq-1', name: 'לוח חשמל ראשי', status: 'installing', location: 'חדר חשמל' },
-  { id: 'eq-2', name: 'מפסקים', status: 'ordered', location: 'לוח 1' },
-  { id: 'eq-3', name: 'גלאי עשן', status: 'waiting', location: 'מסדרון' },
+  {
+    projectEquipmentItemId: -1,
+    projectId: 0,
+    name: 'לוח חשמל ראשי',
+    status: 'installing',
+    location: 'חדר חשמל',
+    sortOrder: 1,
+  },
+  {
+    projectEquipmentItemId: -2,
+    projectId: 0,
+    name: 'מפסקים',
+    status: 'ordered',
+    location: 'לוח 1',
+    sortOrder: 2,
+  },
+  {
+    projectEquipmentItemId: -3,
+    projectId: 0,
+    name: 'גלאי עשן',
+    status: 'waiting',
+    location: 'מסדרון',
+    sortOrder: 3,
+  },
 ];

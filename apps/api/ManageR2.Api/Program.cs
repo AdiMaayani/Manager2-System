@@ -110,6 +110,7 @@ builder.Services.AddScoped<IPasswordService, PasswordService>();
 builder.Services.AddScoped<IUserAuthorizationService, UserAuthorizationService>();
 builder.Services.AddScoped<IWorkReportRepository, WorkReportRepository>();
 builder.Services.AddScoped<IProjectLifecycleRepository, ProjectLifecycleRepository>();
+builder.Services.AddScoped<IProjectEquipmentRepository, ProjectEquipmentRepository>();
 builder.Services.AddScoped<IEmployeeRepository, EmployeeRepository>();
 builder.Services.AddScoped<ICompanySettingsRepository, CompanySettingsRepository>();
 builder.Services.AddScoped<ISmartAssignmentService, SmartAssignmentBatchService>();

@@ -16,7 +16,13 @@ import {
   useUpdateProject,
   buildProjectTeamAssignments,
 } from '../../hooks/useProjectLifecycle';
+import {
+  buildProjectEquipmentReorderRequest,
+  useProjectEquipment,
+  useProjectEquipmentMutations,
+} from '../../hooks/useProjectEquipment';
 import type {
+  CreateProjectEquipmentItemRequest,
   ProjectBoqRow,
   ProjectDrawerMode,
   ProjectDrawerTabId,
@@ -24,12 +30,12 @@ import type {
   ProjectEquipmentItem,
   ProjectOverviewForm,
   ProjectTeamForm,
+  UpdateProjectEquipmentItemRequest,
 } from '../../types';
 import { syncProjectEmployeeAssignmentsAsync } from '../../api/projectsApiClient';
 import {
   DEFAULT_BOQ_ROWS,
   DEFAULT_DRAWINGS,
-  DEFAULT_EQUIPMENT,
   createEmptyOverviewForm,
   overviewFormFromLifecycle,
 } from '../../utils/projectDisplayUtils';
@@ -98,7 +104,6 @@ export function ProjectDrawer({
   });
   const [boqRows, setBoqRows] = useState<ProjectBoqRow[]>(DEFAULT_BOQ_ROWS);
   const [drawings, setDrawings] = useState<ProjectDrawing[]>(DEFAULT_DRAWINGS);
-  const [equipment, setEquipment] = useState<ProjectEquipmentItem[]>(DEFAULT_EQUIPMENT);
   const [saveError, setSaveError] = useState<string | null>(null);
   const isEditModeRef = useRef(isEditMode);
 
@@ -116,6 +121,8 @@ export function ProjectDrawer({
   const createMilestoneAsync = milestoneMutations.createMutation.mutateAsync;
   const updateMilestoneAsync = milestoneMutations.updateMutation.mutateAsync;
   const cancelMilestoneAsync = milestoneMutations.cancelMutation.mutateAsync;
+  const equipmentQuery = useProjectEquipment(isCreateMode ? null : projectId, isOpen);
+  const equipmentMutations = useProjectEquipmentMutations(projectId);
   const refetchLookups = lookups.refetch;
 
   useEffect(() => {
@@ -139,7 +146,6 @@ export function ProjectDrawer({
       setSaveError(null);
       setBoqRows(DEFAULT_BOQ_ROWS.map((row) => ({ ...row })));
       setDrawings(DEFAULT_DRAWINGS.map((drawing) => ({ ...drawing })));
-      setEquipment(DEFAULT_EQUIPMENT.map((item) => ({ ...item })));
 
       if (isCreateMode) {
         setOverviewForm(createEmptyOverviewForm());
@@ -230,6 +236,39 @@ export function ProjectDrawer({
       await cancelMilestoneAsync(milestoneId);
     },
     [cancelMilestoneAsync],
+  );
+
+  const handleCreateEquipment = useCallback(
+    async (body: CreateProjectEquipmentItemRequest) => {
+      await equipmentMutations.createMutation.mutateAsync(body);
+    },
+    [equipmentMutations.createMutation],
+  );
+
+  const handleUpdateEquipment = useCallback(
+    async (equipmentItemId: number, body: UpdateProjectEquipmentItemRequest) => {
+      await equipmentMutations.updateMutation.mutateAsync({
+        equipmentItemId,
+        body,
+      });
+    },
+    [equipmentMutations.updateMutation],
+  );
+
+  const handleDeleteEquipment = useCallback(
+    async (equipmentItemId: number) => {
+      await equipmentMutations.deleteMutation.mutateAsync(equipmentItemId);
+    },
+    [equipmentMutations.deleteMutation],
+  );
+
+  const handleReorderEquipment = useCallback(
+    async (equipmentItems: ProjectEquipmentItem[]) => {
+      await equipmentMutations.reorderMutation.mutateAsync(
+        buildProjectEquipmentReorderRequest(equipmentItems),
+      );
+    },
+    [equipmentMutations.reorderMutation],
   );
 
   const handleSaveProject = useCallback(async () => {
@@ -423,11 +462,37 @@ export function ProjectDrawer({
           />
         );
       case 'equipment':
+        if (isCreateMode) {
+          return <p className="projectDrawer__hint">שמור את הפרויקט לפני הוספת ציוד.</p>;
+        }
+
+        if (equipmentQuery.isLoading) {
+          return <PageSpinner />;
+        }
+
+        if (equipmentQuery.error) {
+          return (
+            <ErrorState
+              message={equipmentQuery.error.message}
+              onRetry={() => equipmentQuery.refetch()}
+            />
+          );
+        }
+
         return (
           <ProjectEquipmentTab
-            items={equipment}
+            items={equipmentQuery.data ?? []}
             isEditMode={isEditMode}
-            onChange={setEquipment}
+            isSaving={
+              equipmentMutations.createMutation.isPending ||
+              equipmentMutations.updateMutation.isPending ||
+              equipmentMutations.deleteMutation.isPending ||
+              equipmentMutations.reorderMutation.isPending
+            }
+            onCreate={handleCreateEquipment}
+            onUpdate={handleUpdateEquipment}
+            onDelete={handleDeleteEquipment}
+            onReorder={handleReorderEquipment}
           />
         );
       default:
