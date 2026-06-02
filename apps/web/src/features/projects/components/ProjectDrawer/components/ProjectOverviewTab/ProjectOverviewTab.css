@@ -44,8 +44,44 @@
   grid-column: 1 / -1;
 }
 
-.projectOverviewTab__select--multi {
-  min-height: 120px;
+.projectOverviewTab__teamEditor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.projectOverviewTab__teamAdd {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--spacing-sm);
+  align-items: center;
+}
+
+.projectOverviewTab__teamChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.projectOverviewTab__teamChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-primary-200);
+  border-radius: var(--radius-full);
+  background: var(--color-primary-50);
+  color: var(--color-neutral-900);
+  font-size: var(--font-size-sm);
+}
+
+.projectOverviewTab__teamChipRemove {
+  border: 0;
+  background: transparent;
+  color: var(--color-danger-600);
+  font: inherit;
+  cursor: pointer;
+  padding: 0;
 }
 
 .projectOverviewTab__hint {
@@ -58,4 +94,10 @@
   margin: 0;
   font-size: var(--font-size-sm);
   color: var(--color-danger, #dc2626);
+}
+
+@media (max-width: 720px) {
+  .projectOverviewTab__teamAdd {
+    grid-template-columns: 1fr;
+  }
 }

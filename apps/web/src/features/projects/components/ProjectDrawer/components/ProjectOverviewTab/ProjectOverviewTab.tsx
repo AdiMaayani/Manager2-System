@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { memo, useCallback, useMemo, useState } from 'react';
 import { Button } from '@shared/components/Button';
 import { Input } from '@shared/components/Input';
 import type { Customer } from '@features/customers/types';
@@ -17,7 +17,6 @@ import {
   getBillingTypeDisplay,
   getProjectNumber,
   getProjectStatusMeta,
-  toDateInputValue,
 } from '../../../../utils/projectDisplayUtils';
 import './ProjectOverviewTab.css';
 
@@ -42,7 +41,7 @@ interface ProjectOverviewTabProps {
   }) => Promise<void>;
 }
 
-export function ProjectOverviewTab({
+export const ProjectOverviewTab = memo(function ProjectOverviewTab({
   lifecycle,
   form,
   teamForm,
@@ -61,21 +60,65 @@ export function ProjectOverviewTab({
   const [newSiteAddress, setNewSiteAddress] = useState('');
   const [newSiteNotes, setNewSiteNotes] = useState('');
   const [siteError, setSiteError] = useState<string | null>(null);
+  const [employeeToAddId, setEmployeeToAddId] = useState('');
 
   const project = lifecycle?.project;
   const projectId = project?.workItemId;
-  const filteredSites = sites.filter((site) => site.customerId === form.customerId);
-  const aggregatedTeam = aggregateProjectTeamFromLifecycle(lifecycle);
-  const activeEmployees = employees.filter((employee) => employee.isActive !== false);
+  const filteredSites = useMemo(
+    () => sites.filter((site) => site.customerId === form.customerId),
+    [form.customerId, sites],
+  );
+  const aggregatedTeam = useMemo(
+    () => aggregateProjectTeamFromLifecycle(lifecycle),
+    [lifecycle],
+  );
+  const activeEmployees = useMemo(
+    () => employees.filter((employee) => employee.isActive !== false),
+    [employees],
+  );
+  const employeesById = useMemo(
+    () => new Map(employees.map((employee) => [employee.employeeId, employee])),
+    [employees],
+  );
+  const selectedTeamEmployeeIds = useMemo(
+    () => new Set(teamForm.teamEmployeeIds),
+    [teamForm.teamEmployeeIds],
+  );
+  const selectedProjectManager = teamForm.projectManagerEmployeeId != null
+    ? employeesById.get(teamForm.projectManagerEmployeeId)
+    : undefined;
+  const managerOptions = useMemo(
+    () =>
+      selectedProjectManager && selectedProjectManager.isActive === false
+        ? [selectedProjectManager, ...activeEmployees]
+        : activeEmployees,
+    [activeEmployees, selectedProjectManager],
+  );
+  const selectedTeamMembers = useMemo(
+    () =>
+      teamForm.teamEmployeeIds
+        .map((employeeId) => employeesById.get(employeeId))
+        .filter((employee): employee is ProjectEmployeeOption => employee != null),
+    [employeesById, teamForm.teamEmployeeIds],
+  );
+  const teamMemberOptions = useMemo(
+    () =>
+      activeEmployees.filter(
+        (employee) =>
+          employee.employeeId !== teamForm.projectManagerEmployeeId &&
+          !selectedTeamEmployeeIds.has(employee.employeeId),
+      ),
+    [activeEmployees, selectedTeamEmployeeIds, teamForm.projectManagerEmployeeId],
+  );
 
-  const updateField = <K extends keyof ProjectOverviewForm>(
+  const updateField = useCallback(<K extends keyof ProjectOverviewForm>(
     key: K,
     value: ProjectOverviewForm[K],
   ) => {
     onChange({ ...form, [key]: value });
-  };
+  }, [form, onChange]);
 
-  const handleCreateSite = async () => {
+  const handleCreateSite = useCallback(async () => {
     setSiteError(null);
 
     if (!form.customerId) {
@@ -110,9 +153,45 @@ export function ProjectOverviewTab({
           : 'יצירת האתר נכשלה. נסה שוב.';
       setSiteError(message);
     }
-  };
+  }, [form.customerId, newSiteAddress, newSiteCity, newSiteName, newSiteNotes, onCreateSite]);
 
-  const statusMeta = getProjectStatusMeta(isEditMode ? form.status : project?.status);
+  const handleProjectManagerChange = useCallback((value: string) => {
+    const projectManagerEmployeeId = value ? Number(value) : null;
+    onTeamChange({
+      ...teamForm,
+      projectManagerEmployeeId,
+      teamEmployeeIds: teamForm.teamEmployeeIds.filter(
+        (employeeId) => employeeId !== projectManagerEmployeeId,
+      ),
+    });
+  }, [onTeamChange, teamForm]);
+
+  const handleAddTeamMember = useCallback(() => {
+    const employeeId = Number(employeeToAddId);
+    if (!Number.isInteger(employeeId) || employeeId <= 0) return;
+    if (employeeId === teamForm.projectManagerEmployeeId) return;
+    if (selectedTeamEmployeeIds.has(employeeId)) return;
+
+    onTeamChange({
+      ...teamForm,
+      teamEmployeeIds: [...teamForm.teamEmployeeIds, employeeId],
+    });
+    setEmployeeToAddId('');
+  }, [employeeToAddId, onTeamChange, selectedTeamEmployeeIds, teamForm]);
+
+  const handleRemoveTeamMember = useCallback((employeeId: number) => {
+    onTeamChange({
+      ...teamForm,
+      teamEmployeeIds: teamForm.teamEmployeeIds.filter(
+        (selectedEmployeeId) => selectedEmployeeId !== employeeId,
+      ),
+    });
+  }, [onTeamChange, teamForm]);
+
+  const statusMeta = useMemo(
+    () => getProjectStatusMeta(isEditMode ? form.status : project?.status),
+    [form.status, isEditMode, project?.status],
+  );
 
   return (
     <div className="projectOverviewTab">
@@ -324,19 +403,12 @@ export function ProjectOverviewTab({
             {isEditMode ? (
               <select
                 className="projectOverviewTab__select"
-                value={teamForm.projectManagerEmployeeId ?? ''}
-                onChange={(event) =>
-                  onTeamChange({
-                    ...teamForm,
-                    projectManagerEmployeeId: event.target.value
-                      ? Number(event.target.value)
-                      : null,
-                  })
-                }
+                value={teamForm.projectManagerEmployeeId != null ? String(teamForm.projectManagerEmployeeId) : ''}
+                onChange={(event) => handleProjectManagerChange(event.target.value)}
               >
                 <option value="">בחר מנהל פרויקט</option>
-                {activeEmployees.map((employee) => (
-                  <option key={employee.employeeId} value={employee.employeeId}>
+                {managerOptions.map((employee) => (
+                  <option key={employee.employeeId} value={String(employee.employeeId)}>
                     {employee.fullName}
                   </option>
                 ))}
@@ -352,23 +424,55 @@ export function ProjectOverviewTab({
           <div className="projectOverviewTab__field">
             <span className="projectOverviewTab__label">עובדים משויכים</span>
             {isEditMode ? (
-              <select
-                className="projectOverviewTab__select projectOverviewTab__select--multi"
-                multiple
-                value={teamForm.teamEmployeeIds.map(String)}
-                onChange={(event) => {
-                  const selectedIds = Array.from(event.target.selectedOptions).map(
-                    (option) => Number(option.value),
-                  );
-                  onTeamChange({ ...teamForm, teamEmployeeIds: selectedIds });
-                }}
-              >
-                {activeEmployees.map((employee) => (
-                  <option key={employee.employeeId} value={employee.employeeId}>
-                    {employee.fullName}
-                  </option>
-                ))}
-              </select>
+              <div className="projectOverviewTab__teamEditor">
+                <div className="projectOverviewTab__teamAdd">
+                  <select
+                    className="projectOverviewTab__select"
+                    value={employeeToAddId}
+                    onChange={(event) => setEmployeeToAddId(event.target.value)}
+                    aria-label="בחר עובד להוספה לצוות"
+                  >
+                    <option value="">בחר עובד להוספה</option>
+                    {teamMemberOptions.map((employee) => (
+                      <option key={employee.employeeId} value={String(employee.employeeId)}>
+                        {employee.fullName}
+                        {employee.primaryRole ? ` · ${employee.primaryRole}` : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={handleAddTeamMember}
+                    disabled={!employeeToAddId}
+                  >
+                    הוסף עובד
+                  </Button>
+                </div>
+
+                {selectedTeamMembers.length > 0 ? (
+                  <div className="projectOverviewTab__teamChips">
+                    {selectedTeamMembers.map((employee) => (
+                      <span key={employee.employeeId} className="projectOverviewTab__teamChip">
+                        <span>
+                          {employee.fullName}
+                          {employee.primaryRole ? ` · ${employee.primaryRole}` : ''}
+                        </span>
+                        <button
+                          type="button"
+                          className="projectOverviewTab__teamChipRemove"
+                          onClick={() => handleRemoveTeamMember(employee.employeeId)}
+                          aria-label={`הסר ${employee.fullName}`}
+                        >
+                          הסר
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="projectOverviewTab__hint">לא נבחרו עובדים לצוות.</p>
+                )}
+              </div>
             ) : (
               <span>
                 {aggregatedTeam.teamMemberNames.length > 0
@@ -379,43 +483,13 @@ export function ProjectOverviewTab({
           </div>
           {isEditMode && !isCreateMode && (
             <p className="projectOverviewTab__hint">
-              שיוך צוות נשמר עם הפרויקט. עובדים חדשים יתווספו לשיוך; הסרת עובדים קיימים
-              דורשת עדכון ידני במערכת.
+              שיוך צוות נשמר עם הפרויקט ומחליף את שיוכי העובדים ברמת הפרויקט בלבד.
+              שיוכי משימות וקבלנים אינם משתנים.
             </p>
           )}
         </section>
       </div>
     </div>
   );
-}
+});
 
-export function overviewFormFromLifecycle(
-  lifecycle: ProjectLifecycle | null,
-): ProjectOverviewForm {
-  if (!lifecycle) {
-    return {
-      title: '',
-      description: '',
-      status: 'Open',
-      billingType: 'Fixed',
-      customerId: 0,
-      siteId: 0,
-      dealCloseDate: '',
-      financeProjectNumber: '',
-      invoiceNumber: '',
-    };
-  }
-
-  const { project } = lifecycle;
-  return {
-    title: project.title,
-    description: project.description ?? '',
-    status: project.status,
-    billingType: project.billingType ?? 'Fixed',
-    customerId: project.customerId,
-    siteId: project.siteId ?? 0,
-    dealCloseDate: toDateInputValue(project.dealCloseDate),
-    financeProjectNumber: project.financeProjectNumber ?? '',
-    invoiceNumber: project.invoiceNumber ?? '',
-  };
-}

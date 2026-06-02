@@ -7,6 +7,7 @@ import type {
   ProjectLifecycle,
   ProjectListItem,
   ProjectMilestone,
+  SyncProjectEmployeeAssignmentsRequest,
   Site,
   UpdateMilestoneRequest,
   UpdateProjectRequest,
@@ -109,5 +110,15 @@ export function assignEmployeeToProjectAsync(
   return apiRequest<{ message: string }>(`/WorkItems/${projectId}/assign-employee`, {
     method: 'POST',
     body: JSON.stringify({ employeeId, assignmentRole }),
+  });
+}
+
+export function syncProjectEmployeeAssignmentsAsync(
+  projectId: number,
+  body: SyncProjectEmployeeAssignmentsRequest,
+): Promise<{ message: string }> {
+  return apiRequest<{ message: string }>(`/WorkItems/${projectId}/employee-assignments`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
   });
 }

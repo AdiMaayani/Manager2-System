@@ -84,10 +84,6 @@ export function aggregateProjectTeamFromLifecycle(
   }
 
   const projectId = lifecycle.project.workItemId;
-  const relevantWorkItemIds = new Set<number>([
-    projectId,
-    ...lifecycle.milestones.map((milestone) => milestone.workItemId),
-  ]);
 
   const managerNames: string[] = [];
   const teamMemberNames = new Set<string>();
@@ -96,7 +92,7 @@ export function aggregateProjectTeamFromLifecycle(
     if (
       assignment.assignmentType !== 'Employee' ||
       !assignment.employeeName ||
-      !relevantWorkItemIds.has(assignment.workItemId)
+      assignment.workItemId !== projectId
     ) {
       return;
     }
@@ -106,7 +102,7 @@ export function aggregateProjectTeamFromLifecycle(
 
     if (!employeeName) return;
 
-    if (role === 'project manager' || role === 'מנהל פרויקט') {
+    if (role === 'project manager' || role === 'מנהל פרויקט' || role === 'team leader') {
       if (!managerNames.includes(employeeName)) {
         managerNames.push(employeeName);
       }
@@ -154,7 +150,7 @@ export function teamFormFromProjectAssignments(
 
 function isProjectManagerAssignment(assignment: ProjectLifecycleAssignment): boolean {
   const role = (assignment.assignmentRole ?? '').trim().toLowerCase();
-  return role === 'project manager' || role === 'מנהל פרויקט';
+  return role === 'project manager' || role === 'מנהל פרויקט' || role === 'team leader';
 }
 
 export function createEmptyMilestoneForm(): ProjectMilestoneForm {
@@ -337,6 +333,27 @@ export function createEmptyOverviewForm(): ProjectOverviewForm {
     dealCloseDate: '',
     financeProjectNumber: '',
     invoiceNumber: '',
+  };
+}
+
+export function overviewFormFromLifecycle(
+  lifecycle: ProjectLifecycle | null,
+): ProjectOverviewForm {
+  if (!lifecycle) {
+    return createEmptyOverviewForm();
+  }
+
+  const { project } = lifecycle;
+  return {
+    title: project.title,
+    description: project.description ?? '',
+    status: project.status,
+    billingType: project.billingType ?? 'Fixed',
+    customerId: project.customerId,
+    siteId: project.siteId ?? 0,
+    dealCloseDate: toDateInputValue(project.dealCloseDate),
+    financeProjectNumber: project.financeProjectNumber ?? '',
+    invoiceNumber: project.invoiceNumber ?? '',
   };
 }
 

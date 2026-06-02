@@ -1,1 +1,1 @@
-export { ProjectOverviewTab, overviewFormFromLifecycle } from './ProjectOverviewTab';
+export { ProjectOverviewTab } from './ProjectOverviewTab';

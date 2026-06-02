@@ -190,7 +190,7 @@ export interface CreateMilestoneRequest {
   contractors: CreateMilestoneContractorAssignment[];
 }
 
-export interface UpdateMilestoneRequest extends CreateMilestoneRequest {}
+export type UpdateMilestoneRequest = CreateMilestoneRequest;
 
 export interface Site {
   siteId: number;
@@ -269,6 +269,10 @@ export interface ProjectMilestoneForm {
 export interface ProjectTeamForm {
   projectManagerEmployeeId: number | null;
   teamEmployeeIds: number[];
+}
+
+export interface SyncProjectEmployeeAssignmentsRequest {
+  employees: CreateMilestoneEmployeeAssignment[];
 }
 
 export interface ProjectEmployeeOption {

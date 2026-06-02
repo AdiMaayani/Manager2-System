@@ -45,6 +45,12 @@ public class AssignEmployeeRequest
     public string AssignmentRole { get; set; } = string.Empty;
 }
 
+// Request payload for replacing project-level employee assignments exactly.
+public class SyncEmployeeAssignmentsRequest
+{
+    public List<AssignEmployeeRequest> Employees { get; set; } = new();
+}
+
 // Request payload for assigning a contractor to a work item.
 public class AssignContractorRequest
 {

@@ -23,6 +23,7 @@ namespace ManageR2.Infrastructure.Repositories
 
         Task<bool> AssignEmployeeToWorkAsync(int workItemId, int employeeId, string assignmentRole);
         Task<bool> AssignContractorToWorkAsync(int workItemId, int contractorId, string assignmentRole);
+        Task<bool> SyncEmployeeAssignmentsByWorkItemIdAsync(int workItemId, IReadOnlyCollection<(int EmployeeId, string AssignmentRole)> assignments);
 
         Task<bool> DeleteEmployeeAssignmentsByWorkItemIdAsync(int workItemId);
         Task<bool> DeleteContractorAssignmentsByWorkItemIdAsync(int workItemId);

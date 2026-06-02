@@ -591,6 +591,73 @@ public class WorkItemsController : ControllerBase
         }
     }
 
+    [HttpPut("{projectId}/employee-assignments")]
+    // Replaces project-level employee assignments without touching child task assignments or contractors.
+    public async Task<IActionResult> SyncProjectEmployeeAssignments(int projectId, [FromBody] SyncEmployeeAssignmentsRequest request)
+    {
+        if (request == null)
+        {
+            return BadRequest(new { message = "Assignment data is required." });
+        }
+
+        var project = await _workItemRepository.GetByIdAsync(projectId);
+        if (project == null)
+        {
+            return NotFound(new { message = $"Project with ID {projectId} was not found." });
+        }
+
+        if (!string.Equals(project.WorkType, "Project", StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new { message = $"WorkItem {projectId} is not a project." });
+        }
+
+        if (request.Employees == null)
+        {
+            return BadRequest(new { message = "Employees collection is required." });
+        }
+
+        var seenEmployeeIds = new HashSet<int>();
+        var normalizedAssignments = new List<(int EmployeeId, string AssignmentRole)>();
+
+        foreach (var employee in request.Employees)
+        {
+            if (employee.EmployeeId <= 0)
+            {
+                return BadRequest(new { message = "EmployeeId must be greater than 0." });
+            }
+
+            if (string.IsNullOrWhiteSpace(employee.AssignmentRole))
+            {
+                return BadRequest(new { message = "AssignmentRole is required." });
+            }
+
+            if (!seenEmployeeIds.Add(employee.EmployeeId))
+            {
+                return BadRequest(new { message = "Duplicate employee assignments are not allowed." });
+            }
+
+            normalizedAssignments.Add((employee.EmployeeId, employee.AssignmentRole.Trim()));
+        }
+
+        try
+        {
+            var synced = await _workItemRepository.SyncEmployeeAssignmentsByWorkItemIdAsync(
+                projectId,
+                normalizedAssignments);
+
+            if (!synced)
+            {
+                return BadRequest(new { message = "Failed to sync project employee assignments." });
+            }
+
+            return Ok(new { message = "Project employee assignments synced successfully." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     [HttpPost("{id}/assign-contractor")]
     // Links a contractor to a work item through assignment records.
     public async Task<IActionResult> AssignContractor(int id, [FromBody] AssignContractorRequest request)
