@@ -2,6 +2,7 @@ import { PageShell } from '@shared/components/PageShell';
 import { PageSpinner } from '@shared/components/PageSpinner';
 import { ErrorState } from '@shared/components/ErrorState';
 import { EmptyState } from '@shared/components/EmptyState';
+import { ComingSoonPanel } from '@shared/components/ComingSoonPanel';
 import { Badge } from '@shared/components/Badge';
 import { getCurrentUser, getRoleDisplayLabel } from '@api/auth';
 import { apiBaseUrl, appDataMode, appEnvironment, isMockDataMode } from '@/config/appConfig';
@@ -23,12 +24,12 @@ import type { UpdateCompanySettingsRequest } from '../../types';
 import './SettingsPage.css';
 
 const INTEGRATIONS = [
-  'Email',
-  'WhatsApp',
-  'Calendar',
-  'Printing',
-  'Documents',
-  'External Project Management',
+  { label: 'אימייל', description: 'שליחה וקבלה של הודעות מערכת ודיווחים' },
+  { label: 'וואטסאפ', description: 'עדכוני לקוחות או עובדים דרך ספק חיצוני' },
+  { label: 'יומן', description: 'סנכרון משימות ותזמונים ליומנים חיצוניים' },
+  { label: 'הדפסה', description: 'תצוגות הדפסה לדיווחים, פרויקטים והצעות מחיר' },
+  { label: 'מסמכים', description: 'קבצים, שרטוטים וצרופות עם הרשאות ואחסון מאובטח' },
+  { label: 'מערכת ניהול חיצונית', description: 'חיבור עתידי לכלי ניהול פרויקטים חיצוני' },
 ];
 
 function renderValue(value?: string | number | null) {
@@ -253,13 +254,21 @@ export function SettingsPage() {
 
         <SettingsSection
           title="אינטגרציות"
-          description="רשימת יכולות מתוכננות. לא נבנו חיבורים חיצוניים בענף הזה."
+          description="יכולות חיצוניות מתוכננות בלבד. אין כאן חיבור פעיל לספקים, מסמכים או מערכות צד שלישי."
         >
+          <ComingSoonPanel
+            title="חיבורים חיצוניים"
+            description="האינטגרציות מוצגות כ-roadmap בלבד. לא נשמרים כאן סודות, כתובות ספקים או הגדרות פעילות."
+            note="מימוש עתידי ידרוש החלטות אבטחה, הגדרות סביבה ו-DB מתאים לכל ספק."
+          />
           <div className="settingsPage__integrationGrid">
             {INTEGRATIONS.map((integration) => (
-              <div key={integration} className="settingsPage__integrationCard">
-                <strong>{integration}</strong>
-                <Badge variant="warning">מתוכנן / לא מוגדר</Badge>
+              <div key={integration.label} className="settingsPage__integrationCard">
+                <div>
+                  <strong>{integration.label}</strong>
+                  <p>{integration.description}</p>
+                </div>
+                <Badge variant="warning">בקרוב</Badge>
               </div>
             ))}
           </div>

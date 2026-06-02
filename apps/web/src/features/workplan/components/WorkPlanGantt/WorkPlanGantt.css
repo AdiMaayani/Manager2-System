@@ -1,7 +1,0 @@
-.workPlanGantt {
-  overflow-x: auto;
-  background: #fff;
-  border-radius: var(--radius-lg);
-  padding: var(--spacing-md);
-  min-height: 320px;
-}
