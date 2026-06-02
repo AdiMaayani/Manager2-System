@@ -20,6 +20,8 @@ database/
     <FunctionName>.sql         # One scalar function per file (2 files)
   cleanup/
     2026-06-01_drop_legacy_functions.sql  # Manual cleanup for removed legacy functions
+  migrations/
+    2026-06-01_company_settings.sql        # Manual migration for persisted company settings
   SP/
     <ProcedureName>.sql        # One stored procedure per file (74 files)
     2026-04-20_workplan_algorithm_data_model_extension.sql   # historical migration (see notes)
@@ -103,6 +105,10 @@ so run it against an empty database).
 The manual cleanup script in `cleanup/2026-06-01_drop_legacy_functions.sql` is not part of a fresh rebuild. Run it
 manually in SSMS against existing target databases that still contain the removed legacy functions.
 
+The company settings migration in `migrations/2026-06-01_company_settings.sql` adds the single-row company profile
+table and Settings stored procedures used by the app. Run it manually in SSMS against each target database before using
+the persisted Settings company details screen.
+
 ### PowerShell helper (uses `sqlcmd`)
 
 ```powershell
@@ -167,6 +173,8 @@ inline SQL), `sp_GetWorkEmployees`, `sp_GetProjectForWorkPlan`, `sp_GetProjectTa
 bundled `Rec_GetTaskRecommendationInput`). These are kept because they are part of the live database.
 
 ### Historical migration / seed scripts (kept, not part of the canonical export)
+- `migrations/2026-06-01_company_settings.sql` — idempotent manual migration for persisted company profile settings.
+  It creates `CompanySettings` plus `sp_Settings_GetCompanySettings` and `sp_Settings_UpsertCompanySettings`.
 - `SP/2026-04-20_workplan_algorithm_data_model_extension.sql` — conditional `ALTER TABLE ADD COLUMN` migration for
   the work-plan algorithm. Its columns are already present in `schema/tables.sql`, so a fresh build does **not**
   need it. Retained as migration history.

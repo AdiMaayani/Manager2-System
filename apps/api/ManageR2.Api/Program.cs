@@ -111,6 +111,7 @@ builder.Services.AddScoped<IUserAuthorizationService, UserAuthorizationService>(
 builder.Services.AddScoped<IWorkReportRepository, WorkReportRepository>();
 builder.Services.AddScoped<IProjectLifecycleRepository, ProjectLifecycleRepository>();
 builder.Services.AddScoped<IEmployeeRepository, EmployeeRepository>();
+builder.Services.AddScoped<ICompanySettingsRepository, CompanySettingsRepository>();
 builder.Services.AddScoped<ISmartAssignmentService, SmartAssignmentBatchService>();
 // Advanced ranked recommendations: concrete repository + service from SmartAssignment module (aliased at top of file).
 builder.Services.AddScoped<AdvancedSmartAssignmentRepository>();

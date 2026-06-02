@@ -15,17 +15,12 @@ import {
   PROJECT_STATUS_OPTIONS,
 } from '@features/projects/utils/projectDisplayUtils';
 import { Link } from 'react-router-dom';
+import { CompanySettingsForm } from '../../components/CompanySettingsForm';
 import { SettingsSection } from '../../components/SettingsSection';
+import { useCompanySettings, useUpdateCompanySettings } from '../../hooks/useCompanySettings';
 import { useSettingsLookups } from '../../hooks/useSettingsLookups';
+import type { UpdateCompanySettingsRequest } from '../../types';
 import './SettingsPage.css';
-
-const COMPANY_DETAILS = [
-  { label: 'שם חברה', value: 'ManageR²' },
-  { label: 'אימייל מערכת', value: 'לא מוגדר' },
-  { label: 'טלפון ראשי', value: 'לא מוגדר' },
-  { label: 'כתובת', value: 'לא מוגדר' },
-  { label: 'מספר עוסק / חברה', value: 'לא מוגדר' },
-];
 
 const INTEGRATIONS = [
   'Email',
@@ -43,7 +38,13 @@ function renderValue(value?: string | number | null) {
 export function SettingsPage() {
   const currentUser = getCurrentUser();
   const isAdmin = currentUser?.roles.includes('Admin') ?? false;
+  const companySettingsQuery = useCompanySettings();
+  const updateCompanySettingsMutation = useUpdateCompanySettings();
   const { rolesQuery, departmentsQuery } = useSettingsLookups(isAdmin);
+
+  async function handleSaveCompanySettings(request: UpdateCompanySettingsRequest) {
+    await updateCompanySettingsMutation.mutateAsync(request);
+  }
 
   return (
     <PageShell title="הגדרות וניהול מערכת" wide>
@@ -94,20 +95,30 @@ export function SettingsPage() {
 
         <SettingsSection
           title="פרטי חברה"
-          description="אין כרגע API או טבלת הגדרות לשמירת פרטי חברה. השדות מוצגים לקריאה בלבד עד שתתווסף יכולת שמירה אמיתית."
+          description="פרטי הארגון נשמרים במסד הנתונים ומשמשים כפרופיל חברה בסיסי. פרטי סביבה וסודות אינם נשמרים כאן."
         >
-          <div className="settingsPage__readonlyGrid">
-            {COMPANY_DETAILS.map((field) => (
-              <div key={field.label} className="settingsPage__readonlyField">
-                <span>{field.label}</span>
-                <strong>{field.value}</strong>
-              </div>
-            ))}
-          </div>
-          <p className="settingsPage__note">
-            שמירת פרטי חברה דורשת endpoint ייעודי ומודל נתונים בצד השרת. לא נוסף כפתור שמירה כדי לא ליצור מצג
-            שווא של הגדרה שנשמרת.
-          </p>
+          {companySettingsQuery.isLoading ? (
+            <PageSpinner />
+          ) : companySettingsQuery.error ? (
+            <ErrorState
+              message={
+                companySettingsQuery.error instanceof Error
+                  ? companySettingsQuery.error.message
+                  : 'טעינת פרטי החברה נכשלה'
+              }
+              onRetry={() => companySettingsQuery.refetch()}
+            />
+          ) : companySettingsQuery.data ? (
+            <CompanySettingsForm
+              key={companySettingsQuery.data.updatedAt}
+              companySettings={companySettingsQuery.data}
+              isAdmin={isAdmin}
+              isSaving={updateCompanySettingsMutation.isPending}
+              onSave={handleSaveCompanySettings}
+            />
+          ) : (
+            <EmptyState title="פרטי החברה לא אותחלו" />
+          )}
         </SettingsSection>
 
         <SettingsSection
@@ -267,9 +278,11 @@ export function SettingsPage() {
             <div className="settingsPage__warning">
               חיבור API, מחרוזת חיבור למסד נתונים ומפתח JWT מוגדרים לפי סביבת הרצה ולא מתוך מסך זה.
             </div>
-            <div className="settingsPage__warning">
-              הגדרות חברה ואינטגרציות עדיין אינן נשמרות משום שאין עבורן API/מודל נתונים ייעודי.
-            </div>
+            {!companySettingsQuery.data && (
+              <div className="settingsPage__warning">
+                פרטי חברה דורשים הרצת migration במסד הנתונים לפני טעינה ושמירה.
+              </div>
+            )}
           </div>
         </SettingsSection>
       </div>
