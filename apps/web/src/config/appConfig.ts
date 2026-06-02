@@ -18,6 +18,10 @@ function resolveAppDataMode(value: string | undefined): AppDataMode {
 
 export const appDataMode: AppDataMode = resolveAppDataMode(requestedAppDataMode);
 
+export const appEnvironment = import.meta.env.MODE;
+
+export const apiBaseUrl = import.meta.env.VITE_API_BASE_URL || '/api';
+
 export const isLocalDataMode = appDataMode === 'local';
 
 export const isMockDataMode = appDataMode === 'mock';
