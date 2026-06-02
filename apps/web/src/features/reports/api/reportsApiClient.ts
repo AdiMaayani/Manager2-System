@@ -4,6 +4,7 @@ import type {
   CreateWorkReportResponse,
   ReportEmployeeOption,
   ReportProjectOption,
+  ReportServiceCallOption,
   WorkReportDetails,
   WorkReportDetailsResponse,
   WorkReportListItem,
@@ -60,6 +61,10 @@ export async function getReportByIdAsync(id: number): Promise<WorkReportDetails>
 
 export function getReportProjectsAsync(): Promise<ReportProjectOption[]> {
   return apiRequest<ReportProjectOption[]>('/WorkItems/projects-list');
+}
+
+export function getReportServiceCallsAsync(): Promise<ReportServiceCallOption[]> {
+  return apiRequest<ReportServiceCallOption[]>('/ServiceCalls');
 }
 
 export function getReportEmployeesAsync(): Promise<ReportEmployeeOption[]> {

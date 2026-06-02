@@ -13,6 +13,7 @@ import {
   createWorkReportAsync,
   getReportEmployeesAsync,
   getReportProjectsAsync,
+  getReportServiceCallsAsync,
   updateWorkReportAsync,
 } from '../../api/reportsApiClient';
 import { ReportDetailModal } from '../../components/ReportDetailModal';
@@ -40,6 +41,7 @@ interface QuickReportPrefill {
   reporterName?: string;
   reporterRole?: string;
   serviceCallId?: number | string | null;
+  serviceCallTitle?: string;
 }
 
 interface ReportFormState {
@@ -73,7 +75,7 @@ function createInitialFormState(prefill?: QuickReportPrefill | null): ReportForm
     projectId: prefill?.projectId != null ? String(prefill.projectId) : '',
     customerName: prefill?.customerName || '',
     serviceCallId: prefill?.serviceCallId != null ? String(prefill.serviceCallId) : '',
-    serviceCallTitle: '',
+    serviceCallTitle: prefill?.serviceCallTitle || '',
     site: prefill?.site || '',
     start: prefill?.start || '',
     end: prefill?.end || '',
@@ -150,6 +152,11 @@ export function ReportsPage() {
     queryFn: getReportProjectsAsync,
   });
 
+  const { data: serviceCalls = [] } = useQuery({
+    queryKey: ['reports', 'serviceCalls'],
+    queryFn: getReportServiceCallsAsync,
+  });
+
   const { data: employees = [] } = useQuery({
     queryKey: ['reports', 'employees'],
     queryFn: getReportEmployeesAsync,
@@ -158,6 +165,13 @@ export function ReportsPage() {
   const selectedProject = useMemo(
     () => projects.find((project) => String(project.workItemId) === form.projectId) ?? null,
     [form.projectId, projects],
+  );
+
+  const selectedServiceCall = useMemo(
+    () =>
+      serviceCalls.find((serviceCall) => String(serviceCall.workItemId) === form.serviceCallId) ??
+      null,
+    [form.serviceCallId, serviceCalls],
   );
 
   const selectedReporter = useMemo(
@@ -271,6 +285,17 @@ export function ReportsPage() {
     });
   }
 
+  function handleServiceCallChange(serviceCallId: string) {
+    const serviceCall = serviceCalls.find((row) => String(row.workItemId) === serviceCallId);
+    updateForm({
+      serviceCallId,
+      serviceCallTitle: serviceCall?.title || '',
+      projectId: serviceCallId,
+      customerName: serviceCall?.customerName || '',
+      site: serviceCall?.siteName || '',
+    });
+  }
+
   function toggleSystem(system: string) {
     setForm((current) => ({
       ...current,
@@ -299,19 +324,38 @@ export function ReportsPage() {
       if (!form.date) throw new Error('יש להזין תאריך דיווח');
       if (!isDraft) {
         if (form.reportType === 'project' && !form.projectId) throw new Error('יש לבחור פרויקט');
+        if (form.reportType === 'service_call' && !form.serviceCallId) {
+          throw new Error('יש לבחור קריאת שירות');
+        }
         if (!form.reporterId) throw new Error('יש לבחור מדווח');
         if (!form.start || !form.end) throw new Error('יש להזין שעות עבודה');
         if (!form.summary.trim()) throw new Error('יש להזין סיכום עבודה');
       }
 
+      const linkedWorkItemId =
+        form.reportType === 'service_call'
+          ? parseNullableInt(form.serviceCallId)
+          : parseNullableInt(form.projectId);
+
       const payload: CreateWorkReportRequest = {
         reportType: form.reportType,
         date: form.date,
-        projectId: parseNullableInt(form.projectId),
-        projectName: selectedProject?.title || null,
-        customerName: form.customerName || selectedProject?.customerName || null,
-        serviceCallId: null,
-        serviceCallTitle: null,
+        // Backend currently names this ProjectId, but it is the WorkReports.WorkItemId link.
+        projectId: linkedWorkItemId,
+        projectName:
+          form.reportType === 'service_call'
+            ? selectedServiceCall?.title || form.serviceCallTitle || null
+            : selectedProject?.title || null,
+        customerName:
+          form.customerName ||
+          selectedServiceCall?.customerName ||
+          selectedProject?.customerName ||
+          null,
+        serviceCallId: form.reportType === 'service_call' ? linkedWorkItemId : null,
+        serviceCallTitle:
+          form.reportType === 'service_call'
+            ? selectedServiceCall?.title || form.serviceCallTitle || null
+            : null,
         site: form.site || null,
         start: form.start || null,
         end: form.end || null,
@@ -492,7 +536,15 @@ export function ReportsPage() {
                   type="radio"
                   name="report-type"
                   checked={form.reportType === 'project'}
-                  onChange={() => updateForm({ reportType: 'project' })}
+                  onChange={() =>
+                    updateForm({
+                      reportType: 'project',
+                      serviceCallId: '',
+                      serviceCallTitle: '',
+                      customerName: selectedProject?.customerName || '',
+                      site: selectedProject?.siteName || '',
+                    })
+                  }
                 />
                 <span>פרויקט</span>
               </label>
@@ -501,7 +553,14 @@ export function ReportsPage() {
                   type="radio"
                   name="report-type"
                   checked={form.reportType === 'service_call'}
-                  onChange={() => updateForm({ reportType: 'service_call' })}
+                  onChange={() =>
+                    updateForm({
+                      reportType: 'service_call',
+                      projectId: '',
+                      customerName: '',
+                      site: '',
+                    })
+                  }
                 />
                 <span>קריאת שירות</span>
               </label>
@@ -534,25 +593,22 @@ export function ReportsPage() {
                   </select>
                 </label>
               ) : (
-                <>
-                  <p className="reportsPage__schemaNote">
-                    מספר וכותרת קריאת שירות אינם נשמרים כרגע כי אין להם עמודות בטבלת
-                    WorkReports. סוג הדיווח כן נשמר.
-                  </p>
-                  <Input
-                    label="מספר קריאת שירות"
-                    type="number"
+                <label className="reportsPage__field">
+                  <span>קריאת שירות</span>
+                  <select
+                    className="reportsPage__select"
                     value={form.serviceCallId}
-                    onChange={(event) => updateForm({ serviceCallId: event.target.value })}
-                    disabled
-                  />
-                  <Input
-                    label="כותרת קריאת שירות"
-                    value={form.serviceCallTitle}
-                    onChange={(event) => updateForm({ serviceCallTitle: event.target.value })}
-                    disabled
-                  />
-                </>
+                    onChange={(event) => handleServiceCallChange(event.target.value)}
+                    required
+                  >
+                    <option value="">בחר קריאת שירות</option>
+                    {serviceCalls.map((serviceCall) => (
+                      <option key={serviceCall.workItemId} value={serviceCall.workItemId}>
+                        {serviceCall.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
               )}
 
               <Input

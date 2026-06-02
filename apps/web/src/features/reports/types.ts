@@ -27,6 +27,14 @@ export interface ReportProjectOption {
   siteName?: string;
 }
 
+export interface ReportServiceCallOption {
+  workItemId: number;
+  title: string;
+  customerName?: string | null;
+  siteName?: string | null;
+  status?: string | null;
+}
+
 export interface ReportEmployeeOption {
   employeeId: number;
   fullName: string;

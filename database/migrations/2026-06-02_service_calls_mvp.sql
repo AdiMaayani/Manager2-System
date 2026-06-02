@@ -1,7 +1,14 @@
-﻿SET ANSI_NULLS ON
-GO
-SET QUOTED_IDENTIFIER ON
-GO
+/*
+    ManageR2 Service Calls MVP migration.
+
+    Run this script manually in SSMS against the intended target database.
+    It does not create a ServiceCalls table. Service calls are WorkItems rows
+    with WorkType = 'ServiceCall'.
+
+    Changes:
+    - Extends sp_GetWorkItemsByType so Service Calls list/detail screens can
+      display site name, scheduling, priority, and assignment-relevant fields.
+*/
 
 CREATE OR ALTER PROCEDURE [dbo].[sp_GetWorkItemsByType]
     @WorkType NVARCHAR(50)
@@ -9,7 +16,7 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    SELECT 
+    SELECT
         wi.WorkItemId,
         wi.Title,
         wi.Description,

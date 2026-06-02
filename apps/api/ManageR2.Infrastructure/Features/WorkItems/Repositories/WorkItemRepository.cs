@@ -452,6 +452,7 @@ public class WorkItemRepository : IWorkItemRepository
             CustomerId = GetIntValue(reader, "CustomerId"),
             CustomerName = GetStringValue(reader, "CustomerName"),
             SiteId = GetIntValue(reader, "SiteId"),
+            SiteName = GetStringValue(reader, "SiteName"),
             CreatedAt = GetDateTimeValue(reader, "CreatedAt") ?? DateTime.MinValue,
             ClosedAt = GetDateTimeValue(reader, "ClosedAt"),
             ParentWorkItemId = GetNullableIntValue(reader, "ParentWorkItemId"),

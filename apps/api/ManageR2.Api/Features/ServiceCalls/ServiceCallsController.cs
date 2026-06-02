@@ -1,0 +1,242 @@
+using ManageR2.Api.Features.ServiceCalls.DTOs;
+using ManageR2.Domain.Entities;
+using ManageR2.Infrastructure.Repositories;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+
+namespace ManageR2.Api.Features.ServiceCalls;
+
+[ApiController]
+[Route("api/[controller]")]
+[Authorize]
+public class ServiceCallsController : ControllerBase
+{
+    private const string ServiceCallWorkType = "ServiceCall";
+
+    private readonly IWorkItemRepository _workItemRepository;
+
+    public ServiceCallsController(IWorkItemRepository workItemRepository)
+    {
+        _workItemRepository = workItemRepository;
+    }
+
+    [HttpGet]
+    public async Task<ActionResult<List<ServiceCallResponseDto>>> GetAll()
+    {
+        var serviceCalls = await _workItemRepository.GetByTypeAsync(ServiceCallWorkType);
+        return Ok(serviceCalls.Select(MapToResponse).ToList());
+    }
+
+    [HttpGet("{id:int}")]
+    public async Task<ActionResult<ServiceCallResponseDto>> GetById(int id)
+    {
+        var serviceCall = await GetServiceCallOrNullAsync(id);
+        if (serviceCall == null)
+        {
+            return NotFound($"Service call with ID {id} was not found.");
+        }
+
+        return Ok(MapToResponse(serviceCall));
+    }
+
+    [HttpPost]
+    public async Task<IActionResult> Create([FromBody] CreateServiceCallRequestDto request)
+    {
+        var validationError = ValidateRequest(request);
+        if (validationError != null)
+        {
+            return BadRequest(validationError);
+        }
+
+        var serviceCall = BuildServiceCall(request);
+        var newWorkItemId = await _workItemRepository.CreateAsync(serviceCall);
+
+        if (newWorkItemId <= 0)
+        {
+            return BadRequest("Failed to create service call.");
+        }
+
+        return Ok(new
+        {
+            message = "Service call created successfully.",
+            workItemId = newWorkItemId
+        });
+    }
+
+    [HttpPut("{id:int}")]
+    public async Task<IActionResult> Update(int id, [FromBody] UpdateServiceCallRequestDto request)
+    {
+        var existingServiceCall = await GetServiceCallOrNullAsync(id);
+        if (existingServiceCall == null)
+        {
+            return NotFound($"Service call with ID {id} was not found.");
+        }
+
+        var validationError = ValidateRequest(request);
+        if (validationError != null)
+        {
+            return BadRequest(validationError);
+        }
+
+        var serviceCall = BuildServiceCall(request);
+        var updated = await _workItemRepository.UpdateAsync(id, serviceCall);
+
+        if (!updated)
+        {
+            return BadRequest("Failed to update service call.");
+        }
+
+        return Ok(new { message = "Service call updated successfully." });
+    }
+
+    [HttpPut("{id:int}/close")]
+    public async Task<IActionResult> Close(int id)
+    {
+        var existingServiceCall = await GetServiceCallOrNullAsync(id);
+        if (existingServiceCall == null)
+        {
+            return NotFound($"Service call with ID {id} was not found.");
+        }
+
+        var closed = await _workItemRepository.CloseAsync(id);
+        if (!closed)
+        {
+            return BadRequest("Failed to close service call.");
+        }
+
+        return Ok(new { message = "Service call closed successfully." });
+    }
+
+    [HttpPost("{id:int}/assign-employee")]
+    public async Task<IActionResult> AssignEmployee(int id, [FromBody] AssignServiceCallEmployeeRequestDto request)
+    {
+        var existingServiceCall = await GetServiceCallOrNullAsync(id);
+        if (existingServiceCall == null)
+        {
+            return NotFound($"Service call with ID {id} was not found.");
+        }
+
+        if (request == null || request.EmployeeId <= 0 || string.IsNullOrWhiteSpace(request.AssignmentRole))
+        {
+            return BadRequest("Valid EmployeeId and AssignmentRole are required.");
+        }
+
+        try
+        {
+            var assigned = await _workItemRepository.AssignEmployeeToWorkAsync(
+                id,
+                request.EmployeeId,
+                request.AssignmentRole);
+
+            if (!assigned)
+            {
+                return BadRequest("Failed to assign employee to service call.");
+            }
+
+            return Ok(new { message = "Employee assigned to service call successfully." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(ex.Message);
+        }
+    }
+
+    private async Task<WorkItem?> GetServiceCallOrNullAsync(int workItemId)
+    {
+        var workItem = await _workItemRepository.GetByIdAsync(workItemId);
+        if (workItem == null ||
+            !string.Equals(workItem.WorkType, ServiceCallWorkType, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        return workItem;
+    }
+
+    private static string? ValidateRequest(CreateServiceCallRequestDto request)
+    {
+        if (request == null)
+        {
+            return "Service call data is required.";
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Title))
+        {
+            return "Title is required.";
+        }
+
+        if (string.IsNullOrWhiteSpace(request.Status))
+        {
+            return "Status is required.";
+        }
+
+        if (string.IsNullOrWhiteSpace(request.BillingType))
+        {
+            return "BillingType is required.";
+        }
+
+        if (request.CustomerId <= 0)
+        {
+            return "CustomerId must be greater than 0.";
+        }
+
+        if (request.SiteId <= 0)
+        {
+            return "SiteId must be greater than 0.";
+        }
+
+        return null;
+    }
+
+    private static WorkItem BuildServiceCall(CreateServiceCallRequestDto request)
+    {
+        return new WorkItem
+        {
+            Title = request.Title.Trim(),
+            Description = request.Description,
+            WorkType = ServiceCallWorkType,
+            Status = request.Status,
+            BillingType = request.BillingType,
+            CustomerId = request.CustomerId,
+            SiteId = request.SiteId,
+            Priority = request.Priority,
+            PlannedStart = request.PlannedStart,
+            PlannedEnd = request.PlannedEnd,
+            EstimatedHours = request.EstimatedHours,
+            ActualStart = request.ActualStart,
+            ActualEnd = request.ActualEnd,
+            ActualHours = request.ActualHours,
+            RequiredRole = request.RequiredRole,
+            IsLocked = request.IsLocked,
+            ParentWorkItemId = null
+        };
+    }
+
+    private static ServiceCallResponseDto MapToResponse(WorkItem serviceCall)
+    {
+        return new ServiceCallResponseDto
+        {
+            WorkItemId = serviceCall.WorkItemId,
+            Title = serviceCall.Title,
+            Description = serviceCall.Description,
+            WorkType = serviceCall.WorkType ?? ServiceCallWorkType,
+            Status = serviceCall.Status ?? string.Empty,
+            BillingType = serviceCall.BillingType,
+            CustomerId = serviceCall.CustomerId,
+            CustomerName = serviceCall.CustomerName,
+            SiteId = serviceCall.SiteId,
+            SiteName = serviceCall.SiteName,
+            Priority = serviceCall.Priority,
+            PlannedStart = serviceCall.PlannedStart,
+            PlannedEnd = serviceCall.PlannedEnd,
+            EstimatedHours = serviceCall.EstimatedHours,
+            ActualStart = serviceCall.ActualStart,
+            ActualEnd = serviceCall.ActualEnd,
+            ActualHours = serviceCall.ActualHours,
+            RequiredRole = serviceCall.RequiredRole,
+            IsLocked = serviceCall.IsLocked,
+            CreatedAt = serviceCall.CreatedAt,
+            ClosedAt = serviceCall.ClosedAt
+        };
+    }
+}

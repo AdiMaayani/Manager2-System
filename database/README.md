@@ -182,6 +182,9 @@ bundled `Rec_GetTaskRecommendationInput`). These are kept because they are part 
   It does not alter tables; delete is physical because `WorkReports` has no soft-delete column.
 - `migrations/2026-06-02_employees_crud.sql` — idempotent manual migration for employee management stored procedures.
   It updates `sp_GetEmployees` to return all roster fields and adds get-by-id, create, update, and active-status procedures.
+- `migrations/2026-06-02_service_calls_mvp.sql` — idempotent manual migration for the Service Calls MVP.
+  It keeps Service Calls in `WorkItems` with `WorkType = 'ServiceCall'` and extends `sp_GetWorkItemsByType`
+  to return site name and scheduling fields for service-call list/detail screens.
 - `SP/2026-04-20_workplan_algorithm_data_model_extension.sql` — conditional `ALTER TABLE ADD COLUMN` migration for
   the work-plan algorithm. Its columns are already present in `schema/tables.sql`, so a fresh build does **not**
   need it. Retained as migration history.
