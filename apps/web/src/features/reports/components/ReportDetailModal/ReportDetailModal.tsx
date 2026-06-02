@@ -1,16 +1,21 @@
+import { useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
 import { useQuery } from '@tanstack/react-query';
 import { Modal } from '@shared/components/Modal';
 import { Badge } from '@shared/components/Badge';
 import { Button } from '@shared/components/Button';
 import { PageSpinner } from '@shared/components/PageSpinner';
 import { ErrorState } from '@shared/components/ErrorState';
-import { getReportByIdAsync } from '../../api/reportsApiClient';
+import { deleteWorkReportAsync, getReportByIdAsync } from '../../api/reportsApiClient';
+import type { WorkReportDetails } from '../../types';
 import './ReportDetailModal.css';
 
 interface ReportDetailModalProps {
   reportId: number | null;
   isOpen: boolean;
   onClose: () => void;
+  onEdit: (report: WorkReportDetails) => void;
+  onDeleted: () => void;
 }
 
 function formatReportDate(value?: string | null) {
@@ -18,17 +23,43 @@ function formatReportDate(value?: string | null) {
   return value.split('T')[0];
 }
 
-export function ReportDetailModal({ reportId, isOpen, onClose }: ReportDetailModalProps) {
+export function ReportDetailModal({
+  reportId,
+  isOpen,
+  onClose,
+  onEdit,
+  onDeleted,
+}: ReportDetailModalProps) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const { data: report, isLoading, error, refetch } = useQuery({
     queryKey: ['reports', 'detail', reportId],
     queryFn: () => getReportByIdAsync(reportId!),
     enabled: isOpen && reportId != null && reportId > 0,
   });
 
+  const deleteReport = useMutation({
+    mutationFn: (id: number) => deleteWorkReportAsync(id),
+    onSuccess: () => {
+      setConfirmDelete(false);
+      setDeleteError(null);
+      onDeleted();
+    },
+    onError: (err) => {
+      setDeleteError(err instanceof Error ? err.message : 'מחיקת הדיווח נכשלה');
+    },
+  });
+
+  function handleClose() {
+    setConfirmDelete(false);
+    setDeleteError(null);
+    onClose();
+  }
+
   return (
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={handleClose}
       title={report ? `דיווח #${report.reportId}` : 'פרטי דיווח'}
     >
       {isLoading && <PageSpinner />}
@@ -141,10 +172,46 @@ export function ReportDetailModal({ reportId, isOpen, onClose }: ReportDetailMod
           )}
 
           <div className="reportDetailModal__actions">
-            <Button type="button" variant="secondary" onClick={onClose}>
+            <Button type="button" onClick={() => onEdit(report)}>
+              עריכה
+            </Button>
+            {confirmDelete ? (
+              <>
+                <span className="reportDetailModal__confirmText">
+                  למחוק את הדיווח לצמיתות?
+                </span>
+                <Button
+                  type="button"
+                  variant="danger"
+                  disabled={deleteReport.isPending}
+                  onClick={() => deleteReport.mutate(report.reportId)}
+                >
+                  {deleteReport.isPending ? 'מוחק...' : 'אישור מחיקה'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  disabled={deleteReport.isPending}
+                  onClick={() => setConfirmDelete(false)}
+                >
+                  חזור
+                </Button>
+              </>
+            ) : (
+              <Button
+                type="button"
+                variant="danger"
+                disabled={deleteReport.isPending}
+                onClick={() => setConfirmDelete(true)}
+              >
+                מחיקה
+              </Button>
+            )}
+            <Button type="button" variant="secondary" onClick={handleClose}>
               סגור
             </Button>
           </div>
+          {deleteError && <p className="reportDetailModal__error">{deleteError}</p>}
         </div>
       )}
     </Modal>

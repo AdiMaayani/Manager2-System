@@ -5,8 +5,7 @@ using Microsoft.Data.SqlClient;
 
 namespace ManageR2.Infrastructure.Repositories;
 
-// ReportsController → this → SQL: transactional SP writes; reads use plain SELECT + manual reader→model mapping.
-// Repository implementation for work report create/read flows.
+// ReportsController -> this -> SQL Server stored procedures. No inline SQL lives in this repository.
 public class WorkReportRepository : IWorkReportRepository
 {
     private readonly DBServices _dbServices;
@@ -19,7 +18,6 @@ public class WorkReportRepository : IWorkReportRepository
     // sp_CreateWorkReport + child SPs inside one SqlTransaction; returns new WorkReportId scalar to the API.
     public async Task<int> CreateAsync(WorkReportCreateModel request)
     {
-        // Uses one transaction so report header and related child rows are saved together.
         await using var connection = _dbServices.CreateConnection();
         await connection.OpenAsync();
 
@@ -33,26 +31,7 @@ public class WorkReportRepository : IWorkReportRepository
             await using (var command = new SqlCommand("sp_CreateWorkReport", connection, transaction))
             {
                 command.CommandType = CommandType.StoredProcedure;
-
-                var parsedReportDate = ParseReportDate(request.Date);
-
-                command.Parameters.AddWithValue("@WorkItemId", request.ProjectId ?? (object)DBNull.Value);
-                command.Parameters.AddWithValue("@ReportType", request.ReportType ?? (object)DBNull.Value);
-                command.Parameters.AddWithValue("@ReportDate", parsedReportDate ?? (object)DBNull.Value);
-                command.Parameters.AddWithValue("@ProjectName", request.ProjectName ?? (object)DBNull.Value);
-                command.Parameters.AddWithValue("@CustomerName", request.CustomerName ?? (object)DBNull.Value);
-                command.Parameters.AddWithValue("@Site", request.Site ?? (object)DBNull.Value);
-                command.Parameters.AddWithValue("@StartTime", request.Start ?? (object)DBNull.Value);
-                command.Parameters.AddWithValue("@EndTime", request.End ?? (object)DBNull.Value);
-                command.Parameters.AddWithValue("@Summary", request.Summary ?? (object)DBNull.Value);
-                command.Parameters.AddWithValue("@Notes", request.Notes ?? (object)DBNull.Value);
-               command.Parameters.AddWithValue("@ReporterEmployeeId", request.ReporterId ?? (object)DBNull.Value);
-command.Parameters.AddWithValue("@ReporterName", request.ReporterName ?? (object)DBNull.Value);
-command.Parameters.AddWithValue("@ReporterRole", request.Role ?? (object)DBNull.Value);
-command.Parameters.AddWithValue("@Status", request.Status ?? (object)DBNull.Value);
-command.Parameters.AddWithValue("@WorkersCount", request.RelatedWorkers?.Count ?? 0);
-                command.Parameters.AddWithValue("@FollowUpRequired", request.Followup);
-                command.Parameters.AddWithValue("@FollowUpReason", request.FollowupReason ?? (object)DBNull.Value);
+                AddEditableReportParameters(command, request);
 
                 var result = await command.ExecuteScalarAsync();
                 newWorkReportId = result != null ? Convert.ToInt32(result) : 0;
@@ -63,46 +42,7 @@ command.Parameters.AddWithValue("@WorkersCount", request.RelatedWorkers?.Count ?
                 throw new Exception("Failed to create work report.");
             }
 
-            // Stores system names linked to the created report.
-            if (request.Systems != null && request.Systems.Count > 0)
-            {
-                foreach (var systemName in request.Systems)
-                {
-                    if (string.IsNullOrWhiteSpace(systemName))
-                    {
-                        continue;
-                    }
-
-                    await using var systemCommand = new SqlCommand("sp_AddWorkReportSystem", connection, transaction)
-                    {
-                        CommandType = CommandType.StoredProcedure
-                    };
-
-                    systemCommand.Parameters.AddWithValue("@WorkReportId", newWorkReportId);
-                    systemCommand.Parameters.AddWithValue("@SystemName", systemName.Trim());
-
-                    await systemCommand.ExecuteNonQueryAsync();
-                }
-            }
-
-            // Stores related employee assignments linked to the created report.
-            if (request.RelatedWorkers != null && request.RelatedWorkers.Count > 0)
-            {
-                foreach (var worker in request.RelatedWorkers)
-                {
-                    await using var workerCommand = new SqlCommand("sp_AddWorkReportEmployeeAssignment", connection, transaction)
-                    {
-                        CommandType = CommandType.StoredProcedure
-                    };
-
-                    workerCommand.Parameters.AddWithValue("@WorkReportId", newWorkReportId);
-                    workerCommand.Parameters.AddWithValue("@EmployeeId", worker.Id ?? (object)DBNull.Value);
-                    workerCommand.Parameters.AddWithValue("@EmployeeName", worker.Name ?? (object)DBNull.Value);
-                    workerCommand.Parameters.AddWithValue("@AssignmentRole", DBNull.Value);
-
-                    await workerCommand.ExecuteNonQueryAsync();
-                }
-            }
+            await InsertChildRowsAsync(connection, transaction, newWorkReportId, request);
 
             await transaction.CommitAsync();
 
@@ -115,148 +55,206 @@ command.Parameters.AddWithValue("@WorkersCount", request.RelatedWorkers?.Count ?
         }
     }
 
-    private static DateTime? ParseReportDate(string? date)
+    public async Task<List<WorkReportListItemModel>> GetAllAsync()
     {
-        // Accepts nullable date text from API payload and normalizes it for DB storage.
-        if (string.IsNullOrWhiteSpace(date))
+        var reports = new List<WorkReportListItemModel>();
+
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand("dbo.sp_WorkReports_GetList", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+
+        await connection.OpenAsync();
+        await using var reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            reports.Add(new WorkReportListItemModel
+            {
+                WorkReportId = GetIntValue(reader, "WorkReportId"),
+                ReportDate = GetDateTimeValue(reader, "ReportDate"),
+                ProjectName = GetStringValue(reader, "ProjectName"),
+                CustomerName = GetStringValue(reader, "CustomerName"),
+                ReporterName = GetStringValue(reader, "ReporterName"),
+                Status = GetStringValue(reader, "Status"),
+                FollowUpRequired = GetBoolValue(reader, "FollowUpRequired")
+            });
+        }
+
+        return reports;
+    }
+
+    public async Task<WorkReportDetailsModel?> GetByIdAsync(int workReportId)
+    {
+        await using var connection = _dbServices.CreateConnection();
+        await connection.OpenAsync();
+
+        WorkReportDetailsModel? report = null;
+
+        await using (var command = new SqlCommand("dbo.sp_WorkReports_GetById", connection))
+        {
+            command.CommandType = CommandType.StoredProcedure;
+            command.Parameters.AddWithValue("@WorkReportId", workReportId);
+
+            await using var reader = await command.ExecuteReaderAsync();
+
+            if (await reader.ReadAsync())
+            {
+                report = MapDetails(reader);
+            }
+        }
+
+        if (report == null)
         {
             return null;
         }
 
-        if (DateTime.TryParse(date, out var parsedDate))
+        await LoadSystemsAsync(connection, report);
+        await LoadRelatedWorkersAsync(connection, report);
+
+        return report;
+    }
+
+    public async Task<bool> UpdateAsync(WorkReportUpdateModel request)
+    {
+        await using var connection = _dbServices.CreateConnection();
+        await connection.OpenAsync();
+
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync();
+
+        try
         {
-            return parsedDate;
+            await using (var command = new SqlCommand("dbo.sp_WorkReports_Update", connection, transaction))
+            {
+                command.CommandType = CommandType.StoredProcedure;
+                command.Parameters.AddWithValue("@WorkReportId", request.WorkReportId);
+                AddEditableReportParameters(command, request);
+
+                var result = await command.ExecuteScalarAsync();
+                var rowsAffected = result != null && result != DBNull.Value
+                    ? Convert.ToInt32(result)
+                    : 0;
+
+                if (rowsAffected <= 0)
+                {
+                    await transaction.RollbackAsync();
+                    return false;
+                }
+            }
+
+            await DeleteChildRowsAsync(connection, transaction, request.WorkReportId);
+            await InsertChildRowsAsync(connection, transaction, request.WorkReportId, request);
+            await transaction.CommitAsync();
+
+            return true;
         }
-
-        return null;
+        catch
+        {
+            await transaction.RollbackAsync();
+            throw;
+        }
     }
 
-    // Ad-hoc SELECT for list grids; maps rows to WorkReportListItemModel (not domain entities).
-    public async Task<List<WorkReportListItemModel>> GetAllAsync()
-{
-    // Returns lightweight report rows for list screens.
-    var reports = new List<WorkReportListItemModel>();
-
-    await using var connection = _dbServices.CreateConnection();
-    await using var command = new SqlCommand(
-        @"SELECT 
-      WorkReportId,
-      ReportDate,
-      ProjectName,
-      CustomerName,
-      ReporterName,
-      Status,
-      FollowUpRequired
-  FROM dbo.WorkReports
-  ORDER BY ReportDate DESC, WorkReportId DESC",
-        connection)
+    public async Task<bool> DeleteAsync(int workReportId)
     {
-        CommandType = CommandType.Text
-    };
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand("dbo.sp_WorkReports_Delete", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
 
-    await connection.OpenAsync();
-    await using var reader = await command.ExecuteReaderAsync();
-
-    while (await reader.ReadAsync())
-    {
-        reports.Add(new WorkReportListItemModel
-{
-    WorkReportId = reader["WorkReportId"] != DBNull.Value ? Convert.ToInt32(reader["WorkReportId"]) : 0,
-    ReportDate = reader["ReportDate"] != DBNull.Value ? Convert.ToDateTime(reader["ReportDate"]) : null,
-    ProjectName = reader["ProjectName"]?.ToString(),
-    CustomerName = reader["CustomerName"]?.ToString(),
-    ReporterName = reader["ReporterName"]?.ToString(),
-    Status = reader["Status"]?.ToString(),
-    FollowUpRequired = reader["FollowUpRequired"] != DBNull.Value && Convert.ToBoolean(reader["FollowUpRequired"])
-});
-    }
-
-    return reports;
-}
-
-// Header SELECT plus follow-up queries for systems and related workers; builds WorkReportDetailsModel graph.
-public async Task<WorkReportDetailsModel?> GetByIdAsync(int workReportId)
-{
-    // Loads full report details plus related systems and workers.
-    await using var connection = _dbServices.CreateConnection();
-    await connection.OpenAsync();
-
-    WorkReportDetailsModel? report = null;
-
-    await using (var command = new SqlCommand(
-@"SELECT 
-      WorkReportId,
-      WorkItemId,
-      ReportType,
-      ReportDate,
-      ProjectName,
-      CustomerName,
-      Site,
-      StartTime,
-      EndTime,
-      Summary,
-      Notes,
-      ReporterEmployeeId,
-      ReporterName,
-      ReporterRole,
-      Status,
-      FollowUpRequired,
-      FollowUpReason
-  FROM dbo.WorkReports
-  WHERE WorkReportId = @WorkReportId",
-        connection))
-    {
-        command.CommandType = CommandType.Text;
         command.Parameters.AddWithValue("@WorkReportId", workReportId);
 
-        await using var reader = await command.ExecuteReaderAsync();
+        await connection.OpenAsync();
+        var result = await command.ExecuteScalarAsync();
+        var rowsAffected = result != null && result != DBNull.Value
+            ? Convert.ToInt32(result)
+            : 0;
 
-        if (await reader.ReadAsync())
+        return rowsAffected > 0;
+    }
+
+    private static async Task InsertChildRowsAsync(
+        SqlConnection connection,
+        SqlTransaction transaction,
+        int workReportId,
+        WorkReportCreateModel request)
+    {
+        if (request.Systems != null && request.Systems.Count > 0)
         {
-            report = new WorkReportDetailsModel
+            foreach (var systemName in request.Systems)
             {
-                WorkReportId = reader["WorkReportId"] != DBNull.Value ? Convert.ToInt32(reader["WorkReportId"]) : 0,
-                ProjectId = reader["WorkItemId"] != DBNull.Value ? Convert.ToInt32(reader["WorkItemId"]) : null,
-                ReportType = reader["ReportType"]?.ToString(),
-                ReportDate = reader["ReportDate"] != DBNull.Value ? Convert.ToDateTime(reader["ReportDate"]) : null,
-                ProjectName = reader["ProjectName"]?.ToString(),
-                CustomerName = reader["CustomerName"]?.ToString(),
-                Site = reader["Site"]?.ToString(),
-                Start = reader["StartTime"]?.ToString(),
-                End = reader["EndTime"]?.ToString(),
-                Summary = reader["Summary"]?.ToString(),
-                Notes = reader["Notes"]?.ToString(),
-                ReporterId = reader["ReporterEmployeeId"] != DBNull.Value ? Convert.ToInt32(reader["ReporterEmployeeId"]) : null,
-                ReporterName = reader["ReporterName"]?.ToString(),
-                Role = reader["ReporterRole"]?.ToString(),
-                Status = reader["Status"]?.ToString(),
-                Followup = reader["FollowUpRequired"] != DBNull.Value && Convert.ToBoolean(reader["FollowUpRequired"]),
-                FollowupReason = reader["FollowUpReason"]?.ToString()
-            };
+                if (string.IsNullOrWhiteSpace(systemName))
+                {
+                    continue;
+                }
+
+                await using var systemCommand = new SqlCommand("sp_AddWorkReportSystem", connection, transaction)
+                {
+                    CommandType = CommandType.StoredProcedure
+                };
+
+                systemCommand.Parameters.AddWithValue("@WorkReportId", workReportId);
+                systemCommand.Parameters.AddWithValue("@SystemName", systemName.Trim());
+
+                await systemCommand.ExecuteNonQueryAsync();
+            }
+        }
+
+        if (request.RelatedWorkers != null && request.RelatedWorkers.Count > 0)
+        {
+            foreach (var worker in request.RelatedWorkers)
+            {
+                await using var workerCommand = new SqlCommand("sp_AddWorkReportEmployeeAssignment", connection, transaction)
+                {
+                    CommandType = CommandType.StoredProcedure
+                };
+
+                workerCommand.Parameters.AddWithValue("@WorkReportId", workReportId);
+                workerCommand.Parameters.AddWithValue("@EmployeeId", worker.Id.HasValue ? worker.Id.Value : DBNull.Value);
+                workerCommand.Parameters.AddWithValue("@EmployeeName", (object?)worker.Name ?? DBNull.Value);
+                workerCommand.Parameters.AddWithValue("@AssignmentRole", DBNull.Value);
+
+                await workerCommand.ExecuteNonQueryAsync();
+            }
         }
     }
 
-    if (report == null)
+    private static async Task DeleteChildRowsAsync(
+        SqlConnection connection,
+        SqlTransaction transaction,
+        int workReportId)
     {
-        return null;
+        await using (var systemsCommand = new SqlCommand("dbo.sp_WorkReports_DeleteSystems", connection, transaction))
+        {
+            systemsCommand.CommandType = CommandType.StoredProcedure;
+            systemsCommand.Parameters.AddWithValue("@WorkReportId", workReportId);
+            await systemsCommand.ExecuteNonQueryAsync();
+        }
+
+        await using (var workersCommand = new SqlCommand("dbo.sp_WorkReports_DeleteEmployeeAssignments", connection, transaction))
+        {
+            workersCommand.CommandType = CommandType.StoredProcedure;
+            workersCommand.Parameters.AddWithValue("@WorkReportId", workReportId);
+            await workersCommand.ExecuteNonQueryAsync();
+        }
     }
 
-    // Loads child system records linked to this report.
-    await using (var systemsCommand = new SqlCommand(
-        @"SELECT SystemName
-          FROM dbo.WorkReportSystems
-          WHERE WorkReportId = @WorkReportId
-          ORDER BY WorkReportSystemId",
-        connection))
+    private async Task LoadSystemsAsync(SqlConnection connection, WorkReportDetailsModel report)
     {
-        systemsCommand.CommandType = CommandType.Text;
-        systemsCommand.Parameters.AddWithValue("@WorkReportId", workReportId);
+        await using var systemsCommand = new SqlCommand("dbo.sp_WorkReports_GetSystems", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+
+        systemsCommand.Parameters.AddWithValue("@WorkReportId", report.WorkReportId);
 
         await using var systemsReader = await systemsCommand.ExecuteReaderAsync();
 
         while (await systemsReader.ReadAsync())
         {
-            var systemName = systemsReader["SystemName"]?.ToString();
+            var systemName = GetStringValue(systemsReader, "SystemName");
             if (!string.IsNullOrWhiteSpace(systemName))
             {
                 report.Systems.Add(systemName);
@@ -264,18 +262,14 @@ public async Task<WorkReportDetailsModel?> GetByIdAsync(int workReportId)
         }
     }
 
-    // Loads child worker records linked to this report.
-    await using (var workersCommand = new SqlCommand(
-        @"SELECT 
-              EmployeeId,
-              EmployeeName
-          FROM dbo.WorkReportEmployeeAssignments
-          WHERE WorkReportId = @WorkReportId
-          ORDER BY WorkReportEmployeeAssignmentId",
-        connection))
+    private async Task LoadRelatedWorkersAsync(SqlConnection connection, WorkReportDetailsModel report)
     {
-        workersCommand.CommandType = CommandType.Text;
-        workersCommand.Parameters.AddWithValue("@WorkReportId", workReportId);
+        await using var workersCommand = new SqlCommand("dbo.sp_WorkReports_GetEmployeeAssignments", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+
+        workersCommand.Parameters.AddWithValue("@WorkReportId", report.WorkReportId);
 
         await using var workersReader = await workersCommand.ExecuteReaderAsync();
 
@@ -283,13 +277,91 @@ public async Task<WorkReportDetailsModel?> GetByIdAsync(int workReportId)
         {
             report.RelatedWorkers.Add(new WorkReportRelatedWorkerModel
             {
-                Id = workersReader["EmployeeId"] != DBNull.Value ? Convert.ToInt32(workersReader["EmployeeId"]) : null,
-                Name = workersReader["EmployeeName"]?.ToString()
+                Id = GetNullableIntValue(workersReader, "EmployeeId"),
+                Name = GetStringValue(workersReader, "EmployeeName")
             });
         }
     }
 
-    return report;
-}
+    private static void AddEditableReportParameters(SqlCommand command, WorkReportCreateModel request)
+    {
+        var parsedReportDate = ParseReportDate(request.Date);
 
+        command.Parameters.AddWithValue("@WorkItemId", request.ProjectId.HasValue ? request.ProjectId.Value : DBNull.Value);
+        command.Parameters.AddWithValue("@ReportType", (object?)request.ReportType ?? DBNull.Value);
+        command.Parameters.AddWithValue("@ReportDate", parsedReportDate.HasValue ? parsedReportDate.Value : DBNull.Value);
+        command.Parameters.AddWithValue("@ProjectName", (object?)request.ProjectName ?? DBNull.Value);
+        command.Parameters.AddWithValue("@CustomerName", (object?)request.CustomerName ?? DBNull.Value);
+        command.Parameters.AddWithValue("@Site", (object?)request.Site ?? DBNull.Value);
+        command.Parameters.AddWithValue("@StartTime", (object?)request.Start ?? DBNull.Value);
+        command.Parameters.AddWithValue("@EndTime", (object?)request.End ?? DBNull.Value);
+        command.Parameters.AddWithValue("@Summary", (object?)request.Summary ?? DBNull.Value);
+        command.Parameters.AddWithValue("@Notes", (object?)request.Notes ?? DBNull.Value);
+        command.Parameters.AddWithValue("@ReporterEmployeeId", request.ReporterId.HasValue ? request.ReporterId.Value : DBNull.Value);
+        command.Parameters.AddWithValue("@ReporterName", (object?)request.ReporterName ?? DBNull.Value);
+        command.Parameters.AddWithValue("@ReporterRole", (object?)request.Role ?? DBNull.Value);
+        command.Parameters.AddWithValue("@Status", (object?)request.Status ?? DBNull.Value);
+        command.Parameters.AddWithValue("@WorkersCount", request.RelatedWorkers?.Count ?? 0);
+        command.Parameters.AddWithValue("@FollowUpRequired", request.Followup);
+        command.Parameters.AddWithValue("@FollowUpReason", (object?)request.FollowupReason ?? DBNull.Value);
+    }
+
+    private static WorkReportDetailsModel MapDetails(SqlDataReader reader)
+    {
+        return new WorkReportDetailsModel
+        {
+            WorkReportId = GetIntValue(reader, "WorkReportId"),
+            ProjectId = GetNullableIntValue(reader, "WorkItemId"),
+            ReportType = GetStringValue(reader, "ReportType"),
+            ReportDate = GetDateTimeValue(reader, "ReportDate"),
+            ProjectName = GetStringValue(reader, "ProjectName"),
+            CustomerName = GetStringValue(reader, "CustomerName"),
+            Site = GetStringValue(reader, "Site"),
+            Start = GetStringValue(reader, "StartTime"),
+            End = GetStringValue(reader, "EndTime"),
+            Summary = GetStringValue(reader, "Summary"),
+            Notes = GetStringValue(reader, "Notes"),
+            ReporterId = GetNullableIntValue(reader, "ReporterEmployeeId"),
+            ReporterName = GetStringValue(reader, "ReporterName"),
+            Role = GetStringValue(reader, "ReporterRole"),
+            Status = GetStringValue(reader, "Status"),
+            Followup = GetBoolValue(reader, "FollowUpRequired"),
+            FollowupReason = GetStringValue(reader, "FollowUpReason")
+        };
+    }
+
+    private static DateTime? ParseReportDate(string? date)
+    {
+        if (string.IsNullOrWhiteSpace(date))
+        {
+            return null;
+        }
+
+        return DateTime.TryParse(date, out var parsedDate) ? parsedDate : null;
+    }
+
+    private static string? GetStringValue(SqlDataReader reader, string columnName)
+    {
+        return reader[columnName] == DBNull.Value ? null : reader[columnName]?.ToString();
+    }
+
+    private static int GetIntValue(SqlDataReader reader, string columnName)
+    {
+        return reader[columnName] == DBNull.Value ? 0 : Convert.ToInt32(reader[columnName]);
+    }
+
+    private static int? GetNullableIntValue(SqlDataReader reader, string columnName)
+    {
+        return reader[columnName] == DBNull.Value ? null : Convert.ToInt32(reader[columnName]);
+    }
+
+    private static bool GetBoolValue(SqlDataReader reader, string columnName)
+    {
+        return reader[columnName] != DBNull.Value && Convert.ToBoolean(reader[columnName]);
+    }
+
+    private static DateTime? GetDateTimeValue(SqlDataReader reader, string columnName)
+    {
+        return reader[columnName] == DBNull.Value ? null : Convert.ToDateTime(reader[columnName]);
+    }
 }

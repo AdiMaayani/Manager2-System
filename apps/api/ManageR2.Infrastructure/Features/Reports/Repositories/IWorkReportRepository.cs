@@ -9,4 +9,6 @@ public interface IWorkReportRepository
     Task<int> CreateAsync(WorkReportCreateModel request);
     Task<List<WorkReportListItemModel>> GetAllAsync();
     Task<WorkReportDetailsModel?> GetByIdAsync(int workReportId);
+    Task<bool> UpdateAsync(WorkReportUpdateModel request);
+    Task<bool> DeleteAsync(int workReportId);
 }

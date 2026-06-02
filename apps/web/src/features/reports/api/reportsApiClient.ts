@@ -74,3 +74,17 @@ export function createWorkReportAsync(
     body: JSON.stringify(request),
   });
 }
+
+export function updateWorkReportAsync(
+  id: number,
+  request: CreateWorkReportRequest,
+): Promise<WorkReportDetails> {
+  return apiRequest<WorkReportDetailsResponse>(`/Reports/${id}`, {
+    method: 'PUT',
+    body: JSON.stringify(request),
+  }).then(mapWorkReportDetails);
+}
+
+export function deleteWorkReportAsync(id: number): Promise<void> {
+  return apiRequest<void>(`/Reports/${id}`, { method: 'DELETE' });
+}
