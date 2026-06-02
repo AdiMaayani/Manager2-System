@@ -1,11 +1,33 @@
 ﻿/* =====================================================================
    ManageR2 - Table DDL Snapshot
    Source: igroup30_prod.sql (live DB dump, Script Date 31/05/2026)
-   Contents: 31 tables, 26 indexes, primary keys, defaults,
+   Contents: 33 tables, 27 indexes, primary keys, defaults,
              check constraints and foreign keys - verbatim from the dump.
    Run within your target database context (USE [<db>]; GO).
    ===================================================================== */
 
+/****** Object:  Table [dbo].[CompanySettings]    Script Date: 02/06/2026 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [dbo].[CompanySettings](
+	[CompanySettingsId] [tinyint] NOT NULL,
+	[CompanyName] [nvarchar](200) NOT NULL,
+	[LegalName] [nvarchar](200) NULL,
+	[RegistrationNumber] [nvarchar](50) NULL,
+	[Email] [nvarchar](254) NULL,
+	[Phone] [nvarchar](50) NULL,
+	[Address] [nvarchar](500) NULL,
+	[Website] [nvarchar](250) NULL,
+	[UpdatedAt] [datetime2](0) NOT NULL,
+	[UpdatedByUserId] [int] NULL,
+ CONSTRAINT [PK_CompanySettings] PRIMARY KEY CLUSTERED
+(
+	[CompanySettingsId] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY]
+GO
 /****** Object:  Table [dbo].[Contacts]    Script Date: 31/05/2026 16:54:53 ******/
 SET ANSI_NULLS ON
 GO
@@ -121,6 +143,26 @@ CREATE TABLE [dbo].[Employees](
 PRIMARY KEY CLUSTERED 
 (
 	[EmployeeId] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+/****** Object:  Table [dbo].[ProjectEquipmentItems]    Script Date: 02/06/2026 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [dbo].[ProjectEquipmentItems](
+	[ProjectEquipmentItemId] [int] IDENTITY(1,1) NOT NULL,
+	[ProjectId] [int] NOT NULL,
+	[EquipmentName] [nvarchar](200) NOT NULL,
+	[Status] [nvarchar](50) NOT NULL,
+	[Location] [nvarchar](200) NULL,
+	[SortOrder] [int] NOT NULL,
+	[CreatedAt] [datetime2](7) NOT NULL,
+	[UpdatedAt] [datetime2](7) NULL,
+ CONSTRAINT [PK_ProjectEquipmentItems] PRIMARY KEY CLUSTERED
+(
+	[ProjectEquipmentItemId] ASC
 )WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
 ) ON [PRIMARY]
 GO
@@ -817,6 +859,14 @@ CREATE NONCLUSTERED INDEX [IX_Customers_CustomerType_IsActive] ON [dbo].[Custome
 	[IsActive] ASC
 )WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
 GO
+/****** Object:  Index [IX_ProjectEquipmentItems_ProjectId_SortOrder]    Script Date: 02/06/2026 ******/
+CREATE NONCLUSTERED INDEX [IX_ProjectEquipmentItems_ProjectId_SortOrder] ON [dbo].[ProjectEquipmentItems]
+(
+	[ProjectId] ASC,
+	[SortOrder] ASC,
+	[ProjectEquipmentItemId] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+GO
 /****** Object:  Index [IX_Rec_EmployeeAvailability_EmployeeId_TimeRange]    Script Date: 31/05/2026 16:54:53 ******/
 CREATE NONCLUSTERED INDEX [IX_Rec_EmployeeAvailability_EmployeeId_TimeRange] ON [dbo].[Rec_EmployeeAvailability]
 (
@@ -955,6 +1005,8 @@ CREATE NONCLUSTERED INDEX [IX_WorkItems_SiteId] ON [dbo].[WorkItems]
 	[SiteId] ASC
 )WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
 GO
+ALTER TABLE [dbo].[CompanySettings] ADD  CONSTRAINT [DF_CompanySettings_UpdatedAt]  DEFAULT (sysutcdatetime()) FOR [UpdatedAt]
+GO
 ALTER TABLE [dbo].[Contacts] ADD  CONSTRAINT [DF_Contacts_IsActive]  DEFAULT ((1)) FOR [IsActive]
 GO
 ALTER TABLE [dbo].[Contacts] ADD  CONSTRAINT [DF_Contacts_CreatedAt]  DEFAULT (sysutcdatetime()) FOR [CreatedAt]
@@ -972,6 +1024,8 @@ GO
 ALTER TABLE [dbo].[Employees] ADD  CONSTRAINT [DF_Employees_CreatedAt]  DEFAULT (sysdatetime()) FOR [CreatedAt]
 GO
 ALTER TABLE [dbo].[Employees] ADD  CONSTRAINT [DF_Employees_IsAssignable]  DEFAULT ((1)) FOR [IsAssignable]
+GO
+ALTER TABLE [dbo].[ProjectEquipmentItems] ADD  CONSTRAINT [DF_ProjectEquipmentItems_CreatedAt]  DEFAULT (sysutcdatetime()) FOR [CreatedAt]
 GO
 ALTER TABLE [dbo].[Rec_EmployeeAvailability] ADD  CONSTRAINT [DF_Rec_EmployeeAvailability_CreatedAt]  DEFAULT (sysutcdatetime()) FOR [CreatedAt]
 GO
@@ -1093,6 +1147,11 @@ ALTER TABLE [dbo].[Customers]  WITH CHECK ADD  CONSTRAINT [FK_Customers_UpdatedB
 REFERENCES [dbo].[Users] ([UserId])
 GO
 ALTER TABLE [dbo].[Customers] CHECK CONSTRAINT [FK_Customers_UpdatedByUser]
+GO
+ALTER TABLE [dbo].[ProjectEquipmentItems]  WITH CHECK ADD  CONSTRAINT [FK_ProjectEquipmentItems_WorkItems] FOREIGN KEY([ProjectId])
+REFERENCES [dbo].[WorkItems] ([WorkItemId])
+GO
+ALTER TABLE [dbo].[ProjectEquipmentItems] CHECK CONSTRAINT [FK_ProjectEquipmentItems_WorkItems]
 GO
 ALTER TABLE [dbo].[Rec_EmployeeAvailability]  WITH CHECK ADD  CONSTRAINT [FK_Rec_EmployeeAvailability_Employees] FOREIGN KEY([EmployeeId])
 REFERENCES [dbo].[Employees] ([EmployeeId])
@@ -1340,6 +1399,18 @@ GO
 ALTER TABLE [dbo].[Contacts]  WITH CHECK ADD  CONSTRAINT [CK_Contacts_PhoneOrEmailRequired] CHECK  ((nullif(ltrim(rtrim(isnull([Phone],''))),'') IS NOT NULL OR nullif(ltrim(rtrim(isnull([Email],''))),'') IS NOT NULL))
 GO
 ALTER TABLE [dbo].[Contacts] CHECK CONSTRAINT [CK_Contacts_PhoneOrEmailRequired]
+GO
+ALTER TABLE [dbo].[CompanySettings]  WITH CHECK ADD  CONSTRAINT [CK_CompanySettings_SingleRow] CHECK  (([CompanySettingsId]=(1)))
+GO
+ALTER TABLE [dbo].[CompanySettings] CHECK CONSTRAINT [CK_CompanySettings_SingleRow]
+GO
+ALTER TABLE [dbo].[ProjectEquipmentItems]  WITH CHECK ADD  CONSTRAINT [CK_ProjectEquipmentItems_EquipmentName_NotBlank] CHECK  ((len(ltrim(rtrim([EquipmentName])))>(0)))
+GO
+ALTER TABLE [dbo].[ProjectEquipmentItems] CHECK CONSTRAINT [CK_ProjectEquipmentItems_EquipmentName_NotBlank]
+GO
+ALTER TABLE [dbo].[ProjectEquipmentItems]  WITH CHECK ADD  CONSTRAINT [CK_ProjectEquipmentItems_Status_NotBlank] CHECK  ((len(ltrim(rtrim([Status])))>(0)))
+GO
+ALTER TABLE [dbo].[ProjectEquipmentItems] CHECK CONSTRAINT [CK_ProjectEquipmentItems_Status_NotBlank]
 GO
 ALTER TABLE [dbo].[Rec_EmployeeAvailability]  WITH CHECK ADD  CONSTRAINT [CK_Rec_EmployeeAvailability_TimeRange] CHECK  (([AvailableFrom]<[AvailableTo]))
 GO

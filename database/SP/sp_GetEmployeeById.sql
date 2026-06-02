@@ -1,12 +1,10 @@
-﻿SET ANSI_NULLS ON
+SET ANSI_NULLS ON
 GO
 SET QUOTED_IDENTIFIER ON
 GO
 
-/* =========================================
-   sp_GetEmployees
-========================================= */
-CREATE OR ALTER PROCEDURE [dbo].[sp_GetEmployees]
+CREATE OR ALTER PROCEDURE dbo.sp_GetEmployeeById
+    @EmployeeId INT
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -22,7 +20,6 @@ BEGIN
         IsActive,
         CreatedAt
     FROM dbo.Employees
-    ORDER BY FullName ASC;
-END;
-
+    WHERE EmployeeId = @EmployeeId;
+END
 GO
