@@ -57,5 +57,20 @@
 
 .reportDetailModal__actions {
   display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  align-items: center;
   justify-content: flex-start;
+}
+
+.reportDetailModal__confirmText {
+  color: var(--color-danger-600);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.reportDetailModal__error {
+  margin: var(--spacing-sm) 0 0;
+  color: var(--color-danger-600);
+  font-size: var(--font-size-sm);
 }

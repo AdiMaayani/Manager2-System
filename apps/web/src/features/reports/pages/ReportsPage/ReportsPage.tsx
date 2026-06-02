@@ -13,10 +13,11 @@ import {
   createWorkReportAsync,
   getReportEmployeesAsync,
   getReportProjectsAsync,
+  updateWorkReportAsync,
 } from '../../api/reportsApiClient';
 import { ReportDetailModal } from '../../components/ReportDetailModal';
 import { useReports } from '../../hooks/useReports';
-import type { CreateWorkReportRequest } from '../../types';
+import type { CreateWorkReportRequest, WorkReportDetails } from '../../types';
 import './ReportsPage.css';
 
 const QUICK_REPORT_KEY = 'manager2_quick_report_prefill';
@@ -25,6 +26,7 @@ const ROLE_OPTIONS = ['מתקין', 'מנהל פרויקט', 'טכנאי'];
 const LIST_STATUS_OPTIONS = ['הוגש', 'טיוטה'];
 
 type SubmitStatus = 'הוגש' | 'טיוטה';
+type ReportFormMode = 'create' | 'edit';
 
 interface QuickReportPrefill {
   date?: string;
@@ -86,6 +88,30 @@ function createInitialFormState(prefill?: QuickReportPrefill | null): ReportForm
   };
 }
 
+function createFormStateFromReport(report: WorkReportDetails): ReportFormState {
+  return {
+    reportType: report.reportType === 'service_call' ? 'service_call' : 'project',
+    date: formatReportDate(report.reportDate) || todayYmd(),
+    projectId: report.projectId != null ? String(report.projectId) : '',
+    customerName: report.customerName || '',
+    serviceCallId: report.serviceCallId != null ? String(report.serviceCallId) : '',
+    serviceCallTitle: report.serviceCallTitle || '',
+    site: report.site || '',
+    start: report.start || '',
+    end: report.end || '',
+    reporterId: report.reporterId != null ? String(report.reporterId) : '',
+    role: report.role || '',
+    summary: report.summary || '',
+    notes: report.notes || '',
+    followup: report.followUpRequired ?? false,
+    followupReason: report.followUpReason || '',
+    systems: report.systems,
+    relatedWorkerIds: report.relatedWorkers
+      .map((worker) => (worker.id != null ? String(worker.id) : ''))
+      .filter(Boolean),
+  };
+}
+
 function parseNullableInt(value: string): number | null {
   const normalized = value.trim();
   if (!normalized) return null;
@@ -93,7 +119,7 @@ function parseNullableInt(value: string): number | null {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
-function formatReportDate(value?: string) {
+function formatReportDate(value?: string | null) {
   if (!value) return '';
   return value.split('T')[0];
 }
@@ -105,8 +131,11 @@ export function ReportsPage() {
   const [searchParams] = useSearchParams();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [selectedReportId, setSelectedReportId] = useState<number | null>(null);
+  const [formMode, setFormMode] = useState<ReportFormMode>('create');
+  const [editingReportId, setEditingReportId] = useState<number | null>(null);
   const [form, setForm] = useState<ReportFormState>(() => createInitialFormState());
   const [formError, setFormError] = useState<string | null>(null);
+  const [pageMessage, setPageMessage] = useState<string | null>(null);
   const [workerToAddId, setWorkerToAddId] = useState('');
 
   // List filter state
@@ -190,10 +219,14 @@ export function ReportsPage() {
 
     try {
       const prefill = JSON.parse(rawPrefill) as QuickReportPrefill;
-      setForm(createInitialFormState(prefill));
-      setIsCreateOpen(true);
-      sessionStorage.removeItem(QUICK_REPORT_KEY);
-      navigate('/reports', { replace: true });
+      window.setTimeout(() => {
+        setForm(createInitialFormState(prefill));
+        setFormMode('create');
+        setEditingReportId(null);
+        setIsCreateOpen(true);
+        sessionStorage.removeItem(QUICK_REPORT_KEY);
+        navigate('/reports', { replace: true });
+      }, 0);
     } catch {
       sessionStorage.removeItem(QUICK_REPORT_KEY);
     }
@@ -201,14 +234,28 @@ export function ReportsPage() {
 
   function openCreateModal() {
     setForm(createInitialFormState());
+    setFormMode('create');
+    setEditingReportId(null);
     setWorkerToAddId('');
     setFormError(null);
+    setPageMessage(null);
     setIsCreateOpen(true);
   }
 
   function closeCreateModal() {
     setFormError(null);
     setIsCreateOpen(false);
+  }
+
+  function openEditModal(report: WorkReportDetails) {
+    setSelectedReportId(null);
+    setForm(createFormStateFromReport(report));
+    setFormMode('edit');
+    setEditingReportId(report.reportId);
+    setWorkerToAddId('');
+    setFormError(null);
+    setPageMessage(null);
+    setIsCreateOpen(true);
   }
 
   function updateForm(patch: Partial<ReportFormState>) {
@@ -245,7 +292,7 @@ export function ReportsPage() {
     });
   }
 
-  const createReport = useMutation({
+  const saveReport = useMutation({
     mutationFn: async (submitStatus: SubmitStatus) => {
       const isDraft = submitStatus === 'טיוטה';
 
@@ -263,8 +310,8 @@ export function ReportsPage() {
         projectId: parseNullableInt(form.projectId),
         projectName: selectedProject?.title || null,
         customerName: form.customerName || selectedProject?.customerName || null,
-        serviceCallId: parseNullableInt(form.serviceCallId),
-        serviceCallTitle: form.serviceCallTitle || null,
+        serviceCallId: null,
+        serviceCallTitle: null,
         site: form.site || null,
         start: form.start || null,
         end: form.end || null,
@@ -283,17 +330,25 @@ export function ReportsPage() {
         followupReason: form.followup ? form.followupReason || null : null,
       };
 
+      if (formMode === 'edit') {
+        if (editingReportId == null) throw new Error('לא נבחר דיווח לעריכה');
+        return updateWorkReportAsync(editingReportId, payload);
+      }
+
       return createWorkReportAsync(payload);
     },
     onSuccess: async () => {
       setIsCreateOpen(false);
       setForm(createInitialFormState());
+      setFormMode('create');
+      setEditingReportId(null);
       setWorkerToAddId('');
       setFormError(null);
+      setPageMessage(formMode === 'edit' ? 'הדיווח עודכן בהצלחה.' : 'הדיווח נשמר בהצלחה.');
       await queryClient.invalidateQueries({ queryKey: ['reports'] });
     },
     onError: (err) => {
-      setFormError(err instanceof Error ? err.message : 'יצירת הדיווח נכשלה');
+      setFormError(err instanceof Error ? err.message : 'שמירת הדיווח נכשלה');
     },
   });
 
@@ -313,6 +368,8 @@ export function ReportsPage() {
           דיווח חדש
         </Button>
       </div>
+
+      {pageMessage && <p className="reportsPage__success">{pageMessage}</p>}
 
       <div className="reportsPage__filterBar">
         <Input
@@ -415,12 +472,16 @@ export function ReportsPage() {
         </div>
       )}
 
-      <Modal isOpen={isCreateOpen} onClose={closeCreateModal} title="דיווח חדש">
+      <Modal
+        isOpen={isCreateOpen}
+        onClose={closeCreateModal}
+        title={formMode === 'edit' ? `עריכת דיווח #${editingReportId}` : 'דיווח חדש'}
+      >
         <form
           className="reportsPage__form"
           onSubmit={(event) => {
             event.preventDefault();
-            createReport.mutate('הוגש');
+            saveReport.mutate('הוגש');
           }}
         >
           <section className="reportsPage__formSection">
@@ -474,16 +535,22 @@ export function ReportsPage() {
                 </label>
               ) : (
                 <>
+                  <p className="reportsPage__schemaNote">
+                    מספר וכותרת קריאת שירות אינם נשמרים כרגע כי אין להם עמודות בטבלת
+                    WorkReports. סוג הדיווח כן נשמר.
+                  </p>
                   <Input
                     label="מספר קריאת שירות"
                     type="number"
                     value={form.serviceCallId}
                     onChange={(event) => updateForm({ serviceCallId: event.target.value })}
+                    disabled
                   />
                   <Input
                     label="כותרת קריאת שירות"
                     value={form.serviceCallTitle}
                     onChange={(event) => updateForm({ serviceCallTitle: event.target.value })}
+                    disabled
                   />
                 </>
               )}
@@ -665,14 +732,18 @@ export function ReportsPage() {
           {formError && <p className="reportsPage__error">{formError}</p>}
 
           <div className="reportsPage__actions">
-            <Button type="submit" disabled={createReport.isPending}>
-              {createReport.isPending ? 'שולח...' : 'שלח דיווח'}
+            <Button type="submit" disabled={saveReport.isPending}>
+              {saveReport.isPending
+                ? 'שומר...'
+                : formMode === 'edit'
+                  ? 'שמור שינויים'
+                  : 'שלח דיווח'}
             </Button>
             <Button
               type="button"
               variant="secondary"
-              onClick={() => createReport.mutate('טיוטה')}
-              disabled={createReport.isPending}
+              onClick={() => saveReport.mutate('טיוטה')}
+              disabled={saveReport.isPending}
             >
               שמור טיוטה
             </Button>
@@ -680,7 +751,7 @@ export function ReportsPage() {
               type="button"
               variant="secondary"
               onClick={closeCreateModal}
-              disabled={createReport.isPending}
+              disabled={saveReport.isPending}
             >
               ביטול
             </Button>
@@ -692,6 +763,12 @@ export function ReportsPage() {
         reportId={selectedReportId}
         isOpen={selectedReportId != null}
         onClose={() => setSelectedReportId(null)}
+        onEdit={openEditModal}
+        onDeleted={async () => {
+          setSelectedReportId(null);
+          setPageMessage('הדיווח נמחק בהצלחה.');
+          await queryClient.invalidateQueries({ queryKey: ['reports'] });
+        }}
       />
     </PageShell>
   );

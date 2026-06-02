@@ -22,6 +22,7 @@ database/
     2026-06-01_drop_legacy_functions.sql  # Manual cleanup for removed legacy functions
   migrations/
     2026-06-01_company_settings.sql        # Manual migration for persisted company settings
+    2026-06-02_reports_lifecycle.sql       # Manual migration for report read/edit/delete procedures
   SP/
     <ProcedureName>.sql        # One stored procedure per file (74 files)
     2026-04-20_workplan_algorithm_data_model_extension.sql   # historical migration (see notes)
@@ -109,6 +110,9 @@ The company settings migration in `migrations/2026-06-01_company_settings.sql` a
 table and Settings stored procedures used by the app. Run it manually in SSMS against each target database before using
 the persisted Settings company details screen.
 
+The reports lifecycle migration in `migrations/2026-06-02_reports_lifecycle.sql` adds stored procedures for report
+list/detail reads, edit, and physical delete. Run it manually in SSMS before using report edit/delete actions.
+
 ### PowerShell helper (uses `sqlcmd`)
 
 ```powershell
@@ -175,6 +179,8 @@ bundled `Rec_GetTaskRecommendationInput`). These are kept because they are part 
 ### Historical migration / seed scripts (kept, not part of the canonical export)
 - `migrations/2026-06-01_company_settings.sql` — idempotent manual migration for persisted company profile settings.
   It creates `CompanySettings` plus `sp_Settings_GetCompanySettings` and `sp_Settings_UpsertCompanySettings`.
+- `migrations/2026-06-02_reports_lifecycle.sql` — idempotent manual migration for report lifecycle stored procedures.
+  It does not alter tables; delete is physical because `WorkReports` has no soft-delete column.
 - `SP/2026-04-20_workplan_algorithm_data_model_extension.sql` — conditional `ALTER TABLE ADD COLUMN` migration for
   the work-plan algorithm. Its columns are already present in `schema/tables.sql`, so a fresh build does **not**
   need it. Retained as migration history.
