@@ -11,7 +11,6 @@ import { CustomersPage } from '@features/customers';
 import { QuotesPage } from '@features/quotes';
 import { InventoryPage } from '@features/inventory';
 import { ServiceCallsPage } from '@features/serviceCalls';
-import { CashflowPage } from '@features/cashflow';
 import { SettingsPage } from '@features/settings';
 import { AppLayout } from '@shared/components/AppLayout';
 import { AdminRoute } from './AdminRoute';
@@ -45,7 +44,7 @@ export const router = createBrowserRouter([
       { path: '/quotes', element: <QuotesPage /> },
       { path: '/inventory', element: <InventoryPage /> },
       { path: '/service-calls', element: <ServiceCallsPage /> },
-      { path: '/cashflow', element: <CashflowPage /> },
+      { path: '/cashflow', element: <Navigate to="/" replace /> },
       { path: '/settings', element: <SettingsPage /> },
       { path: '*', element: <Navigate to="/" replace /> },
     ],

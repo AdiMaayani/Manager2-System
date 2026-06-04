@@ -1,13 +1,16 @@
 import { useMemo } from 'react';
 import { matchesWorkPlanStatusFilter, WEEKDAY_LABELS } from '../../constants';
-import type { MappedWorkPlan } from '../../types';
-import { resolveAssignment } from '../../lib/workPlanScheduling';
+import type { MappedWorkPlan, WorkPlanTaskSelection } from '../../types';
+import {
+  buildWorkPlanTaskSelection,
+  resolveAssignment,
+} from '../../lib/workPlanScheduling';
 import './WorkPlanWeeklyView.css';
 
 interface WorkPlanWeeklyViewProps {
   workPlans: MappedWorkPlan[];
   statusFilter: string;
-  onTaskClick?: (taskId: number, projectTitle: string, title: string) => void;
+  onTaskClick?: (task: WorkPlanTaskSelection) => void;
 }
 
 export function WorkPlanWeeklyView({
@@ -25,10 +28,10 @@ export function WorkPlanWeeklyView({
   }, []);
 
   const rows = useMemo(() => {
-    const assigneeMap = new Map<string, Map<number, Array<{ id: number; title: string; project: string }>>>();
+    const assigneeMap = new Map<string, Map<number, WorkPlanTaskSelection[]>>();
 
     for (const workPlan of workPlans) {
-      for (const task of workPlan.tasks) {
+      for (const [taskIndex, task] of workPlan.tasks.entries()) {
         if (!matchesWorkPlanStatusFilter(task.status, statusFilter)) continue;
         const assignment = resolveAssignment(task, workPlan);
         const assignee = assignment.displayName || 'לא משויך';
@@ -40,11 +43,9 @@ export function WorkPlanWeeklyView({
           : task.workItemId % 5;
         const dayTasks = assigneeMap.get(assignee)!;
         if (!dayTasks.has(dayIndex)) dayTasks.set(dayIndex, []);
-        dayTasks.get(dayIndex)!.push({
-          id: task.workItemId,
-          title: task.title,
-          project: workPlan.project.title,
-        });
+        dayTasks.get(dayIndex)!.push(
+          buildWorkPlanTaskSelection(workPlan, task, taskIndex),
+        );
       }
     }
 
@@ -88,10 +89,10 @@ export function WorkPlanWeeklyView({
                 <div key={`${row.assignee}-${dayIndex}`} className="workPlanWeeklyView__cell">
                   {tasks.map((task) => (
                     <button
-                      key={task.id}
+                      key={task.taskId}
                       type="button"
                       className="workPlanWeeklyView__task"
-                      onClick={() => onTaskClick?.(task.id, task.project, task.title)}
+                      onClick={() => onTaskClick?.(task)}
                     >
                       {task.title}
                     </button>

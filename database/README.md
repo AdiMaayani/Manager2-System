@@ -4,7 +4,7 @@ This folder is the version-controlled, reproducible definition of the ManageR2 S
 It was originally produced by exporting the live production dump `igroup30_prod.sql`
 (Script Date **31/05/2026**, SQL Server 2016, compatibility level 100) into one script per object,
 then reconciled with the completed baseline migrations for company settings, report lifecycle, employees CRUD,
-service calls, and project equipment persistence.
+service calls, project equipment, project BOQ, project drawings, and sites soft-deactivation persistence.
 
 > Goal of this baseline: the live database can be rebuilt from these scripts alone, with no access to the production server.
 > No DB logic was changed. The only modifications are **syntax-only, deploy-safety** changes:
@@ -28,8 +28,11 @@ database/
     2026-06-02_employees_crud.sql          # Historical migration for employee management procedures
     2026-06-02_service_calls_mvp.sql       # Historical migration for WorkItems-backed service calls
     2026-06-02_project_equipment.sql       # Historical migration for project equipment persistence
+    2026-06-02_project_boq.sql             # Historical migration for project BOQ persistence
+    2026-06-04_project_drawings.sql        # Historical migration for project drawings metadata
+    2026-06-04_sites_deactivate.sql        # Historical migration for site soft-deactivation
   SP/
-    <ProcedureName>.sql        # One stored procedure per file (93 canonical files)
+    <ProcedureName>.sql        # One stored procedure per file (103 canonical files)
     2026-04-20_workplan_algorithm_data_model_extension.sql   # historical migration (see notes)
     2026-04-20_seed_WorkPlanAlgorithmDemoData.sql            # demo seed data (see notes)
   README.md
@@ -47,18 +50,19 @@ Unrelated legacy functions were removed from the repository baseline in the clea
 
 | Object type | In dump | Scripts in repo |
 |---|---|---|
-| Tables | 33 | captured in `schema/tables.sql` |
-| Indexes (explicit) | 27 | captured in `schema/tables.sql` |
+| Tables | 35 | captured in `schema/tables.sql` |
+| Indexes (explicit) | 29 | captured in `schema/tables.sql` |
 | Scalar functions | 9 | 2 files in `functions/` |
-| Stored procedures | 93 | 93 canonical files in `SP/` |
+| Stored procedures | 103 | 103 canonical files in `SP/` |
 | Views | 0 | n/a |
 | Triggers | 0 | n/a |
 
 `schema/tables.sql` also contains the primary keys, 54 foreign-key statements, default constraints,
 and 32 check constraints.
 
-### Tables (33)
+### Tables (35)
 CompanySettings, Contacts, Contractors, Customers, Departments, Employees, ProjectEquipmentItems,
+ProjectBoqItems, ProjectDrawings,
 Rec_EmployeeAvailability, Rec_EmployeeBaseAddress,
 Rec_EmployeeCapacity, Rec_EmployeeLocationEvents, Rec_EmployeePlannedStops, Rec_EmployeeSkills,
 Rec_EmployeeWorkZones, Rec_RecommendationRuns, Rec_RouteEstimates, Rec_SiteAddressProfile, Rec_Skills,
@@ -69,7 +73,7 @@ WorkItems, WorkReportEmployeeAssignments, WorkReports, WorkReportSystems.
 ### Scalar functions (2)
 funcParseTaskPriority, funcParseTaskStatus.
 
-### Stored procedures (93)
+### Stored procedures (103)
 **Rec_* (16):** Rec_CreateRecommendationRun, Rec_GetActiveAssignableEmployees,
 Rec_GetAllCandidateAvailabilityForRange, Rec_GetAllCandidateBaseAddresses, Rec_GetAllCandidateCapacities,
 Rec_GetAllCandidateEmployeeSkills, Rec_GetAllCandidateLastLocationEventsForDate,
@@ -77,10 +81,10 @@ Rec_GetAllCandidatePlannedStopsBeforeTask, Rec_GetAllCandidateWorkZones, Rec_Get
 Rec_GetLatestRecommendationsForTask, Rec_GetSiteAddressProfile, Rec_GetTaskCoreData,
 Rec_GetTaskRecommendationInput, Rec_GetWorkItemRequiredSkills, Rec_SaveTaskAssignmentRecommendation.
 
-**sp_* (77):** sp_AddWorkReportEmployeeAssignment, sp_AddWorkReportSystem, sp_AssignContractorToWork,
+**sp_* (87):** sp_AddWorkReportEmployeeAssignment, sp_AddWorkReportSystem, sp_AssignContractorToWork,
 sp_AssignEmployeeToWork, sp_CloseWorkItem, sp_CreateContact, sp_CreateCustomer, sp_CreateEmployee, sp_CreateSite, sp_CreateUser,
 sp_CreateWorkItem, sp_CreateWorkReport, sp_DeactivateContact, sp_DeactivateCustomer,
-sp_DeactivateUserDepartments, sp_DeactivateUserRoles, sp_DeleteContractorAssignmentsByWorkItemId,
+sp_DeactivateSite, sp_DeactivateUserDepartments, sp_DeactivateUserRoles, sp_DeleteContractorAssignmentsByWorkItemId,
 sp_DeleteEmployeeAssignmentsByWorkItemId, sp_DeleteUser, sp_GetActiveContacts, sp_GetActiveCustomers, sp_GetEmployeeById,
 sp_GetAllDepartmentNames, sp_GetAllProjectsForWorkPlans, sp_GetAllRoleNames, sp_GetContactById, sp_GetContacts,
 sp_GetContactsByCustomerId, sp_GetCustomerById, sp_GetCustomers, sp_GetEmployees, sp_GetProjectForWorkPlan,
@@ -88,6 +92,8 @@ sp_GetProjectLifecycle, sp_GetProjectMilestones, sp_GetProjectsList, sp_GetProje
 sp_GetSiteById, sp_GetSites, sp_GetTasksByParentWorkItemId, sp_GetUserByEmail, sp_GetUserById,
 sp_GetUserDepartments, sp_GetUserRoles, sp_GetUsers, sp_GetWorkEmployees, sp_GetWorkItemDetails, sp_GetWorkItems,
 sp_GetWorkItemsByType, sp_GetWorkPlanAssignments, sp_GetWorkPlanProject, sp_GetWorkPlanTasks,
+sp_ProjectBoq_Create, sp_ProjectBoq_Delete, sp_ProjectBoq_GetByProject, sp_ProjectBoq_Reorder, sp_ProjectBoq_Update,
+sp_ProjectDrawings_Create, sp_ProjectDrawings_Delete, sp_ProjectDrawings_GetByProject, sp_ProjectDrawings_Update,
 sp_ProjectEquipment_Create, sp_ProjectEquipment_Delete, sp_ProjectEquipment_GetByProject, sp_ProjectEquipment_Reorder,
 sp_ProjectEquipment_Update, sp_Rec_GetAssignmentInput, sp_SetEmployeeActiveStatus,
 sp_Settings_GetCompanySettings, sp_Settings_UpsertCompanySettings, sp_UpdateContact, sp_UpdateCustomer,
@@ -120,6 +126,7 @@ manually in SSMS against existing target databases that still contain the remove
 The scripts in `migrations/` are retained as historical, idempotent migrations for existing databases that were created
 from an older baseline. A fresh rebuild from `schema/`, `functions/`, and `SP/` already includes the completed company
 settings, report lifecycle, employees CRUD, service calls, and project equipment objects.
+It also includes project BOQ, project drawings, and sites soft-deactivation objects.
 
 ### PowerShell helper (uses `sqlcmd`)
 
@@ -156,13 +163,13 @@ FROM sys.objects
 WHERE is_ms_shipped = 0 AND schema_id = SCHEMA_ID('dbo')
 GROUP BY type_desc
 ORDER BY type_desc;
--- Expect: USER_TABLE = 33, SQL_STORED_PROCEDURE = 93, SQL_SCALAR_FUNCTION = 2, VIEW = 0
+-- Expect: USER_TABLE = 35, SQL_STORED_PROCEDURE = 103, SQL_SCALAR_FUNCTION = 2, VIEW = 0
 ```
 
 Repo-side validation (no DB required):
 
 ```powershell
-"SP files:        " + (Get-ChildItem .\database\SP\*.sql -Exclude '2026-*').Count        # expect 93
+"SP files:        " + (Get-ChildItem .\database\SP\*.sql -Exclude '2026-*').Count        # expect 103
 "Function files:  " + (Get-ChildItem .\database\functions\*.sql).Count                    # expect 2
 "Schema snapshot: " + (Test-Path .\database\schema\tables.sql)                            # expect True
 ```
@@ -199,6 +206,12 @@ A fresh rebuild already gets their final table/procedure state from `schema/tabl
   definition is now canonical under `SP/`.
 - `migrations/2026-06-02_project_equipment.sql` — idempotent migration for project equipment persistence.
   Its table is now captured in `schema/tables.sql`; its five procedures are canonical under `SP/`.
+- `migrations/2026-06-02_project_boq.sql` — idempotent migration for project BOQ persistence.
+  Its table is now captured in `schema/tables.sql`; its five procedures are canonical under `SP/`.
+- `migrations/2026-06-04_project_drawings.sql` — idempotent migration for project drawings metadata persistence.
+  Its table is now captured in `schema/tables.sql`; its four procedures are canonical under `SP/`.
+- `migrations/2026-06-04_sites_deactivate.sql` — idempotent migration for site soft-deactivation.
+  Its columns are now captured in `schema/tables.sql`; `sp_DeactivateSite` is canonical under `SP/`.
 - `SP/2026-04-20_workplan_algorithm_data_model_extension.sql` — conditional `ALTER TABLE ADD COLUMN` migration for
   the work-plan algorithm. Its columns are already present in `schema/tables.sql`, so a fresh build does **not**
   need it. Retained as migration history.
@@ -209,4 +222,4 @@ A fresh rebuild already gets their final table/procedure state from `schema/tabl
 - `WorkItems.Status` / `WorkType` / `Priority` and `Customers.CustomerType` have **no CHECK constraint**
   (app-enforced). Adding guardrails is deferred to a separate branch.
 - `Customers` has duplicate `Phone`/`Email` vs `PrimaryPhone`/`PrimaryEmail` columns.
-- `Users.Email` carries two UNIQUE constraints. These are preserved as-is.
+- `Users.Email` carries a single named UNIQUE constraint (`UQ_Users_Email`) in the canonical schema.

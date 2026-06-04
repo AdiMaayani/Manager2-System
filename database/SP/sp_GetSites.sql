@@ -15,8 +15,10 @@ BEGIN
         City,
         IsPrimary,
         Notes,
-        CreatedAt
+        CreatedAt,
+        UpdatedAt
     FROM dbo.Sites
+    WHERE IsActive = 1
     ORDER BY SiteId DESC;
 END
 GO

@@ -112,6 +112,7 @@ builder.Services.AddScoped<IWorkReportRepository, WorkReportRepository>();
 builder.Services.AddScoped<IProjectLifecycleRepository, ProjectLifecycleRepository>();
 builder.Services.AddScoped<IProjectEquipmentRepository, ProjectEquipmentRepository>();
 builder.Services.AddScoped<IProjectBoqRepository, ProjectBoqRepository>();
+builder.Services.AddScoped<IProjectDrawingRepository, ProjectDrawingRepository>();
 builder.Services.AddScoped<IEmployeeRepository, EmployeeRepository>();
 builder.Services.AddScoped<ICompanySettingsRepository, CompanySettingsRepository>();
 builder.Services.AddScoped<ISmartAssignmentService, SmartAssignmentBatchService>();

@@ -12,4 +12,6 @@ public interface ISiteRepository
     Task<int> CreateAsync(Site site);
 
     Task<bool> UpdateAsync(Site site);
+
+    Task<bool> DeactivateAsync(int siteId);
 }

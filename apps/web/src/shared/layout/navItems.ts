@@ -8,7 +8,6 @@ import {
   Contact,
   FileText,
   Package,
-  Wallet,
   Settings,
   ClipboardList,
 } from 'lucide-react';
@@ -35,6 +34,5 @@ export const mainNavItems: NavItem[] = [
 ];
 
 export const bottomNavItems: NavItem[] = [
-  { path: '/cashflow', label: 'תזרים', icon: Wallet },
   { path: '/settings', label: 'הגדרות', icon: Settings },
 ];

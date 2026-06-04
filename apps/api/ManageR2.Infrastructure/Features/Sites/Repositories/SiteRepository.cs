@@ -201,6 +201,47 @@ public class SiteRepository : ISiteRepository
         }
     }
 
+    public async Task<bool> DeactivateAsync(int siteId)
+    {
+        _logger.LogInformation("DeactivateAsync started for SiteId={SiteId}.", siteId);
+
+        try
+        {
+            await using var connection = _dbServices.CreateConnection();
+            await using var command = new SqlCommand("dbo.sp_DeactivateSite", connection)
+            {
+                CommandType = CommandType.StoredProcedure
+            };
+
+            command.Parameters.AddWithValue("@SiteId", siteId);
+
+            await connection.OpenAsync();
+
+            var result = await command.ExecuteScalarAsync();
+            var rowsAffected = result != null && result != DBNull.Value
+                ? Convert.ToInt32(result)
+                : 0;
+
+            var deactivated = rowsAffected > 0;
+
+            if (deactivated)
+            {
+                _logger.LogInformation("DeactivateAsync succeeded for SiteId={SiteId}.", siteId);
+            }
+            else
+            {
+                _logger.LogWarning("DeactivateAsync affected 0 rows for SiteId={SiteId}.", siteId);
+            }
+
+            return deactivated;
+        }
+        catch (SqlException ex)
+        {
+            _logger.LogError(ex, "DeactivateAsync failed with SQL error for SiteId={SiteId}.", siteId);
+            throw new UserValidationException("Failed to deactivate site.", ex);
+        }
+    }
+
     // Reader → Site entity for API mapping layer.
     private static Site MapSite(SqlDataReader reader)
     {

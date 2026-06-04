@@ -17,15 +17,18 @@ public class ProjectsController : ControllerBase
     private readonly IProjectLifecycleRepository _projectLifecycleRepository;
     private readonly IProjectEquipmentRepository _projectEquipmentRepository;
     private readonly IProjectBoqRepository _projectBoqRepository;
+    private readonly IProjectDrawingRepository _projectDrawingRepository;
 
     public ProjectsController(
         IProjectLifecycleRepository projectLifecycleRepository,
         IProjectEquipmentRepository projectEquipmentRepository,
-        IProjectBoqRepository projectBoqRepository)
+        IProjectBoqRepository projectBoqRepository,
+        IProjectDrawingRepository projectDrawingRepository)
     {
         _projectLifecycleRepository = projectLifecycleRepository;
         _projectEquipmentRepository = projectEquipmentRepository;
         _projectBoqRepository = projectBoqRepository;
+        _projectDrawingRepository = projectDrawingRepository;
     }
 
     [HttpGet("{id:int}/lifecycle")]
@@ -295,6 +298,141 @@ public class ProjectsController : ControllerBase
         }
     }
 
+    [HttpGet("{projectId:int}/drawings")]
+    public async Task<ActionResult<List<ProjectDrawingDto>>> GetDrawings(int projectId)
+    {
+        try
+        {
+            var drawings = await _projectDrawingRepository.GetByProjectIdAsync(projectId);
+            return Ok(drawings.Select(MapProjectDrawing).ToList());
+        }
+        catch (UserValidationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("{projectId:int}/drawings")]
+    public async Task<ActionResult<ProjectDrawingDto>> CreateDrawing(
+        int projectId,
+        [FromBody] CreateProjectDrawingRequestDto request)
+    {
+        var validationError = ValidateProjectDrawingRequest(
+            request.Name,
+            request.Type,
+            request.DrawingDate);
+
+        if (validationError != null)
+        {
+            return BadRequest(new { message = validationError });
+        }
+
+        try
+        {
+            var drawing = new ProjectDrawingModel
+            {
+                ProjectId = projectId,
+                Name = request.Name.Trim(),
+                Type = request.Type.Trim().ToUpperInvariant(),
+                DrawingDate = request.DrawingDate,
+                Note = string.IsNullOrWhiteSpace(request.Note)
+                    ? null
+                    : request.Note.Trim(),
+                SortOrder = request.SortOrder ?? 0
+            };
+
+            var drawingId = await _projectDrawingRepository.CreateAsync(drawing);
+            var created = await GetProjectDrawingOrNullAsync(projectId, drawingId);
+
+            if (created == null)
+            {
+                return BadRequest(new { message = "Project drawing was created but could not be reloaded." });
+            }
+
+            return CreatedAtAction(
+                nameof(GetDrawings),
+                new { projectId },
+                MapProjectDrawing(created));
+        }
+        catch (UserValidationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPut("{projectId:int}/drawings/{projectDrawingId:int}")]
+    public async Task<ActionResult<ProjectDrawingDto>> UpdateDrawing(
+        int projectId,
+        int projectDrawingId,
+        [FromBody] UpdateProjectDrawingRequestDto request)
+    {
+        var validationError = ValidateProjectDrawingRequest(
+            request.Name,
+            request.Type,
+            request.DrawingDate);
+
+        if (validationError != null)
+        {
+            return BadRequest(new { message = validationError });
+        }
+
+        try
+        {
+            var drawing = new ProjectDrawingModel
+            {
+                ProjectDrawingId = projectDrawingId,
+                ProjectId = projectId,
+                Name = request.Name.Trim(),
+                Type = request.Type.Trim().ToUpperInvariant(),
+                DrawingDate = request.DrawingDate,
+                Note = string.IsNullOrWhiteSpace(request.Note)
+                    ? null
+                    : request.Note.Trim(),
+                SortOrder = request.SortOrder
+            };
+
+            var updated = await _projectDrawingRepository.UpdateAsync(drawing);
+
+            if (!updated)
+            {
+                return NotFound(new { message = $"Project drawing with id {projectDrawingId} was not found." });
+            }
+
+            var reloaded = await GetProjectDrawingOrNullAsync(projectId, projectDrawingId);
+
+            if (reloaded == null)
+            {
+                return NotFound(new { message = $"Project drawing with id {projectDrawingId} was not found after update." });
+            }
+
+            return Ok(MapProjectDrawing(reloaded));
+        }
+        catch (UserValidationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpDelete("{projectId:int}/drawings/{projectDrawingId:int}")]
+    public async Task<IActionResult> DeleteDrawing(int projectId, int projectDrawingId)
+    {
+        try
+        {
+            var deleted = await _projectDrawingRepository.DeleteAsync(projectId, projectDrawingId);
+
+            if (!deleted)
+            {
+                return NotFound(new { message = $"Project drawing with id {projectDrawingId} was not found." });
+            }
+
+            return NoContent();
+        }
+        catch (UserValidationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
     [HttpGet("{projectId:int}/equipment")]
     public async Task<ActionResult<List<ProjectEquipmentItemDto>>> GetEquipment(int projectId)
     {
@@ -475,6 +613,14 @@ public class ProjectsController : ControllerBase
         return boqItems.FirstOrDefault(item => item.ProjectBoqItemId == boqItemId);
     }
 
+    private async Task<ProjectDrawingModel?> GetProjectDrawingOrNullAsync(
+        int projectId,
+        int projectDrawingId)
+    {
+        var drawings = await _projectDrawingRepository.GetByProjectIdAsync(projectId);
+        return drawings.FirstOrDefault(item => item.ProjectDrawingId == projectDrawingId);
+    }
+
     private static string? ValidateProjectBoqRequest(
         string itemDescription,
         decimal quantity,
@@ -513,6 +659,35 @@ public class ProjectsController : ControllerBase
         return null;
     }
 
+    private static string? ValidateProjectDrawingRequest(
+        string name,
+        string type,
+        DateOnly drawingDate)
+    {
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return "Name is required.";
+        }
+
+        if (string.IsNullOrWhiteSpace(type))
+        {
+            return "Type is required.";
+        }
+
+        var normalizedType = type.Trim().ToUpperInvariant();
+        if (normalizedType is not ("PDF" or "DWG"))
+        {
+            return "Type must be PDF or DWG.";
+        }
+
+        if (drawingDate == default)
+        {
+            return "DrawingDate is required.";
+        }
+
+        return null;
+    }
+
     private static ProjectBoqItemDto MapProjectBoqItem(ProjectBoqItemModel boqItem)
     {
         return new ProjectBoqItemDto
@@ -542,6 +717,22 @@ public class ProjectsController : ControllerBase
             SortOrder = equipmentItem.SortOrder,
             CreatedAt = equipmentItem.CreatedAt,
             UpdatedAt = equipmentItem.UpdatedAt
+        };
+    }
+
+    private static ProjectDrawingDto MapProjectDrawing(ProjectDrawingModel drawing)
+    {
+        return new ProjectDrawingDto
+        {
+            ProjectDrawingId = drawing.ProjectDrawingId,
+            ProjectId = drawing.ProjectId,
+            Name = drawing.Name,
+            Type = drawing.Type,
+            DrawingDate = drawing.DrawingDate,
+            Note = drawing.Note,
+            SortOrder = drawing.SortOrder,
+            CreatedAt = drawing.CreatedAt,
+            UpdatedAt = drawing.UpdatedAt
         };
     }
 }

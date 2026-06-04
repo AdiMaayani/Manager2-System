@@ -39,6 +39,18 @@ interface ProjectOverviewTabProps {
     notes?: string;
     isPrimary?: boolean;
   }) => Promise<void>;
+  onUpdateSite: (
+    siteId: number,
+    payload: {
+      customerId: number;
+      siteName: string;
+      addressLine?: string;
+      city?: string;
+      notes?: string;
+      isPrimary?: boolean;
+    },
+  ) => Promise<void>;
+  onDeactivateSite: (siteId: number) => Promise<void>;
 }
 
 export const ProjectOverviewTab = memo(function ProjectOverviewTab({
@@ -53,12 +65,19 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
   onChange,
   onTeamChange,
   onCreateSite,
+  onUpdateSite,
+  onDeactivateSite,
 }: ProjectOverviewTabProps) {
   const [showSiteForm, setShowSiteForm] = useState(false);
+  const [showEditSiteForm, setShowEditSiteForm] = useState(false);
   const [newSiteName, setNewSiteName] = useState('');
   const [newSiteCity, setNewSiteCity] = useState('');
   const [newSiteAddress, setNewSiteAddress] = useState('');
   const [newSiteNotes, setNewSiteNotes] = useState('');
+  const [editSiteName, setEditSiteName] = useState('');
+  const [editSiteCity, setEditSiteCity] = useState('');
+  const [editSiteAddress, setEditSiteAddress] = useState('');
+  const [editSiteNotes, setEditSiteNotes] = useState('');
   const [siteError, setSiteError] = useState<string | null>(null);
   const [employeeToAddId, setEmployeeToAddId] = useState('');
 
@@ -67,6 +86,10 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
   const filteredSites = useMemo(
     () => sites.filter((site) => site.customerId === form.customerId),
     [form.customerId, sites],
+  );
+  const selectedSite = useMemo(
+    () => filteredSites.find((site) => site.siteId === form.siteId) ?? null,
+    [filteredSites, form.siteId],
   );
   const aggregatedTeam = useMemo(
     () => aggregateProjectTeamFromLifecycle(lifecycle),
@@ -154,6 +177,84 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
       setSiteError(message);
     }
   }, [form.customerId, newSiteAddress, newSiteCity, newSiteName, newSiteNotes, onCreateSite]);
+
+  const openEditSiteForm = useCallback(() => {
+    if (!selectedSite) return;
+
+    setSiteError(null);
+    setShowSiteForm(false);
+    setShowEditSiteForm(true);
+    setEditSiteName(selectedSite.siteName);
+    setEditSiteCity(selectedSite.city ?? '');
+    setEditSiteAddress(selectedSite.addressLine ?? '');
+    setEditSiteNotes(selectedSite.notes ?? '');
+  }, [selectedSite]);
+
+  const handleUpdateSite = useCallback(async () => {
+    setSiteError(null);
+
+    if (!selectedSite) {
+      setSiteError('יש לבחור אתר לעריכה.');
+      return;
+    }
+
+    if (!editSiteName.trim()) {
+      setSiteError('יש להזין שם אתר.');
+      return;
+    }
+
+    try {
+      await onUpdateSite(selectedSite.siteId, {
+        customerId: selectedSite.customerId,
+        siteName: editSiteName.trim(),
+        addressLine: editSiteAddress.trim() || undefined,
+        city: editSiteCity.trim() || undefined,
+        notes: editSiteNotes.trim() || undefined,
+        isPrimary: selectedSite.isPrimary,
+      });
+
+      setSiteError(null);
+      setShowEditSiteForm(false);
+    } catch (err) {
+      const message =
+        err instanceof Error && err.message
+          ? err.message
+          : 'עדכון האתר נכשל. נסה שוב.';
+      setSiteError(message);
+    }
+  }, [
+    editSiteAddress,
+    editSiteCity,
+    editSiteName,
+    editSiteNotes,
+    onUpdateSite,
+    selectedSite,
+  ]);
+
+  const handleDeactivateSite = useCallback(async () => {
+    setSiteError(null);
+
+    if (!selectedSite) {
+      setSiteError('יש לבחור אתר להשבתה.');
+      return;
+    }
+
+    if (!window.confirm('להשבית את האתר? הוא יוסר מרשימות הבחירה הפעילות.')) {
+      return;
+    }
+
+    try {
+      await onDeactivateSite(selectedSite.siteId);
+      setSiteError(null);
+      setShowEditSiteForm(false);
+    } catch (err) {
+      const message =
+        err instanceof Error && err.message
+          ? err.message
+          : 'השבתת האתר נכשלה. ודא שאין עבודות פתוחות באתר.';
+      setSiteError(message);
+    }
+  }, [onDeactivateSite, selectedSite]);
 
   const handleProjectManagerChange = useCallback((value: string) => {
     const projectManagerEmployeeId = value ? Number(value) : null;
@@ -342,15 +443,39 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
                 <Button
                   type="button"
                   variant="ghost"
-                  onClick={() => setShowSiteForm((value) => !value)}
+                  onClick={() => {
+                    setShowEditSiteForm(false);
+                    setShowSiteForm((value) => !value);
+                  }}
                 >
                   {showSiteForm ? 'ביטול הוספת אתר' : 'הוסף אתר'}
                 </Button>
+                <div className="projectOverviewTab__siteActions">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={openEditSiteForm}
+                    disabled={!selectedSite}
+                  >
+                    ערוך אתר
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={handleDeactivateSite}
+                    disabled={!selectedSite}
+                  >
+                    השבת אתר
+                  </Button>
+                </div>
               </>
             ) : (
               <span>{project?.siteName || '-'}</span>
             )}
           </div>
+          {isEditMode && siteError && !showSiteForm && !showEditSiteForm && (
+            <p className="projectOverviewTab__siteError">{siteError}</p>
+          )}
           {isEditMode && showSiteForm && (
             <div className="projectOverviewTab__siteForm">
               <Input
@@ -379,6 +504,48 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
               <Button type="button" variant="secondary" onClick={handleCreateSite}>
                 שמור אתר
               </Button>
+            </div>
+          )}
+          {isEditMode && showEditSiteForm && selectedSite && (
+            <div className="projectOverviewTab__siteForm">
+              <Input
+                label="שם אתר"
+                value={editSiteName}
+                onChange={(event) => setEditSiteName(event.target.value)}
+              />
+              <Input
+                label="עיר"
+                value={editSiteCity}
+                onChange={(event) => setEditSiteCity(event.target.value)}
+              />
+              <Input
+                label="כתובת"
+                value={editSiteAddress}
+                onChange={(event) => setEditSiteAddress(event.target.value)}
+              />
+              <Input
+                label="הערות"
+                value={editSiteNotes}
+                onChange={(event) => setEditSiteNotes(event.target.value)}
+              />
+              {siteError && (
+                <p className="projectOverviewTab__siteError">{siteError}</p>
+              )}
+              <div className="projectOverviewTab__siteActions">
+                <Button type="button" variant="secondary" onClick={handleUpdateSite}>
+                  שמור אתר
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={() => {
+                    setShowEditSiteForm(false);
+                    setSiteError(null);
+                  }}
+                >
+                  ביטול
+                </Button>
+              </div>
             </div>
           )}
           <div className="projectOverviewTab__field">

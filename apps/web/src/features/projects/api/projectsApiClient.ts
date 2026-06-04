@@ -2,11 +2,13 @@ import { apiRequest } from '@api/client';
 import type {
   CreateMilestoneRequest,
   CreateProjectBoqItemRequest,
+  CreateProjectDrawingRequest,
   CreateProjectEquipmentItemRequest,
   CreateProjectRequest,
   CreateSiteRequest,
   ProjectEmployeeOption,
   ProjectBoqItem,
+  ProjectDrawing,
   ProjectEquipmentItem,
   ProjectLifecycle,
   ProjectListItem,
@@ -17,8 +19,10 @@ import type {
   Site,
   UpdateMilestoneRequest,
   UpdateProjectBoqItemRequest,
+  UpdateProjectDrawingRequest,
   UpdateProjectEquipmentItemRequest,
   UpdateProjectRequest,
+  UpdateSiteRequest,
 } from '../types';
 
 interface RawEmployeeResponse {
@@ -46,6 +50,18 @@ interface RawProjectBoqItemResponse {
   itemDescription: string;
   quantity: number;
   unit: string;
+  sortOrder: number;
+  createdAt?: string;
+  updatedAt?: string | null;
+}
+
+interface RawProjectDrawingResponse {
+  projectDrawingId: number;
+  projectId: number;
+  name: string;
+  type: 'PDF' | 'DWG';
+  drawingDate: string;
+  note?: string | null;
   sortOrder: number;
   createdAt?: string;
   updatedAt?: string | null;
@@ -80,6 +96,20 @@ function mapProjectEquipmentItem(
   };
 }
 
+function mapProjectDrawing(drawing: RawProjectDrawingResponse): ProjectDrawing {
+  return {
+    projectDrawingId: drawing.projectDrawingId,
+    projectId: drawing.projectId,
+    name: drawing.name,
+    type: drawing.type,
+    date: drawing.drawingDate,
+    note: drawing.note ?? undefined,
+    sortOrder: drawing.sortOrder,
+    createdAt: drawing.createdAt,
+    updatedAt: drawing.updatedAt ?? undefined,
+  };
+}
+
 export function getProjectsListAsync(): Promise<ProjectListItem[]> {
   return apiRequest<ProjectListItem[]>('/WorkItems/projects-list');
 }
@@ -101,6 +131,12 @@ export function getProjectEquipmentAsync(projectId: number): Promise<ProjectEqui
 export function getProjectBoqAsync(projectId: number): Promise<ProjectBoqItem[]> {
   return apiRequest<RawProjectBoqItemResponse[]>(`/Projects/${projectId}/boq`).then(
     (boqItems) => boqItems.map(mapProjectBoqItem),
+  );
+}
+
+export function getProjectDrawingsAsync(projectId: number): Promise<ProjectDrawing[]> {
+  return apiRequest<RawProjectDrawingResponse[]>(`/Projects/${projectId}/drawings`).then(
+    (drawings) => drawings.map(mapProjectDrawing),
   );
 }
 
@@ -168,6 +204,39 @@ export function createProjectBoqItemAsync(
     method: 'POST',
     body: JSON.stringify(body),
   }).then(mapProjectBoqItem);
+}
+
+export function createProjectDrawingAsync(
+  projectId: number,
+  body: CreateProjectDrawingRequest,
+): Promise<ProjectDrawing> {
+  return apiRequest<RawProjectDrawingResponse>(`/Projects/${projectId}/drawings`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  }).then(mapProjectDrawing);
+}
+
+export function updateProjectDrawingAsync(
+  projectId: number,
+  projectDrawingId: number,
+  body: UpdateProjectDrawingRequest,
+): Promise<ProjectDrawing> {
+  return apiRequest<RawProjectDrawingResponse>(
+    `/Projects/${projectId}/drawings/${projectDrawingId}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    },
+  ).then(mapProjectDrawing);
+}
+
+export function deleteProjectDrawingAsync(
+  projectId: number,
+  projectDrawingId: number,
+): Promise<void> {
+  return apiRequest<void>(`/Projects/${projectId}/drawings/${projectDrawingId}`, {
+    method: 'DELETE',
+  });
 }
 
 export function updateProjectBoqItemAsync(
@@ -244,6 +313,19 @@ export function createSiteAsync(body: CreateSiteRequest): Promise<Site> {
   return apiRequest<Site>('/Sites', {
     method: 'POST',
     body: JSON.stringify(body),
+  });
+}
+
+export function updateSiteAsync(siteId: number, body: UpdateSiteRequest): Promise<Site> {
+  return apiRequest<Site>(`/Sites/${siteId}`, {
+    method: 'PUT',
+    body: JSON.stringify({ ...body, siteId }),
+  });
+}
+
+export function deactivateSiteAsync(siteId: number): Promise<void> {
+  return apiRequest<void>(`/Sites/${siteId}`, {
+    method: 'DELETE',
   });
 }
 

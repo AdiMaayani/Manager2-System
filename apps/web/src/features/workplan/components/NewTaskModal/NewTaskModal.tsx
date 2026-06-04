@@ -138,6 +138,8 @@ export function NewTaskModal({
   const [acceptedRecommendation, setAcceptedRecommendation] = useState<AcceptedRecommendation | null>(null);
   const [isSmartLoading, setIsSmartLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const isTaskPersistenceAvailable = isLocalDataMode;
+  const taskPersistenceMessage = 'יצירת משימות זמינה רק בחיבור לשרת אמיתי.';
 
   const parentId = useMemo(() => {
     const parsed = Number(selectedProjectId);
@@ -219,8 +221,8 @@ export function NewTaskModal({
   const mutation = useMutation({
     mutationFn: async () => {
       validateAssignment();
-      if (!isLocalDataMode) {
-        throw new Error('יצירת משימות זמינה רק בחיבור לשרת אמיתי');
+      if (!isTaskPersistenceAvailable) {
+        throw new Error(taskPersistenceMessage);
       }
 
       const parsedEmployeeId = Number(employeeId);
@@ -528,6 +530,9 @@ export function NewTaskModal({
         )}
 
         {error && <p className="newTaskModal__error">{error}</p>}
+        {!isTaskPersistenceAvailable && (
+          <p className="newTaskModal__hint">{taskPersistenceMessage}</p>
+        )}
 
         <div className="newTaskModal__actions">
           {step !== 'details' && (
@@ -550,7 +555,11 @@ export function NewTaskModal({
             </Button>
           )}
           {step === 'recommendation' && (
-            <Button type="submit" disabled={mutation.isPending || isSmartLoading}>
+            <Button
+              type="submit"
+              disabled={mutation.isPending || isSmartLoading || !isTaskPersistenceAvailable}
+              title={!isTaskPersistenceAvailable ? taskPersistenceMessage : undefined}
+            >
               {mutation.isPending ? 'שומר...' : 'שמור משימה'}
             </Button>
           )}

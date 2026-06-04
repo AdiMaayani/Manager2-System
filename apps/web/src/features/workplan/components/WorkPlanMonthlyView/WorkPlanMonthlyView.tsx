@@ -1,12 +1,14 @@
-import type { MappedWorkPlan } from '../../types';
+import type { MappedWorkPlan, WorkPlanTaskSelection } from '../../types';
 import { getWorkPlanStatusDisplay } from '../../constants';
+import { buildWorkPlanTaskSelection } from '../../lib/workPlanScheduling';
 import './WorkPlanMonthlyView.css';
 
 interface WorkPlanMonthlyViewProps {
   workPlans: MappedWorkPlan[];
+  onTaskClick?: (task: WorkPlanTaskSelection) => void;
 }
 
-export function WorkPlanMonthlyView({ workPlans }: WorkPlanMonthlyViewProps) {
+export function WorkPlanMonthlyView({ workPlans, onTaskClick }: WorkPlanMonthlyViewProps) {
   const monthLabel = new Date().toLocaleDateString('he-IL', { month: 'long', year: 'numeric' });
 
   return (
@@ -23,15 +25,25 @@ export function WorkPlanMonthlyView({ workPlans }: WorkPlanMonthlyViewProps) {
                 <span className="workPlanMonthlyView__badge">{getWorkPlanStatusDisplay(workPlan.project.status)}</span>
               </header>
               <ul className="workPlanMonthlyView__tasks">
-                {workPlan.tasks.map((task) => (
+                {workPlan.tasks.map((task, taskIndex) => (
                   <li key={task.workItemId}>
-                    <strong>{task.title}</strong>
-                    <span>{getWorkPlanStatusDisplay(task.status)}</span>
-                    {task.plannedStart && (
-                      <span className="workPlanMonthlyView__date">
-                        {new Date(task.plannedStart).toLocaleDateString('he-IL')}
-                      </span>
-                    )}
+                    <button
+                      type="button"
+                      className="workPlanMonthlyView__taskButton"
+                      onClick={() =>
+                        onTaskClick?.(
+                          buildWorkPlanTaskSelection(workPlan, task, taskIndex),
+                        )
+                      }
+                    >
+                      <strong>{task.title}</strong>
+                      <span>{getWorkPlanStatusDisplay(task.status)}</span>
+                      {task.plannedStart && (
+                        <span className="workPlanMonthlyView__date">
+                          {new Date(task.plannedStart).toLocaleDateString('he-IL')}
+                        </span>
+                      )}
+                    </button>
                   </li>
                 ))}
               </ul>

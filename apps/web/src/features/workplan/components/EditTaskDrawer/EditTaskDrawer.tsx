@@ -21,6 +21,7 @@ interface EditTaskDrawerProps {
   isOpen: boolean;
   task: WorkPlanTaskSelection | null;
   onClose: () => void;
+  onSaved?: () => void;
 }
 
 function splitDateTime(value?: string | null): { date: string; time: string } {
@@ -62,7 +63,12 @@ function validatePlannedTimeRange(date: string, startTime: string, endTime: stri
   return { plannedStart, plannedEnd };
 }
 
-export function EditTaskDrawer({ isOpen, task, onClose }: EditTaskDrawerProps) {
+export function EditTaskDrawer({
+  isOpen,
+  task,
+  onClose,
+  onSaved,
+}: EditTaskDrawerProps) {
   const queryClient = useQueryClient();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -135,6 +141,7 @@ export function EditTaskDrawer({ isOpen, task, onClose }: EditTaskDrawerProps) {
     },
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: ['workplan'] });
+      onSaved?.();
       onClose();
     },
     onError: (err) => {

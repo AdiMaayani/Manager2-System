@@ -1,85 +1,233 @@
 import { useState } from 'react';
 import { Button } from '@shared/components/Button';
+import { EmptyState } from '@shared/components/EmptyState';
 import { Input } from '@shared/components/Input';
-import type { ProjectDrawing } from '../../../../types';
+import type {
+  CreateProjectDrawingRequest,
+  ProjectDrawing,
+  UpdateProjectDrawingRequest,
+} from '../../../../types';
 import { formatProjectDate } from '../../../../utils/projectDisplayUtils';
 import './ProjectDrawingsTab.css';
 
 interface ProjectDrawingsTabProps {
   drawings: ProjectDrawing[];
   isEditMode: boolean;
-  onChange: (drawings: ProjectDrawing[]) => void;
+  isSaving: boolean;
+  onCreate: (body: CreateProjectDrawingRequest) => Promise<void>;
+  onUpdate: (
+    projectDrawingId: number,
+    body: UpdateProjectDrawingRequest,
+  ) => Promise<void>;
+  onDelete: (projectDrawingId: number) => Promise<void>;
+}
+
+interface DrawingDraft {
+  name: string;
+  type: 'PDF' | 'DWG';
+  date: string;
+  note: string;
+}
+
+function todayYmd() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function draftFromDrawing(drawing: ProjectDrawing): DrawingDraft {
+  return {
+    name: drawing.name,
+    type: drawing.type,
+    date: drawing.date?.slice(0, 10) || todayYmd(),
+    note: drawing.note ?? '',
+  };
+}
+
+function buildDrawingRequest(
+  draft: DrawingDraft,
+): Omit<UpdateProjectDrawingRequest, 'sortOrder'> | { error: string } {
+  const name = draft.name.trim();
+
+  if (!name) {
+    return { error: 'שם השרטוט הוא שדה חובה.' };
+  }
+
+  if (!draft.date) {
+    return { error: 'יש לבחור תאריך.' };
+  }
+
+  return {
+    name,
+    type: draft.type,
+    drawingDate: draft.date,
+    note: draft.note.trim() || undefined,
+  };
+}
+
+interface DrawingEditCardProps {
+  drawing: ProjectDrawing;
+  isSaving: boolean;
+  onSave: (
+    projectDrawingId: number,
+    body: UpdateProjectDrawingRequest,
+  ) => Promise<void>;
+  onDelete: (projectDrawingId: number) => Promise<void>;
+  onValidationError: (message: string) => void;
+}
+
+function DrawingEditCard({
+  drawing,
+  isSaving,
+  onSave,
+  onDelete,
+  onValidationError,
+}: DrawingEditCardProps) {
+  const [draft, setDraft] = useState<DrawingDraft>(() => draftFromDrawing(drawing));
+
+  const saveDrawing = async () => {
+    const request = buildDrawingRequest(draft);
+
+    if ('error' in request) {
+      onValidationError(request.error);
+      return;
+    }
+
+    await onSave(drawing.projectDrawingId, {
+      ...request,
+      sortOrder: drawing.sortOrder,
+    });
+  };
+
+  return (
+    <div className="projectDrawingsTab__editCard">
+      <Input
+        label="שם"
+        value={draft.name}
+        onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
+      />
+      <label className="projectDrawingsTab__field">
+        <span>סוג</span>
+        <select
+          className="projectDrawingsTab__select"
+          value={draft.type}
+          onChange={(event) =>
+            setDraft((current) => ({
+              ...current,
+              type: event.target.value as 'PDF' | 'DWG',
+            }))
+          }
+        >
+          <option value="PDF">PDF</option>
+          <option value="DWG">DWG</option>
+        </select>
+      </label>
+      <Input
+        label="תאריך"
+        type="date"
+        value={draft.date}
+        onChange={(event) => setDraft((current) => ({ ...current, date: event.target.value }))}
+      />
+      <Input
+        label="הערה"
+        value={draft.note}
+        onChange={(event) => setDraft((current) => ({ ...current, note: event.target.value }))}
+      />
+      <div className="projectDrawingsTab__actions">
+        <Button type="button" variant="secondary" onClick={saveDrawing} disabled={isSaving}>
+          שמור שרטוט
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => onDelete(drawing.projectDrawingId)}
+          disabled={isSaving}
+        >
+          הסר
+        </Button>
+      </div>
+    </div>
+  );
 }
 
 export function ProjectDrawingsTab({
   drawings,
   isEditMode,
-  onChange,
+  isSaving,
+  onCreate,
+  onUpdate,
+  onDelete,
 }: ProjectDrawingsTabProps) {
-  const [name, setName] = useState('');
-  const [type, setType] = useState<'PDF' | 'DWG'>('PDF');
-  const [date, setDate] = useState('');
-  const [note, setNote] = useState('');
+  const [newDrawingDraft, setNewDrawingDraft] = useState<DrawingDraft>({
+    name: '',
+    type: 'PDF',
+    date: todayYmd(),
+    note: '',
+  });
+  const [error, setError] = useState<string | null>(null);
 
-  const removeDrawing = (id: string) => {
-    onChange(drawings.filter((drawing) => drawing.id !== id));
+  const addDrawing = async () => {
+    const request = buildDrawingRequest(newDrawingDraft);
+
+    if ('error' in request) {
+      setError(request.error);
+      return;
+    }
+
+    setError(null);
+    await onCreate({
+      ...request,
+      sortOrder: drawings.length + 1,
+    });
+
+    setNewDrawingDraft({
+      name: '',
+      type: 'PDF',
+      date: todayYmd(),
+      note: '',
+    });
   };
 
-  const addDrawing = () => {
-    if (!name.trim()) return;
-
-    onChange([
-      ...drawings,
-      {
-        id: `drawing-${Date.now()}`,
-        name: name.trim(),
-        type,
-        date: date || new Date().toISOString().slice(0, 10),
-        note: note.trim() || undefined,
-      },
-    ]);
-
-    setName('');
-    setDate('');
-    setNote('');
-  };
-
-  return (
-    <div className="projectDrawingsTab">
-      {isEditMode ? (
+  if (isEditMode) {
+    return (
+      <div className="projectDrawingsTab">
+        {error && <div className="projectDrawingsTab__error">{error}</div>}
         <div className="projectDrawingsTab__editList">
           {drawings.map((drawing) => (
-            <div key={drawing.id} className="projectDrawingsTab__card">
-              <strong>{drawing.name}</strong>
-              <span>{drawing.type}</span>
-              <Button type="button" variant="ghost" onClick={() => removeDrawing(drawing.id)}>
-                הסר
-              </Button>
-            </div>
+            <DrawingEditCard
+              key={`${drawing.projectDrawingId}-${drawing.updatedAt ?? drawing.createdAt ?? ''}`}
+              drawing={drawing}
+              isSaving={isSaving}
+              onSave={onUpdate}
+              onDelete={onDelete}
+              onValidationError={setError}
+            />
           ))}
+          {drawings.length === 0 && (
+            <EmptyState
+              title="אין שרטוטים לפרויקט"
+              description="הוסף מטא-דאטה של שרטוטים כדי לשמור אותו במסד הנתונים."
+            />
+          )}
         </div>
-      ) : (
-        <div className="projectDrawingsTab__viewList">
-          {drawings.map((drawing) => (
-            <div key={drawing.id} className="projectDrawingsTab__card">
-              <strong>{drawing.name}</strong>
-              <span>{drawing.type}</span>
-              <span>{formatProjectDate(drawing.date)}</span>
-              {drawing.note && <p>{drawing.note}</p>}
-            </div>
-          ))}
-        </div>
-      )}
 
-      {isEditMode && (
         <div className="projectDrawingsTab__addForm">
-          <Input label="שם" value={name} onChange={(event) => setName(event.target.value)} />
+          <Input
+            label="שם"
+            value={newDrawingDraft.name}
+            onChange={(event) =>
+              setNewDrawingDraft((current) => ({ ...current, name: event.target.value }))
+            }
+          />
           <label className="projectDrawingsTab__field">
             <span>סוג</span>
             <select
               className="projectDrawingsTab__select"
-              value={type}
-              onChange={(event) => setType(event.target.value as 'PDF' | 'DWG')}
+              value={newDrawingDraft.type}
+              onChange={(event) =>
+                setNewDrawingDraft((current) => ({
+                  ...current,
+                  type: event.target.value as 'PDF' | 'DWG',
+                }))
+              }
             >
               <option value="PDF">PDF</option>
               <option value="DWG">DWG</option>
@@ -88,13 +236,41 @@ export function ProjectDrawingsTab({
           <Input
             label="תאריך"
             type="date"
-            value={date}
-            onChange={(event) => setDate(event.target.value)}
+            value={newDrawingDraft.date}
+            onChange={(event) =>
+              setNewDrawingDraft((current) => ({ ...current, date: event.target.value }))
+            }
           />
-          <Input label="הערה" value={note} onChange={(event) => setNote(event.target.value)} />
-          <Button type="button" variant="secondary" onClick={addDrawing}>
+          <Input
+            label="הערה"
+            value={newDrawingDraft.note}
+            onChange={(event) =>
+              setNewDrawingDraft((current) => ({ ...current, note: event.target.value }))
+            }
+          />
+          <Button type="button" variant="secondary" onClick={addDrawing} disabled={isSaving}>
             הוסף שרטוט
           </Button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="projectDrawingsTab">
+      {drawings.length === 0 && (
+        <EmptyState title="אין שרטוטים לפרויקט" description="שרטוטים שיוגדרו יופיעו כאן." />
+      )}
+      {drawings.length > 0 && (
+        <div className="projectDrawingsTab__viewList">
+          {drawings.map((drawing) => (
+            <div key={drawing.projectDrawingId} className="projectDrawingsTab__card">
+              <strong>{drawing.name}</strong>
+              <span>{drawing.type}</span>
+              <span>{formatProjectDate(drawing.date)}</span>
+              {drawing.note && <p>{drawing.note}</p>}
+            </div>
+          ))}
         </div>
       )}
     </div>
