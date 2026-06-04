@@ -146,6 +146,36 @@ PRIMARY KEY CLUSTERED
 )WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
 ) ON [PRIMARY]
 GO
+/****** Object:  Table [dbo].[InventoryItems]    Script Date: 04/06/2026 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [dbo].[InventoryItems](
+	[InventoryItemId] [int] IDENTITY(1,1) NOT NULL,
+	[SkuCode] [nvarchar](50) NOT NULL,
+	[ItemName] [nvarchar](200) NOT NULL,
+	[Category] [nvarchar](100) NULL,
+	[QuantityOnHand] [decimal](18, 3) NOT NULL CONSTRAINT [DF_InventoryItems_QuantityOnHand] DEFAULT ((0)),
+	[Unit] [nvarchar](20) NOT NULL,
+	[MinimumQuantity] [decimal](18, 3) NULL,
+	[LocationName] [nvarchar](200) NULL,
+	[Notes] [nvarchar](500) NULL,
+	[IsActive] [bit] NOT NULL CONSTRAINT [DF_InventoryItems_IsActive] DEFAULT ((1)),
+	[CreatedAt] [datetime2](7) NOT NULL CONSTRAINT [DF_InventoryItems_CreatedAt] DEFAULT (sysutcdatetime()),
+	[UpdatedAt] [datetime2](7) NULL,
+	[DeletedAt] [datetime2](7) NULL,
+ CONSTRAINT [PK_InventoryItems] PRIMARY KEY CLUSTERED
+(
+	[InventoryItemId] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY],
+ CONSTRAINT [CK_InventoryItems_SkuCode_NotBlank] CHECK ((len(ltrim(rtrim([SkuCode])))>(0))),
+ CONSTRAINT [CK_InventoryItems_ItemName_NotBlank] CHECK ((len(ltrim(rtrim([ItemName])))>(0))),
+ CONSTRAINT [CK_InventoryItems_QuantityOnHand_NonNegative] CHECK (([QuantityOnHand]>=(0))),
+ CONSTRAINT [CK_InventoryItems_Unit_NotBlank] CHECK ((len(ltrim(rtrim([Unit])))>(0))),
+ CONSTRAINT [CK_InventoryItems_MinimumQuantity_NonNegative] CHECK (([MinimumQuantity] IS NULL OR [MinimumQuantity]>=(0)))
+) ON [PRIMARY]
+GO
 /****** Object:  Table [dbo].[ProjectEquipmentItems]    Script Date: 02/06/2026 ******/
 SET ANSI_NULLS ON
 GO
@@ -906,6 +936,35 @@ GO
 CREATE NONCLUSTERED INDEX [IX_Customers_CustomerType_IsActive] ON [dbo].[Customers]
 (
 	[CustomerType] ASC,
+	[IsActive] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+GO
+SET ANSI_PADDING ON
+GO
+/****** Object:  Index [UX_InventoryItems_SkuCode_Active]    Script Date: 04/06/2026 ******/
+CREATE UNIQUE NONCLUSTERED INDEX [UX_InventoryItems_SkuCode_Active] ON [dbo].[InventoryItems]
+(
+	[SkuCode] ASC
+)
+WHERE ([IsActive]=(1))
+WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, IGNORE_DUP_KEY = OFF, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+GO
+SET ANSI_PADDING ON
+GO
+/****** Object:  Index [IX_InventoryItems_IsActive_ItemName]    Script Date: 04/06/2026 ******/
+CREATE NONCLUSTERED INDEX [IX_InventoryItems_IsActive_ItemName] ON [dbo].[InventoryItems]
+(
+	[IsActive] ASC,
+	[ItemName] ASC,
+	[InventoryItemId] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+GO
+SET ANSI_PADDING ON
+GO
+/****** Object:  Index [IX_InventoryItems_Category_IsActive]    Script Date: 04/06/2026 ******/
+CREATE NONCLUSTERED INDEX [IX_InventoryItems_Category_IsActive] ON [dbo].[InventoryItems]
+(
+	[Category] ASC,
 	[IsActive] ASC
 )WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
 GO
