@@ -157,7 +157,7 @@ production mode.
 | `/contacts` | Contacts |
 | `/customers` | Customers |
 | `/quotes` | Quotes (mock when no API) |
-| `/inventory` | Inventory (mock) |
+| `/inventory` | Inventory |
 | `/service-calls` | Service calls (mock) |
 | `/cashflow` | Cashflow (mock) |
 | `/settings` | Settings |
