@@ -213,6 +213,8 @@ export interface CreateSiteRequest {
   notes?: string;
 }
 
+export type UpdateSiteRequest = CreateSiteRequest;
+
 export interface ProjectBoqItem {
   projectBoqItemId: number;
   projectId: number;
@@ -251,11 +253,31 @@ export interface ReorderProjectBoqRequest {
 }
 
 export interface ProjectDrawing {
-  id: string;
+  projectDrawingId: number;
+  projectId: number;
   name: string;
   type: 'PDF' | 'DWG';
   date: string;
   note?: string;
+  sortOrder: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateProjectDrawingRequest {
+  name: string;
+  type: 'PDF' | 'DWG';
+  drawingDate: string;
+  note?: string;
+  sortOrder?: number;
+}
+
+export interface UpdateProjectDrawingRequest {
+  name: string;
+  type: 'PDF' | 'DWG';
+  drawingDate: string;
+  note?: string;
+  sortOrder: number;
 }
 
 export interface ProjectEquipmentItem {

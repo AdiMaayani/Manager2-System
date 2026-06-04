@@ -1,7 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Drawer } from '@shared/components/Drawer';
 import { Button } from '@shared/components/Button';
 import { Input } from '@shared/components/Input';
+import { PageSpinner } from '@shared/components/PageSpinner';
+import { isLocalDataMode } from '@/config/appConfig';
+import { getServiceCallByIdAsync } from '../../api/serviceCallsApiClient';
 import { useServiceCallMutations } from '../../hooks/useServiceCalls';
 import type {
   ServiceCallCustomerOption,
@@ -108,13 +112,29 @@ export function ServiceCallDrawer({
   onSaved,
 }: ServiceCallDrawerProps) {
   const isEditMode = serviceCall != null;
+  const serviceCallDetailsQuery = useQuery({
+    queryKey: ['serviceCalls', 'detail', serviceCall?.workItemId, isLocalDataMode],
+    queryFn: () => getServiceCallByIdAsync(serviceCall!.workItemId),
+    enabled: isOpen && isEditMode && isLocalDataMode,
+  });
+  const currentServiceCall = serviceCallDetailsQuery.data ?? serviceCall;
   const { createMutation, updateMutation, closeMutation, assignEmployeeMutation } =
     useServiceCallMutations();
-  const [form, setForm] = useState<ServiceCallFormState>(() => buildInitialState(serviceCall));
+  const [form, setForm] = useState<ServiceCallFormState>(() => buildInitialState(currentServiceCall));
   const [error, setError] = useState<string | null>(null);
   const [employeeIdToAssign, setEmployeeIdToAssign] = useState('');
-  const [assignmentRole, setAssignmentRole] = useState(serviceCall?.requiredRole ?? '');
+  const [assignmentRole, setAssignmentRole] = useState(currentServiceCall?.requiredRole ?? '');
   const [isCloseConfirmVisible, setIsCloseConfirmVisible] = useState(false);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    setForm(buildInitialState(currentServiceCall));
+    setAssignmentRole(currentServiceCall?.requiredRole ?? '');
+    setEmployeeIdToAssign('');
+    setIsCloseConfirmVisible(false);
+    setError(null);
+  }, [currentServiceCall, isOpen]);
 
   const activeCustomers = useMemo(
     () => customers.filter((customer) => customer.isActive !== false),
@@ -185,7 +205,7 @@ export function ServiceCallDrawer({
 
     try {
       if (isEditMode) {
-        await updateMutation.mutateAsync({ id: serviceCall.workItemId, request: buildRequest() });
+        await updateMutation.mutateAsync({ id: currentServiceCall!.workItemId, request: buildRequest() });
         onSaved('קריאת השירות עודכנה בהצלחה.');
       } else {
         await createMutation.mutateAsync(buildRequest());
@@ -199,11 +219,11 @@ export function ServiceCallDrawer({
   }
 
   async function handleCloseServiceCall() {
-    if (!isEditMode) return;
+    if (!isEditMode || !currentServiceCall) return;
 
     setError(null);
     try {
-      await closeMutation.mutateAsync(serviceCall.workItemId);
+      await closeMutation.mutateAsync(currentServiceCall.workItemId);
       onSaved('קריאת השירות נסגרה בהצלחה.');
       onClose();
     } catch (err) {
@@ -212,7 +232,7 @@ export function ServiceCallDrawer({
   }
 
   async function handleAssignEmployee() {
-    if (!isEditMode) return;
+    if (!isEditMode || !currentServiceCall) return;
 
     const employeeId = Number(employeeIdToAssign);
     if (!employeeId || !assignmentRole.trim()) {
@@ -223,10 +243,11 @@ export function ServiceCallDrawer({
     setError(null);
     try {
       await assignEmployeeMutation.mutateAsync({
-        id: serviceCall.workItemId,
+        id: currentServiceCall.workItemId,
         request: { employeeId, assignmentRole: assignmentRole.trim() },
       });
       setEmployeeIdToAssign('');
+      await serviceCallDetailsQuery.refetch();
       onSaved('העובד שויך לקריאת השירות בהצלחה.');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'שיוך העובד נכשל');
@@ -243,9 +264,15 @@ export function ServiceCallDrawer({
     <Drawer
       isOpen={isOpen}
       onClose={onClose}
-      title={isEditMode ? `עריכת קריאת שירות — ${serviceCall.title}` : 'קריאת שירות חדשה'}
+      title={isEditMode ? `עריכת קריאת שירות — ${currentServiceCall?.title ?? ''}` : 'קריאת שירות חדשה'}
     >
       <div className="serviceCallDrawer">
+        {serviceCallDetailsQuery.isLoading && <PageSpinner />}
+        {serviceCallDetailsQuery.error && (
+          <p className="serviceCallDrawer__error">
+            טעינת פרטי הקריאה נכשלה. מוצגים נתוני הרשימה האחרונים.
+          </p>
+        )}
         <div className="serviceCallDrawer__grid">
           <Input
             label="כותרת *"
@@ -463,7 +490,7 @@ export function ServiceCallDrawer({
             ביטול
           </Button>
 
-          {isEditMode && !serviceCall.closedAt && (
+          {isEditMode && !currentServiceCall?.closedAt && (
             <>
               {isCloseConfirmVisible ? (
                 <>

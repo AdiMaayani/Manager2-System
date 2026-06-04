@@ -1,8 +1,8 @@
 ﻿/* =====================================================================
    ManageR2 - Table DDL Snapshot
    Source: igroup30_prod.sql (live DB dump, Script Date 31/05/2026)
-   Contents: 33 tables, 27 indexes, primary keys, defaults,
-             check constraints and foreign keys - verbatim from the dump.
+   Contents: 35 tables, indexes, primary keys, defaults,
+             check constraints and foreign keys.
    Run within your target database context (USE [<db>]; GO).
    ===================================================================== */
 
@@ -164,6 +164,57 @@ CREATE TABLE [dbo].[ProjectEquipmentItems](
 (
 	[ProjectEquipmentItemId] ASC
 )WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+) ON [PRIMARY]
+GO
+/****** Object:  Table [dbo].[ProjectBoqItems]    Script Date: 04/06/2026 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [dbo].[ProjectBoqItems](
+	[ProjectBoqItemId] [int] IDENTITY(1,1) NOT NULL,
+	[ProjectId] [int] NOT NULL,
+	[SystemName] [nvarchar](200) NULL,
+	[ItemDescription] [nvarchar](500) NOT NULL,
+	[Quantity] [decimal](18, 2) NOT NULL,
+	[Unit] [nvarchar](50) NOT NULL,
+	[SortOrder] [int] NOT NULL,
+	[IsActive] [bit] NOT NULL CONSTRAINT [DF_ProjectBoqItems_IsActive] DEFAULT ((1)),
+	[CreatedAt] [datetime2](7) NOT NULL CONSTRAINT [DF_ProjectBoqItems_CreatedAt] DEFAULT (sysutcdatetime()),
+	[UpdatedAt] [datetime2](7) NULL,
+	[DeletedAt] [datetime2](7) NULL,
+ CONSTRAINT [PK_ProjectBoqItems] PRIMARY KEY CLUSTERED
+(
+	[ProjectBoqItemId] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY],
+ CONSTRAINT [CK_ProjectBoqItems_ItemDescription_NotBlank] CHECK ((len(ltrim(rtrim([ItemDescription])))>(0))),
+ CONSTRAINT [CK_ProjectBoqItems_Quantity_Positive] CHECK (([Quantity]>(0))),
+ CONSTRAINT [CK_ProjectBoqItems_Unit_NotBlank] CHECK ((len(ltrim(rtrim([Unit])))>(0)))
+) ON [PRIMARY]
+GO
+/****** Object:  Table [dbo].[ProjectDrawings]    Script Date: 04/06/2026 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [dbo].[ProjectDrawings](
+	[ProjectDrawingId] [int] IDENTITY(1,1) NOT NULL,
+	[ProjectId] [int] NOT NULL,
+	[Name] [nvarchar](200) NOT NULL,
+	[Type] [nvarchar](20) NOT NULL,
+	[DrawingDate] [date] NOT NULL,
+	[Note] [nvarchar](500) NULL,
+	[SortOrder] [int] NOT NULL,
+	[IsActive] [bit] NOT NULL CONSTRAINT [DF_ProjectDrawings_IsActive] DEFAULT ((1)),
+	[CreatedAt] [datetime2](7) NOT NULL CONSTRAINT [DF_ProjectDrawings_CreatedAt] DEFAULT (sysutcdatetime()),
+	[UpdatedAt] [datetime2](7) NULL,
+	[DeletedAt] [datetime2](7) NULL,
+ CONSTRAINT [PK_ProjectDrawings] PRIMARY KEY CLUSTERED
+(
+	[ProjectDrawingId] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY],
+ CONSTRAINT [CK_ProjectDrawings_Name_NotBlank] CHECK ((len(ltrim(rtrim([Name])))>(0))),
+ CONSTRAINT [CK_ProjectDrawings_Type] CHECK (([Type]=N'DWG' OR [Type]=N'PDF'))
 ) ON [PRIMARY]
 GO
 /****** Object:  Table [dbo].[Rec_EmployeeAvailability]    Script Date: 31/05/2026 16:54:53 ******/
@@ -596,6 +647,9 @@ CREATE TABLE [dbo].[Sites](
 	[IsPrimary] [bit] NOT NULL,
 	[Notes] [nvarchar](500) NULL,
 	[CreatedAt] [datetime2](7) NOT NULL,
+	[IsActive] [bit] NOT NULL CONSTRAINT [DF_Sites_IsActive] DEFAULT ((1)),
+	[UpdatedAt] [datetime2](7) NULL,
+	[DeletedAt] [datetime2](7) NULL,
 PRIMARY KEY CLUSTERED 
 (
 	[SiteId] ASC
@@ -672,10 +726,6 @@ PRIMARY KEY CLUSTERED
 UNIQUE NONCLUSTERED 
 (
 	[Username] ASC
-)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY],
-UNIQUE NONCLUSTERED 
-(
-	[Email] ASC
 )WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY],
  CONSTRAINT [UQ_Users_Email] UNIQUE NONCLUSTERED 
 (
@@ -866,6 +916,26 @@ CREATE NONCLUSTERED INDEX [IX_ProjectEquipmentItems_ProjectId_SortOrder] ON [dbo
 	[SortOrder] ASC,
 	[ProjectEquipmentItemId] ASC
 )WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+GO
+/****** Object:  Index [IX_ProjectBoqItems_ProjectId_SortOrder]    Script Date: 04/06/2026 ******/
+CREATE NONCLUSTERED INDEX [IX_ProjectBoqItems_ProjectId_SortOrder] ON [dbo].[ProjectBoqItems]
+(
+	[ProjectId] ASC,
+	[SortOrder] ASC,
+	[ProjectBoqItemId] ASC
+)
+WHERE ([IsActive]=(1))
+WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
+GO
+/****** Object:  Index [IX_ProjectDrawings_ProjectId_SortOrder]    Script Date: 04/06/2026 ******/
+CREATE NONCLUSTERED INDEX [IX_ProjectDrawings_ProjectId_SortOrder] ON [dbo].[ProjectDrawings]
+(
+	[ProjectId] ASC,
+	[SortOrder] ASC,
+	[ProjectDrawingId] ASC
+)
+WHERE ([IsActive]=(1))
+WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, SORT_IN_TEMPDB = OFF, DROP_EXISTING = OFF, ONLINE = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY]
 GO
 /****** Object:  Index [IX_Rec_EmployeeAvailability_EmployeeId_TimeRange]    Script Date: 31/05/2026 16:54:53 ******/
 CREATE NONCLUSTERED INDEX [IX_Rec_EmployeeAvailability_EmployeeId_TimeRange] ON [dbo].[Rec_EmployeeAvailability]
@@ -1152,6 +1222,16 @@ ALTER TABLE [dbo].[ProjectEquipmentItems]  WITH CHECK ADD  CONSTRAINT [FK_Projec
 REFERENCES [dbo].[WorkItems] ([WorkItemId])
 GO
 ALTER TABLE [dbo].[ProjectEquipmentItems] CHECK CONSTRAINT [FK_ProjectEquipmentItems_WorkItems]
+GO
+ALTER TABLE [dbo].[ProjectBoqItems]  WITH CHECK ADD  CONSTRAINT [FK_ProjectBoqItems_WorkItems] FOREIGN KEY([ProjectId])
+REFERENCES [dbo].[WorkItems] ([WorkItemId])
+GO
+ALTER TABLE [dbo].[ProjectBoqItems] CHECK CONSTRAINT [FK_ProjectBoqItems_WorkItems]
+GO
+ALTER TABLE [dbo].[ProjectDrawings]  WITH CHECK ADD  CONSTRAINT [FK_ProjectDrawings_WorkItems] FOREIGN KEY([ProjectId])
+REFERENCES [dbo].[WorkItems] ([WorkItemId])
+GO
+ALTER TABLE [dbo].[ProjectDrawings] CHECK CONSTRAINT [FK_ProjectDrawings_WorkItems]
 GO
 ALTER TABLE [dbo].[Rec_EmployeeAvailability]  WITH CHECK ADD  CONSTRAINT [FK_Rec_EmployeeAvailability_Employees] FOREIGN KEY([EmployeeId])
 REFERENCES [dbo].[Employees] ([EmployeeId])

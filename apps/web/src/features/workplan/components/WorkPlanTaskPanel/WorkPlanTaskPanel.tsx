@@ -15,9 +15,15 @@ interface WorkPlanTaskPanelProps {
   task: WorkPlanTaskSelection | null;
   onClose: () => void;
   canEdit: boolean;
+  onTaskUpdated: () => void;
 }
 
-export function WorkPlanTaskPanel({ task, onClose, canEdit }: WorkPlanTaskPanelProps) {
+export function WorkPlanTaskPanel({
+  task,
+  onClose,
+  canEdit,
+  onTaskUpdated,
+}: WorkPlanTaskPanelProps) {
   const navigate = useNavigate();
   const [isEditOpen, setIsEditOpen] = useState(false);
 
@@ -31,8 +37,6 @@ export function WorkPlanTaskPanel({ task, onClose, canEdit }: WorkPlanTaskPanelP
       date: today,
       projectId: task.projectId,
       projectName: task.projectTitle,
-      customerName: task.projectTitle,
-      site: task.projectTitle,
       start: formatHourAsTime(task.startHour),
       end: formatHourAsTime(task.endHour),
       reporterName: task.assigneeName !== '—' ? task.assigneeName : '',
@@ -99,7 +103,7 @@ export function WorkPlanTaskPanel({ task, onClose, canEdit }: WorkPlanTaskPanelP
           {task.isLocked
             ? 'משימה נעולה — לא ניתן לערוך.'
             : canEdit
-              ? 'יש הרשאה לעריכה וגרירה.'
+              ? 'יש הרשאה לעריכה.'
               : 'אין הרשאה לעריכה בחתך הנוכחי.'}
         </p>
 
@@ -122,6 +126,10 @@ export function WorkPlanTaskPanel({ task, onClose, canEdit }: WorkPlanTaskPanelP
         isOpen={isEditOpen}
         task={task}
         onClose={() => setIsEditOpen(false)}
+        onSaved={() => {
+          setIsEditOpen(false);
+          onTaskUpdated();
+        }}
       />
     </aside>
   );

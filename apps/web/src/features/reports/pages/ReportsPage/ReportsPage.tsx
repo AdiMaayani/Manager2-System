@@ -18,7 +18,11 @@ import {
 } from '../../api/reportsApiClient';
 import { ReportDetailModal } from '../../components/ReportDetailModal';
 import { useReports } from '../../hooks/useReports';
-import type { CreateWorkReportRequest, WorkReportDetails } from '../../types';
+import type {
+  CreateWorkReportRequest,
+  ReportProjectOption,
+  WorkReportDetails,
+} from '../../types';
 import './ReportsPage.css';
 
 const QUICK_REPORT_KEY = 'manager2_quick_report_prefill';
@@ -119,6 +123,26 @@ function parseNullableInt(value: string): number | null {
   if (!normalized) return null;
   const parsed = Number(normalized);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+}
+
+function enrichQuickReportPrefill(
+  prefill: QuickReportPrefill,
+  projects: ReportProjectOption[],
+): QuickReportPrefill {
+  if (prefill.projectId == null) return prefill;
+
+  const project = projects.find(
+    (row) => String(row.workItemId) === String(prefill.projectId),
+  );
+
+  if (!project) return prefill;
+
+  return {
+    ...prefill,
+    projectName: prefill.projectName || project.title,
+    customerName: project.customerName || prefill.customerName || '',
+    site: project.siteName || prefill.site || '',
+  };
 }
 
 function formatReportDate(value?: string | null) {
@@ -233,8 +257,11 @@ export function ReportsPage() {
 
     try {
       const prefill = JSON.parse(rawPrefill) as QuickReportPrefill;
+      if (prefill.projectId != null && projects.length === 0) return;
+      const enrichedPrefill = enrichQuickReportPrefill(prefill, projects);
+
       window.setTimeout(() => {
-        setForm(createInitialFormState(prefill));
+        setForm(createInitialFormState(enrichedPrefill));
         setFormMode('create');
         setEditingReportId(null);
         setIsCreateOpen(true);
@@ -244,7 +271,7 @@ export function ReportsPage() {
     } catch {
       sessionStorage.removeItem(QUICK_REPORT_KEY);
     }
-  }, [navigate, searchParams]);
+  }, [navigate, projects, searchParams]);
 
   function openCreateModal() {
     setForm(createInitialFormState());

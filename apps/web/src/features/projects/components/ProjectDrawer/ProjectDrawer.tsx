@@ -26,22 +26,30 @@ import {
   useProjectBoq,
   useProjectBoqMutations,
 } from '../../hooks/useProjectBoq';
+import {
+  useProjectDrawingMutations,
+  useProjectDrawings,
+} from '../../hooks/useProjectDrawings';
 import type {
   CreateProjectBoqItemRequest,
+  CreateProjectDrawingRequest,
   CreateProjectEquipmentItemRequest,
   ProjectBoqItem,
   ProjectDrawerMode,
   ProjectDrawerTabId,
-  ProjectDrawing,
   ProjectEquipmentItem,
   ProjectOverviewForm,
   ProjectTeamForm,
   UpdateProjectBoqItemRequest,
+  UpdateProjectDrawingRequest,
   UpdateProjectEquipmentItemRequest,
 } from '../../types';
-import { syncProjectEmployeeAssignmentsAsync } from '../../api/projectsApiClient';
 import {
-  DEFAULT_DRAWINGS,
+  deactivateSiteAsync,
+  syncProjectEmployeeAssignmentsAsync,
+  updateSiteAsync,
+} from '../../api/projectsApiClient';
+import {
   createEmptyOverviewForm,
   overviewFormFromLifecycle,
 } from '../../utils/projectDisplayUtils';
@@ -108,7 +116,6 @@ export function ProjectDrawer({
     projectManagerEmployeeId: null,
     teamEmployeeIds: [],
   });
-  const [drawings, setDrawings] = useState<ProjectDrawing[]>(DEFAULT_DRAWINGS);
   const [saveError, setSaveError] = useState<string | null>(null);
   const isEditModeRef = useRef(isEditMode);
 
@@ -128,6 +135,8 @@ export function ProjectDrawer({
   const cancelMilestoneAsync = milestoneMutations.cancelMutation.mutateAsync;
   const boqQuery = useProjectBoq(isCreateMode ? null : projectId, isOpen);
   const boqMutations = useProjectBoqMutations(projectId);
+  const drawingsQuery = useProjectDrawings(isCreateMode ? null : projectId, isOpen);
+  const drawingMutations = useProjectDrawingMutations(projectId);
   const equipmentQuery = useProjectEquipment(isCreateMode ? null : projectId, isOpen);
   const equipmentMutations = useProjectEquipmentMutations(projectId);
   const refetchLookups = lookups.refetch;
@@ -151,7 +160,6 @@ export function ProjectDrawer({
       setIsEditMode(isCreateMode);
       setIsMaximized(false);
       setSaveError(null);
-      setDrawings(DEFAULT_DRAWINGS.map((drawing) => ({ ...drawing })));
 
       if (isCreateMode) {
         setOverviewForm(createEmptyOverviewForm());
@@ -220,6 +228,35 @@ export function ProjectDrawer({
     [createSiteAsync, refetchLookups],
   );
 
+  const handleUpdateProjectSite = useCallback(
+    async (
+      siteId: number,
+      payload: {
+        customerId: number;
+        siteName: string;
+        addressLine?: string;
+        city?: string;
+        notes?: string;
+        isPrimary?: boolean;
+      },
+    ) => {
+      await updateSiteAsync(siteId, payload);
+      await refetchLookups();
+    },
+    [refetchLookups],
+  );
+
+  const handleDeactivateProjectSite = useCallback(
+    async (siteId: number) => {
+      await deactivateSiteAsync(siteId);
+      if (overviewForm.siteId === siteId) {
+        setOverviewForm((current) => ({ ...current, siteId: 0 }));
+      }
+      await refetchLookups();
+    },
+    [overviewForm.siteId, refetchLookups],
+  );
+
   const handleCreateMilestone = useCallback(
     async (body: Parameters<typeof createMilestoneAsync>[0]) => {
       await createMilestoneAsync(body);
@@ -275,6 +312,30 @@ export function ProjectDrawer({
       );
     },
     [boqMutations.reorderMutation],
+  );
+
+  const handleCreateDrawing = useCallback(
+    async (body: CreateProjectDrawingRequest) => {
+      await drawingMutations.createMutation.mutateAsync(body);
+    },
+    [drawingMutations.createMutation],
+  );
+
+  const handleUpdateDrawing = useCallback(
+    async (projectDrawingId: number, body: UpdateProjectDrawingRequest) => {
+      await drawingMutations.updateMutation.mutateAsync({
+        projectDrawingId,
+        body,
+      });
+    },
+    [drawingMutations.updateMutation],
+  );
+
+  const handleDeleteDrawing = useCallback(
+    async (projectDrawingId: number) => {
+      await drawingMutations.deleteMutation.mutateAsync(projectDrawingId);
+    },
+    [drawingMutations.deleteMutation],
   );
 
   const handleCreateEquipment = useCallback(
@@ -462,6 +523,8 @@ export function ProjectDrawer({
               onChange={setOverviewForm}
               onTeamChange={setTeamForm}
               onCreateSite={handleCreateProjectSite}
+              onUpdateSite={handleUpdateProjectSite}
+              onDeactivateSite={handleDeactivateProjectSite}
             />
           </>
         );
@@ -523,11 +586,35 @@ export function ProjectDrawer({
           />
         );
       case 'drawings':
+        if (isCreateMode) {
+          return <p className="projectDrawer__hint">שמור את הפרויקט לפני הוספת שרטוטים.</p>;
+        }
+
+        if (drawingsQuery.isLoading) {
+          return <PageSpinner />;
+        }
+
+        if (drawingsQuery.error) {
+          return (
+            <ErrorState
+              message={drawingsQuery.error.message}
+              onRetry={() => drawingsQuery.refetch()}
+            />
+          );
+        }
+
         return (
           <ProjectDrawingsTab
-            drawings={drawings}
+            drawings={drawingsQuery.data ?? []}
             isEditMode={isEditMode}
-            onChange={setDrawings}
+            isSaving={
+              drawingMutations.createMutation.isPending ||
+              drawingMutations.updateMutation.isPending ||
+              drawingMutations.deleteMutation.isPending
+            }
+            onCreate={handleCreateDrawing}
+            onUpdate={handleUpdateDrawing}
+            onDelete={handleDeleteDrawing}
           />
         );
       case 'equipment':

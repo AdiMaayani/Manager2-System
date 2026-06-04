@@ -4,6 +4,7 @@ import type {
   ScheduledTaskBar,
   TaskInsightCounts,
   WorkPlanEmployee,
+  WorkPlanTaskSelection,
   WorkPlanTaskSummary,
 } from '../types';
 import {
@@ -74,6 +75,36 @@ export function buildTaskInsightCounts(
       suggestionCount: 0,
     }
   );
+}
+
+export function buildWorkPlanTaskSelection(
+  workPlan: MappedWorkPlan,
+  task: MappedWorkPlan['tasks'][number],
+  fallbackIndex = 0,
+  isPersonal = false,
+): WorkPlanTaskSelection {
+  const assignment = resolveAssignment(task, workPlan);
+  const fallbackStartHour = Math.min(8 + fallbackIndex * 2, 22);
+  const duration = Math.max(2, Math.ceil((task.estimatedHours ?? 2) / 1));
+  const timeWindow = resolveTaskTimeWindow(task, fallbackStartHour, duration);
+
+  return {
+    taskId: task.workItemId,
+    title: task.title,
+    status: task.status,
+    projectId: workPlan.project.id,
+    projectTitle: workPlan.project.title,
+    assigneeName: assignment.displayName,
+    startHour: timeWindow.startHour,
+    endHour: timeWindow.endHour,
+    plannedStart: task.plannedStart,
+    plannedEnd: task.plannedEnd,
+    isLocked: task.isLocked,
+    isPersonal,
+    estimatedHours: task.estimatedHours,
+    priority: task.priority,
+    requiredRole: task.requiredRole,
+  };
 }
 
 export function buildEmployeeDailyBars(

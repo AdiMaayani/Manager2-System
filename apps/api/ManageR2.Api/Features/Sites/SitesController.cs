@@ -195,4 +195,24 @@ public class SitesController : ControllerBase
             return BadRequest(new { message = ex.Message });
         }
     }
+
+    [HttpDelete("{id:int}")]
+    public async Task<IActionResult> Deactivate(int id)
+    {
+        try
+        {
+            var success = await _repository.DeactivateAsync(id);
+
+            if (!success)
+            {
+                return NotFound(new { message = $"Site with id {id} was not found." });
+            }
+
+            return NoContent();
+        }
+        catch (UserValidationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
 }

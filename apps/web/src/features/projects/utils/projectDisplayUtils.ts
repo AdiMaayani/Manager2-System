@@ -1,6 +1,5 @@
 import type {
   ProjectBoqItem,
-  ProjectDrawing,
   ProjectEquipmentItem,
   ProjectLifecycle,
   ProjectLifecycleAssignment,
@@ -383,22 +382,6 @@ export const DEFAULT_BOQ_ROWS: ProjectBoqItem[] = [
     quantity: 24,
     unit: 'יח׳',
     sortOrder: 3,
-  },
-];
-
-export const DEFAULT_DRAWINGS: ProjectDrawing[] = [
-  {
-    id: 'drawing-1',
-    name: 'תוכנית חשמל - קומה 1',
-    type: 'PDF',
-    date: '2025-01-15',
-    note: 'גרסה 1.0',
-  },
-  {
-    id: 'drawing-2',
-    name: 'תוכנית לוחות',
-    type: 'DWG',
-    date: '2025-01-20',
   },
 ];
 

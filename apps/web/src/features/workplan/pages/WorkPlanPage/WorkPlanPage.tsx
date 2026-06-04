@@ -133,25 +133,15 @@ export function WorkPlanPage() {
           <WorkPlanWeeklyView
             workPlans={scheduling.activeWorkPlans}
             statusFilter={pageState.statusFilter}
-            onTaskClick={(taskId, projectTitle, title) =>
-              setSelectedTask({
-                taskId,
-                title,
-                status: '',
-                projectId: 0,
-                projectTitle,
-                assigneeName: '—',
-                startHour: 8,
-                endHour: 10,
-                isLocked: false,
-                isPersonal: false,
-              })
-            }
+            onTaskClick={setSelectedTask}
           />
         )}
 
         {pageState.range === 'monthly' && (
-          <WorkPlanMonthlyView workPlans={scheduling.activeWorkPlans} />
+          <WorkPlanMonthlyView
+            workPlans={scheduling.activeWorkPlans}
+            onTaskClick={setSelectedTask}
+          />
         )}
 
         {pageState.range === 'yearly' && (
@@ -162,6 +152,7 @@ export function WorkPlanPage() {
           task={selectedTask}
           onClose={() => setSelectedTask(null)}
           canEdit={canEditTask}
+          onTaskUpdated={() => setSelectedTask(null)}
         />
 
         <NewTaskModal

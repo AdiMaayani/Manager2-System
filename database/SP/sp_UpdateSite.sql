@@ -22,8 +22,10 @@ BEGIN
         AddressLine = @AddressLine,
         City = @City,
         IsPrimary = @IsPrimary,
-        Notes = @Notes
-    WHERE SiteId = @SiteId;
+        Notes = @Notes,
+        UpdatedAt = SYSUTCDATETIME()
+    WHERE SiteId = @SiteId
+      AND IsActive = 1;
 
     SELECT @@ROWCOUNT AS RowsAffected;
 END
