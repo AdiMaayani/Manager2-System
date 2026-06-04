@@ -21,20 +21,26 @@ import {
   useProjectEquipment,
   useProjectEquipmentMutations,
 } from '../../hooks/useProjectEquipment';
+import {
+  buildProjectBoqReorderRequest,
+  useProjectBoq,
+  useProjectBoqMutations,
+} from '../../hooks/useProjectBoq';
 import type {
+  CreateProjectBoqItemRequest,
   CreateProjectEquipmentItemRequest,
-  ProjectBoqRow,
+  ProjectBoqItem,
   ProjectDrawerMode,
   ProjectDrawerTabId,
   ProjectDrawing,
   ProjectEquipmentItem,
   ProjectOverviewForm,
   ProjectTeamForm,
+  UpdateProjectBoqItemRequest,
   UpdateProjectEquipmentItemRequest,
 } from '../../types';
 import { syncProjectEmployeeAssignmentsAsync } from '../../api/projectsApiClient';
 import {
-  DEFAULT_BOQ_ROWS,
   DEFAULT_DRAWINGS,
   createEmptyOverviewForm,
   overviewFormFromLifecycle,
@@ -102,7 +108,6 @@ export function ProjectDrawer({
     projectManagerEmployeeId: null,
     teamEmployeeIds: [],
   });
-  const [boqRows, setBoqRows] = useState<ProjectBoqRow[]>(DEFAULT_BOQ_ROWS);
   const [drawings, setDrawings] = useState<ProjectDrawing[]>(DEFAULT_DRAWINGS);
   const [saveError, setSaveError] = useState<string | null>(null);
   const isEditModeRef = useRef(isEditMode);
@@ -121,6 +126,8 @@ export function ProjectDrawer({
   const createMilestoneAsync = milestoneMutations.createMutation.mutateAsync;
   const updateMilestoneAsync = milestoneMutations.updateMutation.mutateAsync;
   const cancelMilestoneAsync = milestoneMutations.cancelMutation.mutateAsync;
+  const boqQuery = useProjectBoq(isCreateMode ? null : projectId, isOpen);
+  const boqMutations = useProjectBoqMutations(projectId);
   const equipmentQuery = useProjectEquipment(isCreateMode ? null : projectId, isOpen);
   const equipmentMutations = useProjectEquipmentMutations(projectId);
   const refetchLookups = lookups.refetch;
@@ -144,7 +151,6 @@ export function ProjectDrawer({
       setIsEditMode(isCreateMode);
       setIsMaximized(false);
       setSaveError(null);
-      setBoqRows(DEFAULT_BOQ_ROWS.map((row) => ({ ...row })));
       setDrawings(DEFAULT_DRAWINGS.map((drawing) => ({ ...drawing })));
 
       if (isCreateMode) {
@@ -236,6 +242,39 @@ export function ProjectDrawer({
       await cancelMilestoneAsync(milestoneId);
     },
     [cancelMilestoneAsync],
+  );
+
+  const handleCreateBoqItem = useCallback(
+    async (body: CreateProjectBoqItemRequest) => {
+      await boqMutations.createMutation.mutateAsync(body);
+    },
+    [boqMutations.createMutation],
+  );
+
+  const handleUpdateBoqItem = useCallback(
+    async (boqItemId: number, body: UpdateProjectBoqItemRequest) => {
+      await boqMutations.updateMutation.mutateAsync({
+        boqItemId,
+        body,
+      });
+    },
+    [boqMutations.updateMutation],
+  );
+
+  const handleDeleteBoqItem = useCallback(
+    async (boqItemId: number) => {
+      await boqMutations.deleteMutation.mutateAsync(boqItemId);
+    },
+    [boqMutations.deleteMutation],
+  );
+
+  const handleReorderBoqItems = useCallback(
+    async (boqItems: ProjectBoqItem[]) => {
+      await boqMutations.reorderMutation.mutateAsync(
+        buildProjectBoqReorderRequest(boqItems),
+      );
+    },
+    [boqMutations.reorderMutation],
   );
 
   const handleCreateEquipment = useCallback(
@@ -450,8 +489,38 @@ export function ProjectDrawer({
       case 'quote':
         return <ProjectQuoteTab />;
       case 'boq':
+        if (isCreateMode) {
+          return <p className="projectDrawer__hint">שמור את הפרויקט לפני הוספת כתב כמויות.</p>;
+        }
+
+        if (boqQuery.isLoading) {
+          return <PageSpinner />;
+        }
+
+        if (boqQuery.error) {
+          return (
+            <ErrorState
+              message={boqQuery.error.message}
+              onRetry={() => boqQuery.refetch()}
+            />
+          );
+        }
+
         return (
-          <ProjectBoqTab rows={boqRows} isEditMode={isEditMode} onChange={setBoqRows} />
+          <ProjectBoqTab
+            items={boqQuery.data ?? []}
+            isEditMode={isEditMode}
+            isSaving={
+              boqMutations.createMutation.isPending ||
+              boqMutations.updateMutation.isPending ||
+              boqMutations.deleteMutation.isPending ||
+              boqMutations.reorderMutation.isPending
+            }
+            onCreate={handleCreateBoqItem}
+            onUpdate={handleUpdateBoqItem}
+            onDelete={handleDeleteBoqItem}
+            onReorder={handleReorderBoqItems}
+          />
         );
       case 'drawings':
         return (

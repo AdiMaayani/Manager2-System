@@ -1,18 +1,22 @@
 import { apiRequest } from '@api/client';
 import type {
   CreateMilestoneRequest,
+  CreateProjectBoqItemRequest,
   CreateProjectEquipmentItemRequest,
   CreateProjectRequest,
   CreateSiteRequest,
   ProjectEmployeeOption,
+  ProjectBoqItem,
   ProjectEquipmentItem,
   ProjectLifecycle,
   ProjectListItem,
   ProjectMilestone,
+  ReorderProjectBoqRequest,
   ReorderProjectEquipmentRequest,
   SyncProjectEmployeeAssignmentsRequest,
   Site,
   UpdateMilestoneRequest,
+  UpdateProjectBoqItemRequest,
   UpdateProjectEquipmentItemRequest,
   UpdateProjectRequest,
 } from '../types';
@@ -33,6 +37,32 @@ interface RawProjectEquipmentItemResponse {
   sortOrder: number;
   createdAt?: string;
   updatedAt?: string | null;
+}
+
+interface RawProjectBoqItemResponse {
+  projectBoqItemId: number;
+  projectId: number;
+  systemName?: string | null;
+  itemDescription: string;
+  quantity: number;
+  unit: string;
+  sortOrder: number;
+  createdAt?: string;
+  updatedAt?: string | null;
+}
+
+function mapProjectBoqItem(boqItem: RawProjectBoqItemResponse): ProjectBoqItem {
+  return {
+    projectBoqItemId: boqItem.projectBoqItemId,
+    projectId: boqItem.projectId,
+    systemName: boqItem.systemName ?? undefined,
+    itemDescription: boqItem.itemDescription,
+    quantity: boqItem.quantity,
+    unit: boqItem.unit,
+    sortOrder: boqItem.sortOrder,
+    createdAt: boqItem.createdAt,
+    updatedAt: boqItem.updatedAt ?? undefined,
+  };
 }
 
 function mapProjectEquipmentItem(
@@ -66,6 +96,12 @@ export function getProjectEquipmentAsync(projectId: number): Promise<ProjectEqui
   return apiRequest<RawProjectEquipmentItemResponse[]>(
     `/Projects/${projectId}/equipment`,
   ).then((equipmentItems) => equipmentItems.map(mapProjectEquipmentItem));
+}
+
+export function getProjectBoqAsync(projectId: number): Promise<ProjectBoqItem[]> {
+  return apiRequest<RawProjectBoqItemResponse[]>(`/Projects/${projectId}/boq`).then(
+    (boqItems) => boqItems.map(mapProjectBoqItem),
+  );
 }
 
 export function createProjectAsync(body: CreateProjectRequest): Promise<{ workItemId: number }> {
@@ -122,6 +158,49 @@ export function createProjectEquipmentAsync(
     method: 'POST',
     body: JSON.stringify(body),
   }).then(mapProjectEquipmentItem);
+}
+
+export function createProjectBoqItemAsync(
+  projectId: number,
+  body: CreateProjectBoqItemRequest,
+): Promise<ProjectBoqItem> {
+  return apiRequest<RawProjectBoqItemResponse>(`/Projects/${projectId}/boq`, {
+    method: 'POST',
+    body: JSON.stringify(body),
+  }).then(mapProjectBoqItem);
+}
+
+export function updateProjectBoqItemAsync(
+  projectId: number,
+  boqItemId: number,
+  body: UpdateProjectBoqItemRequest,
+): Promise<ProjectBoqItem> {
+  return apiRequest<RawProjectBoqItemResponse>(
+    `/Projects/${projectId}/boq/${boqItemId}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify(body),
+    },
+  ).then(mapProjectBoqItem);
+}
+
+export function deleteProjectBoqItemAsync(
+  projectId: number,
+  boqItemId: number,
+): Promise<void> {
+  return apiRequest<void>(`/Projects/${projectId}/boq/${boqItemId}`, {
+    method: 'DELETE',
+  });
+}
+
+export function reorderProjectBoqAsync(
+  projectId: number,
+  body: ReorderProjectBoqRequest,
+): Promise<void> {
+  return apiRequest<void>(`/Projects/${projectId}/boq/order`, {
+    method: 'PUT',
+    body: JSON.stringify(body),
+  });
 }
 
 export function updateProjectEquipmentAsync(

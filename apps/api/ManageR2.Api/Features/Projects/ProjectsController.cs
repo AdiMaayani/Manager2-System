@@ -16,13 +16,16 @@ public class ProjectsController : ControllerBase
     // Aggregates project header, milestones, assignments, reports, and KPI summary (often via stored procedures).
     private readonly IProjectLifecycleRepository _projectLifecycleRepository;
     private readonly IProjectEquipmentRepository _projectEquipmentRepository;
+    private readonly IProjectBoqRepository _projectBoqRepository;
 
     public ProjectsController(
         IProjectLifecycleRepository projectLifecycleRepository,
-        IProjectEquipmentRepository projectEquipmentRepository)
+        IProjectEquipmentRepository projectEquipmentRepository,
+        IProjectBoqRepository projectBoqRepository)
     {
         _projectLifecycleRepository = projectLifecycleRepository;
         _projectEquipmentRepository = projectEquipmentRepository;
+        _projectBoqRepository = projectBoqRepository;
     }
 
     [HttpGet("{id:int}/lifecycle")]
@@ -122,6 +125,174 @@ public class ProjectsController : ControllerBase
         };
 
         return Ok(dto);
+    }
+
+    [HttpGet("{projectId:int}/boq")]
+    public async Task<ActionResult<List<ProjectBoqItemDto>>> GetBoq(int projectId)
+    {
+        try
+        {
+            var boqItems = await _projectBoqRepository.GetByProjectIdAsync(projectId);
+            return Ok(boqItems.Select(MapProjectBoqItem).ToList());
+        }
+        catch (UserValidationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPost("{projectId:int}/boq")]
+    public async Task<ActionResult<ProjectBoqItemDto>> CreateBoqItem(
+        int projectId,
+        [FromBody] CreateProjectBoqItemRequestDto request)
+    {
+        var validationError = ValidateProjectBoqRequest(
+            request.ItemDescription,
+            request.Quantity,
+            request.Unit);
+
+        if (validationError != null)
+        {
+            return BadRequest(new { message = validationError });
+        }
+
+        try
+        {
+            var boqItem = new ProjectBoqItemModel
+            {
+                ProjectId = projectId,
+                SystemName = string.IsNullOrWhiteSpace(request.SystemName)
+                    ? null
+                    : request.SystemName.Trim(),
+                ItemDescription = request.ItemDescription.Trim(),
+                Quantity = request.Quantity,
+                Unit = request.Unit.Trim(),
+                SortOrder = request.SortOrder ?? 0
+            };
+
+            var boqItemId = await _projectBoqRepository.CreateAsync(boqItem);
+            var created = await GetProjectBoqItemOrNullAsync(projectId, boqItemId);
+
+            if (created == null)
+            {
+                return BadRequest(new { message = "Project BOQ item was created but could not be reloaded." });
+            }
+
+            return CreatedAtAction(
+                nameof(GetBoq),
+                new { projectId },
+                MapProjectBoqItem(created));
+        }
+        catch (UserValidationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPut("{projectId:int}/boq/{boqItemId:int}")]
+    public async Task<ActionResult<ProjectBoqItemDto>> UpdateBoqItem(
+        int projectId,
+        int boqItemId,
+        [FromBody] UpdateProjectBoqItemRequestDto request)
+    {
+        var validationError = ValidateProjectBoqRequest(
+            request.ItemDescription,
+            request.Quantity,
+            request.Unit);
+
+        if (validationError != null)
+        {
+            return BadRequest(new { message = validationError });
+        }
+
+        try
+        {
+            var boqItem = new ProjectBoqItemModel
+            {
+                ProjectBoqItemId = boqItemId,
+                ProjectId = projectId,
+                SystemName = string.IsNullOrWhiteSpace(request.SystemName)
+                    ? null
+                    : request.SystemName.Trim(),
+                ItemDescription = request.ItemDescription.Trim(),
+                Quantity = request.Quantity,
+                Unit = request.Unit.Trim(),
+                SortOrder = request.SortOrder
+            };
+
+            var updated = await _projectBoqRepository.UpdateAsync(boqItem);
+
+            if (!updated)
+            {
+                return NotFound(new { message = $"Project BOQ item with id {boqItemId} was not found." });
+            }
+
+            var reloaded = await GetProjectBoqItemOrNullAsync(projectId, boqItemId);
+
+            if (reloaded == null)
+            {
+                return NotFound(new { message = $"Project BOQ item with id {boqItemId} was not found after update." });
+            }
+
+            return Ok(MapProjectBoqItem(reloaded));
+        }
+        catch (UserValidationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpDelete("{projectId:int}/boq/{boqItemId:int}")]
+    public async Task<IActionResult> DeleteBoqItem(int projectId, int boqItemId)
+    {
+        try
+        {
+            var deleted = await _projectBoqRepository.DeleteAsync(projectId, boqItemId);
+
+            if (!deleted)
+            {
+                return NotFound(new { message = $"Project BOQ item with id {boqItemId} was not found." });
+            }
+
+            return NoContent();
+        }
+        catch (UserValidationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpPut("{projectId:int}/boq/order")]
+    public async Task<IActionResult> ReorderBoqItems(
+        int projectId,
+        [FromBody] ReorderProjectBoqRequestDto request)
+    {
+        if (request.Items.Any(item => item.ProjectBoqItemId <= 0 || item.SortOrder <= 0))
+        {
+            return BadRequest(new { message = "Every BOQ order item must include a valid id and sort order." });
+        }
+
+        try
+        {
+            var sortOrders = request.Items.Select(item => new ProjectBoqSortOrderModel
+            {
+                ProjectBoqItemId = item.ProjectBoqItemId,
+                SortOrder = item.SortOrder
+            }).ToList();
+
+            var reordered = await _projectBoqRepository.ReorderAsync(projectId, sortOrders);
+
+            if (!reordered)
+            {
+                return NotFound(new { message = "One or more project BOQ items were not found." });
+            }
+
+            return NoContent();
+        }
+        catch (UserValidationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [HttpGet("{projectId:int}/equipment")]
@@ -296,6 +467,37 @@ public class ProjectsController : ControllerBase
         return equipmentItems.FirstOrDefault(item => item.ProjectEquipmentItemId == equipmentItemId);
     }
 
+    private async Task<ProjectBoqItemModel?> GetProjectBoqItemOrNullAsync(
+        int projectId,
+        int boqItemId)
+    {
+        var boqItems = await _projectBoqRepository.GetByProjectIdAsync(projectId);
+        return boqItems.FirstOrDefault(item => item.ProjectBoqItemId == boqItemId);
+    }
+
+    private static string? ValidateProjectBoqRequest(
+        string itemDescription,
+        decimal quantity,
+        string unit)
+    {
+        if (string.IsNullOrWhiteSpace(itemDescription))
+        {
+            return "ItemDescription is required.";
+        }
+
+        if (quantity <= 0)
+        {
+            return "Quantity must be greater than zero.";
+        }
+
+        if (string.IsNullOrWhiteSpace(unit))
+        {
+            return "Unit is required.";
+        }
+
+        return null;
+    }
+
     private static string? ValidateProjectEquipmentRequest(string equipmentName, string status)
     {
         if (string.IsNullOrWhiteSpace(equipmentName))
@@ -309,6 +511,22 @@ public class ProjectsController : ControllerBase
         }
 
         return null;
+    }
+
+    private static ProjectBoqItemDto MapProjectBoqItem(ProjectBoqItemModel boqItem)
+    {
+        return new ProjectBoqItemDto
+        {
+            ProjectBoqItemId = boqItem.ProjectBoqItemId,
+            ProjectId = boqItem.ProjectId,
+            SystemName = boqItem.SystemName,
+            ItemDescription = boqItem.ItemDescription,
+            Quantity = boqItem.Quantity,
+            Unit = boqItem.Unit,
+            SortOrder = boqItem.SortOrder,
+            CreatedAt = boqItem.CreatedAt,
+            UpdatedAt = boqItem.UpdatedAt
+        };
     }
 
     private static ProjectEquipmentItemDto MapProjectEquipmentItem(
