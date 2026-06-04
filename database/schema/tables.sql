@@ -1655,3 +1655,87 @@ ALTER TABLE [dbo].[Rec_WorkItemRequiredSkills]  WITH CHECK ADD  CONSTRAINT [CK_R
 GO
 ALTER TABLE [dbo].[Rec_WorkItemRequiredSkills] CHECK CONSTRAINT [CK_Rec_WorkItemRequiredSkills_RequiredLevel]
 GO
+/****** Object:  Table [dbo].[Quotes]    Script Date: 04/06/2026 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [dbo].[Quotes](
+	[QuoteId] [int] IDENTITY(1,1) NOT NULL,
+	[QuoteNumber] [nvarchar](50) NOT NULL,
+	[CustomerId] [int] NOT NULL,
+	[ProjectId] [int] NULL,
+	[QuoteDate] [date] NOT NULL,
+	[ValidUntil] [date] NULL,
+	[Status] [nvarchar](50) NOT NULL CONSTRAINT [DF_Quotes_Status] DEFAULT (N'Draft'),
+	[Notes] [nvarchar](1000) NULL,
+	[VatRate] [decimal](5, 2) NOT NULL CONSTRAINT [DF_Quotes_VatRate] DEFAULT ((17.00)),
+	[Subtotal] [decimal](18, 2) NOT NULL CONSTRAINT [DF_Quotes_Subtotal] DEFAULT ((0)),
+	[VatAmount] [decimal](18, 2) NOT NULL CONSTRAINT [DF_Quotes_VatAmount] DEFAULT ((0)),
+	[Total] [decimal](18, 2) NOT NULL CONSTRAINT [DF_Quotes_Total] DEFAULT ((0)),
+	[IsActive] [bit] NOT NULL CONSTRAINT [DF_Quotes_IsActive] DEFAULT ((1)),
+	[CreatedAt] [datetime2](7) NOT NULL CONSTRAINT [DF_Quotes_CreatedAt] DEFAULT (sysutcdatetime()),
+	[CreatedByUserId] [int] NULL,
+	[UpdatedAt] [datetime2](7) NULL,
+	[UpdatedByUserId] [int] NULL,
+	[DeletedAt] [datetime2](7) NULL,
+ CONSTRAINT [PK_Quotes] PRIMARY KEY CLUSTERED
+(
+	[QuoteId] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY],
+ CONSTRAINT [CK_Quotes_QuoteNumber_NotBlank] CHECK ((len(ltrim(rtrim([QuoteNumber])))>(0))),
+ CONSTRAINT [CK_Quotes_Status_Allowed] CHECK (([Status]=N'Draft' OR [Status]=N'Sent' OR [Status]=N'Tracking' OR [Status]=N'Approved' OR [Status]=N'Rejected')),
+ CONSTRAINT [CK_Quotes_VatRate_NonNegative] CHECK (([VatRate]>=(0)))
+) ON [PRIMARY]
+GO
+/****** Object:  Table [dbo].[QuoteLineItems]    Script Date: 04/06/2026 ******/
+SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+CREATE TABLE [dbo].[QuoteLineItems](
+	[QuoteLineItemId] [int] IDENTITY(1,1) NOT NULL,
+	[QuoteId] [int] NOT NULL,
+	[Description] [nvarchar](500) NOT NULL,
+	[Quantity] [decimal](18, 2) NOT NULL,
+	[Unit] [nvarchar](50) NOT NULL,
+	[UnitPrice] [decimal](18, 2) NOT NULL,
+	[LineTotal] [decimal](18, 2) NOT NULL CONSTRAINT [DF_QuoteLineItems_LineTotal] DEFAULT ((0)),
+	[SortOrder] [int] NOT NULL CONSTRAINT [DF_QuoteLineItems_SortOrder] DEFAULT ((1)),
+	[CreatedAt] [datetime2](7) NOT NULL CONSTRAINT [DF_QuoteLineItems_CreatedAt] DEFAULT (sysutcdatetime()),
+	[UpdatedAt] [datetime2](7) NULL,
+ CONSTRAINT [PK_QuoteLineItems] PRIMARY KEY CLUSTERED
+(
+	[QuoteLineItemId] ASC
+)WITH (PAD_INDEX = OFF, STATISTICS_NORECOMPUTE = OFF, IGNORE_DUP_KEY = OFF, ALLOW_ROW_LOCKS = ON, ALLOW_PAGE_LOCKS = ON) ON [PRIMARY],
+ CONSTRAINT [CK_QuoteLineItems_Description_NotBlank] CHECK ((len(ltrim(rtrim([Description])))>(0))),
+ CONSTRAINT [CK_QuoteLineItems_Unit_NotBlank] CHECK ((len(ltrim(rtrim([Unit])))>(0))),
+ CONSTRAINT [CK_QuoteLineItems_Quantity_NonNegative] CHECK (([Quantity]>=(0))),
+ CONSTRAINT [CK_QuoteLineItems_UnitPrice_NonNegative] CHECK (([UnitPrice]>=(0)))
+) ON [PRIMARY]
+GO
+ALTER TABLE [dbo].[Quotes]  WITH CHECK ADD  CONSTRAINT [FK_Quotes_Customers] FOREIGN KEY([CustomerId])
+REFERENCES [dbo].[Customers] ([CustomerId])
+GO
+ALTER TABLE [dbo].[Quotes] CHECK CONSTRAINT [FK_Quotes_Customers]
+GO
+ALTER TABLE [dbo].[Quotes]  WITH CHECK ADD  CONSTRAINT [FK_Quotes_WorkItems] FOREIGN KEY([ProjectId])
+REFERENCES [dbo].[WorkItems] ([WorkItemId])
+GO
+ALTER TABLE [dbo].[Quotes] CHECK CONSTRAINT [FK_Quotes_WorkItems]
+GO
+ALTER TABLE [dbo].[Quotes]  WITH CHECK ADD  CONSTRAINT [FK_Quotes_CreatedByUser] FOREIGN KEY([CreatedByUserId])
+REFERENCES [dbo].[Users] ([UserId])
+GO
+ALTER TABLE [dbo].[Quotes] CHECK CONSTRAINT [FK_Quotes_CreatedByUser]
+GO
+ALTER TABLE [dbo].[Quotes]  WITH CHECK ADD  CONSTRAINT [FK_Quotes_UpdatedByUser] FOREIGN KEY([UpdatedByUserId])
+REFERENCES [dbo].[Users] ([UserId])
+GO
+ALTER TABLE [dbo].[Quotes] CHECK CONSTRAINT [FK_Quotes_UpdatedByUser]
+GO
+ALTER TABLE [dbo].[QuoteLineItems]  WITH CHECK ADD  CONSTRAINT [FK_QuoteLineItems_Quotes] FOREIGN KEY([QuoteId])
+REFERENCES [dbo].[Quotes] ([QuoteId])
+GO
+ALTER TABLE [dbo].[QuoteLineItems] CHECK CONSTRAINT [FK_QuoteLineItems_Quotes]
+GO
