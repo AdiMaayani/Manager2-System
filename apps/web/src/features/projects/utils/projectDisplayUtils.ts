@@ -1,5 +1,5 @@
 import type {
-  ProjectBoqRow,
+  ProjectBoqItem,
   ProjectDrawing,
   ProjectEquipmentItem,
   ProjectLifecycle,
@@ -357,10 +357,33 @@ export function overviewFormFromLifecycle(
   };
 }
 
-export const DEFAULT_BOQ_ROWS: ProjectBoqRow[] = [
-  { id: 'boq-1', system: 'חשמל', item: 'לוח חשמל 24 מודול', quantity: '1', unit: 'יח׳' },
-  { id: 'boq-2', system: 'חשמל', item: 'כבל 3x2.5', quantity: '120', unit: 'מ׳' },
-  { id: 'boq-3', item: 'שקעים כפולים', quantity: '24', unit: 'יח׳' },
+export const DEFAULT_BOQ_ROWS: ProjectBoqItem[] = [
+  {
+    projectBoqItemId: -1,
+    projectId: 0,
+    systemName: 'חשמל',
+    itemDescription: 'לוח חשמל 24 מודול',
+    quantity: 1,
+    unit: 'יח׳',
+    sortOrder: 1,
+  },
+  {
+    projectBoqItemId: -2,
+    projectId: 0,
+    systemName: 'חשמל',
+    itemDescription: 'כבל 3x2.5',
+    quantity: 120,
+    unit: 'מ׳',
+    sortOrder: 2,
+  },
+  {
+    projectBoqItemId: -3,
+    projectId: 0,
+    itemDescription: 'שקעים כפולים',
+    quantity: 24,
+    unit: 'יח׳',
+    sortOrder: 3,
+  },
 ];
 
 export const DEFAULT_DRAWINGS: ProjectDrawing[] = [

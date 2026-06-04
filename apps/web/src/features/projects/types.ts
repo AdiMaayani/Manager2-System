@@ -213,12 +213,41 @@ export interface CreateSiteRequest {
   notes?: string;
 }
 
-export interface ProjectBoqRow {
-  id: string;
-  system?: string;
-  item: string;
-  quantity: string;
+export interface ProjectBoqItem {
+  projectBoqItemId: number;
+  projectId: number;
+  systemName?: string;
+  itemDescription: string;
+  quantity: number;
   unit: string;
+  sortOrder: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateProjectBoqItemRequest {
+  systemName?: string;
+  itemDescription: string;
+  quantity: number;
+  unit: string;
+  sortOrder?: number;
+}
+
+export interface UpdateProjectBoqItemRequest {
+  systemName?: string;
+  itemDescription: string;
+  quantity: number;
+  unit: string;
+  sortOrder: number;
+}
+
+export interface ReorderProjectBoqItemRequest {
+  projectBoqItemId: number;
+  sortOrder: number;
+}
+
+export interface ReorderProjectBoqRequest {
+  items: ReorderProjectBoqItemRequest[];
 }
 
 export interface ProjectDrawing {
