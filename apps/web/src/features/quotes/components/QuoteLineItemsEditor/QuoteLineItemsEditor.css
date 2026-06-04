@@ -1,0 +1,107 @@
+.quoteLineItemsEditor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.quoteLineItemsEditor__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+}
+
+.quoteLineItemsEditor__title {
+  font-size: var(--font-size-md);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-900);
+  margin: 0;
+}
+
+.quoteLineItemsEditor__empty {
+  color: var(--color-neutral-500);
+  font-size: var(--font-size-sm);
+  background: var(--color-neutral-50);
+  border: 1px dashed var(--color-neutral-300);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-md);
+  text-align: center;
+}
+
+.quoteLineItemsEditor__tableWrap {
+  overflow-x: auto;
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-md);
+}
+
+.quoteLineItemsEditor__table {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 640px;
+}
+
+.quoteLineItemsEditor__table th,
+.quoteLineItemsEditor__table td {
+  padding: var(--spacing-sm);
+  border-bottom: 1px solid var(--color-neutral-200);
+  text-align: right;
+  font-size: var(--font-size-sm);
+  vertical-align: middle;
+}
+
+.quoteLineItemsEditor__table th {
+  color: var(--color-neutral-600);
+  font-weight: var(--font-weight-semibold);
+  background: var(--color-neutral-50);
+}
+
+.quoteLineItemsEditor__descCol {
+  width: 40%;
+}
+
+.quoteLineItemsEditor__input {
+  width: 100%;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-neutral-300);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-900);
+  direction: rtl;
+  font-family: inherit;
+}
+
+.quoteLineItemsEditor__input:focus {
+  outline: none;
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 2px var(--color-primary-100);
+}
+
+.quoteLineItemsEditor__input--num {
+  text-align: left;
+  direction: ltr;
+  max-width: 120px;
+}
+
+.quoteLineItemsEditor__input--unit {
+  max-width: 110px;
+}
+
+.quoteLineItemsEditor__lineTotal {
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
+.quoteLineItemsEditor__remove {
+  border: none;
+  background: transparent;
+  color: var(--color-danger-600);
+  font-size: var(--font-size-lg);
+  line-height: 1;
+  cursor: pointer;
+  padding: 0 var(--spacing-sm);
+}
+
+.quoteLineItemsEditor__remove:hover {
+  color: var(--color-danger-700);
+}

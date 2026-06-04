@@ -1,19 +1,81 @@
-import { ComingSoonPanel } from '@shared/components/ComingSoonPanel';
+import { useNavigate } from 'react-router-dom';
+import { Button } from '@shared/components/Button';
+import { EmptyState } from '@shared/components/EmptyState';
+import { ErrorState } from '@shared/components/ErrorState';
+import { PageSpinner } from '@shared/components/PageSpinner';
+import { QuoteStatusBadge, formatCurrency, formatDate, useQuotes } from '@features/quotes';
 import './ProjectQuoteTab.css';
 
-export function ProjectQuoteTab() {
+interface ProjectQuoteTabProps {
+  projectId: number;
+}
+
+export function ProjectQuoteTab({ projectId }: ProjectQuoteTabProps) {
+  const navigate = useNavigate();
+  const { data: quotes, isLoading, error, refetch } = useQuotes({ projectId });
+
+  function openInQuotesScreen(quoteId?: number) {
+    const params = new URLSearchParams({ projectId: String(projectId) });
+    if (quoteId) {
+      params.set('quoteId', String(quoteId));
+    }
+    navigate(`/quotes?${params.toString()}`);
+  }
+
+  if (isLoading) {
+    return <PageSpinner />;
+  }
+
+  if (error) {
+    return <ErrorState message={error.message} onRetry={() => refetch()} />;
+  }
+
   return (
     <div className="projectQuoteTab">
-      <ComingSoonPanel
-        title="הצעות מחיר לפרויקט"
-        description="מודול הצעות המחיר עדיין לא מחובר למסד הנתונים או ל-API, ולכן הוא מוסתר כיכולת מתוכננת במקום להציג סכומים מדומים."
-        plannedScope={[
-          'ניהול הצעת מחיר ראשית לפי פרויקט',
-          'שורות תמחור, מע״מ וסיכומים',
-          'תצוגת הדפסה או ייצוא לאחר אישור אפיון',
-        ]}
-        note="המשך העבודה דורש החלטת מוצר ועיצוב DB ייעודי."
-      />
+      <div className="projectQuoteTab__header">
+        <h3 className="projectQuoteTab__title">הצעות מחיר לפרויקט</h3>
+        <Button variant="secondary" onClick={() => openInQuotesScreen()}>
+          נהל במסך הצעות מחיר
+        </Button>
+      </div>
+
+      {!quotes || quotes.length === 0 ? (
+        <EmptyState
+          title="אין הצעות מחיר לפרויקט"
+          description="צרו הצעת מחיר חדשה במסך הצעות המחיר ושייכו אותה לפרויקט זה."
+        />
+      ) : (
+        <div className="projectQuoteTab__tableWrap">
+          <table className="projectQuoteTab__table">
+            <thead>
+              <tr>
+                <th>מספר</th>
+                <th>תאריך</th>
+                <th>סטטוס</th>
+                <th>סה״כ</th>
+                <th aria-label="פעולות" />
+              </tr>
+            </thead>
+            <tbody>
+              {quotes.map((quote) => (
+                <tr key={quote.quoteId}>
+                  <td className="projectQuoteTab__number">{quote.quoteNumber}</td>
+                  <td>{formatDate(quote.quoteDate)}</td>
+                  <td>
+                    <QuoteStatusBadge status={quote.status} />
+                  </td>
+                  <td className="projectQuoteTab__total">{formatCurrency(quote.total)}</td>
+                  <td>
+                    <Button variant="ghost" onClick={() => openInQuotesScreen(quote.quoteId)}>
+                      פתח
+                    </Button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

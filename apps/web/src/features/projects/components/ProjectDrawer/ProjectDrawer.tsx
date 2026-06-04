@@ -550,7 +550,10 @@ export function ProjectDrawer({
           />
         );
       case 'quote':
-        return <ProjectQuoteTab />;
+        if (isCreateMode || projectId == null) {
+          return <p className="projectDrawer__hint">שמור את הפרויקט לפני ניהול הצעות מחיר.</p>;
+        }
+        return <ProjectQuoteTab projectId={projectId} />;
       case 'boq':
         if (isCreateMode) {
           return <p className="projectDrawer__hint">שמור את הפרויקט לפני הוספת כתב כמויות.</p>;
