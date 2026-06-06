@@ -15,6 +15,9 @@ namespace ManageR2.Infrastructure.Repositories
         Task<int> CreateAsync(WorkItem workItem);
         Task<int> CreateMilestoneAsync(WorkItem workItem);
 
+        // Get-or-create the reserved internal/office work context (customer, site, container project).
+        Task<InternalWorkContext> GetInternalWorkContextAsync();
+
         Task<bool> UpdateAsync(int id, WorkItem workItem);
         Task<bool> UpdateMilestoneAsync(int milestoneId, WorkItem workItem);
 

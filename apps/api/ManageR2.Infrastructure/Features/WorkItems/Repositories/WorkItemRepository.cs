@@ -153,6 +153,31 @@ public class WorkItemRepository : IWorkItemRepository
         return await CreateAsync(workItem);
     }
 
+    public async Task<InternalWorkContext> GetInternalWorkContextAsync()
+    {
+        // Idempotent get-or-create handled entirely by the stored procedure.
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand("sp_WorkItems_GetInternalContext", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+
+        await connection.OpenAsync();
+        await using var reader = await command.ExecuteReaderAsync();
+
+        if (await reader.ReadAsync())
+        {
+            return new InternalWorkContext
+            {
+                CustomerId = Convert.ToInt32(reader["CustomerId"]),
+                SiteId = Convert.ToInt32(reader["SiteId"]),
+                ContainerProjectId = Convert.ToInt32(reader["ContainerProjectId"])
+            };
+        }
+
+        throw new InvalidOperationException("Failed to resolve the internal work context.");
+    }
+
     public async Task<bool> UpdateAsync(int id, WorkItem workItem)
     {
         // Updates editable work item fields through stored procedure.

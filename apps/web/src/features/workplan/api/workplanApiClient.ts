@@ -3,6 +3,7 @@ import { mapAllWorkPlansResponse, mapEmployeeResponse, mapWorkPlanResponse } fro
 import type {
   AssignEmployeeRequest,
   CreateTaskRequest,
+  InternalWorkContext,
   MappedWorkPlan,
   SmartAssignmentRequest,
   SmartAssignmentResponse,
@@ -49,6 +50,10 @@ export async function getSmartAssignmentRecommendationsAsync(
     method: 'POST',
     body: JSON.stringify(request),
   });
+}
+
+export async function getInternalWorkContextAsync(): Promise<InternalWorkContext> {
+  return apiRequest<InternalWorkContext>('/WorkItems/internal-context');
 }
 
 export async function createWorkItemAsync(

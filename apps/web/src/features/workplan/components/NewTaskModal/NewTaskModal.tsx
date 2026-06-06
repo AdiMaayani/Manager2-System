@@ -1,15 +1,29 @@
 import { useEffect, useMemo, useState } from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Drawer } from '@shared/components/Drawer';
 import { Button } from '@shared/components/Button';
 import { Input } from '@shared/components/Input';
 import { PageSpinner } from '@shared/components/PageSpinner';
 import { isLocalDataMode } from '@/config/appConfig';
-import { assignEmployeeToWorkItemAsync, createWorkItemAsync } from '../../api/workplanApiClient';
+import {
+  assignEmployeeToWorkItemAsync,
+  createWorkItemAsync,
+  getInternalWorkContextAsync,
+} from '../../api/workplanApiClient';
 import { fetchSmartAssignmentAsync } from '../../hooks/useWorkPlanData';
 import { WORKPLAN_PRIORITY_OPTIONS, WORKPLAN_STATUS_OPTIONS } from '../../constants';
-import type { SmartAssignmentResponse, WorkPlanEmployee, WorkPlanProjectFilter } from '../../types';
+import type {
+  NewTaskKind,
+  SmartAssignmentResponse,
+  WorkPlanEmployee,
+  WorkPlanProjectFilter,
+} from '../../types';
 import './NewTaskModal.css';
+
+const TASK_KIND_OPTIONS: Array<{ id: NewTaskKind; label: string }> = [
+  { id: 'project', label: 'משימת פרויקט' },
+  { id: 'internal', label: 'משימה פנימית / משרדית' },
+];
 
 interface ProjectOption {
   id: number;
@@ -123,6 +137,7 @@ export function NewTaskModal({
   const queryClient = useQueryClient();
   const [isMaximized, setIsMaximized] = useState(false);
   const [step, setStep] = useState<NewTaskStep>('details');
+  const [taskKind, setTaskKind] = useState<NewTaskKind>('project');
   const [selectedProjectId, setSelectedProjectId] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -141,11 +156,28 @@ export function NewTaskModal({
   const [error, setError] = useState<string | null>(null);
   const isTaskPersistenceAvailable = isLocalDataMode;
   const taskPersistenceMessage = 'יצירת משימות זמינה רק בחיבור לשרת אמיתי.';
+  const isInternalTask = taskKind === 'internal';
+
+  const internalContextQuery = useQuery({
+    queryKey: ['workplan', 'internal-context'],
+    queryFn: getInternalWorkContextAsync,
+    enabled: isOpen && isTaskPersistenceAvailable,
+    staleTime: Infinity,
+  });
+  const internalContext = internalContextQuery.data ?? null;
 
   const parentId = useMemo(() => {
+    if (isInternalTask) {
+      return internalContext?.containerProjectId ?? null;
+    }
     const parsed = Number(selectedProjectId);
     return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
-  }, [selectedProjectId]);
+  }, [internalContext, isInternalTask, selectedProjectId]);
+
+  const selectableProjectOptions = useMemo(
+    () => projectOptions.filter((project) => project.id !== internalContext?.containerProjectId),
+    [internalContext, projectOptions],
+  );
 
   const assignableEmployees = useMemo(
     () =>
@@ -165,6 +197,7 @@ export function NewTaskModal({
   function resetForm() {
     setIsMaximized(false);
     setStep('details');
+    setTaskKind('project');
     setTitle('');
     setDescription('');
     setPlannedDate('');
@@ -183,7 +216,13 @@ export function NewTaskModal({
   }
 
   function validateDetails() {
-    if (!parentId) throw new Error('יש לבחור פרויקט לפני יצירת משימה');
+    if (!parentId) {
+      throw new Error(
+        isInternalTask
+          ? 'הקשר המשימה הפנימית עדיין נטען. נסה שוב בעוד רגע.'
+          : 'יש לבחור פרויקט לפני יצירת משימה',
+      );
+    }
     if (!title.trim()) throw new Error('יש להזין כותרת משימה');
     validatePlannedTimeRange(plannedDate, plannedStart, plannedEnd);
   }
@@ -244,7 +283,7 @@ export function NewTaskModal({
         title: title.trim(),
         description: description.trim() || undefined,
         status,
-        billingType: 'Hourly',
+        billingType: isInternalTask ? 'Internal' : 'Hourly',
         parentWorkItemId: parentId,
         plannedStart: plannedTimeRange.plannedStart,
         plannedEnd: plannedTimeRange.plannedEnd,
@@ -345,27 +384,65 @@ export function NewTaskModal({
           {step === 'details' && (
             <section className="newTaskModal__section">
               <h3 className="newTaskModal__sectionTitle">פרטי משימה</h3>
-              <label className="newTaskModal__field">
-                <span>פרויקט</span>
-                <select
-                  className="newTaskModal__select"
-                  value={selectedProjectId}
-                  onChange={(event) => {
-                    setSelectedProjectId(event.target.value);
-                    setSmartResult(null);
-                    setRecommendation(null);
-                    setAcceptedRecommendation(null);
-                  }}
-                  required
-                >
-                  <option value="">בחר פרויקט</option>
-                  {projectOptions.map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {project.title}
-                    </option>
-                  ))}
-                </select>
-              </label>
+
+              <div className="newTaskModal__field">
+                <span>סוג משימה</span>
+                <div className="newTaskModal__kindToggle" role="radiogroup" aria-label="סוג משימה">
+                  {TASK_KIND_OPTIONS.map((option) => {
+                    const isActive = taskKind === option.id;
+                    return (
+                      <button
+                        key={option.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={isActive}
+                        className={`newTaskModal__kindOption ${
+                          isActive ? 'newTaskModal__kindOption--active' : ''
+                        }`}
+                        onClick={() => {
+                          setTaskKind(option.id);
+                          setSmartResult(null);
+                          setRecommendation(null);
+                          setAcceptedRecommendation(null);
+                          setError(null);
+                        }}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {!isInternalTask && (
+                <label className="newTaskModal__field">
+                  <span>פרויקט</span>
+                  <select
+                    className="newTaskModal__select"
+                    value={selectedProjectId}
+                    onChange={(event) => {
+                      setSelectedProjectId(event.target.value);
+                      setSmartResult(null);
+                      setRecommendation(null);
+                      setAcceptedRecommendation(null);
+                    }}
+                    required
+                  >
+                    <option value="">בחר פרויקט</option>
+                    {selectableProjectOptions.map((project) => (
+                      <option key={project.id} value={project.id}>
+                        {project.title}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+
+              {isInternalTask && (
+                <p className="newTaskModal__hint">
+                  משימה פנימית / משרדית נשמרת ללא שיוך לפרויקט לקוח, ומוצגת בתוכנית העבודה תחת קבוצת המשימות הפנימיות.
+                </p>
+              )}
 
               <Input
                 label="כותרת משימה"

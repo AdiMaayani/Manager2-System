@@ -169,6 +169,14 @@ export interface SmartAssignmentResponse {
   }>;
 }
 
+export type NewTaskKind = 'project' | 'internal';
+
+export interface InternalWorkContext {
+  customerId: number;
+  siteId: number;
+  containerProjectId: number;
+}
+
 export interface CreateTaskRequest {
   title: string;
   description?: string;
