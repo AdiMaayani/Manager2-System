@@ -156,6 +156,7 @@ export function ReportsPage() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [isFormMaximized, setIsFormMaximized] = useState(false);
   const [selectedReportId, setSelectedReportId] = useState<number | null>(null);
   const [formMode, setFormMode] = useState<ReportFormMode>('create');
   const [editingReportId, setEditingReportId] = useState<number | null>(null);
@@ -167,6 +168,7 @@ export function ReportsPage() {
   // List filter state
   const [filterSearch, setFilterSearch] = useState('');
   const [filterProjectId, setFilterProjectId] = useState('');
+  const [filterCustomer, setFilterCustomer] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
   const [filterDateFrom, setFilterDateFrom] = useState('');
   const [filterDateTo, setFilterDateTo] = useState('');
@@ -220,6 +222,16 @@ export function ReportsPage() {
     [form.relatedWorkerIds, employees],
   );
 
+  // Distinct customer names present in the loaded reports (client-side filter source)
+  const customerOptions = useMemo(() => {
+    if (!reports) return [];
+    const names = new Set<string>();
+    reports.forEach((r) => {
+      if (r.customerName) names.add(r.customerName);
+    });
+    return Array.from(names).sort((a, b) => a.localeCompare(b, 'he'));
+  }, [reports]);
+
   // Filtered reports list — all filters are client-side, no new API calls
   const filteredReports = useMemo(() => {
     if (!reports) return [];
@@ -238,6 +250,7 @@ export function ReportsPage() {
           projects.find((p) => String(p.workItemId) === filterProjectId)?.title ?? '';
         if (r.projectTitle !== selectedTitle) return false;
       }
+      if (filterCustomer && (r.customerName ?? '') !== filterCustomer) return false;
       if (filterStatus && r.status !== filterStatus) return false;
       if (filterDateFrom && r.reportDate) {
         if (formatReportDate(r.reportDate) < filterDateFrom) return false;
@@ -247,7 +260,16 @@ export function ReportsPage() {
       }
       return true;
     });
-  }, [reports, filterSearch, filterProjectId, filterStatus, filterDateFrom, filterDateTo, projects]);
+  }, [
+    reports,
+    filterSearch,
+    filterProjectId,
+    filterCustomer,
+    filterStatus,
+    filterDateFrom,
+    filterDateTo,
+    projects,
+  ]);
 
   useEffect(() => {
     if (searchParams.get('quick') !== '1') return;
@@ -285,6 +307,7 @@ export function ReportsPage() {
 
   function closeCreateModal() {
     setFormError(null);
+    setIsFormMaximized(false);
     setIsCreateOpen(false);
   }
 
@@ -410,6 +433,7 @@ export function ReportsPage() {
     },
     onSuccess: async () => {
       setIsCreateOpen(false);
+      setIsFormMaximized(false);
       setForm(createInitialFormState());
       setFormMode('create');
       setEditingReportId(null);
@@ -434,68 +458,90 @@ export function ReportsPage() {
 
   return (
     <PageShell title="דיווחים">
-      <div className="reportsPage__toolbar">
-        <Button type="button" onClick={openCreateModal}>
-          דיווח חדש
-        </Button>
-      </div>
-
       {pageMessage && <p className="reportsPage__success">{pageMessage}</p>}
 
       <div className="reportsPage__filterBar">
-        <Input
-          placeholder="חיפוש..."
-          value={filterSearch}
-          onChange={(e) => setFilterSearch(e.target.value)}
-        />
-        <label className="reportsPage__filterField">
-          <span>פרויקט</span>
-          <select
-            className="reportsPage__select"
-            value={filterProjectId}
-            onChange={(e) => setFilterProjectId(e.target.value)}
-          >
-            <option value="">הכל</option>
-            {projects.map((p) => (
-              <option key={p.workItemId} value={String(p.workItemId)}>
-                {p.title}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="reportsPage__filterField">
-          <span>סטטוס</span>
-          <select
-            className="reportsPage__select"
-            value={filterStatus}
-            onChange={(e) => setFilterStatus(e.target.value)}
-          >
-            <option value="">הכל</option>
-            {LIST_STATUS_OPTIONS.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="reportsPage__filterField">
-          <span>מתאריך</span>
-          <input
-            type="date"
-            className="reportsPage__select"
-            value={filterDateFrom}
-            onChange={(e) => setFilterDateFrom(e.target.value)}
-          />
-        </label>
-        <label className="reportsPage__filterField">
-          <span>עד תאריך</span>
-          <input
-            type="date"
-            className="reportsPage__select"
-            value={filterDateTo}
-            onChange={(e) => setFilterDateTo(e.target.value)}
-          />
-        </label>
+        <div className="reportsPage__filters">
+          <label className="reportsPage__filterField reportsPage__filterField--search">
+            <span>חיפוש</span>
+            <input
+              type="search"
+              className="reportsPage__select"
+              placeholder="פרויקט, לקוח, מדווח או מס׳ דיווח"
+              value={filterSearch}
+              onChange={(e) => setFilterSearch(e.target.value)}
+            />
+          </label>
+          <label className="reportsPage__filterField">
+            <span>פרויקט</span>
+            <select
+              className="reportsPage__select"
+              value={filterProjectId}
+              onChange={(e) => setFilterProjectId(e.target.value)}
+            >
+              <option value="">הכל</option>
+              {projects.map((p) => (
+                <option key={p.workItemId} value={String(p.workItemId)}>
+                  {p.title}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="reportsPage__filterField">
+            <span>לקוח</span>
+            <select
+              className="reportsPage__select"
+              value={filterCustomer}
+              onChange={(e) => setFilterCustomer(e.target.value)}
+            >
+              <option value="">הכל</option>
+              {customerOptions.map((name) => (
+                <option key={name} value={name}>
+                  {name}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="reportsPage__filterField">
+            <span>סטטוס</span>
+            <select
+              className="reportsPage__select"
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+            >
+              <option value="">הכל</option>
+              {LIST_STATUS_OPTIONS.map((s) => (
+                <option key={s} value={s}>
+                  {s}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="reportsPage__filterField">
+            <span>מתאריך</span>
+            <input
+              type="date"
+              className="reportsPage__select"
+              value={filterDateFrom}
+              onChange={(e) => setFilterDateFrom(e.target.value)}
+            />
+          </label>
+          <label className="reportsPage__filterField">
+            <span>עד תאריך</span>
+            <input
+              type="date"
+              className="reportsPage__select"
+              value={filterDateTo}
+              onChange={(e) => setFilterDateTo(e.target.value)}
+            />
+          </label>
+        </div>
+
+        <div className="reportsPage__filterActions">
+          <Button type="button" onClick={openCreateModal}>
+            דיווח חדש
+          </Button>
+        </div>
       </div>
 
       {filteredReports.length === 0 ? (
@@ -547,6 +593,8 @@ export function ReportsPage() {
         isOpen={isCreateOpen}
         onClose={closeCreateModal}
         title={formMode === 'edit' ? `עריכת דיווח #${editingReportId}` : 'דיווח חדש'}
+        isMaximized={isFormMaximized}
+        onToggleMaximize={() => setIsFormMaximized((value) => !value)}
       >
         <form
           className="reportsPage__form"
@@ -812,32 +860,33 @@ export function ReportsPage() {
             )}
           </section>
 
-          {formError && <p className="reportsPage__error">{formError}</p>}
-
-          <div className="reportsPage__actions">
-            <Button type="submit" disabled={saveReport.isPending}>
-              {saveReport.isPending
-                ? 'שומר...'
-                : formMode === 'edit'
-                  ? 'שמור שינויים'
-                  : 'שלח דיווח'}
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => saveReport.mutate('טיוטה')}
-              disabled={saveReport.isPending}
-            >
-              שמור טיוטה
-            </Button>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={closeCreateModal}
-              disabled={saveReport.isPending}
-            >
-              ביטול
-            </Button>
+          <div className="reportsPage__formFooter">
+            {formError && <p className="reportsPage__error">{formError}</p>}
+            <div className="reportsPage__actions">
+              <Button type="submit" disabled={saveReport.isPending}>
+                {saveReport.isPending
+                  ? 'שומר...'
+                  : formMode === 'edit'
+                    ? 'שמור שינויים'
+                    : 'שלח דיווח'}
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => saveReport.mutate('טיוטה')}
+                disabled={saveReport.isPending}
+              >
+                שמור טיוטה
+              </Button>
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={closeCreateModal}
+                disabled={saveReport.isPending}
+              >
+                ביטול
+              </Button>
+            </div>
           </div>
         </form>
       </Modal>

@@ -121,6 +121,7 @@ export function NewTaskModal({
   employees,
 }: NewTaskModalProps) {
   const queryClient = useQueryClient();
+  const [isMaximized, setIsMaximized] = useState(false);
   const [step, setStep] = useState<NewTaskStep>('details');
   const [selectedProjectId, setSelectedProjectId] = useState('');
   const [title, setTitle] = useState('');
@@ -162,6 +163,7 @@ export function NewTaskModal({
   }, [defaultProjectId, isOpen, projectFilter]);
 
   function resetForm() {
+    setIsMaximized(false);
     setStep('details');
     setTitle('');
     setDescription('');
@@ -301,8 +303,16 @@ export function NewTaskModal({
     }
   }
 
+  const currentStepIndex = STEPS.findIndex((item) => item.id === step);
+
   return (
-    <Drawer isOpen={isOpen} onClose={handleClose} title="משימה חדשה">
+    <Drawer
+      isOpen={isOpen}
+      onClose={handleClose}
+      title="משימה חדשה"
+      isMaximized={isMaximized}
+      onToggleMaximize={() => setIsMaximized((value) => !value)}
+    >
       <form
         className="newTaskModal"
         onSubmit={(e) => {
@@ -310,262 +320,304 @@ export function NewTaskModal({
           mutation.mutate();
         }}
       >
-        <div className="newTaskModal__steps" aria-label="שלבי יצירת משימה">
-          {STEPS.map((item) => (
-            <span
-              key={item.id}
-              className={`newTaskModal__step ${step === item.id ? 'newTaskModal__step--active' : ''}`}
-              aria-current={step === item.id ? 'step' : undefined}
-            >
-              {item.label}
-            </span>
-          ))}
+        <div className="newTaskModal__header">
+          <ol className="newTaskModal__steps" aria-label="שלבי יצירת משימה">
+            {STEPS.map((item, index) => {
+              const isActive = step === item.id;
+              const isComplete = index < currentStepIndex;
+              return (
+                <li
+                  key={item.id}
+                  className={`newTaskModal__step ${isActive ? 'newTaskModal__step--active' : ''} ${
+                    isComplete ? 'newTaskModal__step--complete' : ''
+                  }`}
+                  aria-current={isActive ? 'step' : undefined}
+                >
+                  <span className="newTaskModal__stepIndex">{index + 1}</span>
+                  <span className="newTaskModal__stepLabel">{item.label}</span>
+                </li>
+              );
+            })}
+          </ol>
         </div>
 
-        {step === 'details' && (
-          <section className="newTaskModal__section">
-            <h3 className="newTaskModal__sectionTitle">פרטי משימה</h3>
-            <label className="newTaskModal__field">
-              <span>פרויקט</span>
-              <select
-                className="newTaskModal__select"
-                value={selectedProjectId}
-                onChange={(event) => {
-                  setSelectedProjectId(event.target.value);
-                  setSmartResult(null);
-                  setRecommendation(null);
-                  setAcceptedRecommendation(null);
-                }}
-                required
-              >
-                <option value="">בחר פרויקט</option>
-                {projectOptions.map((project) => (
-                  <option key={project.id} value={project.id}>
-                    {project.title}
-                  </option>
-                ))}
-              </select>
-            </label>
-
-            <Input
-              label="כותרת משימה"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              required
-            />
-
-            <label className="newTaskModal__field">
-              <span>תיאור</span>
-              <textarea
-                className="newTaskModal__textarea"
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-                rows={3}
-              />
-            </label>
-
-            <div className="newTaskModal__grid">
-              <Input
-                label="תאריך מתוכנן"
-                type="date"
-                value={plannedDate}
-                onChange={(event) => setPlannedDate(event.target.value)}
-                required
-              />
-              <Input
-                label="שעת התחלה"
-                type="time"
-                value={plannedStart}
-                onChange={(event) => setPlannedStart(event.target.value)}
-                required
-              />
-              <Input
-                label="שעת סיום"
-                type="time"
-                value={plannedEnd}
-                onChange={(event) => setPlannedEnd(event.target.value)}
-                required
-              />
-              <Input
-                label="הערכת שעות"
-                type="number"
-                min="0"
-                step="0.5"
-                value={estimatedHours}
-                onChange={(event) => setEstimatedHours(event.target.value)}
-              />
-            </div>
-
-            <div className="newTaskModal__grid">
+        <div className="newTaskModal__body">
+          {step === 'details' && (
+            <section className="newTaskModal__section">
+              <h3 className="newTaskModal__sectionTitle">פרטי משימה</h3>
               <label className="newTaskModal__field">
-                <span>סטטוס</span>
+                <span>פרויקט</span>
                 <select
                   className="newTaskModal__select"
-                  value={status}
-                  onChange={(event) => setStatus(event.target.value)}
-                >
-                  {WORKPLAN_STATUS_OPTIONS.map((option) => (
-                    <option key={option.code} value={option.code}>
-                      {option.display}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="newTaskModal__field">
-                <span>דחיפות</span>
-                <select
-                  className="newTaskModal__select"
-                  value={priority}
-                  onChange={(event) => setPriority(event.target.value)}
-                >
-                  {WORKPLAN_PRIORITY_OPTIONS.map((option) => (
-                    <option key={option.code} value={option.code}>
-                      {option.display}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="newTaskModal__field">
-                <span>תפקיד נדרש</span>
-                <select
-                  className="newTaskModal__select"
-                  value={requiredRole}
-                  onChange={(event) => setRequiredRole(event.target.value)}
-                >
-                  <option value="">בחר תפקיד</option>
-                  {ROLE_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-          </section>
-        )}
-
-        {step === 'assignment' && (
-          <section className="newTaskModal__section">
-            <h3 className="newTaskModal__sectionTitle">שיוך עובד</h3>
-            <label className="newTaskModal__field">
-              <span>עובד משויך</span>
-              <select
-                className="newTaskModal__select"
-                value={employeeId}
-                onChange={(event) => {
-                  setEmployeeId(event.target.value);
-                  if (acceptedRecommendation?.employeeId !== Number(event.target.value)) {
+                  value={selectedProjectId}
+                  onChange={(event) => {
+                    setSelectedProjectId(event.target.value);
+                    setSmartResult(null);
+                    setRecommendation(null);
                     setAcceptedRecommendation(null);
-                  }
-                }}
-              >
-                <option value="">בחר עובד</option>
-                {assignableEmployees.map((employee) => (
-                  <option key={employee.employeeId} value={employee.employeeId}>
-                    {employee.fullName} {employee.primaryRole ? `· ${employee.primaryRole}` : ''}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <p className="newTaskModal__hint">
-              ניתן לבחור עובד ידנית או להמשיך לשלב ההמלצה כדי לקבל שיבוץ חכם.
-            </p>
-          </section>
-        )}
+                  }}
+                  required
+                >
+                  <option value="">בחר פרויקט</option>
+                  {projectOptions.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.title}
+                    </option>
+                  ))}
+                </select>
+              </label>
 
-        {step === 'recommendation' && (
-          <section className="newTaskModal__section">
-            <h3 className="newTaskModal__sectionTitle">המלצת שיבוץ חכם</h3>
-            {!smartResult && !isSmartLoading && (
-              <p className="newTaskModal__hint">
-                ההמלצה תיבנה לפי משימות הפרויקט, עומסי העובדים והכללים הקיימים.
-              </p>
-            )}
+              <Input
+                label="כותרת משימה"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                required
+              />
 
-            {isSmartLoading && <PageSpinner />}
+              <label className="newTaskModal__field">
+                <span>תיאור</span>
+                <textarea
+                  className="newTaskModal__textarea"
+                  value={description}
+                  onChange={(event) => setDescription(event.target.value)}
+                  rows={3}
+                />
+              </label>
 
-            {smartResult && (
-              <div className="newTaskModal__smartSummary">
-                <strong>{smartResult.summary.message}</strong>
-                <span>משימות: {smartResult.summary.totalTasks}</span>
-                <span>המלצות: {smartResult.summary.tasksWithRecommendations}</span>
-                <span>אזהרות: {smartResult.summary.warningsCount}</span>
+              <div className="newTaskModal__grid">
+                <Input
+                  label="תאריך מתוכנן"
+                  type="date"
+                  value={plannedDate}
+                  onChange={(event) => setPlannedDate(event.target.value)}
+                  required
+                />
+                <Input
+                  label="שעת התחלה"
+                  type="time"
+                  value={plannedStart}
+                  onChange={(event) => setPlannedStart(event.target.value)}
+                  required
+                />
+                <Input
+                  label="שעת סיום"
+                  type="time"
+                  value={plannedEnd}
+                  onChange={(event) => setPlannedEnd(event.target.value)}
+                  required
+                />
+                <Input
+                  label="הערכת שעות"
+                  type="number"
+                  min="0"
+                  step="0.5"
+                  value={estimatedHours}
+                  onChange={(event) => setEstimatedHours(event.target.value)}
+                />
               </div>
-            )}
 
-            {recommendation && (
-              <div className="newTaskModal__recommendation">
-                <div>
-                  <span className="newTaskModal__recommendationLabel">עובד מומלץ</span>
-                  <strong>{recommendation.employeeName}</strong>
-                  <span>ציון: {formatRecommendationScore(recommendation.score)}</span>
-                </div>
-
-                {recommendation.reasons.length > 0 && (
-                  <ul>
-                    {recommendation.reasons.map((reason) => (
-                      <li key={reason}>{reason}</li>
+              <div className="newTaskModal__grid">
+                <label className="newTaskModal__field">
+                  <span>סטטוס</span>
+                  <select
+                    className="newTaskModal__select"
+                    value={status}
+                    onChange={(event) => setStatus(event.target.value)}
+                  >
+                    {WORKPLAN_STATUS_OPTIONS.map((option) => (
+                      <option key={option.code} value={option.code}>
+                        {option.display}
+                      </option>
                     ))}
-                  </ul>
-                )}
+                  </select>
+                </label>
+                <label className="newTaskModal__field">
+                  <span>דחיפות</span>
+                  <select
+                    className="newTaskModal__select"
+                    value={priority}
+                    onChange={(event) => setPriority(event.target.value)}
+                  >
+                    {WORKPLAN_PRIORITY_OPTIONS.map((option) => (
+                      <option key={option.code} value={option.code}>
+                        {option.display}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label className="newTaskModal__field">
+                  <span>תפקיד נדרש</span>
+                  <select
+                    className="newTaskModal__select"
+                    value={requiredRole}
+                    onChange={(event) => setRequiredRole(event.target.value)}
+                  >
+                    <option value="">בחר תפקיד</option>
+                    {ROLE_OPTIONS.map((option) => (
+                      <option key={option} value={option}>
+                        {option}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            </section>
+          )}
 
-                {recommendation.warnings.length > 0 && (
-                  <p className="newTaskModal__hint">{recommendation.warnings.join(' · ')}</p>
-                )}
+          {step === 'assignment' && (
+            <section className="newTaskModal__section">
+              <h3 className="newTaskModal__sectionTitle">שיוך עובד</h3>
+              <label className="newTaskModal__field">
+                <span>עובד משויך</span>
+                <select
+                  className="newTaskModal__select"
+                  value={employeeId}
+                  onChange={(event) => {
+                    setEmployeeId(event.target.value);
+                    if (acceptedRecommendation?.employeeId !== Number(event.target.value)) {
+                      setAcceptedRecommendation(null);
+                    }
+                  }}
+                >
+                  <option value="">בחר עובד</option>
+                  {assignableEmployees.map((employee) => (
+                    <option key={employee.employeeId} value={employee.employeeId}>
+                      {employee.fullName} {employee.primaryRole ? `· ${employee.primaryRole}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <p className="newTaskModal__hint">
+                ניתן לבחור עובד ידנית, או להמשיך לשלב הבא לקבלת המלצת שיבוץ חכם אוטומטית.
+              </p>
+            </section>
+          )}
 
+          {step === 'recommendation' && (
+            <section className="newTaskModal__section">
+              <div className="newTaskModal__smartHead">
+                <h3 className="newTaskModal__sectionTitle">שיבוץ חכם</h3>
+                <p className="newTaskModal__hint">
+                  ההמלצה נבנית לפי משימות הפרויקט, עומסי העובדים והכללים הקיימים.
+                </p>
+              </div>
+
+              {isSmartLoading && (
+                <div className="newTaskModal__smartLoading">
+                  <PageSpinner />
+                </div>
+              )}
+
+              {!isSmartLoading && smartResult && (
+                <div className="newTaskModal__smartSummary">
+                  <strong className="newTaskModal__smartMessage">
+                    {smartResult.summary.message}
+                  </strong>
+                  <div className="newTaskModal__smartStats">
+                    <span className="newTaskModal__stat">
+                      <strong>{smartResult.summary.totalTasks}</strong> משימות
+                    </span>
+                    <span className="newTaskModal__stat">
+                      <strong>{smartResult.summary.tasksWithRecommendations}</strong> המלצות
+                    </span>
+                    <span className="newTaskModal__stat">
+                      <strong>{smartResult.summary.warningsCount}</strong> אזהרות
+                    </span>
+                  </div>
+                </div>
+              )}
+
+              {!isSmartLoading && recommendation && (
+                <div className="newTaskModal__recommendation">
+                  <div className="newTaskModal__recommendationHead">
+                    <div className="newTaskModal__recommendationWho">
+                      <span className="newTaskModal__recommendationLabel">עובד מומלץ</span>
+                      <strong className="newTaskModal__recommendationName">
+                        {recommendation.employeeName}
+                      </strong>
+                    </div>
+                    {recommendation.score != null && (
+                      <span className="newTaskModal__score">
+                        {formatRecommendationScore(recommendation.score)}
+                      </span>
+                    )}
+                  </div>
+
+                  {recommendation.reasons.length > 0 && (
+                    <ul className="newTaskModal__reasons">
+                      {recommendation.reasons.map((reason) => (
+                        <li key={reason}>{reason}</li>
+                      ))}
+                    </ul>
+                  )}
+
+                  {recommendation.warnings.length > 0 && (
+                    <p className="newTaskModal__warning">{recommendation.warnings.join(' · ')}</p>
+                  )}
+
+                  <Button
+                    type="button"
+                    variant={acceptedRecommendation ? 'secondary' : 'primary'}
+                    onClick={handleAcceptRecommendation}
+                  >
+                    {acceptedRecommendation ? 'ההמלצה התקבלה' : 'קבל המלצה'}
+                  </Button>
+                </div>
+              )}
+
+              <div className="newTaskModal__smartRun">
                 <Button
                   type="button"
-                  variant={acceptedRecommendation ? 'secondary' : 'primary'}
-                  onClick={handleAcceptRecommendation}
+                  variant="secondary"
+                  onClick={handleRunSmartRecommendation}
+                  disabled={isSmartLoading}
                 >
-                  {acceptedRecommendation ? 'ההמלצה התקבלה' : 'קבל המלצה'}
+                  {smartResult ? 'הרץ המלצה מחדש' : 'הרץ שיבוץ חכם'}
                 </Button>
               </div>
+            </section>
+          )}
+        </div>
+
+        <div className="newTaskModal__footer">
+          {error && <p className="newTaskModal__error">{error}</p>}
+          {!isTaskPersistenceAvailable && (
+            <p className="newTaskModal__hint">{taskPersistenceMessage}</p>
+          )}
+
+          <div className="newTaskModal__actions">
+            {step !== 'details' && (
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={() => setStep(step === 'recommendation' ? 'assignment' : 'details')}
+              >
+                חזור
+              </Button>
             )}
-
-            <Button type="button" variant="secondary" onClick={handleRunSmartRecommendation} disabled={isSmartLoading}>
-              {smartResult ? 'הרץ המלצה מחדש' : 'הרץ שיבוץ חכם'}
+            {step === 'details' && (
+              <Button type="button" onClick={handleContinueFromDetails}>
+                המשך
+              </Button>
+            )}
+            {step === 'assignment' && (
+              <Button type="button" onClick={handleContinueFromAssignment} disabled={isSmartLoading}>
+                {isSmartLoading ? 'מריץ שיבוץ...' : 'המשך לשיבוץ חכם'}
+              </Button>
+            )}
+            {step === 'recommendation' && (
+              <Button
+                type="submit"
+                disabled={mutation.isPending || isSmartLoading || !isTaskPersistenceAvailable}
+                title={!isTaskPersistenceAvailable ? taskPersistenceMessage : undefined}
+              >
+                {mutation.isPending ? 'שומר...' : 'שמור משימה'}
+              </Button>
+            )}
+            <Button type="button" variant="secondary" onClick={handleClose}>
+              ביטול
             </Button>
-          </section>
-        )}
-
-        {error && <p className="newTaskModal__error">{error}</p>}
-        {!isTaskPersistenceAvailable && (
-          <p className="newTaskModal__hint">{taskPersistenceMessage}</p>
-        )}
-
-        <div className="newTaskModal__actions">
-          {step !== 'details' && (
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={() => setStep(step === 'recommendation' ? 'assignment' : 'details')}
-            >
-              חזור
-            </Button>
-          )}
-          {step === 'details' && (
-            <Button type="button" onClick={handleContinueFromDetails}>
-              המשך
-            </Button>
-          )}
-          {step === 'assignment' && (
-            <Button type="button" onClick={handleContinueFromAssignment} disabled={isSmartLoading}>
-              {isSmartLoading ? 'מריץ שיבוץ...' : 'המשך'}
-            </Button>
-          )}
-          {step === 'recommendation' && (
-            <Button
-              type="submit"
-              disabled={mutation.isPending || isSmartLoading || !isTaskPersistenceAvailable}
-              title={!isTaskPersistenceAvailable ? taskPersistenceMessage : undefined}
-            >
-              {mutation.isPending ? 'שומר...' : 'שמור משימה'}
-            </Button>
-          )}
-          <Button type="button" variant="secondary" onClick={handleClose}>
-            ביטול
-          </Button>
+          </div>
         </div>
       </form>
     </Drawer>

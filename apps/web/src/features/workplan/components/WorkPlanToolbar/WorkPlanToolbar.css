@@ -1,49 +1,65 @@
 .workPlanToolbar {
-  padding: var(--spacing-lg);
-  margin-bottom: var(--spacing-md);
-}
-
-.workPlanToolbar__layout {
-  display: flex;
-  flex-direction: row-reverse;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: var(--spacing-md);
-  margin-bottom: var(--spacing-md);
-}
-
-.workPlanToolbar__left,
-.workPlanToolbar__right {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
+  gap: var(--spacing-md);
+  padding: var(--spacing-lg);
 }
 
-.workPlanToolbar__left {
-  flex-direction: row;
-  flex-wrap: wrap;
-}
-
-.workPlanToolbar__tabsRow {
+.workPlanToolbar__main {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--spacing-lg);
+}
+
+.workPlanToolbar__selectors {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
   gap: var(--spacing-md);
 }
 
-.workPlanToolbar__conditional {
+.workPlanToolbar__actions {
   display: flex;
+  align-items: flex-start;
+}
+
+.workPlanToolbar__group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-xs);
+}
+
+.workPlanToolbar__groupLabel {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-500);
+}
+
+.workPlanToolbar__scopeRow {
+  display: flex;
+  flex-wrap: wrap;
   align-items: center;
+  gap: var(--spacing-sm);
 }
 
 .workPlanToolbar__select {
   min-width: 200px;
-  height: 40px;
+  height: 38px;
   padding: var(--spacing-xs) var(--spacing-md);
   border: 1px solid var(--color-neutral-300);
   border-radius: var(--radius-md);
   background: #fff;
   font-size: var(--font-size-sm);
+  color: var(--color-neutral-900);
+}
+
+.workPlanToolbar__select:focus {
+  outline: none;
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 3px var(--color-primary-100);
 }
 
 .workPlanToolbar__segment {
@@ -60,31 +76,36 @@
   padding: var(--spacing-xs) var(--spacing-md);
   border-radius: var(--radius-full);
   font-size: var(--font-size-sm);
-  color: var(--color-neutral-700);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-neutral-600);
   background: transparent;
   border: 1px solid transparent;
   cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.workPlanToolbar__segBtn:hover:not(.workPlanToolbar__segBtn--active) {
+  background: #fff;
+  color: var(--color-neutral-900);
 }
 
 .workPlanToolbar__segBtn--active {
   background-color: var(--color-primary-600);
   color: #fff;
-}
-
-.workPlanToolbar__filtersRow {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--spacing-md);
+  font-weight: var(--font-weight-semibold);
+  box-shadow: var(--shadow-sm);
 }
 
 .workPlanToolbar__legend {
   display: flex;
   flex-wrap: wrap;
+  align-items: center;
   gap: var(--spacing-md);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--color-neutral-100);
   font-size: var(--font-size-xs);
-  color: var(--color-neutral-600);
+  color: var(--color-neutral-500);
 }
 
 .workPlanToolbar__legendItem {
@@ -94,9 +115,9 @@
 }
 
 .workPlanToolbar__chip {
-  width: 12px;
-  height: 12px;
-  border-radius: 3px;
+  width: 10px;
+  height: 10px;
+  border-radius: var(--radius-sm);
   display: inline-block;
 }
 
@@ -110,4 +131,19 @@
 
 .workPlanToolbar__chip--warning {
   background: var(--color-warning-500, #f59e0b);
+}
+
+@media (max-width: 640px) {
+  .workPlanToolbar__main {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .workPlanToolbar__actions {
+    justify-content: stretch;
+  }
+
+  .workPlanToolbar__select {
+    min-width: 100%;
+  }
 }

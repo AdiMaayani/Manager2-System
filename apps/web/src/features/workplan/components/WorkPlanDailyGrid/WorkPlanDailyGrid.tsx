@@ -1,5 +1,5 @@
 import { getWorkPlanStatusDisplay, HOUR_LABELS } from '../../constants';
-import { hourSpanToWidth, hourToPercent } from '../../lib/workPlanScheduling';
+import { formatHourAsTime, hourSpanToWidth, hourToPercent } from '../../lib/workPlanScheduling';
 import type { ScheduledTaskBar } from '../../types';
 import './WorkPlanDailyGrid.css';
 
@@ -22,6 +22,39 @@ interface WorkPlanDailyGridProps {
   selectedTaskId?: number | null;
 }
 
+const LANE_HEIGHT = 56;
+const LANE_GAP = 6;
+const TRACK_PADDING = 10;
+
+interface PositionedTask {
+  task: ScheduledTaskBar;
+  lane: number;
+}
+
+/**
+ * Assigns each task to a vertical lane so that tasks overlapping in time never
+ * sit on top of each other. Pure layout — does not alter scheduling values.
+ */
+function assignLanes(tasks: ScheduledTaskBar[]): { positioned: PositionedTask[]; laneCount: number } {
+  const sorted = [...tasks].sort(
+    (left, right) => left.startHour - right.startHour || left.endHour - right.endHour,
+  );
+  const laneEndHours: number[] = [];
+
+  const positioned = sorted.map((task) => {
+    let lane = laneEndHours.findIndex((endHour) => endHour <= task.startHour);
+    if (lane === -1) {
+      lane = laneEndHours.length;
+      laneEndHours.push(task.endHour);
+    } else {
+      laneEndHours[lane] = task.endHour;
+    }
+    return { task, lane };
+  });
+
+  return { positioned, laneCount: Math.max(1, laneEndHours.length) };
+}
+
 function taskClassName(task: ScheduledTaskBar): string {
   const classes = ['workPlanDailyGrid__task'];
   if (task.isLocked) classes.push('workPlanDailyGrid__task--locked');
@@ -31,12 +64,25 @@ function taskClassName(task: ScheduledTaskBar): string {
   return classes.join(' ');
 }
 
+function buildTaskTooltip(task: ScheduledTaskBar): string {
+  return [
+    task.title,
+    `${task.projectTitle} · ${getWorkPlanStatusDisplay(task.status)}`,
+    task.assigneeName && task.assigneeName !== '—' ? `מבצע: ${task.assigneeName}` : null,
+    `שעות: ${formatHourAsTime(task.startHour)}–${formatHourAsTime(task.endHour)}`,
+  ]
+    .filter(Boolean)
+    .join('\n');
+}
+
 function TaskBar({
   task,
+  lane,
   onSelect,
   isSelected,
 }: {
   task: ScheduledTaskBar;
+  lane: number;
   onSelect: (task: ScheduledTaskBar) => void;
   isSelected: boolean;
 }) {
@@ -47,13 +93,16 @@ function TaskBar({
       style={{
         insetInlineStart: `${hourToPercent(task.startHour)}%`,
         width: `${hourSpanToWidth(task.startHour, task.endHour)}%`,
+        top: `${TRACK_PADDING + lane * (LANE_HEIGHT + LANE_GAP)}px`,
+        height: `${LANE_HEIGHT}px`,
       }}
       onClick={() => onSelect(task)}
       aria-pressed={isSelected}
+      title={buildTaskTooltip(task)}
     >
       <span className="workPlanDailyGrid__taskName">{task.title}</span>
       <span className="workPlanDailyGrid__taskMeta">
-        {task.projectTitle} · {getWorkPlanStatusDisplay(task.status)}
+        {formatHourAsTime(task.startHour)}–{formatHourAsTime(task.endHour)} · {getWorkPlanStatusDisplay(task.status)}
       </span>
       {(task.violationCount > 0 || task.warningCount > 0 || task.suggestionCount > 0) && (
         <span className="workPlanDailyGrid__taskIndicators" aria-hidden>
@@ -105,24 +154,34 @@ export function WorkPlanDailyGrid({
         {rows.length === 0 ? (
           <div className="workPlanDailyGrid__empty">אין משימות להצגה בטווח הנבחר</div>
         ) : (
-          rows.map((row) => (
-            <div key={row.key} className="workPlanDailyGrid__row">
-              <div className="workPlanDailyGrid__stickyCol">
-                <div className="workPlanDailyGrid__rowTitle">{row.title}</div>
-                <div className="workPlanDailyGrid__rowSubtitle">{row.subtitle}</div>
+          rows.map((row) => {
+            const { positioned, laneCount } = assignLanes(row.tasks);
+            const trackMinHeight =
+              laneCount * LANE_HEIGHT + (laneCount - 1) * LANE_GAP + TRACK_PADDING * 2;
+
+            return (
+              <div key={row.key} className="workPlanDailyGrid__row">
+                <div className="workPlanDailyGrid__stickyCol">
+                  <div className="workPlanDailyGrid__rowTitle">{row.title}</div>
+                  <div className="workPlanDailyGrid__rowSubtitle">{row.subtitle}</div>
+                  {row.tasks.length > 0 && (
+                    <div className="workPlanDailyGrid__rowCount">{row.tasks.length} משימות</div>
+                  )}
+                </div>
+                <div className="workPlanDailyGrid__track" style={{ minHeight: `${trackMinHeight}px` }}>
+                  {positioned.map(({ task, lane }) => (
+                    <TaskBar
+                      key={task.taskId}
+                      task={task}
+                      lane={lane}
+                      onSelect={onTaskSelect}
+                      isSelected={selectedTaskId === task.taskId}
+                    />
+                  ))}
+                </div>
               </div>
-              <div className="workPlanDailyGrid__track">
-                {row.tasks.map((task) => (
-                  <TaskBar
-                    key={task.taskId}
-                    task={task}
-                    onSelect={onTaskSelect}
-                    isSelected={selectedTaskId === task.taskId}
-                  />
-                ))}
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>

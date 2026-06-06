@@ -48,6 +48,7 @@ export interface MappedWorkPlan {
     id: number;
     workItemId: number;
     title: string;
+    description?: string | null;
     status: string;
     estimatedHours?: number | null;
     priority?: string | null;
@@ -81,6 +82,7 @@ export interface ResolvedAssignment {
 export interface ScheduledTaskBar {
   taskId: number;
   title: string;
+  description?: string | null;
   status: string;
   projectId: number;
   projectTitle: string;
@@ -104,6 +106,7 @@ export interface ScheduledTaskBar {
 export interface WorkPlanTaskSelection {
   taskId: number;
   title: string;
+  description?: string | null;
   status: string;
   projectId: number;
   projectTitle: string;

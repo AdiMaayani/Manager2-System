@@ -1,11 +1,23 @@
 import { useMemo } from 'react';
-import { matchesWorkPlanStatusFilter, WEEKDAY_LABELS } from '../../constants';
+import {
+  getWorkPlanStatusDisplay,
+  isWorkPlanStatusDone,
+  isWorkPlanStatusInProgress,
+  matchesWorkPlanStatusFilter,
+  WEEKDAY_LABELS,
+} from '../../constants';
 import type { MappedWorkPlan, WorkPlanTaskSelection } from '../../types';
 import {
   buildWorkPlanTaskSelection,
   resolveAssignment,
 } from '../../lib/workPlanScheduling';
 import './WorkPlanWeeklyView.css';
+
+function weeklyTaskStatusClass(status?: string | null): string {
+  if (isWorkPlanStatusDone(status)) return 'workPlanWeeklyView__task--done';
+  if (isWorkPlanStatusInProgress(status)) return 'workPlanWeeklyView__task--progress';
+  return 'workPlanWeeklyView__task--planned';
+}
 
 interface WorkPlanWeeklyViewProps {
   workPlans: MappedWorkPlan[];
@@ -87,16 +99,24 @@ export function WorkPlanWeeklyView({
               <div className="workPlanWeeklyView__name">{row.assignee}</div>
               {row.days.map((tasks, dayIndex) => (
                 <div key={`${row.assignee}-${dayIndex}`} className="workPlanWeeklyView__cell">
-                  {tasks.map((task) => (
-                    <button
-                      key={task.taskId}
-                      type="button"
-                      className="workPlanWeeklyView__task"
-                      onClick={() => onTaskClick?.(task)}
-                    >
-                      {task.title}
-                    </button>
-                  ))}
+                  {tasks.length === 0 ? (
+                    <span className="workPlanWeeklyView__cellEmpty" aria-hidden>
+                      ·
+                    </span>
+                  ) : (
+                    tasks.map((task) => (
+                      <button
+                        key={task.taskId}
+                        type="button"
+                        className={`workPlanWeeklyView__task ${weeklyTaskStatusClass(task.status)}`}
+                        onClick={() => onTaskClick?.(task)}
+                        title={`${task.title} · ${getWorkPlanStatusDisplay(task.status)}`}
+                      >
+                        <span className="workPlanWeeklyView__taskDot" aria-hidden />
+                        <span className="workPlanWeeklyView__taskText">{task.title}</span>
+                      </button>
+                    ))
+                  )}
                 </div>
               ))}
             </div>
