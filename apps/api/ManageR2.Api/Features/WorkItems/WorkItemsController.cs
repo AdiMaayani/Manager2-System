@@ -240,6 +240,20 @@ public class WorkItemsController : ControllerBase
         return Ok(response);
     }
 
+    [HttpGet("internal-context")]
+    // Resolves the reserved internal/office context so the WorkPlan can create non-project tasks.
+    public async Task<ActionResult<InternalWorkContextResponseDto>> GetInternalContext()
+    {
+        var context = await _workItemRepository.GetInternalWorkContextAsync();
+
+        return Ok(new InternalWorkContextResponseDto
+        {
+            CustomerId = context.CustomerId,
+            SiteId = context.SiteId,
+            ContainerProjectId = context.ContainerProjectId
+        });
+    }
+
     [HttpGet("{id}/milestones")]
     // Returns milestone details and assignment participants for one project.
     public async Task<ActionResult<List<ProjectMilestoneDto>>> GetProjectMilestones(int id)
