@@ -192,6 +192,42 @@ export function getProjectStatusMeta(statusCode?: string | null): StatusOption {
   return match;
 }
 
+type BadgeVariant = StatusOption['badgeVariant'];
+
+// Backend lifecycle summary returns English indicators; map to Hebrew for display only.
+const PROJECT_RISK_META: Record<string, { display: string; badgeVariant: BadgeVariant }> = {
+  high: { display: 'גבוה', badgeVariant: 'danger' },
+  medium: { display: 'בינוני', badgeVariant: 'warning' },
+  low: { display: 'נמוך', badgeVariant: 'success' },
+};
+
+const PROJECT_HEALTH_META: Record<string, { display: string; badgeVariant: BadgeVariant }> = {
+  'on track': { display: 'במסלול', badgeVariant: 'success' },
+  completed: { display: 'הושלם', badgeVariant: 'primary' },
+  'at risk': { display: 'בסיכון', badgeVariant: 'warning' },
+  'data issue': { display: 'בעיית נתונים', badgeVariant: 'danger' },
+};
+
+export function getProjectRiskMeta(riskLevel?: string | null): {
+  display: string;
+  badgeVariant: BadgeVariant;
+} {
+  const key = String(riskLevel ?? '').trim().toLowerCase();
+  if (!key) return { display: '-', badgeVariant: 'neutral' };
+  return PROJECT_RISK_META[key] ?? { display: String(riskLevel).trim(), badgeVariant: 'neutral' };
+}
+
+export function getProjectHealthMeta(healthStatus?: string | null): {
+  display: string;
+  badgeVariant: BadgeVariant;
+} {
+  const key = String(healthStatus ?? '').trim().toLowerCase();
+  if (!key) return { display: '-', badgeVariant: 'neutral' };
+  return (
+    PROJECT_HEALTH_META[key] ?? { display: String(healthStatus).trim(), badgeVariant: 'neutral' }
+  );
+}
+
 export function getBillingTypeDisplay(billingTypeCode?: string | null): string {
   if (!billingTypeCode) return '-';
 
@@ -329,6 +365,7 @@ export function createEmptyOverviewForm(): ProjectOverviewForm {
     billingType: 'Fixed',
     customerId: 0,
     siteId: 0,
+    createdAt: '',
     dealCloseDate: '',
     financeProjectNumber: '',
     invoiceNumber: '',
@@ -350,6 +387,7 @@ export function overviewFormFromLifecycle(
     billingType: project.billingType ?? 'Fixed',
     customerId: project.customerId,
     siteId: project.siteId ?? 0,
+    createdAt: toDateInputValue(project.createdAt),
     dealCloseDate: toDateInputValue(project.dealCloseDate),
     financeProjectNumber: project.financeProjectNumber ?? '',
     invoiceNumber: project.invoiceNumber ?? '',

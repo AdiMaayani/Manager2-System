@@ -91,6 +91,7 @@ interface ProjectDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   onSaved: (projectId: number) => void;
+  onActiveTabChange?: (tabId: ProjectDrawerTabId) => void;
 }
 
 export function ProjectDrawer({
@@ -100,6 +101,7 @@ export function ProjectDrawer({
   isOpen,
   onClose,
   onSaved,
+  onActiveTabChange,
 }: ProjectDrawerProps) {
   const isCreateMode = mode === 'create';
   const [activeTab, setActiveTab] = useState<ProjectDrawerTabId>(initialTab);
@@ -118,6 +120,7 @@ export function ProjectDrawer({
   });
   const [saveError, setSaveError] = useState<string | null>(null);
   const isEditModeRef = useRef(isEditMode);
+  const lastResetKeyRef = useRef<string | null>(null);
 
   const lifecycleQuery = useProjectLifecycle(
     isCreateMode ? null : projectId,
@@ -146,7 +149,15 @@ export function ProjectDrawer({
   }, [isEditMode]);
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      lastResetKeyRef.current = null;
+      return;
+    }
+
+    const resetKey = `${isCreateMode ? 'create' : 'view'}:${projectId ?? 'new'}`;
+    if (lastResetKeyRef.current === resetKey) return;
+    lastResetKeyRef.current = resetKey;
+
     let isCancelled = false;
 
     const nextTab = DRAWER_TABS.some((tab) => tab.id === initialTab)
@@ -173,6 +184,12 @@ export function ProjectDrawer({
       isCancelled = true;
     };
   }, [isOpen, isCreateMode, initialTab, projectId]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    if (!DRAWER_TABS.some((tab) => tab.id === initialTab)) return;
+    setActiveTab(initialTab);
+  }, [initialTab, isOpen]);
 
   useEffect(() => {
     if (lifecycleQuery.data && !isCreateMode && !isEditModeRef.current) {
@@ -423,7 +440,7 @@ export function ProjectDrawer({
           status: overviewForm.status,
           customerId: overviewForm.customerId,
           siteId: overviewForm.siteId,
-          createdAt: lifecycle.project.createdAt,
+          createdAt: overviewForm.createdAt || lifecycle.project.createdAt,
           closedAt: lifecycle.project.closedAt ?? null,
           parentWorkItemId: null,
           dealCloseDate: overviewForm.dealCloseDate || null,
@@ -454,40 +471,46 @@ export function ProjectDrawer({
     updateProject,
   ]);
 
+  const isSavingProject =
+    createProject.isPending || updateProject.isPending || assignProjectTeam.isPending;
+
   const headerActions = useMemo(() => (
     <div className="projectDrawer__headerActions">
-      {isEditMode && (
+      {isCreateMode && (
+        <span className="projectDrawer__editIndicator">מצב יצירה</span>
+      )}
+      {isEditMode && !isCreateMode && (
         <span className="projectDrawer__editIndicator">מצב עריכה</span>
       )}
       {!isEditMode && !isCreateMode && (
         <Button type="button" variant="secondary" onClick={() => setIsEditMode(true)}>
-          ערוך
+          ערוך פרטים
         </Button>
       )}
-      {isEditMode && (
-        <>
-          <Button
-            type="button"
-            onClick={handleSaveProject}
-            disabled={createProject.isPending || updateProject.isPending || assignProjectTeam.isPending}
-          >
-            שמור
-          </Button>
+    </div>
+  ), [isCreateMode, isEditMode]);
+
+  const footerActions = useMemo(() => {
+    if (!isEditMode) return null;
+
+    return (
+      <>
+        <span className="projectDrawer__footerHint">
+          {isCreateMode
+            ? 'מלא את פרטי הפרויקט ולחץ שמירה ליצירתו.'
+            : 'שינויים בפרטי הפרויקט יישמרו בלחיצה על שמירה.'}
+        </span>
+        <div className="projectDrawer__footerButtons">
           <Button type="button" variant="ghost" onClick={handleCancelEdit}>
             ביטול
           </Button>
-        </>
-      )}
-    </div>
-  ), [
-    assignProjectTeam.isPending,
-    createProject.isPending,
-    handleCancelEdit,
-    handleSaveProject,
-    isCreateMode,
-    isEditMode,
-    updateProject.isPending,
-  ]);
+          <Button type="button" onClick={handleSaveProject} disabled={isSavingProject}>
+            {isSavingProject ? 'שומר…' : isCreateMode ? 'צור פרויקט' : 'שמור שינויים'}
+          </Button>
+        </div>
+      </>
+    );
+  }, [handleCancelEdit, handleSaveProject, isCreateMode, isEditMode, isSavingProject]);
 
   const renderTabContent = () => {
     if (!isCreateMode && lifecycleQuery.isLoading) {
@@ -522,6 +545,14 @@ export function ProjectDrawer({
               employees={lookups.employees}
               onChange={setOverviewForm}
               onTeamChange={setTeamForm}
+              onCustomerCreated={async (customerId) => {
+                await refetchLookups();
+                setOverviewForm((current) => ({
+                  ...current,
+                  customerId,
+                  siteId: 0,
+                }));
+              }}
               onCreateSite={handleCreateProjectSite}
               onUpdateSite={handleUpdateProjectSite}
               onDeactivateSite={handleDeactivateProjectSite}
@@ -665,13 +696,18 @@ export function ProjectDrawer({
       onClose={onClose}
       title={title}
       headerActions={headerActions}
+      footer={footerActions}
       isMaximized={isMaximized}
       onToggleMaximize={() => setIsMaximized((value) => !value)}
     >
       <Tabs
         tabs={DRAWER_TABS}
         activeTabId={activeTab}
-        onTabChange={(tabId) => setActiveTab(tabId as ProjectDrawerTabId)}
+        onTabChange={(tabId) => {
+          const nextTabId = tabId as ProjectDrawerTabId;
+          setActiveTab(nextTabId);
+          onActiveTabChange?.(nextTabId);
+        }}
       >
         {renderTabContent()}
       </Tabs>

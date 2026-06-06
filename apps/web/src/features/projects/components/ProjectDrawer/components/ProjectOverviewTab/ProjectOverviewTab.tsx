@@ -1,7 +1,7 @@
 import { memo, useCallback, useMemo, useState } from 'react';
 import { Button } from '@shared/components/Button';
 import { Input } from '@shared/components/Input';
-import type { Customer } from '@features/customers/types';
+import { CustomerDrawer, type Customer } from '@features/customers';
 import type {
   ProjectEmployeeOption,
   ProjectLifecycle,
@@ -31,6 +31,7 @@ interface ProjectOverviewTabProps {
   employees: ProjectEmployeeOption[];
   onChange: (form: ProjectOverviewForm) => void;
   onTeamChange: (form: ProjectTeamForm) => void;
+  onCustomerCreated: (customerId: number) => Promise<void>;
   onCreateSite: (payload: {
     customerId: number;
     siteName: string;
@@ -64,12 +65,14 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
   employees,
   onChange,
   onTeamChange,
+  onCustomerCreated,
   onCreateSite,
   onUpdateSite,
   onDeactivateSite,
 }: ProjectOverviewTabProps) {
   const [showSiteForm, setShowSiteForm] = useState(false);
   const [showEditSiteForm, setShowEditSiteForm] = useState(false);
+  const [showCustomerDrawer, setShowCustomerDrawer] = useState(false);
   const [newSiteName, setNewSiteName] = useState('');
   const [newSiteCity, setNewSiteCity] = useState('');
   const [newSiteAddress, setNewSiteAddress] = useState('');
@@ -90,6 +93,10 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
   const selectedSite = useMemo(
     () => filteredSites.find((site) => site.siteId === form.siteId) ?? null,
     [filteredSites, form.siteId],
+  );
+  const selectedCustomer = useMemo(
+    () => customers.find((customer) => customer.customerId === form.customerId) ?? null,
+    [customers, form.customerId],
   );
   const aggregatedTeam = useMemo(
     () => aggregateProjectTeamFromLifecycle(lifecycle),
@@ -267,6 +274,14 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
     });
   }, [onTeamChange, teamForm]);
 
+  const handleCustomerSaved = useCallback(
+    async (customer: Customer) => {
+      await onCustomerCreated(customer.customerId);
+      setShowCustomerDrawer(false);
+    },
+    [onCustomerCreated],
+  );
+
   const handleAddTeamMember = useCallback(() => {
     const employeeId = Number(employeeToAddId);
     if (!Number.isInteger(employeeId) || employeeId <= 0) return;
@@ -311,25 +326,44 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
             )}
           </div>
           <div className="projectOverviewTab__field">
-            <span className="projectOverviewTab__label">שם הלקוח</span>
+            <span className="projectOverviewTab__label">
+              שם הלקוח <span className="projectOverviewTab__required">*</span>
+            </span>
             {isEditMode ? (
-              <select
-                className="projectOverviewTab__select"
-                value={form.customerId || ''}
-                onChange={(event) => {
-                  const customerId = Number(event.target.value);
-                  onChange({ ...form, customerId, siteId: 0 });
-                }}
-              >
-                <option value="">בחר לקוח</option>
-                {customers.map((customer) => (
-                  <option key={customer.customerId} value={customer.customerId}>
-                    {customer.customerName}
-                  </option>
-                ))}
-              </select>
+              <div className="projectOverviewTab__fieldWithAction">
+                <select
+                  className="projectOverviewTab__select"
+                  value={form.customerId || ''}
+                  onChange={(event) => {
+                    const customerId = Number(event.target.value);
+                    onChange({ ...form, customerId, siteId: 0 });
+                    setShowSiteForm(false);
+                    setShowEditSiteForm(false);
+                  }}
+                  required
+                >
+                  <option value="">בחר לקוח קיים</option>
+                  {customers.map((customer) => (
+                    <option key={customer.customerId} value={customer.customerId}>
+                      {customer.customerName}
+                    </option>
+                  ))}
+                </select>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => setShowCustomerDrawer(true)}
+                >
+                  לקוח חדש
+                </Button>
+              </div>
             ) : (
               <span>{project?.customerName || '-'}</span>
+            )}
+            {isEditMode && selectedCustomer && (
+              <span className="projectOverviewTab__fieldNote">
+                נבחר: {selectedCustomer.customerName}
+              </span>
             )}
           </div>
           <div className="projectOverviewTab__field">
@@ -374,7 +408,15 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
           <h3 className="projectOverviewTab__cardTitle">תאריכים</h3>
           <div className="projectOverviewTab__field">
             <span className="projectOverviewTab__label">תאריך פתיחה</span>
-            <span>{formatProjectDate(project?.createdAt)}</span>
+            {isEditMode && !isCreateMode ? (
+              <Input
+                type="date"
+                value={form.createdAt}
+                onChange={(event) => updateField('createdAt', event.target.value)}
+              />
+            ) : (
+              <span>{isCreateMode ? 'ייקבע בעת יצירה' : formatProjectDate(project?.createdAt)}</span>
+            )}
           </div>
           <div className="projectOverviewTab__field">
             <span className="projectOverviewTab__label">תאריך סגירת העסקה</span>
@@ -423,7 +465,32 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
         </section>
 
         <section className="projectOverviewTab__card">
-          <h3 className="projectOverviewTab__cardTitle">אתר ותיאור</h3>
+          <div className="projectOverviewTab__cardHeader">
+            <h3 className="projectOverviewTab__cardTitle">אתר ותיאור</h3>
+            {isEditMode && (
+              <div className="projectOverviewTab__cardActions">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => {
+                    setShowEditSiteForm(false);
+                    setShowSiteForm((value) => !value);
+                  }}
+                  disabled={!form.customerId}
+                >
+                  {showSiteForm ? 'ביטול הוספת אתר' : 'הוסף אתר'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={openEditSiteForm}
+                  disabled={!selectedSite}
+                >
+                  ערוך אתר נבחר
+                </Button>
+              </div>
+            )}
+          </div>
           <div className="projectOverviewTab__field">
             <span className="projectOverviewTab__label">אתר</span>
             {isEditMode ? (
@@ -436,43 +503,43 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
                   <option value="">בחר אתר</option>
                   {filteredSites.map((site) => (
                     <option key={site.siteId} value={site.siteId}>
-                      {site.siteName}
+                      {[site.siteName, site.city, site.addressLine].filter(Boolean).join(' · ')}
                     </option>
                   ))}
                 </select>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => {
-                    setShowEditSiteForm(false);
-                    setShowSiteForm((value) => !value);
-                  }}
-                >
-                  {showSiteForm ? 'ביטול הוספת אתר' : 'הוסף אתר'}
-                </Button>
-                <div className="projectOverviewTab__siteActions">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={openEditSiteForm}
-                    disabled={!selectedSite}
-                  >
-                    ערוך אתר
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={handleDeactivateSite}
-                    disabled={!selectedSite}
-                  >
-                    השבת אתר
-                  </Button>
-                </div>
+                {filteredSites.length > 0 ? (
+                  <span className="projectOverviewTab__fieldNote">
+                    נמצאו {filteredSites.length} אתרים ללקוח זה. בחר אתר מהרשימה.
+                  </span>
+                ) : (
+                  <span className="projectOverviewTab__fieldNote">
+                    אין עדיין אתרים ללקוח הנבחר.
+                  </span>
+                )}
               </>
             ) : (
               <span>{project?.siteName || '-'}</span>
             )}
           </div>
+          {selectedSite && (
+            <div className="projectOverviewTab__sitePreview">
+              <strong>{selectedSite.siteName}</strong>
+              <span>
+                {[selectedSite.city, selectedSite.addressLine].filter(Boolean).join(' · ') || 'ללא כתובת'}
+              </span>
+              {selectedSite.notes && <span>{selectedSite.notes}</span>}
+              {isEditMode && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  onClick={handleDeactivateSite}
+                  disabled={!selectedSite}
+                >
+                  השבת אתר
+                </Button>
+              )}
+            </div>
+          )}
           {isEditMode && siteError && !showSiteForm && !showEditSiteForm && (
             <p className="projectOverviewTab__siteError">{siteError}</p>
           )}
@@ -656,6 +723,11 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
           )}
         </section>
       </div>
+      <CustomerDrawer
+        isOpen={showCustomerDrawer}
+        onClose={() => setShowCustomerDrawer(false)}
+        onSaved={handleCustomerSaved}
+      />
     </div>
   );
 });

@@ -321,6 +321,7 @@ export interface ProjectOverviewForm {
   billingType: string;
   customerId: number;
   siteId: number;
+  createdAt: string;
   dealCloseDate: string;
   financeProjectNumber: string;
   invoiceNumber: string;

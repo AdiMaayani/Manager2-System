@@ -1,4 +1,4 @@
-import { useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '@shared/components/Button';
 import { EmptyState } from '@shared/components/EmptyState';
 import { ErrorState } from '@shared/components/ErrorState';
@@ -12,10 +12,12 @@ interface ProjectQuoteTabProps {
 
 export function ProjectQuoteTab({ projectId }: ProjectQuoteTabProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { data: quotes, isLoading, error, refetch } = useQuotes({ projectId });
 
   function openInQuotesScreen(quoteId?: number) {
     const params = new URLSearchParams({ projectId: String(projectId) });
+    params.set('returnTo', `${location.pathname}${location.search}`);
     if (quoteId) {
       params.set('quoteId', String(quoteId));
     }

@@ -8,15 +8,40 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md);
-  padding: var(--spacing-md);
+  padding: var(--spacing-lg);
   border: 1px solid var(--color-neutral-200);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-lg);
   background: #fff;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+}
+
+.projectOverviewTab__cardHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  padding-bottom: var(--spacing-sm);
+  border-bottom: 1px solid var(--color-neutral-200);
 }
 
 .projectOverviewTab__cardTitle {
+  margin: 0;
   font-size: var(--font-size-base);
   font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-800);
+}
+
+.projectOverviewTab__card > .projectOverviewTab__cardTitle {
+  padding-bottom: var(--spacing-sm);
+  border-bottom: 1px solid var(--color-neutral-200);
+}
+
+.projectOverviewTab__cardActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
 }
 
 .projectOverviewTab__field {
@@ -26,8 +51,34 @@
 }
 
 .projectOverviewTab__label {
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
   color: var(--color-neutral-500);
+}
+
+.projectOverviewTab__required {
+  color: var(--color-danger-600);
+}
+
+/* View-mode values (any non-label span inside a field) */
+.projectOverviewTab__field > span:not(.projectOverviewTab__label) {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-neutral-900);
+  word-break: break-word;
+}
+
+.projectOverviewTab__fieldWithAction {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--spacing-sm);
+  align-items: center;
+}
+
+.projectOverviewTab__fieldNote {
+  font-size: var(--font-size-xs) !important;
+  font-weight: var(--font-weight-normal) !important;
+  color: var(--color-neutral-500) !important;
 }
 
 .projectOverviewTab__select,
@@ -36,8 +87,29 @@
   padding: var(--spacing-sm) var(--spacing-md);
   border: 1px solid var(--color-neutral-300);
   border-radius: var(--radius-md);
-  font-size: var(--font-size-sm);
+  font-size: var(--font-size-base);
   background: #fff;
+  font-family: inherit;
+}
+
+.projectOverviewTab__select:focus,
+.projectOverviewTab__textarea:focus {
+  outline: none;
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 3px var(--color-primary-100);
+}
+
+.projectOverviewTab__textarea {
+  resize: vertical;
+  min-height: 96px;
+}
+
+.projectOverviewTab__field .inputField {
+  width: 100%;
+}
+
+.projectOverviewTab__field .inputField__input {
+  font-size: var(--font-size-base);
 }
 
 .projectOverviewTab__card--wide {
@@ -67,7 +139,7 @@
   display: inline-flex;
   align-items: center;
   gap: var(--spacing-sm);
-  padding: var(--spacing-xs) var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-sm) var(--spacing-xs) var(--spacing-md);
   border: 1px solid var(--color-primary-200);
   border-radius: var(--radius-full);
   background: var(--color-primary-50);
@@ -84,6 +156,10 @@
   padding: 0;
 }
 
+.projectOverviewTab__teamChipRemove:hover {
+  text-decoration: underline;
+}
+
 .projectOverviewTab__hint {
   margin: 0;
   font-size: var(--font-size-sm);
@@ -93,7 +169,7 @@
 .projectOverviewTab__siteError {
   margin: 0;
   font-size: var(--font-size-sm);
-  color: var(--color-danger, #dc2626);
+  color: var(--color-danger-600);
 }
 
 .projectOverviewTab__siteForm {
@@ -105,6 +181,23 @@
   background: var(--color-neutral-50);
 }
 
+.projectOverviewTab__sitePreview {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-md);
+  background: var(--color-neutral-50);
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-700);
+}
+
+.projectOverviewTab__sitePreview strong {
+  color: var(--color-neutral-900);
+  font-size: var(--font-size-base);
+}
+
 .projectOverviewTab__siteActions {
   display: flex;
   flex-wrap: wrap;
@@ -112,7 +205,13 @@
 }
 
 @media (max-width: 720px) {
-  .projectOverviewTab__teamAdd {
+  .projectOverviewTab__teamAdd,
+  .projectOverviewTab__fieldWithAction {
     grid-template-columns: 1fr;
+  }
+
+  .projectOverviewTab__cardHeader {
+    align-items: stretch;
+    flex-direction: column;
   }
 }
