@@ -18,6 +18,7 @@ function scheduledToSelection(task: ScheduledTaskBar): WorkPlanTaskSelection {
   return {
     taskId: task.taskId,
     title: task.title,
+    description: task.description ?? null,
     status: task.status,
     projectId: task.projectId,
     projectTitle: task.projectTitle,

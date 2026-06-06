@@ -1,7 +1,17 @@
 import type { MappedWorkPlan, WorkPlanTaskSelection } from '../../types';
-import { getWorkPlanStatusDisplay } from '../../constants';
+import {
+  getWorkPlanStatusDisplay,
+  isWorkPlanStatusDone,
+  isWorkPlanStatusInProgress,
+} from '../../constants';
 import { buildWorkPlanTaskSelection } from '../../lib/workPlanScheduling';
 import './WorkPlanMonthlyView.css';
+
+function monthlyTaskStatusClass(status?: string | null): string {
+  if (isWorkPlanStatusDone(status)) return 'workPlanMonthlyView__taskButton--done';
+  if (isWorkPlanStatusInProgress(status)) return 'workPlanMonthlyView__taskButton--progress';
+  return 'workPlanMonthlyView__taskButton--planned';
+}
 
 interface WorkPlanMonthlyViewProps {
   workPlans: MappedWorkPlan[];
@@ -21,32 +31,44 @@ export function WorkPlanMonthlyView({ workPlans, onTaskClick }: WorkPlanMonthlyV
           workPlans.map((workPlan) => (
             <section key={workPlan.project.id} className="workPlanMonthlyView__project">
               <header className="workPlanMonthlyView__projectHeader">
-                <h4>{workPlan.project.title}</h4>
+                <div className="workPlanMonthlyView__projectTitle">
+                  <h4>{workPlan.project.title}</h4>
+                  <span className="workPlanMonthlyView__count">
+                    {workPlan.tasks.length} משימות
+                  </span>
+                </div>
                 <span className="workPlanMonthlyView__badge">{getWorkPlanStatusDisplay(workPlan.project.status)}</span>
               </header>
-              <ul className="workPlanMonthlyView__tasks">
-                {workPlan.tasks.map((task, taskIndex) => (
-                  <li key={task.workItemId}>
-                    <button
-                      type="button"
-                      className="workPlanMonthlyView__taskButton"
-                      onClick={() =>
-                        onTaskClick?.(
-                          buildWorkPlanTaskSelection(workPlan, task, taskIndex),
-                        )
-                      }
-                    >
-                      <strong>{task.title}</strong>
-                      <span>{getWorkPlanStatusDisplay(task.status)}</span>
-                      {task.plannedStart && (
-                        <span className="workPlanMonthlyView__date">
-                          {new Date(task.plannedStart).toLocaleDateString('he-IL')}
+              {workPlan.tasks.length === 0 ? (
+                <p className="workPlanMonthlyView__noTasks">אין משימות בפרויקט זה</p>
+              ) : (
+                <ul className="workPlanMonthlyView__tasks">
+                  {workPlan.tasks.map((task, taskIndex) => (
+                    <li key={task.workItemId}>
+                      <button
+                        type="button"
+                        className={`workPlanMonthlyView__taskButton ${monthlyTaskStatusClass(task.status)}`}
+                        onClick={() =>
+                          onTaskClick?.(
+                            buildWorkPlanTaskSelection(workPlan, task, taskIndex),
+                          )
+                        }
+                        title={`${task.title} · ${getWorkPlanStatusDisplay(task.status)}`}
+                      >
+                        <strong className="workPlanMonthlyView__taskTitle">{task.title}</strong>
+                        <span className="workPlanMonthlyView__taskStatus">
+                          {getWorkPlanStatusDisplay(task.status)}
                         </span>
-                      )}
-                    </button>
-                  </li>
-                ))}
-              </ul>
+                        {task.plannedStart && (
+                          <span className="workPlanMonthlyView__date">
+                            {new Date(task.plannedStart).toLocaleDateString('he-IL')}
+                          </span>
+                        )}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </section>
           ))
         )}

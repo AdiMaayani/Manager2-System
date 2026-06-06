@@ -91,6 +91,7 @@ export function buildWorkPlanTaskSelection(
   return {
     taskId: task.workItemId,
     title: task.title,
+    description: task.description ?? null,
     status: task.status,
     projectId: workPlan.project.id,
     projectTitle: workPlan.project.title,
@@ -155,6 +156,7 @@ export function buildEmployeeDailyBars(
       return {
         taskId: task.workItemId,
         title: task.title,
+        description: task.description ?? null,
         status: task.status,
         projectId: task.parentWorkItemId ?? workPlan.project.id,
         projectTitle: workPlan.project.title,
@@ -199,6 +201,7 @@ export function buildProjectDailyBars(
           return {
             taskId: task.workItemId,
             title: task.title,
+            description: task.description ?? null,
             status: task.status,
             projectId: workPlan.project.id,
             projectTitle: workPlan.project.title,

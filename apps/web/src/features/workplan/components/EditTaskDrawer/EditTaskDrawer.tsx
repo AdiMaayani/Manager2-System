@@ -163,120 +163,132 @@ export function EditTaskDrawer({
           saveMutation.mutate();
         }}
       >
-        {workItemQuery.isLoading && <PageSpinner />}
-        {workItemQuery.error && (
-          <p className="editTaskDrawer__error">
-            {workItemQuery.error instanceof Error
-              ? workItemQuery.error.message
-              : 'טעינת המשימה נכשלה'}
-          </p>
-        )}
+        <div className="editTaskDrawer__body">
+          {workItemQuery.isLoading && <PageSpinner />}
+          {workItemQuery.error && (
+            <p className="editTaskDrawer__error">
+              {workItemQuery.error instanceof Error
+                ? workItemQuery.error.message
+                : 'טעינת המשימה נכשלה'}
+            </p>
+          )}
 
-        {!workItemQuery.isLoading && !workItemQuery.error && (
-          <>
-            <Input
-              label="כותרת משימה"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              required
-            />
+          {!workItemQuery.isLoading && !workItemQuery.error && (
+            <>
+              <section className="editTaskDrawer__section">
+                <h3 className="editTaskDrawer__sectionTitle">פרטי משימה</h3>
+                <Input
+                  label="כותרת משימה"
+                  value={title}
+                  onChange={(event) => setTitle(event.target.value)}
+                  required
+                />
 
-            <label className="editTaskDrawer__field">
-              <span>תיאור</span>
-              <textarea
-                className="editTaskDrawer__textarea"
-                value={description}
-                onChange={(event) => setDescription(event.target.value)}
-                rows={3}
-              />
-            </label>
+                <label className="editTaskDrawer__field">
+                  <span>תיאור</span>
+                  <textarea
+                    className="editTaskDrawer__textarea"
+                    value={description}
+                    onChange={(event) => setDescription(event.target.value)}
+                    rows={3}
+                  />
+                </label>
+              </section>
 
-            <div className="editTaskDrawer__grid">
-              <Input
-                label="תאריך מתוכנן"
-                type="date"
-                value={plannedDate}
-                onChange={(event) => setPlannedDate(event.target.value)}
-              />
-              <Input
-                label="שעת התחלה"
-                type="time"
-                value={plannedStart}
-                onChange={(event) => setPlannedStart(event.target.value)}
-              />
-              <Input
-                label="שעת סיום"
-                type="time"
-                value={plannedEnd}
-                onChange={(event) => setPlannedEnd(event.target.value)}
-              />
-              <Input
-                label="הערכת שעות"
-                type="number"
-                min="0"
-                step="0.5"
-                value={estimatedHours}
-                onChange={(event) => setEstimatedHours(event.target.value)}
-              />
-            </div>
+              <section className="editTaskDrawer__section">
+                <h3 className="editTaskDrawer__sectionTitle">תזמון</h3>
+                <div className="editTaskDrawer__grid">
+                  <Input
+                    label="תאריך מתוכנן"
+                    type="date"
+                    value={plannedDate}
+                    onChange={(event) => setPlannedDate(event.target.value)}
+                  />
+                  <Input
+                    label="שעת התחלה"
+                    type="time"
+                    value={plannedStart}
+                    onChange={(event) => setPlannedStart(event.target.value)}
+                  />
+                  <Input
+                    label="שעת סיום"
+                    type="time"
+                    value={plannedEnd}
+                    onChange={(event) => setPlannedEnd(event.target.value)}
+                  />
+                  <Input
+                    label="הערכת שעות"
+                    type="number"
+                    min="0"
+                    step="0.5"
+                    value={estimatedHours}
+                    onChange={(event) => setEstimatedHours(event.target.value)}
+                  />
+                </div>
+              </section>
 
-            <div className="editTaskDrawer__grid">
-              <label className="editTaskDrawer__field">
-                <span>סטטוס</span>
-                <select
-                  className="editTaskDrawer__select"
-                  value={status}
-                  onChange={(event) => setStatus(event.target.value)}
-                >
-                  {WORKPLAN_STATUS_OPTIONS.map((option) => (
-                    <option key={option.code} value={option.code}>
-                      {option.display}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="editTaskDrawer__field">
-                <span>דחיפות</span>
-                <select
-                  className="editTaskDrawer__select"
-                  value={priority}
-                  onChange={(event) => setPriority(event.target.value)}
-                >
-                  {WORKPLAN_PRIORITY_OPTIONS.map((option) => (
-                    <option key={option.code} value={option.code}>
-                      {option.display}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="editTaskDrawer__field">
-                <span>תפקיד נדרש</span>
-                <select
-                  className="editTaskDrawer__select"
-                  value={requiredRole}
-                  onChange={(event) => setRequiredRole(event.target.value)}
-                >
-                  <option value="">בחר תפקיד</option>
-                  {ROLE_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-          </>
-        )}
+              <section className="editTaskDrawer__section">
+                <h3 className="editTaskDrawer__sectionTitle">סיווג</h3>
+                <div className="editTaskDrawer__grid">
+                  <label className="editTaskDrawer__field">
+                    <span>סטטוס</span>
+                    <select
+                      className="editTaskDrawer__select"
+                      value={status}
+                      onChange={(event) => setStatus(event.target.value)}
+                    >
+                      {WORKPLAN_STATUS_OPTIONS.map((option) => (
+                        <option key={option.code} value={option.code}>
+                          {option.display}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="editTaskDrawer__field">
+                    <span>דחיפות</span>
+                    <select
+                      className="editTaskDrawer__select"
+                      value={priority}
+                      onChange={(event) => setPriority(event.target.value)}
+                    >
+                      {WORKPLAN_PRIORITY_OPTIONS.map((option) => (
+                        <option key={option.code} value={option.code}>
+                          {option.display}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="editTaskDrawer__field">
+                    <span>תפקיד נדרש</span>
+                    <select
+                      className="editTaskDrawer__select"
+                      value={requiredRole}
+                      onChange={(event) => setRequiredRole(event.target.value)}
+                    >
+                      <option value="">בחר תפקיד</option>
+                      {ROLE_OPTIONS.map((option) => (
+                        <option key={option} value={option}>
+                          {option}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                </div>
+              </section>
+            </>
+          )}
+        </div>
 
-        {error && <p className="editTaskDrawer__error">{error}</p>}
-
-        <div className="editTaskDrawer__actions">
-          <Button type="submit" disabled={saveMutation.isPending || workItemQuery.isLoading}>
-            {saveMutation.isPending ? 'שומר...' : 'שמור'}
-          </Button>
-          <Button type="button" variant="secondary" onClick={handleClose}>
-            ביטול
-          </Button>
+        <div className="editTaskDrawer__footer">
+          {error && <p className="editTaskDrawer__error">{error}</p>}
+          <div className="editTaskDrawer__actions">
+            <Button type="submit" disabled={saveMutation.isPending || workItemQuery.isLoading}>
+              {saveMutation.isPending ? 'שומר...' : 'שמור'}
+            </Button>
+            <Button type="button" variant="secondary" onClick={handleClose}>
+              ביטול
+            </Button>
+          </div>
         </div>
       </form>
     </Drawer>

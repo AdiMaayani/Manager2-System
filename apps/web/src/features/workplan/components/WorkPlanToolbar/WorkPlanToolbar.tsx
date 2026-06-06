@@ -43,34 +43,30 @@ export function WorkPlanToolbar({
   onEmployeeFilterChange,
   onNewTask,
 }: WorkPlanToolbarProps) {
+  const isProjectScope = scope === 'project';
+
   return (
     <div className="workPlanToolbar card">
-      <div className="workPlanToolbar__layout">
-        <div className="workPlanToolbar__left">
-          <Button type="button" onClick={onNewTask}>
-            <PlusCircle size={18} aria-hidden />
-            משימה חדשה
-          </Button>
-        </div>
+      <div className="workPlanToolbar__main">
+        <div className="workPlanToolbar__selectors">
+          <div className="workPlanToolbar__group">
+            <span className="workPlanToolbar__groupLabel">חתך</span>
+            <div className="workPlanToolbar__scopeRow">
+              <div className="workPlanToolbar__segment" role="tablist" aria-label="היקף תצוגה">
+                {SCOPES.map((item) => (
+                  <button
+                    key={item}
+                    type="button"
+                    role="tab"
+                    aria-selected={scope === item}
+                    className={`workPlanToolbar__segBtn ${scope === item ? 'workPlanToolbar__segBtn--active' : ''}`}
+                    onClick={() => onScopeChange(item)}
+                  >
+                    {SCOPE_LABELS[item]}
+                  </button>
+                ))}
+              </div>
 
-        <div className="workPlanToolbar__right">
-          <div className="workPlanToolbar__tabsRow">
-            <div className="workPlanToolbar__segment" role="tablist" aria-label="היקף תצוגה">
-              {SCOPES.map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  role="tab"
-                  aria-selected={scope === item}
-                  className={`workPlanToolbar__segBtn ${scope === item ? 'workPlanToolbar__segBtn--active' : ''}`}
-                  onClick={() => onScopeChange(item)}
-                >
-                  {SCOPE_LABELS[item]}
-                </button>
-              ))}
-            </div>
-
-            <div className="workPlanToolbar__conditional">
               {scope === 'employee' && (
                 <select
                   className="workPlanToolbar__select"
@@ -87,7 +83,7 @@ export function WorkPlanToolbar({
                 </select>
               )}
 
-              {scope === 'project' && (
+              {isProjectScope && (
                 <select
                   className="workPlanToolbar__select"
                   value={projectFilter === 'all' ? 'all' : String(projectFilter)}
@@ -108,48 +104,61 @@ export function WorkPlanToolbar({
             </div>
           </div>
 
-          <div className="workPlanToolbar__segment" role="tablist" aria-label="טווח תצוגה">
-            {RANGES.map((item) => (
-              <button
-                key={item}
-                type="button"
-                role="tab"
-                aria-selected={range === item}
-                className={`workPlanToolbar__segBtn ${range === item ? 'workPlanToolbar__segBtn--active' : ''}`}
-                onClick={() => onRangeChange(item)}
-              >
-                {RANGE_LABELS[item]}
-              </button>
-            ))}
+          <div className="workPlanToolbar__group">
+            <span className="workPlanToolbar__groupLabel">תצוגה</span>
+            <div className="workPlanToolbar__segment" role="tablist" aria-label="טווח תצוגה">
+              {RANGES.map((item) => (
+                <button
+                  key={item}
+                  type="button"
+                  role="tab"
+                  aria-selected={range === item}
+                  className={`workPlanToolbar__segBtn ${range === item ? 'workPlanToolbar__segBtn--active' : ''}`}
+                  onClick={() => onRangeChange(item)}
+                >
+                  {RANGE_LABELS[item]}
+                </button>
+              ))}
+            </div>
           </div>
+
+          {isProjectScope && (
+            <div className="workPlanToolbar__group">
+              <span className="workPlanToolbar__groupLabel">סטטוס</span>
+              <select
+                className="workPlanToolbar__select"
+                value={statusFilter}
+                onChange={(e) => onStatusFilterChange(e.target.value)}
+                aria-label="סינון לפי סטטוס"
+              >
+                {STATUS_FILTER_OPTIONS.map((option) => (
+                  <option key={option.id} value={option.id}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+        </div>
+
+        <div className="workPlanToolbar__actions">
+          <Button type="button" onClick={onNewTask}>
+            <PlusCircle size={18} aria-hidden />
+            משימה חדשה
+          </Button>
         </div>
       </div>
 
-      <div className="workPlanToolbar__filtersRow">
-        <div className="workPlanToolbar__segment workPlanToolbar__segment--filters">
-          {STATUS_FILTER_OPTIONS.map((option) => (
-            <button
-              key={option.id}
-              type="button"
-              className={`workPlanToolbar__segBtn ${statusFilter === option.id ? 'workPlanToolbar__segBtn--active' : ''}`}
-              onClick={() => onStatusFilterChange(option.id)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-
-        <div className="workPlanToolbar__legend" aria-label="מקרא משימות">
-          <span className="workPlanToolbar__legendItem">
-            <span className="workPlanToolbar__chip workPlanToolbar__chip--locked" /> נעול
-          </span>
-          <span className="workPlanToolbar__legendItem">
-            <span className="workPlanToolbar__chip workPlanToolbar__chip--normal" /> רגיל
-          </span>
-          <span className="workPlanToolbar__legendItem">
-            <span className="workPlanToolbar__chip workPlanToolbar__chip--warning" /> אזהרה
-          </span>
-        </div>
+      <div className="workPlanToolbar__legend" aria-label="מקרא משימות">
+        <span className="workPlanToolbar__legendItem">
+          <span className="workPlanToolbar__chip workPlanToolbar__chip--normal" /> משימת פרויקט
+        </span>
+        <span className="workPlanToolbar__legendItem">
+          <span className="workPlanToolbar__chip workPlanToolbar__chip--locked" /> נעולה
+        </span>
+        <span className="workPlanToolbar__legendItem">
+          <span className="workPlanToolbar__chip workPlanToolbar__chip--warning" /> אזהרה
+        </span>
       </div>
     </div>
   );

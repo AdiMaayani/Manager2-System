@@ -1,8 +1,33 @@
 .editTaskDrawer {
   display: flex;
   flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.editTaskDrawer__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
   gap: var(--spacing-lg);
   padding: var(--spacing-lg);
+}
+
+.editTaskDrawer__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.editTaskDrawer__sectionTitle {
+  margin: 0;
+  padding-bottom: var(--spacing-sm);
+  border-bottom: 1px solid var(--color-neutral-200);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-900);
 }
 
 .editTaskDrawer__grid {
@@ -30,8 +55,25 @@
   background: #fff;
 }
 
+.editTaskDrawer__select:focus,
+.editTaskDrawer__textarea:focus {
+  outline: none;
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 3px var(--color-primary-100);
+}
+
 .editTaskDrawer__textarea {
   resize: vertical;
+}
+
+.editTaskDrawer__footer {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-top: 1px solid var(--color-neutral-200);
+  background: var(--color-neutral-50);
 }
 
 .editTaskDrawer__actions {

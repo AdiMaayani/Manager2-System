@@ -1,15 +1,18 @@
 .workPlanPage {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
+  gap: var(--spacing-lg);
 }
 
-.workPlanPage__gantt {
-  padding: var(--spacing-lg);
-  margin-top: var(--spacing-md);
-}
-
-.workPlanPage__ganttTitle {
-  margin: 0 0 var(--spacing-md);
-  font-size: var(--font-size-lg);
+/*
+ * Shared surface for WorkPlan card containers (toolbar + weekly/monthly/yearly
+ * views). The `card` class was previously referenced in markup but never
+ * defined, leaving these containers without a surface. Provides surface only
+ * (no padding) so each container keeps its own internal spacing.
+ */
+.card {
+  background: #fff;
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
 }

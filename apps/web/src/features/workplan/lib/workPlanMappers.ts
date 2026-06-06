@@ -57,6 +57,7 @@ export function mapWorkPlanResponse(response: RawWorkPlanResponse | null): Mappe
       id: task.workItemId ?? 0,
       workItemId: task.workItemId ?? 0,
       title: task.title ?? '',
+      description: task.description ?? null,
       status: task.status ?? '',
       estimatedHours: task.estimatedHours ?? null,
       priority: task.priority ?? null,

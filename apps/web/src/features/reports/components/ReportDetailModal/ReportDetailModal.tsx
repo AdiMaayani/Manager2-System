@@ -18,6 +18,14 @@ interface ReportDetailModalProps {
   onDeleted: () => void;
 }
 
+type StatusVariant = 'primary' | 'neutral' | 'success';
+
+function resolveStatusVariant(status?: string | null): StatusVariant {
+  if (status === 'הוגש') return 'primary';
+  if (status === 'הועבר להנה״ח') return 'success';
+  return 'neutral';
+}
+
 function formatReportDate(value?: string | null) {
   if (!value) return '—';
   return value.split('T')[0];
@@ -32,6 +40,7 @@ export function ReportDetailModal({
 }: ReportDetailModalProps) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [isMaximized, setIsMaximized] = useState(false);
   const { data: report, isLoading, error, refetch } = useQuery({
     queryKey: ['reports', 'detail', reportId],
     queryFn: () => getReportByIdAsync(reportId!),
@@ -53,6 +62,7 @@ export function ReportDetailModal({
   function handleClose() {
     setConfirmDelete(false);
     setDeleteError(null);
+    setIsMaximized(false);
     onClose();
   }
 
@@ -61,6 +71,8 @@ export function ReportDetailModal({
       isOpen={isOpen}
       onClose={handleClose}
       title={report ? `דיווח #${report.reportId}` : 'פרטי דיווח'}
+      isMaximized={isMaximized}
+      onToggleMaximize={() => setIsMaximized((value) => !value)}
     >
       {isLoading && <PageSpinner />}
       {error && (
@@ -82,7 +94,9 @@ export function ReportDetailModal({
               <div>
                 <dt>סטטוס</dt>
                 <dd>
-                  <Badge variant="primary">{report.status ?? '—'}</Badge>
+                  <Badge variant={resolveStatusVariant(report.status)}>
+                    {report.status ?? '—'}
+                  </Badge>
                 </dd>
               </div>
               {report.reportType !== 'service_call' && (
@@ -173,47 +187,49 @@ export function ReportDetailModal({
             </section>
           )}
 
-          <div className="reportDetailModal__actions">
-            <Button type="button" onClick={() => onEdit(report)}>
-              עריכה
-            </Button>
-            {confirmDelete ? (
-              <>
-                <span className="reportDetailModal__confirmText">
-                  למחוק את הדיווח לצמיתות?
-                </span>
+          <div className="reportDetailModal__footer">
+            {deleteError && <p className="reportDetailModal__error">{deleteError}</p>}
+            <div className="reportDetailModal__actions">
+              <Button type="button" onClick={() => onEdit(report)}>
+                עריכה
+              </Button>
+              {confirmDelete ? (
+                <>
+                  <span className="reportDetailModal__confirmText">
+                    למחוק את הדיווח לצמיתות?
+                  </span>
+                  <Button
+                    type="button"
+                    variant="danger"
+                    disabled={deleteReport.isPending}
+                    onClick={() => deleteReport.mutate(report.reportId)}
+                  >
+                    {deleteReport.isPending ? 'מוחק...' : 'אישור מחיקה'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    disabled={deleteReport.isPending}
+                    onClick={() => setConfirmDelete(false)}
+                  >
+                    חזור
+                  </Button>
+                </>
+              ) : (
                 <Button
                   type="button"
                   variant="danger"
                   disabled={deleteReport.isPending}
-                  onClick={() => deleteReport.mutate(report.reportId)}
+                  onClick={() => setConfirmDelete(true)}
                 >
-                  {deleteReport.isPending ? 'מוחק...' : 'אישור מחיקה'}
+                  מחיקה
                 </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  disabled={deleteReport.isPending}
-                  onClick={() => setConfirmDelete(false)}
-                >
-                  חזור
-                </Button>
-              </>
-            ) : (
-              <Button
-                type="button"
-                variant="danger"
-                disabled={deleteReport.isPending}
-                onClick={() => setConfirmDelete(true)}
-              >
-                מחיקה
+              )}
+              <Button type="button" variant="secondary" onClick={handleClose}>
+                סגור
               </Button>
-            )}
-            <Button type="button" variant="secondary" onClick={handleClose}>
-              סגור
-            </Button>
+            </div>
           </div>
-          {deleteError && <p className="reportDetailModal__error">{deleteError}</p>}
         </div>
       )}
     </Modal>

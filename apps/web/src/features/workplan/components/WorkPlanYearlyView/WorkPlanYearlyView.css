@@ -4,6 +4,7 @@
 
 .workPlanYearlyView__title {
   margin: 0 0 var(--spacing-md);
+  font-size: var(--font-size-lg);
 }
 
 .workPlanYearlyView__cards {
@@ -13,20 +14,63 @@
 }
 
 .workPlanYearlyView__card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
   border: 1px solid var(--color-neutral-200);
   border-radius: var(--radius-lg);
   padding: var(--spacing-md);
-  background: var(--color-neutral-50);
+  background: #fff;
+  transition: box-shadow var(--transition-fast);
 }
 
-.workPlanYearlyView__card h4 {
-  margin: 0 0 var(--spacing-sm);
+.workPlanYearlyView__card:hover {
+  box-shadow: var(--shadow-sm);
+}
+
+.workPlanYearlyView__cardHead {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.workPlanYearlyView__cardHead h4 {
+  margin: 0;
+  font-size: var(--font-size-base);
+}
+
+.workPlanYearlyView__status {
+  font-size: var(--font-size-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  background: var(--color-neutral-100);
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+}
+
+.workPlanYearlyView__progress {
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-neutral-100);
+  overflow: hidden;
+}
+
+.workPlanYearlyView__progressBar {
+  height: 100%;
+  background: var(--color-success-500);
+  border-radius: var(--radius-full);
+  transition: width var(--transition-fast);
+}
+
+.workPlanYearlyView__progressLabel {
+  font-size: var(--font-size-xs);
+  color: var(--color-neutral-500);
 }
 
 .workPlanYearlyView__card dl {
   margin: 0;
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(3, 1fr);
   gap: var(--spacing-sm);
 }
 
@@ -43,5 +87,6 @@
 .workPlanYearlyView__empty {
   grid-column: 1 / -1;
   text-align: center;
-  color: var(--color-neutral-600);
+  color: var(--color-neutral-500);
+  padding: var(--spacing-xl);
 }

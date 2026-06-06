@@ -22,10 +22,31 @@ export function WorkPlanYearlyView({ workPlans }: WorkPlanYearlyViewProps) {
               0,
             );
             const completed = workPlan.tasks.filter((t) => isWorkPlanStatusDone(t.status)).length;
+            const completionPct =
+              workPlan.tasks.length > 0
+                ? Math.round((completed / workPlan.tasks.length) * 100)
+                : 0;
 
             return (
               <article key={workPlan.project.id} className="workPlanYearlyView__card">
-                <h4>{workPlan.project.title}</h4>
+                <header className="workPlanYearlyView__cardHead">
+                  <h4>{workPlan.project.title}</h4>
+                  <span className="workPlanYearlyView__status">
+                    {getWorkPlanStatusDisplay(workPlan.project.status)}
+                  </span>
+                </header>
+
+                <div
+                  className="workPlanYearlyView__progress"
+                  title={`${completed}/${workPlan.tasks.length} הושלמו`}
+                >
+                  <div
+                    className="workPlanYearlyView__progressBar"
+                    style={{ width: `${completionPct}%` }}
+                  />
+                </div>
+                <span className="workPlanYearlyView__progressLabel">{completionPct}% הושלמו</span>
+
                 <dl>
                   <div>
                     <dt>משימות</dt>
@@ -38,10 +59,6 @@ export function WorkPlanYearlyView({ workPlans }: WorkPlanYearlyViewProps) {
                   <div>
                     <dt>שעות משוערות</dt>
                     <dd>{totalHours}</dd>
-                  </div>
-                  <div>
-                    <dt>סטטוס</dt>
-                    <dd>{getWorkPlanStatusDisplay(workPlan.project.status)}</dd>
                   </div>
                 </dl>
               </article>
