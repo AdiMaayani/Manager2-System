@@ -6,6 +6,7 @@ interface DrawerProps {
   onClose: () => void;
   title?: string;
   headerActions?: ReactNode;
+  footer?: ReactNode;
   isMaximized?: boolean;
   onToggleMaximize?: () => void;
   children: ReactNode;
@@ -16,6 +17,7 @@ export function Drawer({
   onClose,
   title,
   headerActions,
+  footer,
   isMaximized = false,
   onToggleMaximize,
   children,
@@ -71,6 +73,7 @@ export function Drawer({
           </div>
         </div>
         <div className="drawer__body">{children}</div>
+        {footer && <div className="drawer__footer">{footer}</div>}
       </div>
     </div>
   );

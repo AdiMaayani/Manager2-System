@@ -12,6 +12,7 @@ const STATUS_OPTIONS = ['פעיל', 'לא פעיל', 'ממתין'];
 interface CustomerDrawerProps {
   isOpen: boolean;
   onClose: () => void;
+  onSaved?: (customer: Customer) => void | Promise<void>;
   customer?: Customer | null;
 }
 
@@ -43,7 +44,7 @@ function buildInitialState(customer: Customer | null | undefined): CustomerFormS
   };
 }
 
-export function CustomerDrawer({ isOpen, onClose, customer }: CustomerDrawerProps) {
+export function CustomerDrawer({ isOpen, onClose, onSaved, customer }: CustomerDrawerProps) {
   const isEditMode = customer != null;
   const { createMutation, updateMutation, deactivateMutation } = useCustomerMutations();
 
@@ -92,11 +93,14 @@ export function CustomerDrawer({ isOpen, onClose, customer }: CustomerDrawerProp
     };
 
     try {
+      let savedCustomer: Customer;
       if (isEditMode) {
-        await updateMutation.mutateAsync({ id: customer.customerId, request });
+        const updatedCustomer = await updateMutation.mutateAsync({ id: customer.customerId, request });
+        savedCustomer = updatedCustomer ?? { ...customer, ...request };
       } else {
-        await createMutation.mutateAsync(request);
+        savedCustomer = await createMutation.mutateAsync(request);
       }
+      await onSaved?.(savedCustomer);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'שמירה נכשלה');

@@ -230,99 +230,121 @@ export function ProjectMilestonesTab({
 
       {showForm && (
         <div className="projectMilestonesTab__formCard">
-          <h3>{editingMilestoneId ? 'עריכת אבן דרך' : 'אבן דרך חדשה'}</h3>
+          <div className="projectMilestonesTab__formHeader">
+            <div>
+              <span className="projectMilestonesTab__formKicker">
+                {editingMilestoneId ? 'עדכון משימה קיימת' : 'תכנון משימה חדשה'}
+              </span>
+              <h3>{editingMilestoneId ? 'עריכת אבן דרך' : 'אבן דרך חדשה'}</h3>
+            </div>
+          </div>
           {editingMilestoneId != null && milestonesQuery.isLoading ? (
             <PageSpinner />
           ) : (
             <>
-              <div className="projectMilestonesTab__formGrid">
-                <Input
-                  label="שם אבן הדרך"
-                  value={form.title}
-                  onChange={(event) => updateField('title', event.target.value)}
-                />
-                <label className="projectMilestonesTab__field">
-                  <span>סטטוס</span>
-                  <select
-                    className="projectMilestonesTab__select"
-                    value={form.status}
-                    onChange={(event) => updateField('status', event.target.value)}
-                  >
-                    {MILESTONE_STATUS_OPTIONS.map((option) => (
-                      <option key={option.code} value={option.code}>
-                        {option.display}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="projectMilestonesTab__field">
-                  <span>סוג חיוב</span>
-                  <select
-                    className="projectMilestonesTab__select"
-                    value={form.billingType}
-                    onChange={(event) => updateField('billingType', event.target.value)}
-                  >
-                    {BILLING_TYPE_OPTIONS.map((option) => (
-                      <option key={option.code} value={option.code}>
-                        {option.display}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="projectMilestonesTab__field">
-                  <span>עדיפות</span>
-                  <select
-                    className="projectMilestonesTab__select"
-                    value={form.priority}
-                    onChange={(event) => updateField('priority', event.target.value)}
-                  >
-                    {MILESTONE_PRIORITY_OPTIONS.map((option) => (
-                      <option key={option.code} value={option.code}>
-                        {option.display}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <Input
-                  label="תחילה מתוכננת"
-                  type="datetime-local"
-                  value={form.plannedStart}
-                  onChange={(event) => updateField('plannedStart', event.target.value)}
-                />
-                <Input
-                  label="סיום מתוכנן"
-                  type="datetime-local"
-                  value={form.plannedEnd}
-                  onChange={(event) => updateField('plannedEnd', event.target.value)}
-                />
-                <Input
-                  label="הערכת שעות (מאמץ)"
-                  type="number"
-                  min={0}
-                  max={999.99}
-                  step={0.5}
-                  value={form.estimatedHours}
-                  onChange={(event) => updateField('estimatedHours', event.target.value)}
-                />
-                <Input
-                  label="תפקיד נדרש"
-                  value={form.requiredRole}
-                  onChange={(event) => updateField('requiredRole', event.target.value)}
-                />
-                <Input
-                  label="תחילה בפועל"
-                  type="datetime-local"
-                  value={form.actualStart}
-                  onChange={(event) => updateField('actualStart', event.target.value)}
-                />
-                <Input
-                  label="סיום בפועל"
-                  type="datetime-local"
-                  value={form.actualEnd}
-                  onChange={(event) => updateField('actualEnd', event.target.value)}
-                />
-                <Input label="שעות בפועל" value={form.actualHours} readOnly />
-              </div>
+              <section className="projectMilestonesTab__formSection">
+                <h4 className="projectMilestonesTab__sectionTitle">פרטי אבן הדרך</h4>
+                <div className="projectMilestonesTab__formGrid">
+                  <Input
+                    label="שם אבן הדרך"
+                    value={form.title}
+                    onChange={(event) => updateField('title', event.target.value)}
+                  />
+                  <label className="projectMilestonesTab__field">
+                    <span>סטטוס</span>
+                    <select
+                      className="projectMilestonesTab__select"
+                      value={form.status}
+                      onChange={(event) => updateField('status', event.target.value)}
+                    >
+                      {MILESTONE_STATUS_OPTIONS.map((option) => (
+                        <option key={option.code} value={option.code}>
+                          {option.display}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="projectMilestonesTab__field">
+                    <span>סוג חיוב</span>
+                    <select
+                      className="projectMilestonesTab__select"
+                      value={form.billingType}
+                      onChange={(event) => updateField('billingType', event.target.value)}
+                    >
+                      {BILLING_TYPE_OPTIONS.map((option) => (
+                        <option key={option.code} value={option.code}>
+                          {option.display}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label className="projectMilestonesTab__field">
+                    <span>עדיפות</span>
+                    <select
+                      className="projectMilestonesTab__select"
+                      value={form.priority}
+                      onChange={(event) => updateField('priority', event.target.value)}
+                    >
+                      {MILESTONE_PRIORITY_OPTIONS.map((option) => (
+                        <option key={option.code} value={option.code}>
+                          {option.display}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <Input
+                    label="תפקיד נדרש"
+                    value={form.requiredRole}
+                    onChange={(event) => updateField('requiredRole', event.target.value)}
+                  />
+                </div>
+              </section>
+
+              <section className="projectMilestonesTab__formSection">
+                <h4 className="projectMilestonesTab__sectionTitle">תכנון</h4>
+                <div className="projectMilestonesTab__formGrid">
+                  <Input
+                    label="תחילה מתוכננת"
+                    type="datetime-local"
+                    value={form.plannedStart}
+                    onChange={(event) => updateField('plannedStart', event.target.value)}
+                  />
+                  <Input
+                    label="סיום מתוכנן"
+                    type="datetime-local"
+                    value={form.plannedEnd}
+                    onChange={(event) => updateField('plannedEnd', event.target.value)}
+                  />
+                  <Input
+                    label="הערכת שעות (מאמץ)"
+                    type="number"
+                    min={0}
+                    max={999.99}
+                    step={0.5}
+                    value={form.estimatedHours}
+                    onChange={(event) => updateField('estimatedHours', event.target.value)}
+                  />
+                </div>
+              </section>
+
+              <section className="projectMilestonesTab__formSection">
+                <h4 className="projectMilestonesTab__sectionTitle">ביצוע בפועל</h4>
+                <div className="projectMilestonesTab__formGrid">
+                  <Input
+                    label="תחילה בפועל"
+                    type="datetime-local"
+                    value={form.actualStart}
+                    onChange={(event) => updateField('actualStart', event.target.value)}
+                  />
+                  <Input
+                    label="סיום בפועל"
+                    type="datetime-local"
+                    value={form.actualEnd}
+                    onChange={(event) => updateField('actualEnd', event.target.value)}
+                  />
+                  <Input label="שעות בפועל" value={form.actualHours} readOnly />
+                </div>
+              </section>
 
               <section className="projectMilestonesTab__assignments">
                 <div className="projectMilestonesTab__assignmentsHeader">
@@ -379,21 +401,24 @@ export function ProjectMilestonesTab({
                 )}
               </section>
 
-              <label className="projectMilestonesTab__checkbox">
-                <input
-                  type="checkbox"
-                  checked={form.isLocked}
-                  onChange={(event) => updateField('isLocked', event.target.checked)}
+              <section className="projectMilestonesTab__formSection">
+                <h4 className="projectMilestonesTab__sectionTitle">הערות ונעילה</h4>
+                <label className="projectMilestonesTab__checkbox">
+                  <input
+                    type="checkbox"
+                    checked={form.isLocked}
+                    onChange={(event) => updateField('isLocked', event.target.checked)}
+                  />
+                  <span>נעול לתכנון</span>
+                </label>
+                <textarea
+                  className="projectMilestonesTab__textarea"
+                  value={form.description}
+                  onChange={(event) => updateField('description', event.target.value)}
+                  placeholder="תיאור"
+                  rows={3}
                 />
-                נעול לתכנון
-              </label>
-              <textarea
-                className="projectMilestonesTab__textarea"
-                value={form.description}
-                onChange={(event) => updateField('description', event.target.value)}
-                placeholder="תיאור"
-                rows={3}
-              />
+              </section>
               <div className="projectMilestonesTab__formActions">
                 <Button type="button" onClick={handleSave} disabled={isSaving}>
                   שמור

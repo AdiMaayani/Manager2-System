@@ -38,8 +38,8 @@
 .topBar {
   display: flex;
   align-items: center;
-  height: 90px;
-  padding: 0 30px;
+  height: 92px;
+  padding: 0 var(--spacing-xl);
   background-color: #fff;
   position: sticky;
   top: 0;
@@ -58,7 +58,7 @@
 .topBar__logo {
   position: absolute;
   left: 0;
-  height: 65px;
+  height: 78px;
   width: auto;
   object-fit: contain;
 }
