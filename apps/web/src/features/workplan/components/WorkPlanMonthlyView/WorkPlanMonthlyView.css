@@ -22,17 +22,18 @@
 
 .workPlanMonthlyView__projectHeader {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   align-items: center;
   gap: var(--spacing-sm);
-  margin-bottom: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
   padding-bottom: var(--spacing-sm);
   border-bottom: 1px solid var(--color-neutral-200);
 }
 
 .workPlanMonthlyView__projectTitle {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--spacing-sm);
 }
 
@@ -41,9 +42,38 @@
   font-size: var(--font-size-base);
 }
 
-.workPlanMonthlyView__count {
+.workPlanMonthlyView__counts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+}
+
+.workPlanMonthlyView__countChip {
   font-size: var(--font-size-xs);
-  color: var(--color-neutral-500);
+  font-weight: var(--font-weight-medium);
+  padding: 2px var(--spacing-sm);
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+}
+
+.workPlanMonthlyView__countChip--total {
+  background: var(--color-neutral-100);
+  color: var(--color-neutral-700);
+}
+
+.workPlanMonthlyView__countChip--planned {
+  background: var(--color-neutral-100);
+  color: var(--color-neutral-600);
+}
+
+.workPlanMonthlyView__countChip--progress {
+  background: var(--color-primary-50);
+  color: var(--color-primary-700);
+}
+
+.workPlanMonthlyView__countChip--done {
+  background: var(--color-success-50);
+  color: var(--color-success-700);
 }
 
 .workPlanMonthlyView__badge {
@@ -92,12 +122,28 @@
   border-color: var(--color-neutral-300);
 }
 
+.workPlanMonthlyView__taskDot {
+  flex-shrink: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--color-neutral-400);
+}
+
 .workPlanMonthlyView__taskButton--done {
   border-inline-start-color: var(--color-success-500);
 }
 
+.workPlanMonthlyView__taskButton--done .workPlanMonthlyView__taskDot {
+  background: var(--color-success-500);
+}
+
 .workPlanMonthlyView__taskButton--progress {
   border-inline-start-color: var(--color-primary-500);
+}
+
+.workPlanMonthlyView__taskButton--progress .workPlanMonthlyView__taskDot {
+  background: var(--color-primary-500);
 }
 
 .workPlanMonthlyView__taskButton--planned {
@@ -107,6 +153,9 @@
 .workPlanMonthlyView__taskTitle {
   flex: 1;
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .workPlanMonthlyView__taskStatus {

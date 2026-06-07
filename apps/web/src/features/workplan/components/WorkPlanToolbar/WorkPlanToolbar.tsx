@@ -1,4 +1,13 @@
-import { PlusCircle } from 'lucide-react';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Download,
+  PlusCircle,
+  Printer,
+  Search,
+  Upload,
+  X,
+} from 'lucide-react';
 import { Button } from '@shared/components/Button';
 import { RANGE_LABELS, SCOPE_LABELS, STATUS_FILTER_OPTIONS } from '../../constants';
 import type { WorkPlanProjectFilter, WorkPlanRange, WorkPlanScope } from '../../types';
@@ -15,6 +24,8 @@ interface WorkPlanToolbarProps {
   statusFilter: string;
   projectFilter: WorkPlanProjectFilter;
   employeeFilterId: string;
+  searchQuery: string;
+  periodLabel: string;
   projectOptions: ProjectOption[];
   employees: Array<{ employeeId: number; fullName: string }>;
   onScopeChange: (scope: WorkPlanScope) => void;
@@ -22,11 +33,24 @@ interface WorkPlanToolbarProps {
   onStatusFilterChange: (status: string) => void;
   onProjectFilterChange: (projectId: WorkPlanProjectFilter) => void;
   onEmployeeFilterChange: (employeeId: string) => void;
+  onSearchChange: (query: string) => void;
+  onPreviousPeriod: () => void;
+  onNextPeriod: () => void;
+  onToday: () => void;
+  onPrint: () => void;
   onNewTask: () => void;
 }
 
 const SCOPES: WorkPlanScope[] = ['company', 'personal', 'employee', 'project'];
 const RANGES: WorkPlanRange[] = ['daily', 'weekly', 'monthly', 'yearly'];
+
+const LEGEND_ITEMS: Array<{ modifier: string; label: string }> = [
+  { modifier: 'normal', label: 'משימת פרויקט' },
+  { modifier: 'locked', label: 'נעולה' },
+  { modifier: 'warning', label: 'אזהרה' },
+  { modifier: 'violation', label: 'חריגה / ללא שיבוץ' },
+  { modifier: 'urgent', label: 'דחוף' },
+];
 
 export function WorkPlanToolbar({
   scope,
@@ -34,6 +58,8 @@ export function WorkPlanToolbar({
   statusFilter,
   projectFilter,
   employeeFilterId,
+  searchQuery,
+  periodLabel,
   projectOptions,
   employees,
   onScopeChange,
@@ -41,6 +67,11 @@ export function WorkPlanToolbar({
   onStatusFilterChange,
   onProjectFilterChange,
   onEmployeeFilterChange,
+  onSearchChange,
+  onPreviousPeriod,
+  onNextPeriod,
+  onToday,
+  onPrint,
   onNewTask,
 }: WorkPlanToolbarProps) {
   const isProjectScope = scope === 'project';
@@ -146,19 +177,100 @@ export function WorkPlanToolbar({
             <PlusCircle size={18} aria-hidden />
             משימה חדשה
           </Button>
+          <div className="workPlanToolbar__iconActions">
+            <button
+              type="button"
+              className="workPlanToolbar__iconBtn"
+              onClick={onPrint}
+              title="הדפסת התצוגה הנוכחית"
+              aria-label="הדפסה"
+            >
+              <Printer size={18} aria-hidden />
+            </button>
+            <button
+              type="button"
+              className="workPlanToolbar__iconBtn"
+              disabled
+              title="ייצוא נתונים — בקרוב"
+              aria-label="ייצוא (בקרוב)"
+            >
+              <Download size={18} aria-hidden />
+            </button>
+            <button
+              type="button"
+              className="workPlanToolbar__iconBtn"
+              disabled
+              title="ייבוא נתונים — בקרוב"
+              aria-label="ייבוא (בקרוב)"
+            >
+              <Upload size={18} aria-hidden />
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="workPlanToolbar__tools">
+        <div className="workPlanToolbar__nav" role="group" aria-label="ניווט בין תקופות">
+          <button
+            type="button"
+            className="workPlanToolbar__navBtn"
+            onClick={onPreviousPeriod}
+            aria-label="התקופה הקודמת"
+            title="הקודם"
+          >
+            <ChevronRight size={18} aria-hidden />
+          </button>
+          <button type="button" className="workPlanToolbar__todayBtn" onClick={onToday}>
+            היום
+          </button>
+          <button
+            type="button"
+            className="workPlanToolbar__navBtn"
+            onClick={onNextPeriod}
+            aria-label="התקופה הבאה"
+            title="הבא"
+          >
+            <ChevronLeft size={18} aria-hidden />
+          </button>
+          <span className="workPlanToolbar__periodLabel" aria-live="polite">
+            {periodLabel}
+          </span>
+        </div>
+
+        <div className="workPlanToolbar__search">
+          <Search size={16} aria-hidden className="workPlanToolbar__searchIcon" />
+          <input
+            type="search"
+            className="workPlanToolbar__searchInput"
+            placeholder="חיפוש משימה, פרויקט, עובד, תפקיד או סטטוס"
+            value={searchQuery}
+            onChange={(e) => onSearchChange(e.target.value)}
+            aria-label="חיפוש בתוכנית העבודה"
+          />
+          {searchQuery && (
+            <button
+              type="button"
+              className="workPlanToolbar__searchClear"
+              onClick={() => onSearchChange('')}
+              aria-label="נקה חיפוש"
+              title="נקה חיפוש"
+            >
+              <X size={14} aria-hidden />
+            </button>
+          )}
         </div>
       </div>
 
       <div className="workPlanToolbar__legend" aria-label="מקרא משימות">
-        <span className="workPlanToolbar__legendItem">
-          <span className="workPlanToolbar__chip workPlanToolbar__chip--normal" /> משימת פרויקט
-        </span>
-        <span className="workPlanToolbar__legendItem">
-          <span className="workPlanToolbar__chip workPlanToolbar__chip--locked" /> נעולה
-        </span>
-        <span className="workPlanToolbar__legendItem">
-          <span className="workPlanToolbar__chip workPlanToolbar__chip--warning" /> אזהרה
-        </span>
+        {LEGEND_ITEMS.map((item) => (
+          <span key={item.modifier} className="workPlanToolbar__legendItem">
+            <span
+              className={`workPlanToolbar__chip workPlanToolbar__chip--${item.modifier}`}
+              aria-hidden
+            />
+            {item.label}
+          </span>
+        ))}
       </div>
     </div>
   );

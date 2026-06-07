@@ -1,6 +1,12 @@
 import { useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { WORKPLAN_DEFAULTS, WORKPLAN_QUERY } from '../constants';
+import {
+  addPeriod,
+  formatPeriodLabel,
+  parseAnchorDate,
+  toAnchorParam,
+} from '../lib/workPlanPeriod';
 import type { WorkPlanProjectFilter, WorkPlanRange, WorkPlanScope } from '../types';
 
 export function useWorkPlanPageState() {
@@ -10,6 +16,17 @@ export function useWorkPlanPageState() {
   const range = (searchParams.get('range') as WorkPlanRange) || WORKPLAN_DEFAULTS.RANGE;
   const statusFilter = searchParams.get('status') ?? 'all';
   const employeeFilterId = searchParams.get('employeeId') ?? '';
+  const searchQuery = searchParams.get(WORKPLAN_QUERY.SEARCH) ?? '';
+
+  const periodAnchor = useMemo(
+    () => parseAnchorDate(searchParams.get(WORKPLAN_QUERY.DATE)),
+    [searchParams],
+  );
+
+  const periodLabel = useMemo(
+    () => formatPeriodLabel(periodAnchor, range),
+    [periodAnchor, range],
+  );
 
   const projectFilter = useMemo((): WorkPlanProjectFilter => {
     const raw = searchParams.get(WORKPLAN_QUERY.PROJECT_ID);
@@ -81,6 +98,48 @@ export function useWorkPlanPageState() {
     [setSearchParams],
   );
 
+  const setSearchQuery = useCallback(
+    (query: string) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (query.trim()) next.set(WORKPLAN_QUERY.SEARCH, query);
+          else next.delete(WORKPLAN_QUERY.SEARCH);
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  const setPeriodAnchor = useCallback(
+    (nextAnchor: Date) => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.set(WORKPLAN_QUERY.DATE, toAnchorParam(nextAnchor));
+        return next;
+      });
+    },
+    [setSearchParams],
+  );
+
+  const goToPreviousPeriod = useCallback(() => {
+    setPeriodAnchor(addPeriod(periodAnchor, range, -1));
+  }, [periodAnchor, range, setPeriodAnchor]);
+
+  const goToNextPeriod = useCallback(() => {
+    setPeriodAnchor(addPeriod(periodAnchor, range, 1));
+  }, [periodAnchor, range, setPeriodAnchor]);
+
+  const goToToday = useCallback(() => {
+    setSearchParams((prev) => {
+      const next = new URLSearchParams(prev);
+      next.delete(WORKPLAN_QUERY.DATE);
+      return next;
+    });
+  }, [setSearchParams]);
+
   const isAllProjectsMode = projectFilter === 'all';
 
   return {
@@ -90,10 +149,17 @@ export function useWorkPlanPageState() {
     employeeFilterId,
     projectFilter,
     isAllProjectsMode,
+    searchQuery,
+    periodAnchor,
+    periodLabel,
     setScope,
     setRange,
     setProjectFilter,
     setEmployeeFilterId,
     setStatusFilter,
+    setSearchQuery,
+    goToPreviousPeriod,
+    goToNextPeriod,
+    goToToday,
   };
 }

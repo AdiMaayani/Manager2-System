@@ -2,6 +2,8 @@ import type { WorkPlanPriorityCode, WorkPlanRange, WorkPlanScope, WorkPlanStatus
 
 export const WORKPLAN_QUERY = {
   PROJECT_ID: 'projectId',
+  SEARCH: 'q',
+  DATE: 'date',
 } as const;
 
 export const WORKPLAN_SCOPES: Record<string, WorkPlanScope> = {
@@ -166,4 +168,8 @@ export function isWorkPlanStatusDone(status?: string | null): boolean {
 
 export function isWorkPlanStatusInProgress(status?: string | null): boolean {
   return normalizeWorkPlanStatusCode(status) === 'Execution';
+}
+
+export function isWorkPlanPriorityUrgent(priority?: string | null): boolean {
+  return normalizeWorkPlanPriorityCode(priority) === 'Urgent';
 }
