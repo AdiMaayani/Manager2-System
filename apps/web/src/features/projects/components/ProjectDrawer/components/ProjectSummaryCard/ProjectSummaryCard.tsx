@@ -32,11 +32,11 @@ export function ProjectSummaryCard({ summary }: ProjectSummaryCardProps) {
 
       <div className="projectSummaryCard__stats">
         <div className="projectSummaryCard__item">
-          <span className="projectSummaryCard__label">בריאות</span>
+          <span className="projectSummaryCard__label">מצב הפרויקט</span>
           <Badge variant={healthMeta.badgeVariant}>{healthMeta.display}</Badge>
         </div>
         <div className="projectSummaryCard__item">
-          <span className="projectSummaryCard__label">רמת סיכון</span>
+          <span className="projectSummaryCard__label">סיכון לעמידה בזמנים</span>
           <Badge variant={riskMeta.badgeVariant}>{riskMeta.display}</Badge>
         </div>
         <div className="projectSummaryCard__item">

@@ -1,4 +1,12 @@
 :root {
+  /* Typography
+     System stack first: Segoe UI (Windows) and the Apple/system UI fonts all
+     ship high-quality Hebrew glyphs, so RTL text stays crisp without loading
+     any external web font. */
+  --font-family-base:
+    'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, 'Helvetica Neue',
+    'Arial Hebrew', Arial, 'Noto Sans Hebrew', sans-serif;
+
   /* Colors */
   --color-primary-50: #f0f4ff;
   --color-primary-100: #e0e9ff;
@@ -88,6 +96,6 @@
 
   /* Layout */
   --sidebar-width: 280px;
-  --topbar-height: 64px;
+  --topbar-height: 96px;
   --content-max-width: 1400px;
 }

@@ -161,11 +161,9 @@ export function ProjectsPage() {
   return (
     <PageShell title="פרויקטים" wide>
       <div className="projectsPage__toolbar">
-        <div className="projectsPage__toolbarLead">
-          <Button type="button" onClick={openCreateProject}>
-            פרויקט חדש
-          </Button>
-          <div className="projectsPage__search">
+        <div className="projectsPage__filters">
+          <label className="projectsPage__filter projectsPage__filter--search">
+            <span>חיפוש</span>
             <Input
               placeholder="חיפוש לפי שם, לקוח או מספר..."
               value={search}
@@ -174,9 +172,7 @@ export function ProjectsPage() {
                 updateSearchParams({ search: event.target.value.trim() || null });
               }}
             />
-          </div>
-        </div>
-        <div className="projectsPage__filters">
+          </label>
           <label className="projectsPage__filter">
             <span>שלב</span>
             <select
@@ -249,6 +245,11 @@ export function ProjectsPage() {
             </select>
           </label>
         </div>
+        <div className="projectsPage__toolbarActions">
+          <Button type="button" onClick={openCreateProject}>
+            פרויקט חדש
+          </Button>
+        </div>
       </div>
 
       {filtered.length === 0 ? (
@@ -259,9 +260,9 @@ export function ProjectsPage() {
             <thead>
               <tr>
                 <th>מספר</th>
-                <th>שם</th>
+                <th>שם הפרויקט</th>
                 <th>לקוח</th>
-                <th>מנהל</th>
+                <th>מנהל פרויקט</th>
                 <th>סטטוס</th>
                 <th>תאריך פתיחה</th>
               </tr>

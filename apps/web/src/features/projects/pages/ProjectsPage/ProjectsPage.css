@@ -1,8 +1,8 @@
 .projectsPage__toolbar {
-  display: grid;
-  grid-template-columns: minmax(320px, 0.9fr) minmax(420px, 1.4fr);
-  align-items: end;
-  gap: var(--spacing-md) var(--spacing-lg);
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--spacing-lg);
   margin-bottom: var(--spacing-lg);
   padding: var(--spacing-lg);
   background: #fff;
@@ -11,23 +11,19 @@
   box-shadow: var(--shadow-sm);
 }
 
-.projectsPage__toolbarLead {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-md);
-  min-width: 0;
-}
-
-.projectsPage__search {
-  flex: 1;
-  min-width: 200px;
-}
-
+/* Filters + search are grouped together on the start (physical right in RTL). */
 .projectsPage__filters {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(120px, 1fr));
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--spacing-md);
   align-items: flex-end;
+}
+
+/* The primary action sits on the physical left, separated from the filters. */
+.projectsPage__toolbarActions {
+  flex-shrink: 0;
 }
 
 .projectsPage__filter {
@@ -36,6 +32,12 @@
   gap: var(--spacing-xs);
   font-size: var(--font-size-xs);
   color: var(--color-neutral-500);
+  flex: 0 1 150px;
+}
+
+.projectsPage__filter--search {
+  flex: 1 1 240px;
+  min-width: 200px;
 }
 
 .projectsPage__select {
@@ -142,24 +144,17 @@
   width: 11%;
 }
 
-@media (max-width: 1200px) {
-  .projectsPage__toolbar {
-    grid-template-columns: 1fr;
-  }
-
-  .projectsPage__filters {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-}
-
 @media (max-width: 760px) {
-  .projectsPage__toolbarLead,
-  .projectsPage__filters {
-    grid-template-columns: 1fr;
-  }
-
-  .projectsPage__toolbarLead {
+  .projectsPage__toolbar {
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .projectsPage__filter {
+    flex: 1 1 100%;
+  }
+
+  .projectsPage__toolbarActions {
+    align-self: flex-start;
   }
 }

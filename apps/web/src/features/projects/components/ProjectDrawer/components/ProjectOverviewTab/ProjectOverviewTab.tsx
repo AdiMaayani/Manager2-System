@@ -2,6 +2,7 @@ import { memo, useCallback, useMemo, useState } from 'react';
 import { Button } from '@shared/components/Button';
 import { Input } from '@shared/components/Input';
 import { CustomerDrawer, type Customer } from '@features/customers';
+import { ProjectReportsCard } from '../ProjectReportsCard';
 import type {
   ProjectEmployeeOption,
   ProjectLifecycle,
@@ -722,6 +723,10 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
             </p>
           )}
         </section>
+
+        {!isCreateMode && lifecycle && (
+          <ProjectReportsCard reports={lifecycle.reports ?? []} />
+        )}
       </div>
       <CustomerDrawer
         isOpen={showCustomerDrawer}
