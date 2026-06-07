@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Badge } from '@shared/components/Badge';
 import { Button } from '@shared/components/Button';
 import { EmptyState } from '@shared/components/EmptyState';
@@ -143,6 +143,21 @@ export function ProjectEquipmentTab({
   const [location, setLocation] = useState('');
   const [error, setError] = useState<string | null>(null);
 
+  // Group items by location so the view mirrors the Inventory layout:
+  // a location/category header first, with its products listed inside.
+  const groupedByLocation = useMemo(() => {
+    const groups = new Map<string, ProjectEquipmentItem[]>();
+    [...items]
+      .sort((first, second) => first.sortOrder - second.sortOrder)
+      .forEach((item) => {
+        const groupKey = item.location.trim() || 'ללא מיקום מוגדר';
+        const groupItems = groups.get(groupKey) ?? [];
+        groupItems.push(item);
+        groups.set(groupKey, groupItems);
+      });
+    return Array.from(groups.entries());
+  }, [items]);
+
   const removeItem = async (equipmentItemId: number) => {
     setError(null);
     await onDelete(equipmentItemId);
@@ -235,30 +250,30 @@ export function ProjectEquipmentTab({
 
   return (
     <div className="projectEquipmentTab">
-      {items.length === 0 && (
+      {items.length === 0 ? (
         <EmptyState title="אין ציוד לפרויקט" description="פריטי ציוד שיוגדרו יופיעו כאן." />
-      )}
-      {items.length > 0 && (
-      <table className="projectEquipmentTab__table">
-        <thead>
-          <tr>
-            <th>מערכת / פריט</th>
-            <th>מיקום</th>
-            <th>סטטוס</th>
-          </tr>
-        </thead>
-        <tbody>
-          {items.map((item) => (
-            <tr key={item.projectEquipmentItemId}>
-              <td>{item.name}</td>
-              <td>{item.location || '-'}</td>
-              <td>
-                <Badge variant="primary">{getEquipmentStatusLabel(item.status)}</Badge>
-              </td>
-            </tr>
+      ) : (
+        <div className="projectEquipmentTab__groups">
+          {groupedByLocation.map(([groupName, groupItems]) => (
+            <section className="projectEquipmentTab__group" key={groupName}>
+              <header className="projectEquipmentTab__groupHeader">
+                <span className="projectEquipmentTab__groupName">{groupName}</span>
+                <span className="projectEquipmentTab__groupCount">{groupItems.length}</span>
+              </header>
+              <ul className="projectEquipmentTab__groupList">
+                {groupItems.map((item) => (
+                  <li
+                    className="projectEquipmentTab__groupItem"
+                    key={item.projectEquipmentItemId}
+                  >
+                    <span className="projectEquipmentTab__itemName">{item.name}</span>
+                    <Badge variant="primary">{getEquipmentStatusLabel(item.status)}</Badge>
+                  </li>
+                ))}
+              </ul>
+            </section>
           ))}
-        </tbody>
-      </table>
+        </div>
       )}
     </div>
   );

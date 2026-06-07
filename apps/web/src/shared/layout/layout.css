@@ -38,7 +38,7 @@
 .topBar {
   display: flex;
   align-items: center;
-  height: 92px;
+  height: var(--topbar-height);
   padding: 0 var(--spacing-xl);
   background-color: #fff;
   position: sticky;
@@ -55,10 +55,26 @@
   position: relative;
 }
 
-.topBar__logo {
+/* The logo asset carries large internal whitespace, so the wordmark looks
+   small at its natural size. The wrapper clips that whitespace to a band the
+   height of the top bar, letting the scaled image show a much larger wordmark
+   without overflowing into the page content. The wrapper is sized to the full
+   top-bar height and vertically centered, since its positioned ancestor only
+   stretches to the title height. */
+.topBar__logoWrap {
   position: absolute;
   left: 0;
-  height: 78px;
+  top: 50%;
+  transform: translateY(-50%);
+  height: var(--topbar-height);
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.topBar__logo {
+  height: 168px;
   width: auto;
   object-fit: contain;
 }
