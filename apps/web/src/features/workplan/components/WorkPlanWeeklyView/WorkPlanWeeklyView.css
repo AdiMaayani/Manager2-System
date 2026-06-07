@@ -1,58 +1,118 @@
 .workPlanWeeklyView {
   padding: var(--spacing-lg);
-  overflow-x: auto;
+}
+
+.workPlanWeeklyView__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  margin-bottom: var(--spacing-md);
 }
 
 .workPlanWeeklyView__title {
-  margin: 0 0 var(--spacing-md);
+  margin: 0;
   font-size: var(--font-size-lg);
 }
 
+.workPlanWeeklyView__note {
+  font-size: var(--font-size-xs);
+  color: var(--color-neutral-500);
+}
+
+.workPlanWeeklyView__scroll {
+  overflow-x: auto;
+}
+
 .workPlanWeeklyView__grid {
-  min-width: 900px;
+  min-width: 920px;
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
 }
 
 .workPlanWeeklyView__header,
 .workPlanWeeklyView__row {
   display: grid;
-  grid-template-columns: 180px repeat(7, 1fr);
-  gap: var(--spacing-xs);
+  grid-template-columns: 180px repeat(7, minmax(96px, 1fr));
 }
 
 .workPlanWeeklyView__header {
-  margin-bottom: var(--spacing-sm);
+  background: var(--color-neutral-100);
+  border-bottom: 1px solid var(--color-neutral-200);
+}
+
+.workPlanWeeklyView__nameHeader {
+  padding: var(--spacing-sm) var(--spacing-md);
+  font-size: var(--font-size-sm);
   font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-700);
+  border-inline-end: 1px solid var(--color-neutral-200);
 }
 
 .workPlanWeeklyView__dayHeader {
   text-align: center;
+  padding: var(--spacing-sm) var(--spacing-xs);
+  border-inline-end: 1px solid var(--color-neutral-200);
+}
+
+.workPlanWeeklyView__dayHeader:last-child {
+  border-inline-end: none;
+}
+
+.workPlanWeeklyView__dayHeader--today {
+  background: var(--color-primary-50);
+}
+
+.workPlanWeeklyView__dayName {
   font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-800);
+}
+
+.workPlanWeeklyView__dayHeader--today .workPlanWeeklyView__dayName {
+  color: var(--color-primary-700);
 }
 
 .workPlanWeeklyView__dayDate {
   font-size: var(--font-size-xs);
-  color: var(--color-neutral-600);
+  color: var(--color-neutral-500);
 }
 
 .workPlanWeeklyView__row {
   border-top: 1px solid var(--color-neutral-200);
-  padding-top: var(--spacing-sm);
+}
+
+.workPlanWeeklyView__row:first-of-type {
+  border-top: none;
 }
 
 .workPlanWeeklyView__name {
   font-weight: var(--font-weight-medium);
-  padding: var(--spacing-sm);
+  color: var(--color-neutral-800);
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: var(--color-neutral-50);
+  border-inline-end: 1px solid var(--color-neutral-200);
+  display: flex;
+  align-items: center;
 }
 
 .workPlanWeeklyView__cell {
-  min-height: 76px;
-  background: var(--color-neutral-50);
-  border: 1px solid var(--color-neutral-100);
-  border-radius: var(--radius-md);
+  min-height: 84px;
   padding: var(--spacing-xs);
+  border-inline-end: 1px solid var(--color-neutral-100);
   display: flex;
   flex-direction: column;
   gap: var(--spacing-xs);
+}
+
+.workPlanWeeklyView__cell:last-child {
+  border-inline-end: none;
+}
+
+.workPlanWeeklyView__cell--today {
+  background: color-mix(in srgb, var(--color-primary-50) 70%, white);
 }
 
 .workPlanWeeklyView__cellEmpty {
@@ -90,10 +150,25 @@
   background: var(--color-neutral-400);
 }
 
+.workPlanWeeklyView__taskBody {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--spacing-xs);
+  min-width: 0;
+  flex: 1;
+}
+
 .workPlanWeeklyView__taskText {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.workPlanWeeklyView__taskTime {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-neutral-500);
 }
 
 .workPlanWeeklyView__task--done {
@@ -117,6 +192,7 @@
 }
 
 .workPlanWeeklyView__empty {
+  grid-column: 1 / -1;
   padding: var(--spacing-xl);
   text-align: center;
   color: var(--color-neutral-500);

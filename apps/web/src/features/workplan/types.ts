@@ -97,6 +97,7 @@ export interface ScheduledTaskBar {
   requiredRole?: string | null;
   isLocked: boolean;
   isPersonal: boolean;
+  isUrgent: boolean;
   assignmentSource: ResolvedAssignment['source'];
   violationCount: number;
   warningCount: number;

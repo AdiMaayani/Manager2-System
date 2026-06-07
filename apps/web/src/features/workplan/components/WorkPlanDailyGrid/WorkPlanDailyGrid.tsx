@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import type { CSSProperties } from 'react';
 import { getWorkPlanStatusDisplay, HOUR_LABELS } from '../../constants';
 import { formatHourAsTime, hourSpanToWidth, hourToPercent } from '../../lib/workPlanScheduling';
 import type { ScheduledTaskBar } from '../../types';
@@ -22,9 +24,17 @@ interface WorkPlanDailyGridProps {
   selectedTaskId?: number | null;
 }
 
-const LANE_HEIGHT = 56;
+const LANE_HEIGHT = 58;
 const LANE_GAP = 6;
 const TRACK_PADDING = 10;
+
+type DailyDensity = 'normal' | 'wide' | 'max';
+
+const DENSITY_LEVELS: Array<{ id: DailyDensity; label: string; width: number }> = [
+  { id: 'normal', label: 'רגיל', width: 1400 },
+  { id: 'wide', label: 'רחב', width: 2000 },
+  { id: 'max', label: 'מירבי', width: 2800 },
+];
 
 interface PositionedTask {
   task: ScheduledTaskBar;
@@ -61,6 +71,7 @@ function taskClassName(task: ScheduledTaskBar): string {
   else classes.push('workPlanDailyGrid__task--normal');
   if (task.violationCount > 0) classes.push('workPlanDailyGrid__task--violation');
   else if (task.warningCount > 0) classes.push('workPlanDailyGrid__task--warning');
+  if (task.isUrgent) classes.push('workPlanDailyGrid__task--urgent');
   return classes.join(' ');
 }
 
@@ -69,7 +80,9 @@ function buildTaskTooltip(task: ScheduledTaskBar): string {
     task.title,
     `${task.projectTitle} · ${getWorkPlanStatusDisplay(task.status)}`,
     task.assigneeName && task.assigneeName !== '—' ? `מבצע: ${task.assigneeName}` : null,
+    task.isUrgent ? 'דחיפות: דחוף' : null,
     `שעות: ${formatHourAsTime(task.startHour)}–${formatHourAsTime(task.endHour)}`,
+    task.description?.trim() ? task.description.trim() : null,
   ]
     .filter(Boolean)
     .join('\n');
@@ -100,7 +113,14 @@ function TaskBar({
       aria-pressed={isSelected}
       title={buildTaskTooltip(task)}
     >
-      <span className="workPlanDailyGrid__taskName">{task.title}</span>
+      <span className="workPlanDailyGrid__taskTop">
+        {task.isUrgent && (
+          <span className="workPlanDailyGrid__taskFlag" title="דחוף">
+            דחוף
+          </span>
+        )}
+        <span className="workPlanDailyGrid__taskName">{task.title}</span>
+      </span>
       <span className="workPlanDailyGrid__taskMeta">
         {formatHourAsTime(task.startHour)}–{formatHourAsTime(task.endHour)} · {getWorkPlanStatusDisplay(task.status)}
       </span>
@@ -122,6 +142,9 @@ export function WorkPlanDailyGrid({
   onTaskSelect,
   selectedTaskId,
 }: WorkPlanDailyGridProps) {
+  const [density, setDensity] = useState<DailyDensity>('normal');
+  const dayWidth = DENSITY_LEVELS.find((level) => level.id === density)?.width ?? 1400;
+
   const rows =
     mode === 'employees'
       ? employeeRows.map((row) => ({
@@ -138,18 +161,41 @@ export function WorkPlanDailyGrid({
         }));
 
   return (
-    <div className="workPlanDailyGrid workPlanShell">
-      <div className="workPlanDailyGrid__grid">
-        <div className="workPlanDailyGrid__header">
-          <div className="workPlanDailyGrid__headerCell">שם</div>
-          <div className="workPlanDailyGrid__hours">
-            {HOUR_LABELS.map((label) => (
-              <div key={label} className="workPlanDailyGrid__hour">
-                {label}
-              </div>
-            ))}
-          </div>
+    <div className="workPlanDailyGrid">
+      <div className="workPlanDailyGrid__controls">
+        <span className="workPlanDailyGrid__controlsLabel">ציר 24 שעות · צפיפות תצוגה</span>
+        <div className="workPlanDailyGrid__density" role="group" aria-label="צפיפות תצוגה יומית">
+          {DENSITY_LEVELS.map((level) => (
+            <button
+              key={level.id}
+              type="button"
+              className={`workPlanDailyGrid__densityBtn ${
+                density === level.id ? 'workPlanDailyGrid__densityBtn--active' : ''
+              }`}
+              aria-pressed={density === level.id}
+              onClick={() => setDensity(level.id)}
+            >
+              {level.label}
+            </button>
+          ))}
         </div>
+      </div>
+
+      <div className="workPlanShell">
+        <div
+          className="workPlanDailyGrid__grid"
+          style={{ '--workplan-day-width': `${dayWidth}px` } as CSSProperties}
+        >
+          <div className="workPlanDailyGrid__header">
+            <div className="workPlanDailyGrid__headerCell">שם</div>
+            <div className="workPlanDailyGrid__hours">
+              {HOUR_LABELS.map((label) => (
+                <div key={label} className="workPlanDailyGrid__hour">
+                  {label}
+                </div>
+              ))}
+            </div>
+          </div>
 
         {rows.length === 0 ? (
           <div className="workPlanDailyGrid__empty">אין משימות להצגה בטווח הנבחר</div>
@@ -183,6 +229,7 @@ export function WorkPlanDailyGrid({
             );
           })
         )}
+        </div>
       </div>
     </div>
   );

@@ -43,10 +43,52 @@ export function WorkPlanPage() {
     isAllProjectsMode: pageState.isAllProjectsMode,
     statusFilter: pageState.statusFilter,
     employeeFilterId: pageState.employeeFilterId,
+    searchQuery: pageState.searchQuery,
+    selectedDate: pageState.periodAnchor,
   });
 
   const [selectedTask, setSelectedTask] = useState<WorkPlanTaskSelection | null>(null);
   const [isNewTaskModalOpen, setIsNewTaskModalOpen] = useState(false);
+
+  const personalScopeInfo = useMemo(() => {
+    if (pageState.scope !== 'personal') return null;
+    if (scheduling.currentUserEmployeeId == null) {
+      return {
+        tone: 'warning' as const,
+        message: scheduling.currentUserIsAdmin
+          ? 'אתה מחובר כמנהל מערכת ללא עובד משויך, ולכן אין תצוגה אישית. השתמש בחתך "כללי" או "לפי עובד" כדי לראות משימות.'
+          : 'לא ניתן להציג תצוגה אישית: למשתמש המחובר אין עובד משויך. יש לוודא שחשבון המשתמש מקושר לעובד במערכת.',
+      };
+    }
+    if (!scheduling.currentUserEmployee) {
+      return {
+        tone: 'warning' as const,
+        message: `העובד המשויך למשתמש (מזהה #${scheduling.currentUserEmployeeId}) אינו נמצא ברשימת העובדים הפעילים.`,
+      };
+    }
+    const role = scheduling.currentUserEmployee.primaryRole;
+    return {
+      tone: 'info' as const,
+      message: `תצוגה אישית · ${scheduling.currentUserEmployee.fullName}${role ? ` · ${role}` : ''}`,
+    };
+  }, [
+    pageState.scope,
+    scheduling.currentUserEmployee,
+    scheduling.currentUserEmployeeId,
+    scheduling.currentUserIsAdmin,
+  ]);
+
+  function handlePrint() {
+    const printClass = 'workPlanPrint';
+    document.body.classList.add(printClass);
+    const cleanup = () => {
+      document.body.classList.remove(printClass);
+      window.removeEventListener('afterprint', cleanup);
+    };
+    window.addEventListener('afterprint', cleanup);
+    window.print();
+    window.setTimeout(cleanup, 1000);
+  }
 
   const effectiveProjectId = useMemo(() => {
     if (typeof pageState.projectFilter === 'number') return pageState.projectFilter;
@@ -102,6 +144,8 @@ export function WorkPlanPage() {
           statusFilter={pageState.statusFilter}
           projectFilter={pageState.projectFilter}
           employeeFilterId={pageState.employeeFilterId}
+          searchQuery={pageState.searchQuery}
+          periodLabel={pageState.periodLabel}
           projectOptions={scheduling.projectOptions}
           employees={scheduling.employees}
           onScopeChange={pageState.setScope}
@@ -109,8 +153,22 @@ export function WorkPlanPage() {
           onStatusFilterChange={pageState.setStatusFilter}
           onProjectFilterChange={pageState.setProjectFilter}
           onEmployeeFilterChange={pageState.setEmployeeFilterId}
+          onSearchChange={pageState.setSearchQuery}
+          onPreviousPeriod={pageState.goToPreviousPeriod}
+          onNextPeriod={pageState.goToNextPeriod}
+          onToday={pageState.goToToday}
+          onPrint={handlePrint}
           onNewTask={() => setIsNewTaskModalOpen(true)}
         />
+
+        {personalScopeInfo && (
+          <div
+            className={`workPlanPage__scopeBanner workPlanPage__scopeBanner--${personalScopeInfo.tone}`}
+            role="status"
+          >
+            {personalScopeInfo.message}
+          </div>
+        )}
 
         {pageState.range === 'daily' && pageState.scope === 'project' && (
           <WorkPlanDailyGrid
@@ -134,6 +192,8 @@ export function WorkPlanPage() {
           <WorkPlanWeeklyView
             workPlans={scheduling.activeWorkPlans}
             statusFilter={pageState.statusFilter}
+            searchQuery={pageState.searchQuery}
+            periodAnchor={pageState.periodAnchor}
             onTaskClick={setSelectedTask}
           />
         )}
@@ -141,12 +201,18 @@ export function WorkPlanPage() {
         {pageState.range === 'monthly' && (
           <WorkPlanMonthlyView
             workPlans={scheduling.activeWorkPlans}
+            searchQuery={pageState.searchQuery}
+            periodAnchor={pageState.periodAnchor}
             onTaskClick={setSelectedTask}
           />
         )}
 
         {pageState.range === 'yearly' && (
-          <WorkPlanYearlyView workPlans={scheduling.activeWorkPlans} />
+          <WorkPlanYearlyView
+            workPlans={scheduling.activeWorkPlans}
+            searchQuery={pageState.searchQuery}
+            periodAnchor={pageState.periodAnchor}
+          />
         )}
 
         <WorkPlanTaskPanel

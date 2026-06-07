@@ -65,6 +65,8 @@ export function useWorkPlanScheduling(options: {
   isAllProjectsMode: boolean;
   statusFilter: string;
   employeeFilterId: string;
+  searchQuery: string;
+  selectedDate: Date;
 }) {
   const {
     data: employees = [],
@@ -98,6 +100,23 @@ export function useWorkPlanScheduling(options: {
   );
 
   const currentUser = getCurrentUser();
+  // Treat a missing or non-positive employeeId (e.g. an admin account that is
+  // not linked to an employee row) as "no linked employee" so personal scope
+  // never falls back to another employee.
+  const rawCurrentUserEmployeeId = currentUser?.employeeId ?? null;
+  const currentUserEmployeeId =
+    rawCurrentUserEmployeeId != null && rawCurrentUserEmployeeId > 0
+      ? rawCurrentUserEmployeeId
+      : null;
+  const currentUserIsAdmin = currentUser?.roles?.includes('Admin') ?? false;
+
+  const currentUserEmployee = useMemo(
+    () =>
+      currentUserEmployeeId != null
+        ? (employees.find((employee) => employee.employeeId === currentUserEmployeeId) ?? null)
+        : null,
+    [employees, currentUserEmployeeId],
+  );
 
   const employeeRows = useMemo(
     () =>
@@ -105,7 +124,9 @@ export function useWorkPlanScheduling(options: {
         scope: options.scope,
         statusFilter: options.statusFilter,
         employeeFilterId: options.employeeFilterId,
-        currentUserEmployeeId: currentUser?.employeeId ?? null,
+        currentUserEmployeeId,
+        searchQuery: options.searchQuery,
+        selectedDate: options.selectedDate,
       }),
     [
       employees,
@@ -114,13 +135,22 @@ export function useWorkPlanScheduling(options: {
       options.scope,
       options.statusFilter,
       options.employeeFilterId,
-      currentUser?.employeeId,
+      options.searchQuery,
+      options.selectedDate,
+      currentUserEmployeeId,
     ],
   );
 
   const projectRows = useMemo(
-    () => buildProjectDailyBars(activeWorkPlans, insightMap, options.statusFilter),
-    [activeWorkPlans, insightMap, options.statusFilter],
+    () =>
+      buildProjectDailyBars(
+        activeWorkPlans,
+        insightMap,
+        options.statusFilter,
+        options.searchQuery,
+        options.selectedDate,
+      ),
+    [activeWorkPlans, insightMap, options.statusFilter, options.searchQuery, options.selectedDate],
   );
 
   const ganttTasks = useMemo(() => {
@@ -147,6 +177,9 @@ export function useWorkPlanScheduling(options: {
     ganttTasks,
     projectOptions,
     insightMap,
+    currentUserEmployeeId,
+    currentUserEmployee,
+    currentUserIsAdmin,
     isLoading: employeesLoading || allLoading || (singleProjectId != null && singleLoading),
     error: employeesError ?? allWorkPlansError ?? singleWorkPlanError ?? null,
   };

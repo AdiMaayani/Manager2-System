@@ -8,10 +8,81 @@ import type {
   WorkPlanTaskSummary,
 } from '../types';
 import {
+  getWorkPlanPriorityDisplay,
+  getWorkPlanStatusDisplay,
+  isWorkPlanPriorityUrgent,
   isWorkPlanStatusDone,
   isWorkPlanStatusInProgress,
   matchesWorkPlanStatusFilter,
 } from '../constants';
+
+/**
+ * Case-insensitive "contains" match across a task's searchable text fields.
+ * Pure helper shared by every view so search behaves consistently. An empty
+ * query matches everything.
+ */
+export function matchesWorkPlanSearch(
+  fields: Array<string | null | undefined>,
+  query: string,
+): boolean {
+  const normalizedQuery = query.trim().toLowerCase();
+  if (!normalizedQuery) return true;
+  return fields.some((field) =>
+    String(field ?? '').toLowerCase().includes(normalizedQuery),
+  );
+}
+
+/** Builds the searchable text fields for a task within its work plan. */
+export function buildTaskSearchFields(
+  task: WorkPlanTaskSummary,
+  workPlan: MappedWorkPlan,
+  assignment: ResolvedAssignment,
+): Array<string | null | undefined> {
+  return [
+    task.title,
+    task.description,
+    workPlan.project.title,
+    assignment.displayName,
+    assignment.role,
+    task.requiredRole,
+    task.status,
+    getWorkPlanStatusDisplay(task.status),
+    task.priority,
+    getWorkPlanPriorityDisplay(task.priority),
+  ];
+}
+
+function localDateKey(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, '0');
+  const day = String(date.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Returns true when a task belongs on the given calendar day. Used to wire the
+ * daily period anchor into the daily views. The date is taken from the stored
+ * `plannedStart` string (no timezone reinterpretation) so the displayed times
+ * and scheduling values are never altered. A null `selectedDate` disables the
+ * filter; tasks without a planned date are treated as unscheduled and remain
+ * visible on every day so no data is hidden.
+ */
+export function taskMatchesSelectedDate(
+  plannedStart: string | null | undefined,
+  selectedDate?: Date | null,
+): boolean {
+  if (!selectedDate) return true;
+  if (!plannedStart) return true;
+
+  const isoMatch = plannedStart.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (isoMatch) {
+    return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}` === localDateKey(selectedDate);
+  }
+
+  const parsed = new Date(plannedStart);
+  if (Number.isNaN(parsed.getTime())) return true;
+  return localDateKey(parsed) === localDateKey(selectedDate);
+}
 
 export function resolveAssignment(
   task: WorkPlanTaskSummary,
@@ -117,8 +188,11 @@ export function buildEmployeeDailyBars(
     currentUserEmployeeId?: number | null;
     scope: 'company' | 'personal' | 'employee' | 'project';
     statusFilter: string;
+    searchQuery?: string;
+    selectedDate?: Date | null;
   },
 ): Array<{ employee: WorkPlanEmployee; tasks: ScheduledTaskBar[] }> {
+  const searchQuery = options.searchQuery ?? '';
   const taskContexts = workPlans.flatMap((workPlan) =>
     workPlan.tasks.map((task) => ({ task, workPlan })),
   );
@@ -127,7 +201,11 @@ export function buildEmployeeDailyBars(
     if (!employee.fullName || !employee.isActive) return false;
     const employeeId = String(employee.employeeId);
 
-    if (options.scope === 'personal' && options.currentUserEmployeeId != null) {
+    if (options.scope === 'personal') {
+      // Personal scope must reflect the signed-in user only. Without a linked
+      // employee we surface an empty state at the page level instead of
+      // silently falling back to "everyone".
+      if (options.currentUserEmployeeId == null) return false;
       return employee.employeeId === options.currentUserEmployeeId;
     }
 
@@ -143,7 +221,12 @@ export function buildEmployeeDailyBars(
     const employeeTasks = taskContexts.filter(({ task, workPlan }) => {
       const assignment = resolveAssignment(task, workPlan);
       if (String(assignment.employeeId ?? '').trim() !== employeeId) return false;
-      return matchesWorkPlanStatusFilter(task.status, options.statusFilter);
+      if (!matchesWorkPlanStatusFilter(task.status, options.statusFilter)) return false;
+      if (!taskMatchesSelectedDate(task.plannedStart, options.selectedDate)) return false;
+      return matchesWorkPlanSearch(
+        buildTaskSearchFields(task, workPlan, assignment),
+        searchQuery,
+      );
     });
 
     const tasks: ScheduledTaskBar[] = employeeTasks.map(({ task, workPlan }, index) => {
@@ -171,6 +254,7 @@ export function buildEmployeeDailyBars(
         requiredRole: task.requiredRole,
         isLocked: task.isLocked,
         isPersonal: false,
+        isUrgent: isWorkPlanPriorityUrgent(task.priority),
         assignmentSource: assignment.source,
         violationCount: insights.violationCount,
         warningCount: insights.warningCount,
@@ -186,12 +270,22 @@ export function buildProjectDailyBars(
   workPlans: MappedWorkPlan[],
   insightMap: Map<number, TaskInsightCounts>,
   statusFilter: string,
+  searchQuery = '',
+  selectedDate?: Date | null,
 ): Array<{ projectId: number; projectTitle: string; tasks: ScheduledTaskBar[] }> {
   return workPlans
     .filter((workPlan) => workPlan.project.id > 0 && workPlan.tasks.length > 0)
     .map((workPlan) => {
       const tasks: ScheduledTaskBar[] = workPlan.tasks
-        .filter((task) => matchesWorkPlanStatusFilter(task.status, statusFilter))
+        .filter((task) => {
+          if (!matchesWorkPlanStatusFilter(task.status, statusFilter)) return false;
+          if (!taskMatchesSelectedDate(task.plannedStart, selectedDate)) return false;
+          const assignment = resolveAssignment(task, workPlan);
+          return matchesWorkPlanSearch(
+            buildTaskSearchFields(task, workPlan, assignment),
+            searchQuery,
+          );
+        })
         .map((task, index) => {
           const assignment = resolveAssignment(task, workPlan);
           const insights = buildTaskInsightCounts(task.workItemId, insightMap);
@@ -216,6 +310,7 @@ export function buildProjectDailyBars(
             requiredRole: task.requiredRole,
             isLocked: task.isLocked,
             isPersonal: false,
+            isUrgent: isWorkPlanPriorityUrgent(task.priority),
             assignmentSource: assignment.source,
             violationCount: insights.violationCount,
             warningCount: insights.warningCount,
@@ -228,7 +323,8 @@ export function buildProjectDailyBars(
         projectTitle: workPlan.project.title,
         tasks,
       };
-    });
+    })
+    .filter((row) => row.tasks.length > 0 || !searchQuery.trim());
 }
 
 export function hourToPercent(hour: number): number {

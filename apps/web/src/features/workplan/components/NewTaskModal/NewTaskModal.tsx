@@ -185,6 +185,18 @@ export function NewTaskModal({
     [employees],
   );
 
+  const selectedEmployeeName = useMemo(() => {
+    if (!employeeId) return null;
+    const match = assignableEmployees.find((employee) => String(employee.employeeId) === employeeId);
+    if (match) return match.fullName;
+    if (acceptedRecommendation && String(acceptedRecommendation.employeeId) === employeeId) {
+      return acceptedRecommendation.employeeName;
+    }
+    return `עובד #${employeeId}`;
+  }, [acceptedRecommendation, assignableEmployees, employeeId]);
+
+  const isManualSelection = Boolean(employeeId) && !acceptedRecommendation;
+
   useEffect(() => {
     if (!isOpen) return;
 
@@ -271,11 +283,9 @@ export function NewTaskModal({
         throw new Error('יש לבחור עובד תקין לשיוך');
       }
 
-      if (recommendation) {
-        if (!acceptedRecommendation || acceptedRecommendation.employeeId !== parsedEmployeeId) {
-          throw new Error('יש לאשר את המלצת השיבוץ לפני שמירת המשימה');
-        }
-      }
+      // Smart Assignment is optional. A manually selected employee is enough to
+      // save; accepting a recommendation only replaces the selected employee.
+      // The single requirement is that some employee is assigned (enforced above).
 
       const plannedTimeRange = validatePlannedTimeRange(plannedDate, plannedStart, plannedEnd);
 
@@ -493,6 +503,11 @@ export function NewTaskModal({
                 />
               </div>
 
+              <p className="newTaskModal__fieldHint">
+                הערכת השעות משמשת לתכנון עומס העובדים ולחישוב המלצת השיבוץ החכם. היא אינה משנה את חלון
+                הזמן המתוכנן (שעת התחלה וסיום).
+              </p>
+
               <div className="newTaskModal__grid">
                 <label className="newTaskModal__field">
                   <span>סטטוס</span>
@@ -578,6 +593,14 @@ export function NewTaskModal({
                   ההמלצה נבנית לפי משימות הפרויקט, עומסי העובדים והכללים הקיימים.
                 </p>
               </div>
+
+              {selectedEmployeeName && (
+                <p className="newTaskModal__assignedNote">
+                  {acceptedRecommendation
+                    ? `העובד המשויך: ${selectedEmployeeName} · התקבל מהמלצת השיבוץ.`
+                    : `כבר נבחר עובד: ${selectedEmployeeName}. קבלת המלצת השיבוץ היא אופציונלית — ניתן לשמור עם העובד שנבחר.`}
+                </p>
+              )}
 
               {isSmartLoading && (
                 <div className="newTaskModal__smartLoading">
@@ -688,7 +711,11 @@ export function NewTaskModal({
                 disabled={mutation.isPending || isSmartLoading || !isTaskPersistenceAvailable}
                 title={!isTaskPersistenceAvailable ? taskPersistenceMessage : undefined}
               >
-                {mutation.isPending ? 'שומר...' : 'שמור משימה'}
+                {mutation.isPending
+                  ? 'שומר...'
+                  : isManualSelection
+                    ? 'שמור עם העובד שנבחר'
+                    : 'שמור משימה'}
               </Button>
             )}
             <Button type="button" variant="secondary" onClick={handleClose}>
