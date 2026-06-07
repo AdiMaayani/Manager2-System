@@ -54,18 +54,21 @@ DECLARE @Now DATETIME2(0) = SYSUTCDATETIME();
 BEGIN TRY
     BEGIN TRAN;
 
+    /* Skill catalog aligned to the business domains (= task RequiredRole set
+       and the inventory categories). Rec_Skills is preserved across cleanup,
+       so this reuses existing rows by name and only adds missing ones. */
     DECLARE @SkillCat TABLE (SkillName NVARCHAR(100), SkillCategory NVARCHAR(100), Descr NVARCHAR(255));
     INSERT INTO @SkillCat (SkillName, SkillCategory, Descr) VALUES
-        (N'התקנת מצלמות ו-NVR', N'מצלמות ואבטחה',  N'התקנה, כבילה והגדרת מצלמות IP ומקליטי NVR'),
-        (N'בקרת כניסה ומחסומים', N'בקרת כניסה',     N'בקרים, קוראים, מנעולים ומחסומי חניון'),
-        (N'תשתיות תקשורת מבנים', N'תקשורת ותשתית', N'השחלת CAT6, פאנלים, מיתוג ותשתית פסיבית'),
-        (N'סיב אופטי',           N'תקשורת ותשתית', N'ריתוך, חיבור ובדיקת סיב אופטי'),
-        (N'חשמל ומתח נמוך',      N'חשמל ובקרה',    N'עבודות חשמל, מתח נמוך וספקי כוח'),
-        (N'גילוי וכיבוי אש',     N'בטיחות אש',     N'גלאים כתובתיים, רכזות וכריזת חירום'),
-        (N'כריזה ומולטימדיה',    N'כריזה ומולטימדיה', N'רמקולים, מגברים, מקרנים ומסכים'),
-        (N'בקרת מבנה BMS',       N'חשמל ובקרה',    N'בקרי DDC, חיישנים ובקרת מבנה'),
-        (N'ניהול פרויקטים',      N'ניהול',         N'ניהול לוחות זמנים, צוותים ומסירות'),
-        (N'אבחון ותיקון תקלות',  N'שירות',         N'אבחון תקלות שטח ותיקון מערכות מותקנות');
+        (N'מצלמות אבטחה',       N'מתח נמוך מאוד', N'התקנה, כבילה והגדרת מצלמות IP ומקליטי NVR'),
+        (N'מערכות אזעקה',       N'מתח נמוך מאוד', N'רכזות אזעקה, גלאים, סירנות וגילוי אש'),
+        (N'שו"ב',               N'שליטה ובקרה',   N'בקרת כניסה, מחסומים ובקרי מבנה (DDC)'),
+        (N'רשת מחשבים',         N'תקשורת',        N'מיתוג מנוהל, פאנלים, ארונות תקשורת ונתבים'),
+        (N'טלפוניה ואינטרקום',  N'תקשורת',        N'מרכזיות IP, אינטרקום ושלוחות'),
+        (N'כבילה ותשתיות',      N'תשתיות',        N'השחלת CAT6, סיב אופטי, צנרת ותשתית פסיבית'),
+        (N'חשמל חכם',           N'חשמל ובקרה',    N'עמעום, ממסרים חכמים, ספקי כוח ובקרת תאורה'),
+        (N'מולטימדיה',          N'מולטימדיה',     N'רמקולים, מגברים, מקרנים ומסכים'),
+        (N'ניהול פרויקטים',     N'ניהול',         N'ניהול לוחות זמנים, צוותים ומסירות'),
+        (N'אבחון ותיקון תקלות', N'שירות',         N'אבחון תקלות שטח ותיקון מערכות מותקנות');
 
     INSERT INTO dbo.Rec_Skills (SkillName, SkillCategory, Description, IsActive, CreatedAt)
     SELECT sc.SkillName, sc.SkillCategory, sc.Descr, 1, @Now
@@ -103,33 +106,34 @@ RAISERROR(N'-- 08: catalog section done. --', 0, 1) WITH NOWAIT;
 BEGIN TRY
     BEGIN TRAN;
 
-    /* ---- B. Employee skills (per role) ---- */
-    DECLARE @EmpSkill TABLE (Role NVARCHAR(100), SkillName NVARCHAR(100), SkillLevel INT, Years DECIMAL(5,2), IsCertified BIT);
+    /* ---- B. Employee skills (keyed by PrimaryRole of IsAssignable=1 staff) ----
+       Three installers share PrimaryRole = N'צוות התקנות', so they all inherit
+       the installer skill set. Every task RequiredRole domain has >=1 candidate. */
+    DECLARE @EmpSkill TABLE (Role NVARCHAR(120), SkillName NVARCHAR(100), SkillLevel INT, Years DECIMAL(5,2), IsCertified BIT);
     INSERT INTO @EmpSkill (Role, SkillName, SkillLevel, Years, IsCertified) VALUES
-        (N'מנהל פרויקטים',          N'ניהול פרויקטים',     5, 8.0, 1),
-        (N'מנהל פרויקטים',          N'אבחון ותיקון תקלות', 3, 5.0, 0),
-        (N'מנהלת פרויקטים',         N'ניהול פרויקטים',     5, 7.0, 1),
-        (N'מנהלת פרויקטים',         N'כריזה ומולטימדיה',   3, 4.0, 0),
-        (N'טכנאי בכיר',             N'אבחון ותיקון תקלות', 5, 10.0,1),
-        (N'טכנאי בכיר',             N'התקנת מצלמות ו-NVR', 4, 8.0, 0),
-        (N'טכנאי בכיר',             N'תשתיות תקשורת מבנים',4, 8.0, 0),
-        (N'טכנאי בכיר',             N'בקרת כניסה ומחסומים',3, 6.0, 0),
-        (N'טכנאי מערכות מתח נמוך',  N'חשמל ומתח נמוך',     4, 6.0, 0),
-        (N'טכנאי מערכות מתח נמוך',  N'תשתיות תקשורת מבנים',3, 5.0, 0),
-        (N'טכנאי מערכות מתח נמוך',  N'בקרת כניסה ומחסומים',3, 5.0, 0),
-        (N'חשמלאי מוסמך',           N'חשמל ומתח נמוך',     5, 9.0, 1),
-        (N'חשמלאי מוסמך',           N'גילוי וכיבוי אש',    4, 6.0, 1),
-        (N'חשמלאי מוסמך',           N'בקרת מבנה BMS',      3, 4.0, 0),
-        (N'מתקין מצלמות',           N'התקנת מצלמות ו-NVR', 5, 6.0, 0),
-        (N'מתקין מצלמות',           N'תשתיות תקשורת מבנים',3, 5.0, 0),
-        (N'טכנאי תקשורת',           N'תשתיות תקשורת מבנים',5, 7.0, 0),
-        (N'טכנאי תקשורת',           N'סיב אופטי',          4, 5.0, 1),
-        (N'טכנאי תקשורת',           N'התקנת מצלמות ו-NVR', 2, 3.0, 0),
-        (N'מתקין בקרת כניסה',       N'בקרת כניסה ומחסומים',5, 6.0, 0),
-        (N'מתקין בקרת כניסה',       N'חשמל ומתח נמוך',     3, 4.0, 0),
-        (N'טכנאי שירות',            N'אבחון ותיקון תקלות', 4, 5.0, 0),
-        (N'טכנאי שירות',            N'כריזה ומולטימדיה',   3, 4.0, 0),
-        (N'טכנאי שירות',            N'התקנת מצלמות ו-NVR', 2, 3.0, 0);
+        /* רותם — ראש צוות חשמל חכם ומולטימדיה */
+        (N'ראש צוות חשמל חכם ומולטימדיה / ניהול פרויקטים / שירות והתקנות', N'חשמל חכם',           5, 9.0, 1),
+        (N'ראש צוות חשמל חכם ומולטימדיה / ניהול פרויקטים / שירות והתקנות', N'מולטימדיה',          5, 8.0, 0),
+        (N'ראש צוות חשמל חכם ומולטימדיה / ניהול פרויקטים / שירות והתקנות', N'שו"ב',               3, 6.0, 0),
+        (N'ראש צוות חשמל חכם ומולטימדיה / ניהול פרויקטים / שירות והתקנות', N'ניהול פרויקטים',     4, 7.0, 1),
+        (N'ראש צוות חשמל חכם ומולטימדיה / ניהול פרויקטים / שירות והתקנות', N'אבחון ותיקון תקלות', 4, 7.0, 0),
+        /* יובל — ראש צוות מתח נמוך מאוד */
+        (N'ראש צוות מתח נמוך מאוד / ניהול פרויקטים / שירות והתקנות',       N'מצלמות אבטחה',       5, 9.0, 1),
+        (N'ראש צוות מתח נמוך מאוד / ניהול פרויקטים / שירות והתקנות',       N'מערכות אזעקה',       4, 7.0, 0),
+        (N'ראש צוות מתח נמוך מאוד / ניהול פרויקטים / שירות והתקנות',       N'שו"ב',               4, 7.0, 0),
+        (N'ראש צוות מתח נמוך מאוד / ניהול פרויקטים / שירות והתקנות',       N'רשת מחשבים',         4, 6.0, 1),
+        (N'ראש צוות מתח נמוך מאוד / ניהול פרויקטים / שירות והתקנות',       N'טלפוניה ואינטרקום',  3, 5.0, 0),
+        (N'ראש צוות מתח נמוך מאוד / ניהול פרויקטים / שירות והתקנות',       N'ניהול פרויקטים',     4, 6.0, 1),
+        (N'ראש צוות מתח נמוך מאוד / ניהול פרויקטים / שירות והתקנות',       N'אבחון ותיקון תקלות', 4, 6.0, 0),
+        /* איתן / עופר / ליאור — צוות התקנות (shared role) */
+        (N'צוות התקנות',  N'כבילה ותשתיות',      4, 5.0, 0),
+        (N'צוות התקנות',  N'מצלמות אבטחה',       4, 5.0, 0),
+        (N'צוות התקנות',  N'רשת מחשבים',         3, 4.0, 0),
+        (N'צוות התקנות',  N'חשמל חכם',           3, 4.0, 0),
+        (N'צוות התקנות',  N'מולטימדיה',          3, 4.0, 0),
+        (N'צוות התקנות',  N'מערכות אזעקה',       3, 4.0, 0),
+        (N'צוות התקנות',  N'טלפוניה ואינטרקום',  3, 3.0, 0),
+        (N'צוות התקנות',  N'אבחון ותיקון תקלות', 3, 4.0, 0);
 
     INSERT INTO dbo.Rec_EmployeeSkills (EmployeeId, SkillId, SkillLevel, YearsExperience, IsCertified, CreatedAt)
     SELECT e.EmployeeId, s.SkillId, es.SkillLevel, es.Years, es.IsCertified, @Now
@@ -140,18 +144,15 @@ BEGIN TRY
     RAISERROR(N'Rec_EmployeeSkills upserted (+%d new).', 0, 1, @@ROWCOUNT) WITH NOWAIT;
 
     /* ---- C. Employee work zones: home (primary) + secondary coverage ---- */
+    /* Only the five IsAssignable=1 operational employees get a base address
+       and work zones. Admin / sales / domain managers are intentionally absent. */
     DECLARE @EmpBase TABLE (FullName NVARCHAR(100), City NVARCHAR(100), ZoneName NVARCHAR(100));
     INSERT INTO @EmpBase (FullName, City, ZoneName) VALUES
-        (N'יוסי אברהמי', N'רעננה',   N'אזור השרון'),
-        (N'דנה כהן',      N'תל אביב', N'אזור גוש דן'),
-        (N'איציק לוי',    N'כפר סבא', N'אזור השרון'),
-        (N'מוחמד עוואד',  N'טירה',    N'אזור השרון'),
-        (N'סרגיי פלדמן',  N'נתניה',   N'אזור השרון'),
-        (N'אבי מזרחי',    N'הרצליה',  N'אזור השרון'),
-        (N'נועם שלו',     N'תל אביב', N'אזור גוש דן'),
-        (N'ראמי חורי',    N'חולון',   N'אזור גוש דן'),
-        (N'טל גולן',      N'רעננה',   N'אזור השרון'),
-        (N'עומר בן דוד',  N'בת ים',   N'אזור גוש דן');
+        (N'רותם', N'כפר סבא', N'אזור השרון'),
+        (N'יובל', N'רעננה',   N'אזור השרון'),
+        (N'איתן', N'נתניה',   N'אזור השרון'),
+        (N'עופר', N'תל אביב', N'אזור גוש דן'),
+        (N'ליאור',N'בת ים',   N'אזור גוש דן');
 
     /* Primary zone = home zone. */
     INSERT INTO dbo.Rec_EmployeeWorkZones (EmployeeId, ZoneId, IsPrimary, Notes, CreatedAt)
@@ -165,12 +166,11 @@ BEGIN TRY
     /* Secondary coverage so both metro zones have candidates per role. */
     DECLARE @EmpZoneExtra TABLE (FullName NVARCHAR(100), ZoneName NVARCHAR(100));
     INSERT INTO @EmpZoneExtra (FullName, ZoneName) VALUES
-        (N'איציק לוי',   N'אזור גוש דן'),
-        (N'טל גולן',     N'אזור גוש דן'),
-        (N'מוחמד עוואד', N'אזור גוש דן'),
-        (N'סרגיי פלדמן', N'אזור גוש דן'),
-        (N'נועם שלו',    N'אזור השרון'),
-        (N'ראמי חורי',   N'אזור השרון');
+        (N'רותם', N'אזור גוש דן'),
+        (N'יובל', N'אזור גוש דן'),
+        (N'איתן', N'אזור גוש דן'),
+        (N'עופר', N'אזור השרון'),
+        (N'ליאור',N'אזור השרון');
 
     INSERT INTO dbo.Rec_EmployeeWorkZones (EmployeeId, ZoneId, IsPrimary, Notes, CreatedAt)
     SELECT e.EmployeeId, z.ZoneId, 0, N'אזור משני', @Now
@@ -227,12 +227,13 @@ BEGIN TRY
                       WHERE a.EmployeeId = e.EmployeeId AND a.AvailableFrom = @AvailFrom AND a.AvailabilityType = N'Available');
     RAISERROR(N'Rec_EmployeeAvailability (Available windows) upserted (+%d new).', 0, 1, @@ROWCOUNT) WITH NOWAIT;
 
-    /* Short blocking windows (do not blanket-block the roster). */
+    /* Short blocking windows (do not blanket-block the roster). Placed past the
+       dense WorkPlan horizon (+35d) so they never collide with scheduled tasks. */
     DECLARE @Blocks TABLE (FullName NVARCHAR(100), Kind NVARCHAR(20), StartOffset INT, DurDays INT, Notes NVARCHAR(500));
     INSERT INTO @Blocks (FullName, Kind, StartOffset, DurDays, Notes) VALUES
-        (N'סרגיי פלדמן', N'Leave',    20, 4, N'חופשה מתוכננת'),
-        (N'טל גולן',     N'Training', 15, 1, N'יום הדרכת יצרן'),
-        (N'מוחמד עוואד', N'Busy',     30, 1, N'יום ספירת מלאי');
+        (N'איתן', N'Leave',    42, 4, N'חופשה מתוכננת'),
+        (N'ליאור',N'Training', 47, 1, N'יום הדרכת יצרן'),
+        (N'עופר', N'Busy',     40, 1, N'יום ספירת מלאי');
 
     INSERT INTO dbo.Rec_EmployeeAvailability (EmployeeId, AvailableFrom, AvailableTo, AvailabilityType, Source, Notes, CreatedAt)
     SELECT e.EmployeeId,
@@ -269,24 +270,30 @@ BEGIN TRY
     RAISERROR(N'Rec_SiteAddressProfile upserted (+%d new).', 0, 1, @@ROWCOUNT) WITH NOWAIT;
 
     /* ---- G. Required skills per task / service call (by RequiredRole). ---- */
+    /* Each WorkItem.RequiredRole IS a skill-domain name; map it to that skill
+       (Critical) plus one realistic secondary skill. Covers every RequiredRole
+       used in 04 / 07. */
     DECLARE @RoleSkill TABLE (Role NVARCHAR(100), SkillName NVARCHAR(100), Importance NVARCHAR(20), RequiredLevel INT);
     INSERT INTO @RoleSkill (Role, SkillName, Importance, RequiredLevel) VALUES
-        (N'מנהל פרויקטים',          N'ניהול פרויקטים',     N'Critical', 4),
-        (N'מנהלת פרויקטים',         N'ניהול פרויקטים',     N'Critical', 4),
-        (N'טכנאי בכיר',             N'אבחון ותיקון תקלות', N'Critical', 4),
-        (N'טכנאי בכיר',             N'תשתיות תקשורת מבנים',N'Preferred',3),
-        (N'טכנאי מערכות מתח נמוך',  N'חשמל ומתח נמוך',     N'Critical', 4),
-        (N'טכנאי מערכות מתח נמוך',  N'בקרת כניסה ומחסומים',N'Preferred',3),
-        (N'חשמלאי מוסמך',           N'חשמל ומתח נמוך',     N'Critical', 4),
-        (N'חשמלאי מוסמך',           N'גילוי וכיבוי אש',    N'Important', 3),
-        (N'מתקין מצלמות',           N'התקנת מצלמות ו-NVR', N'Critical', 4),
-        (N'מתקין מצלמות',           N'תשתיות תקשורת מבנים',N'Preferred',2),
-        (N'טכנאי תקשורת',           N'תשתיות תקשורת מבנים',N'Critical', 4),
-        (N'טכנאי תקשורת',           N'סיב אופטי',          N'Important', 3),
-        (N'מתקין בקרת כניסה',       N'בקרת כניסה ומחסומים',N'Critical', 4),
-        (N'מתקין בקרת כניסה',       N'חשמל ומתח נמוך',     N'Preferred',2),
-        (N'טכנאי שירות',            N'אבחון ותיקון תקלות', N'Critical', 4),
-        (N'טכנאי שירות',            N'כריזה ומולטימדיה',   N'Preferred',2);
+        (N'ניהול פרויקטים',     N'ניהול פרויקטים',     N'Critical', 4),
+        (N'ניהול פרויקטים',     N'אבחון ותיקון תקלות', N'Preferred',2),
+        (N'מצלמות אבטחה',       N'מצלמות אבטחה',       N'Critical', 4),
+        (N'מצלמות אבטחה',       N'כבילה ותשתיות',      N'Preferred',3),
+        (N'מערכות אזעקה',       N'מערכות אזעקה',       N'Critical', 4),
+        (N'מערכות אזעקה',       N'אבחון ותיקון תקלות', N'Important', 3),
+        (N'שו"ב',               N'שו"ב',               N'Critical', 4),
+        (N'שו"ב',               N'חשמל חכם',           N'Preferred',2),
+        (N'רשת מחשבים',         N'רשת מחשבים',         N'Critical', 4),
+        (N'רשת מחשבים',         N'כבילה ותשתיות',      N'Important', 3),
+        (N'טלפוניה ואינטרקום',  N'טלפוניה ואינטרקום',  N'Critical', 4),
+        (N'טלפוניה ואינטרקום',  N'רשת מחשבים',         N'Preferred',2),
+        (N'כבילה ותשתיות',      N'כבילה ותשתיות',      N'Critical', 4),
+        (N'כבילה ותשתיות',      N'רשת מחשבים',         N'Preferred',2),
+        (N'חשמל חכם',           N'חשמל חכם',           N'Critical', 4),
+        (N'חשמל חכם',           N'שו"ב',               N'Preferred',2),
+        (N'מולטימדיה',          N'מולטימדיה',          N'Critical', 4),
+        (N'מולטימדיה',          N'חשמל חכם',           N'Preferred',2),
+        (N'אבחון ותיקון תקלות', N'אבחון ותיקון תקלות', N'Critical', 4);
 
     INSERT INTO dbo.Rec_WorkItemRequiredSkills (WorkItemId, SkillId, RequiredLevel, ImportanceLevel, Notes, CreatedAt)
     SELECT wi.WorkItemId, s.SkillId, rs.RequiredLevel, rs.Importance, N'נגזר מתפקיד נדרש: ' + wi.RequiredRole, @Now

@@ -67,6 +67,23 @@ INNER JOIN dbo.UserRoles ur ON ur.UserId = u.UserId AND ur.IsActive = 1
 INNER JOIN dbo.Roles r ON r.RoleId = ur.RoleId AND r.RoleName = N'Admin'
 WHERE u.IsActive = 1;
 
+/* ---- 1c. Admin / project-team employees may exist (Users.EmployeeId is
+   required) but must NOT be Smart-Assignment candidates (IsAssignable=0). --- */
+SELECT
+    N'1c. Admin employees not assignable' AS Check_Name,
+    e.EmployeeId,
+    e.FullName,
+    e.PrimaryRole,
+    e.IsAssignable,
+    CASE WHEN e.IsAssignable = 0 THEN N'PASS' ELSE N'CHECK - admin must be IsAssignable=0' END AS Result
+FROM dbo.Users u
+INNER JOIN dbo.Employees e ON e.EmployeeId = u.EmployeeId
+WHERE EXISTS (
+    SELECT 1 FROM dbo.UserRoles ur
+    INNER JOIN dbo.Roles r ON r.RoleId = ur.RoleId
+    WHERE ur.UserId = u.UserId AND ur.IsActive = 1 AND r.RoleName = N'Admin')
+ORDER BY e.FullName;
+
 /* ---- 2. Core entity counts ---------------------------------------- */
 SELECT
     N'2. Core entities' AS Check_Name,
@@ -76,6 +93,56 @@ SELECT
     (SELECT COUNT(*) FROM dbo.Contacts)                                         AS Contacts,
     (SELECT COUNT(*) FROM dbo.Contractors)                                      AS Contractors,
     (SELECT COUNT(*) FROM dbo.InventoryItems WHERE IsActive = 1)                AS Inventory_active;
+
+/* ---- 2a. Active roster: PrimaryRole + IsAssignable split.
+   Assignable (=1): רותם, יובל, איתן, עופר, ליאור. Non-assignable (=0):
+   the three sales/domain managers + the five admin/project-team users. ---- */
+SELECT
+    N'2a. Roster' AS Check_Name,
+    e.EmployeeId,
+    e.FullName,
+    e.PrimaryRole,
+    e.IsAssignable,
+    e.DailyCapacityHours
+FROM dbo.Employees e
+WHERE e.IsActive = 1
+ORDER BY e.IsAssignable DESC, e.FullName;
+
+/* ---- 2b. Customer type domain = {עסקי, מוסד, פרטי} (Internal excluded). --- */
+SELECT
+    N'2b. Customer type domain' AS Check_Name,
+    SUM(CASE WHEN c.CustomerType IN (N'עסקי', N'מוסד', N'פרטי') THEN 1 ELSE 0 END)     AS Valid_types,
+    SUM(CASE WHEN c.CustomerType NOT IN (N'עסקי', N'מוסד', N'פרטי') THEN 1 ELSE 0 END) AS Invalid_types,
+    CASE WHEN SUM(CASE WHEN c.CustomerType NOT IN (N'עסקי', N'מוסד', N'פרטי') THEN 1 ELSE 0 END) = 0
+         THEN N'PASS' ELSE N'CHECK - unexpected customer type' END AS Result
+FROM dbo.Customers c
+WHERE c.CustomerType <> N'Internal';
+
+/* ---- 2c. Customer business status = {פרויקט בביצוע, בשירות תחת חוזה, בתשלום}. --- */
+SELECT
+    N'2c. Customer status domain' AS Check_Name,
+    SUM(CASE WHEN c.Status IN (N'פרויקט בביצוע', N'בשירות תחת חוזה', N'בתשלום') THEN 1 ELSE 0 END)     AS Valid_status,
+    SUM(CASE WHEN c.Status NOT IN (N'פרויקט בביצוע', N'בשירות תחת חוזה', N'בתשלום') OR c.Status IS NULL THEN 1 ELSE 0 END) AS Invalid_status,
+    CASE WHEN SUM(CASE WHEN c.Status NOT IN (N'פרויקט בביצוע', N'בשירות תחת חוזה', N'בתשלום') OR c.Status IS NULL THEN 1 ELSE 0 END) = 0
+         THEN N'PASS' ELSE N'CHECK - unexpected customer status' END AS Result
+FROM dbo.Customers c
+WHERE c.CustomerType <> N'Internal';
+
+/* ---- 2d. Inventory category domain = the eight business categories. ---- */
+SELECT
+    N'2d. Inventory category domain' AS Check_Name,
+    SUM(CASE WHEN i.Category IN (N'חשמל חכם', N'מולטימדיה', N'שו"ב', N'רשת מחשבים',
+                                 N'מצלמות אבטחה', N'מערכות אזעקה', N'טלפוניה ואינטרקום', N'כבילה ותשתיות')
+             THEN 1 ELSE 0 END) AS Valid_categories,
+    SUM(CASE WHEN i.Category NOT IN (N'חשמל חכם', N'מולטימדיה', N'שו"ב', N'רשת מחשבים',
+                                     N'מצלמות אבטחה', N'מערכות אזעקה', N'טלפוניה ואינטרקום', N'כבילה ותשתיות')
+             THEN 1 ELSE 0 END) AS Invalid_categories,
+    CASE WHEN SUM(CASE WHEN i.Category NOT IN (N'חשמל חכם', N'מולטימדיה', N'שו"ב', N'רשת מחשבים',
+                                               N'מצלמות אבטחה', N'מערכות אזעקה', N'טלפוניה ואינטרקום', N'כבילה ותשתיות')
+                       THEN 1 ELSE 0 END) = 0
+         THEN N'PASS' ELSE N'CHECK - unexpected inventory category' END AS Result
+FROM dbo.InventoryItems i
+WHERE i.IsActive = 1;
 
 /* ---- 3. Work items by type ---------------------------------------- */
 SELECT
@@ -148,6 +215,22 @@ FROM dbo.Employees e
 WHERE e.IsActive = 1 AND e.IsAssignable = 1
 ORDER BY e.EmployeeId;
 
+/* ---- 7c. Non-assignable employees (admins + sales/domain managers) must
+   NOT appear in any Smart Assignment candidate input table. ---- */
+SELECT
+    N'7c. Non-assignable excluded from SA' AS Check_Name,
+    (SELECT COUNT(*) FROM dbo.Rec_EmployeeSkills s       INNER JOIN dbo.Employees e ON e.EmployeeId = s.EmployeeId WHERE e.IsAssignable = 0) AS NonAssignable_skills,
+    (SELECT COUNT(*) FROM dbo.Rec_EmployeeWorkZones z    INNER JOIN dbo.Employees e ON e.EmployeeId = z.EmployeeId WHERE e.IsAssignable = 0) AS NonAssignable_zones,
+    (SELECT COUNT(*) FROM dbo.Rec_EmployeeCapacity c     INNER JOIN dbo.Employees e ON e.EmployeeId = c.EmployeeId WHERE e.IsAssignable = 0) AS NonAssignable_capacity,
+    (SELECT COUNT(*) FROM dbo.Rec_EmployeeBaseAddress b  INNER JOIN dbo.Employees e ON e.EmployeeId = b.EmployeeId WHERE e.IsAssignable = 0) AS NonAssignable_base,
+    (SELECT COUNT(*) FROM dbo.Rec_EmployeeAvailability a INNER JOIN dbo.Employees e ON e.EmployeeId = a.EmployeeId WHERE e.IsAssignable = 0) AS NonAssignable_avail,
+    CASE WHEN (SELECT COUNT(*) FROM dbo.Rec_EmployeeSkills s       INNER JOIN dbo.Employees e ON e.EmployeeId = s.EmployeeId WHERE e.IsAssignable = 0)
+            + (SELECT COUNT(*) FROM dbo.Rec_EmployeeWorkZones z    INNER JOIN dbo.Employees e ON e.EmployeeId = z.EmployeeId WHERE e.IsAssignable = 0)
+            + (SELECT COUNT(*) FROM dbo.Rec_EmployeeCapacity c     INNER JOIN dbo.Employees e ON e.EmployeeId = c.EmployeeId WHERE e.IsAssignable = 0)
+            + (SELECT COUNT(*) FROM dbo.Rec_EmployeeBaseAddress b  INNER JOIN dbo.Employees e ON e.EmployeeId = b.EmployeeId WHERE e.IsAssignable = 0)
+            + (SELECT COUNT(*) FROM dbo.Rec_EmployeeAvailability a INNER JOIN dbo.Employees e ON e.EmployeeId = a.EmployeeId WHERE e.IsAssignable = 0) = 0
+         THEN N'PASS' ELSE N'CHECK - a non-assignable employee has SA inputs' END AS Result;
+
 /* ---- 8. Runtime/computed recommendation tables must be EMPTY ------- */
 SELECT
     N'8. Runtime rec tables empty' AS Check_Name,
@@ -163,15 +246,25 @@ SELECT
             + (SELECT COUNT(*) FROM dbo.Rec_RouteEstimates) = 0
          THEN N'PASS' ELSE N'CHECK - expected empty' END AS Result;
 
-/* ---- 9. RequiredRole alignment (every required role has a matching
-          active employee; otherwise the algorithm has no candidate). --- */
+/* ---- 9. RequiredRole skill coverage. RequiredRole is now a skill-domain
+   name (aligned with 08), so a work item is "coverable" when >=1 assignable
+   employee holds that skill. (Explicit by-name assignment is done in 04/07;
+   this confirms the Smart Assignment algorithm also has candidates.) ---- */
 SELECT
-    N'9. RequiredRole alignment' AS Check_Name,
+    N'9. RequiredRole skill coverage' AS Check_Name,
     wi.RequiredRole,
     COUNT(*) AS WorkItems_needing_role,
-    (SELECT COUNT(*) FROM dbo.Employees e WHERE e.IsActive = 1 AND e.IsAssignable = 1 AND e.PrimaryRole = wi.RequiredRole) AS MatchingEmployees,
-    CASE WHEN (SELECT COUNT(*) FROM dbo.Employees e WHERE e.IsActive = 1 AND e.IsAssignable = 1 AND e.PrimaryRole = wi.RequiredRole) > 0
-         THEN N'PASS' ELSE N'CHECK - no matching employee' END AS Result
+    (SELECT COUNT(DISTINCT e.EmployeeId)
+       FROM dbo.Employees e
+       INNER JOIN dbo.Rec_EmployeeSkills es ON es.EmployeeId = e.EmployeeId
+       INNER JOIN dbo.Rec_Skills s ON s.SkillId = es.SkillId
+       WHERE e.IsActive = 1 AND e.IsAssignable = 1 AND s.SkillName = wi.RequiredRole) AS SkilledCandidates,
+    CASE WHEN (SELECT COUNT(DISTINCT e.EmployeeId)
+       FROM dbo.Employees e
+       INNER JOIN dbo.Rec_EmployeeSkills es ON es.EmployeeId = e.EmployeeId
+       INNER JOIN dbo.Rec_Skills s ON s.SkillId = es.SkillId
+       WHERE e.IsActive = 1 AND e.IsAssignable = 1 AND s.SkillName = wi.RequiredRole) > 0
+         THEN N'PASS' ELSE N'CHECK - no skilled candidate' END AS Result
 FROM dbo.WorkItems wi
 WHERE wi.RequiredRole IS NOT NULL
   AND (wi.WorkType = N'ServiceCall'
@@ -188,5 +281,46 @@ SELECT
          OR NOT EXISTS (SELECT 1 FROM dbo.WorkItems p WHERE p.WorkItemId = t.ParentWorkItemId))) AS Tasks_without_parent,
     (SELECT COUNT(*) FROM dbo.WorkEmployeeAssignments wa WHERE NOT EXISTS (SELECT 1 FROM dbo.Employees e WHERE e.EmployeeId = wa.EmployeeId)) AS Assignments_bad_employee,
     (SELECT COUNT(*) FROM dbo.Sites s LEFT JOIN dbo.Customers c ON c.CustomerId = s.CustomerId WHERE c.CustomerId IS NULL) AS Sites_missing_customer;
+
+/* ---- 11. Project stage vs computed progress consistency.
+   Recomputes the same ratio sp_GetProjectLifecycle uses
+   (ClosedTasks / (Total - Cancelled)) and surfaces the Hebrew business stage
+   embedded in the project Description ("שלב נוכחי: ..."). A closed/סיום project
+   must be >=95%; an open project must stay <95%. ---- */
+SELECT
+    N'11. Stage vs progress' AS Check_Name,
+    p.FinanceProjectNumber,
+    p.Status,
+    CASE WHEN CHARINDEX(N'שלב נוכחי:', p.Description) > 0
+         THEN LTRIM(REPLACE(SUBSTRING(p.Description, CHARINDEX(N'שלב נוכחי:', p.Description) + 10, 60), N'.', N''))
+         ELSE NULL END AS StageHe,
+    tc.TotalTasks,
+    tc.ClosedTasks,
+    tc.CancelledTasks,
+    CAST(CASE WHEN (tc.TotalTasks - tc.CancelledTasks) > 0
+              THEN 100.0 * tc.ClosedTasks / (tc.TotalTasks - tc.CancelledTasks)
+              ELSE 0 END AS DECIMAL(5,1)) AS ProgressPct,
+    CASE
+        WHEN p.Status = N'Closed'
+             AND NOT ((tc.TotalTasks - tc.CancelledTasks) > 0
+                      AND (100.0 * tc.ClosedTasks / (tc.TotalTasks - tc.CancelledTasks)) >= 95)
+            THEN N'CHECK - closed/סיום but progress < 95%'
+        WHEN p.Status <> N'Closed'
+             AND (tc.TotalTasks - tc.CancelledTasks) > 0
+             AND (100.0 * tc.ClosedTasks / (tc.TotalTasks - tc.CancelledTasks)) >= 95
+            THEN N'CHECK - open project but progress >= 95%'
+        ELSE N'PASS'
+    END AS Result
+FROM dbo.WorkItems p
+CROSS APPLY (
+    SELECT
+        COUNT(*) AS TotalTasks,
+        SUM(CASE WHEN t.Status = N'Closed'    THEN 1 ELSE 0 END) AS ClosedTasks,
+        SUM(CASE WHEN t.Status = N'Cancelled' THEN 1 ELSE 0 END) AS CancelledTasks
+    FROM dbo.WorkItems t
+    WHERE t.ParentWorkItemId = p.WorkItemId AND t.WorkType = N'Task'
+) tc
+WHERE p.WorkType = N'Project' AND p.FinanceProjectNumber LIKE N'SEED-P%'
+ORDER BY p.FinanceProjectNumber;
 
 RAISERROR(N'== 10_verify: done. Review the result grids above. ==', 0, 1) WITH NOWAIT;

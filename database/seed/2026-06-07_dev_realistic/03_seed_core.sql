@@ -67,10 +67,16 @@ BEGIN TRY
     BEGIN TRAN;
 
     /* ================================================================
-       EMPLOYEES - field roster (names deliberately differ from the
-       preserved admin users to avoid confusion / duplication).
-       Roles align with WorkItems.RequiredRole used in 04 and the
-       skills seeded in 08.
+       EMPLOYEES - operational roster reflecting the real org structure
+       (names deliberately differ from the preserved admin users).
+
+       IsAssignable = 1  -> Smart Assignment / WorkPlan field candidates
+                            (team leads + installation crew).
+       IsAssignable = 0  -> sales / domain managers; appear as employees
+                            but are NOT field-assignable candidates.
+
+       Last names are unknown for now, so first-name Hebrew display names
+       are used intentionally (no invented contact details).
        ================================================================ */
     DECLARE @Employees TABLE (
         FullName NVARCHAR(100),
@@ -81,22 +87,39 @@ BEGIN TRY
         IsAssignable BIT
     );
     INSERT INTO @Employees (FullName, PrimaryRole, Phone, Email, DailyCapacityHours, IsAssignable) VALUES
-        (N'יוסי אברהמי',  N'מנהל פרויקטים',            N'052-5512011', N'yossi.avrahami@smartsys.co.il', 8.00, 1),
-        (N'דנה כהן',       N'מנהלת פרויקטים',           N'052-5512012', N'dana.cohen@smartsys.co.il',     8.00, 1),
-        (N'איציק לוי',     N'טכנאי בכיר',               N'052-5512013', N'itzik.levi@smartsys.co.il',     8.00, 1),
-        (N'מוחמד עוואד',   N'טכנאי מערכות מתח נמוך',     N'052-5512014', N'mohammed.awad@smartsys.co.il',  8.00, 1),
-        (N'סרגיי פלדמן',   N'חשמלאי מוסמך',             N'052-5512015', N'sergey.feldman@smartsys.co.il', 8.00, 1),
-        (N'אבי מזרחי',     N'מתקין מצלמות',             N'052-5512016', N'avi.mizrahi@smartsys.co.il',    8.00, 1),
-        (N'נועם שלו',      N'טכנאי תקשורת',             N'052-5512017', N'noam.shalev@smartsys.co.il',    8.00, 1),
-        (N'ראמי חורי',     N'מתקין בקרת כניסה',         N'052-5512018', N'rami.khoury@smartsys.co.il',    8.00, 1),
-        (N'טל גולן',       N'טכנאי שירות',              N'052-5512019', N'tal.golan@smartsys.co.il',      8.00, 1),
-        (N'עומר בן דוד',   N'מתקין מצלמות',             N'052-5512020', N'omer.bendavid@smartsys.co.il',  8.00, 1);
+        -- Sales / domain managers (not field-assignable)
+        (N'אלון', N'מנהל תחום ומכירות מולטימדיה',   NULL, NULL, NULL, 0),
+        (N'אבי',  N'מנהל מכירות',                    NULL, NULL, NULL, 0),
+        (N'נחום', N'מנהל תחום ומכירות חשמל חכם',     NULL, NULL, NULL, 0),
+        -- Team leads (project management + service + field-assignable)
+        (N'רותם', N'ראש צוות חשמל חכם ומולטימדיה / ניהול פרויקטים / שירות והתקנות', NULL, NULL, 8.00, 1),
+        (N'יובל', N'ראש צוות מתח נמוך מאוד / ניהול פרויקטים / שירות והתקנות',       NULL, NULL, 8.00, 1),
+        -- Installation crew (field-assignable)
+        (N'איתן', N'צוות התקנות', NULL, NULL, 8.00, 1),
+        (N'עופר', N'צוות התקנות', NULL, NULL, 8.00, 1),
+        (N'ליאור',N'צוות התקנות', NULL, NULL, 8.00, 1);
 
     INSERT INTO dbo.Employees (FullName, PrimaryRole, Phone, Email, IsActive, CreatedAt, DailyCapacityHours, IsAssignable)
     SELECT e.FullName, e.PrimaryRole, e.Phone, e.Email, 1, @Now, e.DailyCapacityHours, e.IsAssignable
     FROM @Employees e
     WHERE NOT EXISTS (SELECT 1 FROM dbo.Employees x WHERE x.FullName = e.FullName);
     RAISERROR(N'Employees upserted (+%d new).', 0, 1, @@ROWCOUNT) WITH NOWAIT;
+
+    /* Keep the roster aligned on re-run: correct role / assignability for the
+       operational employees in case an earlier seed created them differently.
+       Admin-linked employees (02b) are left untouched. */
+    UPDATE e
+        SET e.PrimaryRole = src.PrimaryRole,
+            e.IsAssignable = src.IsAssignable,
+            e.DailyCapacityHours = src.DailyCapacityHours,
+            e.IsActive = 1
+    FROM dbo.Employees e
+    INNER JOIN @Employees src ON src.FullName = e.FullName
+    WHERE e.PrimaryRole <> src.PrimaryRole
+       OR e.IsAssignable <> src.IsAssignable
+       OR ISNULL(e.DailyCapacityHours, -1) <> ISNULL(src.DailyCapacityHours, -1)
+       OR e.IsActive <> 1;
+    RAISERROR(N'Operational employees reconciled (%d corrected).', 0, 1, @@ROWCOUNT) WITH NOWAIT;
 
     COMMIT TRAN;
 END TRY
@@ -113,12 +136,15 @@ BEGIN TRAN;
 
 /* ====================================================================
    CUSTOMERS - Israeli low-voltage / smart-systems clients.
-   CustomerType in {עסקי, פרטי, גוף ציבורי, תאגיד}; Status 'פעיל'.
+   CustomerType is restricted to the business set {עסקי, מוסד, פרטי}.
+   Status carries the customer business state and is one of
+   {פרויקט בביצוע, בשירות תחת חוזה, בתשלום} (Customers.Status column).
    Natural key: CustomerName.
    ==================================================================== */
 DECLARE @Customers TABLE (
     CustomerName NVARCHAR(200),
     CustomerType NVARCHAR(50),
+    Status NVARCHAR(50),
     Phone NVARCHAR(20),
     Email NVARCHAR(100),
     City NVARCHAR(100),
@@ -126,21 +152,31 @@ DECLARE @Customers TABLE (
     Address NVARCHAR(255),
     Notes NVARCHAR(1000)
 );
-INSERT INTO @Customers (CustomerName, CustomerType, Phone, Email, City, Region, Address, Notes) VALUES
-    (N'עיריית כפר סבא',                    N'גוף ציבורי', N'09-7649000', N'info@ksaba.muni.il',                N'כפר סבא', N'השרון',  N'רחוב ויצמן 135, כפר סבא',        N'לקוח מסגרת - מערכות אבטחה ובקרה במבני ציבור'),
-    (N'קניון רננים - חברת ניהול',          N'תאגיד',      N'09-7610000', N'mgmt@renanim-mall.co.il',           N'רעננה',   N'השרון',  N'דרך מנחם בגין 2, רעננה',         N'אחזקת מערכות מצלמות וכריזה במתחם המסחרי'),
-    (N'רשת מלונות ישרוטל',                 N'עסקי',       N'03-5200000', N'projects@isrotel-example.co.il',    N'תל אביב', N'גוש דן', N'רחוב הירקון 115, תל אביב',       N'פרויקטי מולטימדיה וחדרי ישיבות'),
-    (N'מכללת אפקה להנדסה',                 N'גוף ציבורי', N'03-7688888', N'facilities@afeka-example.ac.il',    N'תל אביב', N'גוש דן', N'רחוב מבצע קדש 38, תל אביב',      N'תשתיות תקשורת ובקרת כניסה בקמפוס'),
-    (N'מגדלי הים התיכון - ניהול ואחזקה',   N'תאגיד',      N'03-5512345', N'vaad@medtowers.co.il',              N'בת ים',   N'גוש דן', N'שדרות העצמאות 100, בת ים',       N'בקרת מבנה ומערכות בטיחות במגדלי מגורים'),
-    (N'בנק הפועלים סניף רעננה',            N'עסקי',       N'09-7720000', N'branch.raanana@bank-example.co.il', N'רעננה',   N'השרון',  N'אחוזה 96, רעננה',               N'שדרוג מערכות מצלמות ואזעקה בסניף'),
-    (N'מרכז רפואי מאיר',                   N'גוף ציבורי', N'09-7472555', N'maintenance@meir-example.health.il',N'כפר סבא', N'השרון',  N'רחוב טשרניחובסקי 59, כפר סבא',   N'מערכות גילוי אש וכריזת חירום'),
-    (N'משפחת לוי - הרצליה פיתוח',          N'פרטי',       N'054-4412233',N'david.levi@example.com',            N'הרצליה',  N'השרון',  N'רחוב גלי תכלת 20, הרצליה פיתוח', N'מערכת בית חכם בווילה פרטית');
+INSERT INTO @Customers (CustomerName, CustomerType, Status, Phone, Email, City, Region, Address, Notes) VALUES
+    (N'עיריית כפר סבא',                    N'מוסד',  N'בשירות תחת חוזה', N'09-7649000', N'info@ksaba.muni.il',                N'כפר סבא', N'השרון',  N'רחוב ויצמן 135, כפר סבא',        N'לקוח מסגרת - מערכות אבטחה ובקרה במבני ציבור'),
+    (N'קניון רננים - חברת ניהול',          N'עסקי',  N'בשירות תחת חוזה', N'09-7610000', N'mgmt@renanim-mall.co.il',           N'רעננה',   N'השרון',  N'דרך מנחם בגין 2, רעננה',         N'אחזקת מערכות מצלמות וכריזה במתחם המסחרי'),
+    (N'רשת מלונות ישרוטל',                 N'עסקי',  N'פרויקט בביצוע',   N'03-5200000', N'projects@isrotel-example.co.il',    N'תל אביב', N'גוש דן', N'רחוב הירקון 115, תל אביב',       N'פרויקטי מולטימדיה וחדרי ישיבות'),
+    (N'מכללת אפקה להנדסה',                 N'מוסד',  N'פרויקט בביצוע',   N'03-7688888', N'facilities@afeka-example.ac.il',    N'תל אביב', N'גוש דן', N'רחוב מבצע קדש 38, תל אביב',      N'תשתיות תקשורת ובקרת כניסה בקמפוס'),
+    (N'מגדלי הים התיכון - ניהול ואחזקה',   N'עסקי',  N'בשירות תחת חוזה', N'03-5512345', N'vaad@medtowers.co.il',              N'בת ים',   N'גוש דן', N'שדרות העצמאות 100, בת ים',       N'בקרת מבנה ומערכות בטיחות במגדלי מגורים'),
+    (N'בנק הפועלים סניף רעננה',            N'עסקי',  N'בתשלום',          N'09-7720000', N'branch.raanana@bank-example.co.il', N'רעננה',   N'השרון',  N'אחוזה 96, רעננה',               N'שדרוג מערכות מצלמות ואזעקה בסניף'),
+    (N'מרכז רפואי מאיר',                   N'מוסד',  N'פרויקט בביצוע',   N'09-7472555', N'maintenance@meir-example.health.il',N'כפר סבא', N'השרון',  N'רחוב טשרניחובסקי 59, כפר סבא',   N'מערכות גילוי אש וכריזת חירום'),
+    (N'משפחת לוי - הרצליה פיתוח',          N'פרטי',  N'בתשלום',          N'054-4412233',N'david.levi@example.com',            N'הרצליה',  N'השרון',  N'רחוב גלי תכלת 20, הרצליה פיתוח', N'מערכת בית חכם בווילה פרטית');
 
 INSERT INTO dbo.Customers (CustomerName, CustomerType, Phone, Email, PrimaryPhone, PrimaryEmail, City, Region, Address, Status, Notes, IsActive, CreatedAt, CreatedByUserId)
-SELECT c.CustomerName, c.CustomerType, c.Phone, c.Email, c.Phone, c.Email, c.City, c.Region, c.Address, N'פעיל', c.Notes, 1, @Now, @SeedUserId
+SELECT c.CustomerName, c.CustomerType, c.Phone, c.Email, c.Phone, c.Email, c.City, c.Region, c.Address, c.Status, c.Notes, 1, @Now, @SeedUserId
 FROM @Customers c
 WHERE NOT EXISTS (SELECT 1 FROM dbo.Customers x WHERE x.CustomerName = c.CustomerName);
 RAISERROR(N'Customers upserted (+%d new).', 0, 1, @@ROWCOUNT) WITH NOWAIT;
+
+/* Keep CustomerType / Status aligned to the business set on re-run
+   (corrects rows from an earlier seed; never touches the Internal customer). */
+UPDATE x
+    SET x.CustomerType = c.CustomerType,
+        x.Status = c.Status
+FROM dbo.Customers x
+INNER JOIN @Customers c ON c.CustomerName = x.CustomerName
+WHERE x.CustomerType <> c.CustomerType OR ISNULL(x.Status, N'') <> c.Status;
+RAISERROR(N'Customer type/status reconciled (%d corrected).', 0, 1, @@ROWCOUNT) WITH NOWAIT;
 
 /* ====================================================================
    SITES - one or two per customer. Natural key: (CustomerId, SiteName).
@@ -258,6 +294,15 @@ RAISERROR(N'Contractors upserted (+%d new).', 0, 1, @@ROWCOUNT) WITH NOWAIT;
 /* ====================================================================
    INVENTORY - low-voltage / smart-systems catalog. Natural key: SkuCode
    (matches the active-SKU unique filtered index). QuantityOnHand >= 0.
+
+   Category is restricted to the business set:
+     חשמל חכם, מולטימדיה, שו"ב, רשת מחשבים, מצלמות אבטחה,
+     מערכות אזעקה, טלפוניה ואינטרקום, כבילה ותשתיות.
+
+   DB LIMITATION: InventoryItems has no supplier-price / sale-price /
+   warranty columns. Per the brief, warranty status + supplier price +
+   sale price are stored in the existing Notes column (documented in
+   00_README.md). Warranty is one of {באחריות, לא באחריות}.
    ==================================================================== */
 DECLARE @Inventory TABLE (
     SkuCode NVARCHAR(50),
@@ -265,43 +310,79 @@ DECLARE @Inventory TABLE (
     Category NVARCHAR(100),
     QuantityOnHand DECIMAL(18,3),
     Unit NVARCHAR(20),
-    MinimumQuantity DECIMAL(18,3)
+    MinimumQuantity DECIMAL(18,3),
+    Warranty NVARCHAR(20),
+    SupplierPrice DECIMAL(18,2),
+    SalePrice DECIMAL(18,2)
 );
-INSERT INTO @Inventory (SkuCode, ItemName, Category, QuantityOnHand, Unit, MinimumQuantity) VALUES
-    (N'CAM-DOME-4MP',    N'מצלמת כיפה IP 4MP',              N'מצלמות ואבטחה',  48, N'יח׳', 10),
-    (N'CAM-BULLET-8MP',  N'מצלמת צינור IP 8MP',            N'מצלמות ואבטחה',  32, N'יח׳', 8),
-    (N'CAM-PTZ-2MP',     N'מצלמת PTZ ממונעת 2MP',          N'מצלמות ואבטחה',  9,  N'יח׳', 3),
-    (N'NVR-16CH',        N'מקליט רשת NVR 16 ערוצים',        N'מצלמות ואבטחה',  7,  N'יח׳', 2),
-    (N'NVR-32CH',        N'מקליט רשת NVR 32 ערוצים',        N'מצלמות ואבטחה',  4,  N'יח׳', 2),
-    (N'HDD-8TB',         N'דיסק קשיח לאבטחה 8TB',          N'מצלמות ואבטחה',  22, N'יח׳', 6),
-    (N'ACS-CTRL-4DR',    N'בקר כניסה 4 דלתות',             N'בקרת כניסה',     11, N'יח׳', 3),
-    (N'ACS-READER-RFID', N'קורא כרטיסים RFID',             N'בקרת כניסה',     40, N'יח׳', 10),
-    (N'ACS-MAGLOCK-600', N'מנעול מגנטי 600 ק״ג',           N'בקרת כניסה',     26, N'יח׳', 8),
-    (N'ACS-EXIT-BTN',    N'לחצן יציאה',                    N'בקרת כניסה',     35, N'יח׳', 10),
-    (N'ACS-CARD-RFID',   N'כרטיס קרבה RFID',               N'בקרת כניסה',     500,N'יח׳', 100),
-    (N'NET-CAT6-305',    N'כבל רשת CAT6 (תיבה 305 מ׳)',     N'תקשורת ותשתית',  18, N'תיבה',5),
-    (N'NET-PATCH-24',    N'פאנל ניתוק 24 פורט',            N'תקשורת ותשתית',  14, N'יח׳', 4),
-    (N'NET-SWITCH-P24',  N'מתג PoE מנוהל 24 פורט',          N'תקשורת ותשתית',  9,  N'יח׳', 3),
-    (N'NET-RACK-42U',    N'ארון תקשורת 19 אינץ׳ 42U',       N'תקשורת ותשתית',  5,  N'יח׳', 2),
-    (N'NET-FIBER-SM',    N'כבל סיב אופטי חד-מודי (מטר)',    N'תקשורת ותשתית',  1200,N'מ׳',300),
-    (N'NET-PATCHCORD2',  N'כבל חיבור רשת 2 מ׳',            N'תקשורת ותשתית',  220,N'יח׳', 50),
-    (N'AV-SPK-CEIL6',    N'רמקול תקרה 6W',                 N'כריזה ומולטימדיה',60,N'יח׳', 15),
-    (N'AV-AMP-240',      N'מגבר כריזה 240W',               N'כריזה ומולטימדיה',6, N'יח׳', 2),
-    (N'AV-SCREEN-75',    N'מסך מקצועי 75 אינץ׳',            N'כריזה ומולטימדיה',5, N'יח׳', 2),
-    (N'AV-PROJ-LASER',   N'מקרן לייזר 5000 לומן',          N'כריזה ומולטימדיה',4, N'יח׳', 1),
-    (N'AV-MIC-CONF',     N'מיקרופון ועידה שולחני',         N'כריזה ומולטימדיה',18,N'יח׳', 6),
-    (N'ELE-PSU-12V10A',  N'ספק כוח מיוצב 12V 10A',         N'חשמל ובקרה',     30, N'יח׳', 8),
-    (N'ELE-UPS-1500',    N'אל-פסק UPS 1500VA',             N'חשמל ובקרה',     12, N'יח׳', 4),
-    (N'ELE-CONDUIT-25',  N'צינור שרשורי 25 מ״מ (מטר)',     N'חשמל ובקרה',     800,N'מ׳',200),
-    (N'BMS-CTRL-DDC',    N'בקר DDC לבקרת מבנה',            N'חשמל ובקרה',     8,  N'יח׳', 2),
-    (N'FIRE-SMOKE-DET',  N'גלאי עשן אופטי כתובתי',         N'בטיחות אש',      55, N'יח׳', 15),
-    (N'FIRE-PANEL-8Z',   N'רכזת גילוי אש 8 אזורים',         N'בטיחות אש',      4,  N'יח׳', 1);
+INSERT INTO @Inventory (SkuCode, ItemName, Category, QuantityOnHand, Unit, MinimumQuantity, Warranty, SupplierPrice, SalePrice) VALUES
+    -- מצלמות אבטחה
+    (N'CAM-DOME-4MP',    N'מצלמת כיפה IP 4MP',              N'מצלמות אבטחה',     48,  N'יח׳', 10,  N'באחריות',    280.00,  420.00),
+    (N'CAM-BULLET-8MP',  N'מצלמת צינור IP 8MP',            N'מצלמות אבטחה',     32,  N'יח׳', 8,   N'באחריות',    360.00,  540.00),
+    (N'CAM-PTZ-2MP',     N'מצלמת PTZ ממונעת 2MP',          N'מצלמות אבטחה',     9,   N'יח׳', 3,   N'באחריות',    1450.00, 2100.00),
+    (N'NVR-32CH',        N'מקליט רשת NVR 32 ערוצים',        N'מצלמות אבטחה',     4,   N'יח׳', 2,   N'באחריות',    1900.00, 2750.00),
+    (N'HDD-8TB',         N'דיסק קשיח לאבטחה 8TB',          N'מצלמות אבטחה',     22,  N'יח׳', 6,   N'לא באחריות', 520.00,  720.00),
+    -- מערכות אזעקה
+    (N'ALM-PANEL-8Z',    N'רכזת אזעקה 8 אזורים',           N'מערכות אזעקה',     10,  N'יח׳', 3,   N'באחריות',    540.00,  820.00),
+    (N'ALM-PIR',         N'גלאי נפח IR',                   N'מערכות אזעקה',     80,  N'יח׳', 20,  N'באחריות',    45.00,   75.00),
+    (N'ALM-SIREN',       N'סירנה חיצונית עם פלאש',         N'מערכות אזעקה',     24,  N'יח׳', 6,   N'באחריות',    120.00,  190.00),
+    (N'FIRE-SMOKE-DET',  N'גלאי עשן אופטי כתובתי',         N'מערכות אזעקה',     55,  N'יח׳', 15,  N'באחריות',    95.00,   150.00),
+    -- שו"ב (שליטה ובקרה / בקרת כניסה)
+    (N'ACS-CTRL-4DR',    N'בקר כניסה 4 דלתות',             N'שו"ב',             11,  N'יח׳', 3,   N'באחריות',    980.00,  1450.00),
+    (N'ACS-READER-RFID', N'קורא כרטיסים RFID',             N'שו"ב',             40,  N'יח׳', 10,  N'באחריות',    130.00,  210.00),
+    (N'ACS-MAGLOCK-600', N'מנעול מגנטי 600 ק״ג',           N'שו"ב',             26,  N'יח׳', 8,   N'באחריות',    90.00,   150.00),
+    (N'BMS-CTRL-DDC',    N'בקר DDC לבקרת מבנה',            N'שו"ב',             8,   N'יח׳', 2,   N'באחריות',    1600.00, 2350.00),
+    -- רשת מחשבים
+    (N'NET-SWITCH-P24',  N'מתג PoE מנוהל 24 פורט',          N'רשת מחשבים',       9,   N'יח׳', 3,   N'באחריות',    1250.00, 1850.00),
+    (N'NET-PATCH-24',    N'פאנל ניתוק 24 פורט',            N'רשת מחשבים',       14,  N'יח׳', 4,   N'באחריות',    110.00,  180.00),
+    (N'NET-RACK-42U',    N'ארון תקשורת 19 אינץ׳ 42U',       N'רשת מחשבים',       5,   N'יח׳', 2,   N'באחריות',    1700.00, 2500.00),
+    (N'NET-ROUTER-ENT',  N'נתב ארגוני',                    N'רשת מחשבים',       6,   N'יח׳', 2,   N'לא באחריות', 900.00,  1400.00),
+    -- כבילה ותשתיות
+    (N'NET-CAT6-305',    N'כבל רשת CAT6 (תיבה 305 מ׳)',     N'כבילה ותשתיות',    18,  N'תיבה',5,   N'לא באחריות', 320.00,  480.00),
+    (N'NET-FIBER-SM',    N'כבל סיב אופטי חד-מודי (מטר)',    N'כבילה ותשתיות',    1200,N'מ׳',  300, N'לא באחריות', 3.50,    6.00),
+    (N'ELE-CONDUIT-25',  N'צינור שרשורי 25 מ״מ (מטר)',     N'כבילה ותשתיות',    800, N'מ׳',  200, N'לא באחריות', 2.20,    4.00),
+    (N'NET-PATCHCORD2',  N'כבל חיבור רשת 2 מ׳',            N'כבילה ותשתיות',    220, N'יח׳', 50,  N'לא באחריות', 8.00,    15.00),
+    -- חשמל חכם
+    (N'ELE-PSU-12V10A',  N'ספק כוח מיוצב 12V 10A',         N'חשמל חכם',         30,  N'יח׳', 8,   N'באחריות',    110.00,  180.00),
+    (N'ELE-UPS-1500',    N'אל-פסק UPS 1500VA',             N'חשמל חכם',         12,  N'יח׳', 4,   N'באחריות',    520.00,  780.00),
+    (N'SH-DIMMER-KNX',   N'יחידת עמעום חכמה KNX',          N'חשמל חכם',         20,  N'יח׳', 5,   N'באחריות',    380.00,  560.00),
+    (N'SH-RELAY-8CH',    N'מודול ממסרים חכם 8 ערוצים',      N'חשמל חכם',         16,  N'יח׳', 4,   N'באחריות',    420.00,  620.00),
+    -- מולטימדיה
+    (N'AV-SCREEN-75',    N'מסך מקצועי 75 אינץ׳',            N'מולטימדיה',        5,   N'יח׳', 2,   N'באחריות',    3200.00, 4600.00),
+    (N'AV-PROJ-LASER',   N'מקרן לייזר 5000 לומן',          N'מולטימדיה',        4,   N'יח׳', 1,   N'באחריות',    4100.00, 5900.00),
+    (N'AV-SPK-CEIL6',    N'רמקול תקרה 6W',                 N'מולטימדיה',        60,  N'יח׳', 15,  N'באחריות',    60.00,   110.00),
+    (N'AV-AMP-240',      N'מגבר כריזה ומולטימדיה 240W',     N'מולטימדיה',        6,   N'יח׳', 2,   N'באחריות',    880.00,  1300.00),
+    -- טלפוניה ואינטרקום
+    (N'INT-PANEL-IP',    N'פאנל אינטרקום IP בכניסה',        N'טלפוניה ואינטרקום',8,   N'יח׳', 2,   N'באחריות',    540.00,  820.00),
+    (N'INT-STATION',     N'שלוחת אינטרקום פנים',           N'טלפוניה ואינטרקום',30,  N'יח׳', 8,   N'באחריות',    180.00,  290.00),
+    (N'TEL-PBX-IP',      N'מרכזיית IP-PBX',                N'טלפוניה ואינטרקום',3,   N'יח׳', 1,   N'לא באחריות', 1500.00, 2200.00),
+    (N'TEL-PHONE-IP',    N'טלפון IP שולחני',               N'טלפוניה ואינטרקום',24,  N'יח׳', 6,   N'באחריות',    220.00,  340.00);
 
-INSERT INTO dbo.InventoryItems (SkuCode, ItemName, Category, QuantityOnHand, Unit, MinimumQuantity, LocationName, IsActive, CreatedAt)
-SELECT i.SkuCode, i.ItemName, i.Category, i.QuantityOnHand, i.Unit, i.MinimumQuantity, N'מחסן ראשי - רעננה', 1, @Now
-FROM @Inventory i
-WHERE NOT EXISTS (SELECT 1 FROM dbo.InventoryItems x WHERE x.SkuCode = i.SkuCode AND x.IsActive = 1);
-RAISERROR(N'Inventory items upserted (+%d new).', 0, 1, @@ROWCOUNT) WITH NOWAIT;
+    /* Compose the Notes payload (warranty + prices) once, reused for insert + reconcile. */
+    INSERT INTO dbo.InventoryItems (SkuCode, ItemName, Category, QuantityOnHand, Unit, MinimumQuantity, LocationName, Notes, IsActive, CreatedAt)
+    SELECT i.SkuCode, i.ItemName, i.Category, i.QuantityOnHand, i.Unit, i.MinimumQuantity, N'מחסן ראשי - רעננה',
+           N'אחריות: ' + i.Warranty
+             + N' | מחיר ספק: ' + CONVERT(NVARCHAR(20), CAST(i.SupplierPrice AS DECIMAL(18,2))) + N' ₪'
+             + N' | מחיר מכירה: ' + CONVERT(NVARCHAR(20), CAST(i.SalePrice AS DECIMAL(18,2))) + N' ₪',
+           1, @Now
+    FROM @Inventory i
+    WHERE NOT EXISTS (SELECT 1 FROM dbo.InventoryItems x WHERE x.SkuCode = i.SkuCode AND x.IsActive = 1);
+    RAISERROR(N'Inventory items upserted (+%d new).', 0, 1, @@ROWCOUNT) WITH NOWAIT;
+
+    /* Reconcile Category + Notes for SKUs that already existed from an earlier
+       seed (so categories/warranty/prices match the current business set). */
+    UPDATE x
+        SET x.Category = i.Category,
+            x.ItemName = i.ItemName,
+            x.Notes = N'אחריות: ' + i.Warranty
+                + N' | מחיר ספק: ' + CONVERT(NVARCHAR(20), CAST(i.SupplierPrice AS DECIMAL(18,2))) + N' ₪'
+                + N' | מחיר מכירה: ' + CONVERT(NVARCHAR(20), CAST(i.SalePrice AS DECIMAL(18,2))) + N' ₪',
+            x.UpdatedAt = @Now
+    FROM dbo.InventoryItems x
+    INNER JOIN @Inventory i ON i.SkuCode = x.SkuCode AND x.IsActive = 1
+    WHERE ISNULL(x.Category, N'') <> i.Category
+       OR ISNULL(x.Notes, N'') NOT LIKE N'אחריות:%';
+    RAISERROR(N'Inventory category/notes reconciled (%d corrected).', 0, 1, @@ROWCOUNT) WITH NOWAIT;
 
 COMMIT TRAN;
 END TRY

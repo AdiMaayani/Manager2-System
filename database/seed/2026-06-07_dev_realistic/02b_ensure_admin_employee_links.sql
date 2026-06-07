@@ -60,12 +60,15 @@ DECLARE @AdminMap TABLE (
     FullNameHe NVARCHAR(100),
     RoleHe NVARCHAR(100)
 );
+/* RoleHe is the business role for each admin's Employee row. adi/klil/almog are
+   project-team/admin users; raviv/ronen are real company management. All admins
+   are IsAssignable = 0 (never Smart Assignment / field candidates). */
 INSERT INTO @AdminMap (Name, Rank, FullNameHe, RoleHe) VALUES
-    (N'adi',   1, N'עדי מעיני',  N'מנהל מערכת'),
-    (N'klil',  2, N'כליל כהן',   N'מנהל מערכת'),
-    (N'almog', 3, N'אלמוג שלף',  N'מנהל מערכת'),
-    (N'raviv', 4, N'רביב מעיני', N'מנהל מערכת'),
-    (N'ronen', 5, N'רונן כץ',    N'מנהל מערכת');
+    (N'adi',   1, N'עדי מעיני',  N'מנהל מערכת / צוות פרויקט'),
+    (N'klil',  2, N'כליל כהן',   N'מנהל מערכת / צוות פרויקט'),
+    (N'almog', 3, N'אלמוג שלף',  N'מנהל מערכת / צוות פרויקט'),
+    (N'raviv', 4, N'רביב מעיני', N'הנהלה / שיווק / כספים / משאבי אנוש / ניהול VLV'),
+    (N'ronen', 5, N'רונן כץ',    N'הנהלה / ניהול טכני / קשרי חוץ / שירות והתקנות');
 
 BEGIN TRY
     BEGIN TRAN;
@@ -105,25 +108,27 @@ BEGIN TRY
         END
         ELSE
         BEGIN
-            /* Converge the admin's own employee to the canonical name + active.
-               Only this admin's matched employee is touched (matched by the
-               user's unique email or the canonical name). */
+            /* Converge the admin's own employee to the canonical name, business
+               role, non-assignable + active. Only this admin's matched employee
+               is touched (matched by the user's unique email or canonical name). */
             UPDATE dbo.Employees
                 SET FullName = @fullHe,
+                    PrimaryRole = @roleHe,
+                    IsAssignable = 0,
                     IsActive = 1
             WHERE EmployeeId = @empId
-              AND (FullName <> @fullHe OR IsActive <> 1);
+              AND (FullName <> @fullHe OR PrimaryRole <> @roleHe OR IsAssignable <> 0 OR IsActive <> 1);
             SET @correctedEmp += @@ROWCOUNT;
         END
 
         /* Relink the user only if it currently points to a different employee.
            Touches EmployeeId only - never password columns. */
-        IF @curEmp <> @empId
-        BEGIN
-            UPDATE dbo.Users SET EmployeeId = @empId WHERE UserId = @uid;
-            SET @relinked += 1;
-            RAISERROR(N'Relinked user "%s" from EmployeeId %d to %d.', 0, 1, @uname, @curEmp, @empId) WITH NOWAIT;
-        END
+        IF @curEmp IS NULL OR @curEmp <> @empId
+BEGIN
+    UPDATE dbo.Users SET EmployeeId = @empId WHERE UserId = @uid;
+    SET @relinked += 1;
+    RAISERROR(N'Relinked user "%s" to EmployeeId %d.', 0, 1, @uname, @empId) WITH NOWAIT;
+END
 
         FETCH NEXT FROM admin_link_cursor INTO @uid, @uemail, @uname, @fullHe, @roleHe, @curEmp;
     END
