@@ -1,0 +1,34 @@
+.detailsField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  min-width: 0;
+}
+
+.detailsField__label {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-neutral-500);
+}
+
+.detailsField__value {
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-900);
+  overflow-wrap: anywhere;
+}
+
+.detailsField__value--empty {
+  color: var(--color-neutral-400);
+}
+
+/* Single-line variant for dense layouts; uses logical alignment so it flips in RTL. */
+.detailsField--compact {
+  flex-direction: row;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+}
+
+.detailsField--compact .detailsField__value {
+  text-align: end;
+}
