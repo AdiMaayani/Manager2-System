@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Drawer } from '@shared/components/Drawer';
+import { Badge } from '@shared/components/Badge';
 import { Button } from '@shared/components/Button';
+import { DetailsField } from '@shared/components/DetailsField';
+import { DetailsSection } from '@shared/components/DetailsSection';
 import { Input } from '@shared/components/Input';
 import { PageSpinner } from '@shared/components/PageSpinner';
 import { isLocalDataMode } from '@/config/appConfig';
@@ -23,6 +26,13 @@ const STATUS_OPTIONS = [
   { value: 'Cancelled', label: 'בוטלה' },
 ];
 
+const STATUS_VARIANTS: Record<string, 'neutral' | 'primary' | 'success' | 'warning' | 'danger'> = {
+  Open: 'warning',
+  InProgress: 'primary',
+  Done: 'success',
+  Cancelled: 'danger',
+};
+
 const PRIORITY_OPTIONS = [
   { value: '', label: 'ללא עדיפות' },
   { value: 'Low', label: 'נמוכה' },
@@ -30,6 +40,11 @@ const PRIORITY_OPTIONS = [
   { value: 'High', label: 'גבוהה' },
   { value: 'Urgent', label: 'דחופה' },
 ];
+
+const PRIORITY_VARIANTS: Record<string, 'neutral' | 'warning' | 'danger'> = {
+  High: 'warning',
+  Urgent: 'danger',
+};
 
 const BILLING_TYPE_OPTIONS = [
   { value: 'Hourly', label: 'שעתי' },
@@ -44,7 +59,7 @@ interface ServiceCallDrawerProps {
   customers: ServiceCallCustomerOption[];
   sites: ServiceCallSiteOption[];
   employees: ServiceCallEmployeeOption[];
-  onSaved: (message: string) => void;
+  onSaved: (message: string, savedServiceCall?: ServiceCallDetails) => void;
 }
 
 interface ServiceCallFormState {
@@ -102,6 +117,35 @@ function nullableNumber(value: string): number | null {
   return Number.isFinite(parsedValue) && parsedValue >= 0 ? Number(parsedValue.toFixed(2)) : null;
 }
 
+function getStatusLabel(status?: string | null): string {
+  if (!status) return '';
+  return STATUS_OPTIONS.find((option) => option.value === status)?.label ?? status;
+}
+
+function getPriorityLabel(priority?: string | null): string | undefined {
+  if (!priority) return undefined;
+  return PRIORITY_OPTIONS.find((option) => option.value === priority)?.label ?? priority;
+}
+
+function getBillingTypeLabel(billingType?: string | null): string | undefined {
+  if (!billingType) return undefined;
+  return BILLING_TYPE_OPTIONS.find((option) => option.value === billingType)?.label ?? billingType;
+}
+
+function formatDateTime(value?: string | null): string | undefined {
+  if (!value) return undefined;
+  const parsedDate = new Date(value);
+  if (Number.isNaN(parsedDate.getTime())) return undefined;
+  return new Intl.DateTimeFormat('he-IL', {
+    dateStyle: 'short',
+    timeStyle: 'short',
+  }).format(parsedDate);
+}
+
+function formatHours(value?: number | null): string | undefined {
+  return value != null ? `${value} שעות` : undefined;
+}
+
 export function ServiceCallDrawer({
   isOpen,
   onClose,
@@ -111,30 +155,65 @@ export function ServiceCallDrawer({
   employees,
   onSaved,
 }: ServiceCallDrawerProps) {
-  const isEditMode = serviceCall != null;
+  if (!isOpen) return null;
+
+  // Remount per service call so form/edit state always resets when the drawer
+  // opens for a different record (or switches from create to a saved record).
+  return (
+    <ServiceCallDrawerContent
+      key={serviceCall?.workItemId ?? 'new'}
+      serviceCall={serviceCall ?? null}
+      customers={customers}
+      sites={sites}
+      employees={employees}
+      onClose={onClose}
+      onSaved={onSaved}
+    />
+  );
+}
+
+interface ServiceCallDrawerContentProps {
+  serviceCall: ServiceCallDetails | null;
+  customers: ServiceCallCustomerOption[];
+  sites: ServiceCallSiteOption[];
+  employees: ServiceCallEmployeeOption[];
+  onClose: () => void;
+  onSaved: (message: string, savedServiceCall?: ServiceCallDetails) => void;
+}
+
+function ServiceCallDrawerContent({
+  serviceCall,
+  customers,
+  sites,
+  employees,
+  onClose,
+  onSaved,
+}: ServiceCallDrawerContentProps) {
+  const isExistingServiceCall = serviceCall != null;
   const serviceCallDetailsQuery = useQuery({
     queryKey: ['serviceCalls', 'detail', serviceCall?.workItemId, isLocalDataMode],
     queryFn: () => getServiceCallByIdAsync(serviceCall!.workItemId),
-    enabled: isOpen && isEditMode && isLocalDataMode,
+    enabled: isExistingServiceCall && isLocalDataMode,
   });
   const currentServiceCall = serviceCallDetailsQuery.data ?? serviceCall;
   const { createMutation, updateMutation, closeMutation, assignEmployeeMutation } =
     useServiceCallMutations();
+
+  // Existing service calls open in read-only review mode; create opens editable.
+  const [isEditing, setIsEditing] = useState(!isExistingServiceCall);
   const [form, setForm] = useState<ServiceCallFormState>(() => buildInitialState(currentServiceCall));
   const [error, setError] = useState<string | null>(null);
   const [employeeIdToAssign, setEmployeeIdToAssign] = useState('');
   const [assignmentRole, setAssignmentRole] = useState(currentServiceCall?.requiredRole ?? '');
   const [isCloseConfirmVisible, setIsCloseConfirmVisible] = useState(false);
 
+  // Keep the form mirrored to the freshest server data while reviewing, without
+  // clobbering in-progress edits when the detail query resolves mid-edit.
   useEffect(() => {
-    if (!isOpen) return;
-
+    if (isEditing) return;
     setForm(buildInitialState(currentServiceCall));
     setAssignmentRole(currentServiceCall?.requiredRole ?? '');
-    setEmployeeIdToAssign('');
-    setIsCloseConfirmVisible(false);
-    setError(null);
-  }, [currentServiceCall, isOpen]);
+  }, [currentServiceCall, isEditing]);
 
   const activeCustomers = useMemo(
     () => customers.filter((customer) => customer.isActive !== false),
@@ -154,6 +233,29 @@ export function ServiceCallDrawer({
 
   function setField<K extends keyof ServiceCallFormState>(key: K, value: ServiceCallFormState[K]) {
     setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  function handleStartEdit() {
+    setForm(buildInitialState(currentServiceCall));
+    setAssignmentRole(currentServiceCall?.requiredRole ?? '');
+    setEmployeeIdToAssign('');
+    setIsCloseConfirmVisible(false);
+    setError(null);
+    setIsEditing(true);
+  }
+
+  function handleCancelEdit() {
+    if (!isExistingServiceCall) {
+      onClose();
+      return;
+    }
+
+    setForm(buildInitialState(currentServiceCall));
+    setAssignmentRole(currentServiceCall?.requiredRole ?? '');
+    setEmployeeIdToAssign('');
+    setIsCloseConfirmVisible(false);
+    setError(null);
+    setIsEditing(false);
   }
 
   function validate(): string | null {
@@ -194,6 +296,23 @@ export function ServiceCallDrawer({
     };
   }
 
+  // The update API returns only a message, so review mode shows the request
+  // values merged into the known record until the detail query refreshes.
+  function buildUpdatedServiceCallFallback(existing: ServiceCallDetails): ServiceCallDetails {
+    const request = buildRequest();
+    const selectedCustomer = customers.find(
+      (customer) => customer.customerId === request.customerId,
+    );
+    const selectedSite = sites.find((site) => site.siteId === request.siteId);
+
+    return {
+      ...existing,
+      ...request,
+      customerName: selectedCustomer?.customerName ?? existing.customerName,
+      siteName: selectedSite?.siteName ?? existing.siteName,
+    };
+  }
+
   async function handleSave() {
     const validationError = validate();
     if (validationError) {
@@ -204,22 +323,31 @@ export function ServiceCallDrawer({
     setError(null);
 
     try {
-      if (isEditMode) {
-        await updateMutation.mutateAsync({ id: currentServiceCall!.workItemId, request: buildRequest() });
-        onSaved('קריאת השירות עודכנה בהצלחה.');
+      if (isExistingServiceCall) {
+        await updateMutation.mutateAsync({
+          id: currentServiceCall!.workItemId,
+          request: buildRequest(),
+        });
+        setIsEditing(false);
+        setIsCloseConfirmVisible(false);
+        onSaved(
+          'קריאת השירות עודכנה בהצלחה.',
+          buildUpdatedServiceCallFallback(currentServiceCall!),
+        );
       } else {
+        // The create API returns only the new id, so the drawer closes instead
+        // of inventing a review view from unsaved values.
         await createMutation.mutateAsync(buildRequest());
         onSaved('קריאת השירות נוצרה בהצלחה.');
+        onClose();
       }
-
-      onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'שמירת קריאת השירות נכשלה');
     }
   }
 
   async function handleCloseServiceCall() {
-    if (!isEditMode || !currentServiceCall) return;
+    if (!isExistingServiceCall || !currentServiceCall) return;
 
     setError(null);
     try {
@@ -232,7 +360,7 @@ export function ServiceCallDrawer({
   }
 
   async function handleAssignEmployee() {
-    if (!isEditMode || !currentServiceCall) return;
+    if (!isExistingServiceCall || !currentServiceCall) return;
 
     const employeeId = Number(employeeIdToAssign);
     if (!employeeId || !assignmentRole.trim()) {
@@ -260,272 +388,411 @@ export function ServiceCallDrawer({
     closeMutation.isPending ||
     assignEmployeeMutation.isPending;
 
+  const title = !isExistingServiceCall
+    ? 'קריאת שירות חדשה'
+    : isEditing
+      ? `עריכת קריאת שירות — ${currentServiceCall?.title ?? ''}`
+      : `פרטי קריאת שירות — ${currentServiceCall?.title ?? ''}`;
+
   return (
     <Drawer
-      isOpen={isOpen}
+      isOpen
       onClose={onClose}
-      title={isEditMode ? `עריכת קריאת שירות — ${currentServiceCall?.title ?? ''}` : 'קריאת שירות חדשה'}
+      title={title}
+      headerActions={
+        isExistingServiceCall && !isEditing ? (
+          <Button type="button" variant="secondary" onClick={handleStartEdit}>
+            ערוך פרטים
+          </Button>
+        ) : undefined
+      }
+      footer={
+        isEditing ? (
+          <div className="serviceCallDrawer__footerContent">
+            {error && <p className="serviceCallDrawer__error">{error}</p>}
+            <div className="serviceCallDrawer__actions">
+              <Button type="button" onClick={handleSave} disabled={isSaving}>
+                {isSaving ? 'שומר...' : 'שמור'}
+              </Button>
+              <Button type="button" variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
+                ביטול
+              </Button>
+
+              {isExistingServiceCall && !currentServiceCall?.closedAt && (
+                <>
+                  {isCloseConfirmVisible ? (
+                    <>
+                      <span className="serviceCallDrawer__confirmText">
+                        לסגור את קריאת השירות?
+                      </span>
+                      <Button
+                        type="button"
+                        variant="danger"
+                        onClick={handleCloseServiceCall}
+                        disabled={isSaving}
+                      >
+                        אישור סגירה
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        onClick={() => setIsCloseConfirmVisible(false)}
+                        disabled={isSaving}
+                      >
+                        ביטול סגירה
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      type="button"
+                      variant="danger"
+                      onClick={() => setIsCloseConfirmVisible(true)}
+                      disabled={isSaving}
+                    >
+                      סגור קריאה
+                    </Button>
+                  )}
+                </>
+              )}
+            </div>
+          </div>
+        ) : undefined
+      }
     >
-      <div className="serviceCallDrawer">
-        {serviceCallDetailsQuery.isLoading && <PageSpinner />}
-        {serviceCallDetailsQuery.error && (
-          <p className="serviceCallDrawer__error">
-            טעינת פרטי הקריאה נכשלה. מוצגים נתוני הרשימה האחרונים.
-          </p>
-        )}
-        <div className="serviceCallDrawer__grid">
-          <Input
-            label="כותרת *"
-            value={form.title}
-            onChange={(event) => setField('title', event.target.value)}
-            required
-          />
+      {serviceCallDetailsQuery.isLoading && <PageSpinner />}
+      {serviceCallDetailsQuery.error != null && (
+        <p className="serviceCallDrawer__error serviceCallDrawer__error--detached">
+          טעינת פרטי הקריאה נכשלה. מוצגים נתוני הרשימה האחרונים.
+        </p>
+      )}
 
-          <label className="serviceCallDrawer__field">
-            <span>סטטוס *</span>
-            <select
-              className="serviceCallDrawer__select"
-              value={form.status}
-              onChange={(event) => setField('status', event.target.value)}
+      {!isEditing && isExistingServiceCall && currentServiceCall ? (
+        <ServiceCallReviewDetails
+          serviceCall={currentServiceCall}
+          customers={customers}
+          sites={sites}
+        />
+      ) : (
+        <div className="serviceCallDrawer serviceCallDrawer--edit">
+          <DetailsSection title="פרטים כלליים">
+            <Input
+              label="כותרת *"
+              value={form.title}
+              onChange={(event) => setField('title', event.target.value)}
               required
-            >
-              {STATUS_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
+            />
 
-          <label className="serviceCallDrawer__field">
-            <span>לקוח *</span>
-            <select
-              className="serviceCallDrawer__select"
-              value={form.customerId}
-              onChange={(event) => {
-                setForm((current) => ({
-                  ...current,
-                  customerId: event.target.value,
-                  siteId: '',
-                }));
-              }}
-              required
-            >
-              <option value="">בחר לקוח</option>
-              {activeCustomers.map((customer) => (
-                <option key={customer.customerId} value={customer.customerId}>
-                  {customer.customerName}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="serviceCallDrawer__field">
-            <span>אתר *</span>
-            <select
-              className="serviceCallDrawer__select"
-              value={form.siteId}
-              onChange={(event) => setField('siteId', event.target.value)}
-              required
-              disabled={!form.customerId}
-            >
-              <option value="">בחר אתר</option>
-              {filteredSites.map((site) => (
-                <option key={site.siteId} value={site.siteId}>
-                  {site.siteName}
-                  {site.city ? ` — ${site.city}` : ''}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="serviceCallDrawer__field">
-            <span>סוג חיוב *</span>
-            <select
-              className="serviceCallDrawer__select"
-              value={form.billingType}
-              onChange={(event) => setField('billingType', event.target.value)}
-              required
-            >
-              {BILLING_TYPE_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="serviceCallDrawer__field">
-            <span>עדיפות</span>
-            <select
-              className="serviceCallDrawer__select"
-              value={form.priority}
-              onChange={(event) => setField('priority', event.target.value)}
-            >
-              {PRIORITY_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <Input
-            label="התחלה מתוכננת"
-            type="datetime-local"
-            value={form.plannedStart}
-            onChange={(event) => setField('plannedStart', event.target.value)}
-          />
-
-          <Input
-            label="סיום מתוכנן"
-            type="datetime-local"
-            value={form.plannedEnd}
-            onChange={(event) => setField('plannedEnd', event.target.value)}
-          />
-
-          <Input
-            label="שעות מתוכננות"
-            type="number"
-            min="0"
-            step="0.25"
-            value={form.estimatedHours}
-            onChange={(event) => setField('estimatedHours', event.target.value)}
-          />
-
-          <Input
-            label="תפקיד נדרש"
-            value={form.requiredRole}
-            onChange={(event) => setField('requiredRole', event.target.value)}
-          />
-
-          <Input
-            label="התחלה בפועל"
-            type="datetime-local"
-            value={form.actualStart}
-            onChange={(event) => setField('actualStart', event.target.value)}
-          />
-
-          <Input
-            label="סיום בפועל"
-            type="datetime-local"
-            value={form.actualEnd}
-            onChange={(event) => setField('actualEnd', event.target.value)}
-          />
-
-          <Input
-            label="שעות בפועל"
-            type="number"
-            min="0"
-            step="0.25"
-            value={form.actualHours}
-            onChange={(event) => setField('actualHours', event.target.value)}
-          />
-        </div>
-
-        <label className="serviceCallDrawer__field serviceCallDrawer__field--wide">
-          <span>תיאור</span>
-          <textarea
-            className="serviceCallDrawer__textarea"
-            value={form.description}
-            onChange={(event) => setField('description', event.target.value)}
-            rows={4}
-          />
-        </label>
-
-        <label className="serviceCallDrawer__checkboxRow">
-          <input
-            type="checkbox"
-            checked={form.isLocked}
-            onChange={(event) => setField('isLocked', event.target.checked)}
-          />
-          <span>נעול לעריכה תפעולית</span>
-        </label>
-
-        {isEditMode && (
-          <section className="serviceCallDrawer__assignment">
-            <h3>שיוך עובד</h3>
-            <div className="serviceCallDrawer__assignmentGrid">
+            <div className="serviceCallDrawer__grid">
               <label className="serviceCallDrawer__field">
-                <span>עובד</span>
+                <span>סטטוס *</span>
                 <select
                   className="serviceCallDrawer__select"
-                  value={employeeIdToAssign}
-                  onChange={(event) => setEmployeeIdToAssign(event.target.value)}
+                  value={form.status}
+                  onChange={(event) => setField('status', event.target.value)}
+                  required
                 >
-                  <option value="">בחר עובד</option>
-                  {assignableEmployees.map((employee) => (
-                    <option key={employee.employeeId} value={employee.employeeId}>
-                      {employee.fullName}
-                      {employee.primaryRole ? ` — ${employee.primaryRole}` : ''}
+                  {STATUS_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
                     </option>
                   ))}
                 </select>
               </label>
 
+              <label className="serviceCallDrawer__field">
+                <span>עדיפות</span>
+                <select
+                  className="serviceCallDrawer__select"
+                  value={form.priority}
+                  onChange={(event) => setField('priority', event.target.value)}
+                >
+                  {PRIORITY_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="serviceCallDrawer__field">
+                <span>סוג חיוב *</span>
+                <select
+                  className="serviceCallDrawer__select"
+                  value={form.billingType}
+                  onChange={(event) => setField('billingType', event.target.value)}
+                  required
+                >
+                  {BILLING_TYPE_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+
+            <label className="serviceCallDrawer__checkboxRow">
+              <input
+                type="checkbox"
+                checked={form.isLocked}
+                onChange={(event) => setField('isLocked', event.target.checked)}
+              />
+              <span>נעול לעריכה תפעולית</span>
+            </label>
+          </DetailsSection>
+
+          <DetailsSection title="לקוח ואתר">
+            <div className="serviceCallDrawer__grid">
+              <label className="serviceCallDrawer__field">
+                <span>לקוח *</span>
+                <select
+                  className="serviceCallDrawer__select"
+                  value={form.customerId}
+                  onChange={(event) => {
+                    setForm((current) => ({
+                      ...current,
+                      customerId: event.target.value,
+                      siteId: '',
+                    }));
+                  }}
+                  required
+                >
+                  <option value="">בחר לקוח</option>
+                  {activeCustomers.map((customer) => (
+                    <option key={customer.customerId} value={customer.customerId}>
+                      {customer.customerName}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <label className="serviceCallDrawer__field">
+                <span>אתר *</span>
+                <select
+                  className="serviceCallDrawer__select"
+                  value={form.siteId}
+                  onChange={(event) => setField('siteId', event.target.value)}
+                  required
+                  disabled={!form.customerId}
+                >
+                  <option value="">בחר אתר</option>
+                  {filteredSites.map((site) => (
+                    <option key={site.siteId} value={site.siteId}>
+                      {site.siteName}
+                      {site.city ? ` — ${site.city}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            </div>
+          </DetailsSection>
+
+          <DetailsSection title="תזמון ושעות">
+            <div className="serviceCallDrawer__grid">
               <Input
-                label="תפקיד בשיוך"
-                value={assignmentRole}
-                onChange={(event) => setAssignmentRole(event.target.value)}
+                label="התחלה מתוכננת"
+                type="datetime-local"
+                value={form.plannedStart}
+                onChange={(event) => setField('plannedStart', event.target.value)}
+              />
+
+              <Input
+                label="סיום מתוכנן"
+                type="datetime-local"
+                value={form.plannedEnd}
+                onChange={(event) => setField('plannedEnd', event.target.value)}
+              />
+
+              <Input
+                label="התחלה בפועל"
+                type="datetime-local"
+                value={form.actualStart}
+                onChange={(event) => setField('actualStart', event.target.value)}
+              />
+
+              <Input
+                label="סיום בפועל"
+                type="datetime-local"
+                value={form.actualEnd}
+                onChange={(event) => setField('actualEnd', event.target.value)}
+              />
+
+              <Input
+                label="שעות מתוכננות"
+                type="number"
+                min="0"
+                step="0.25"
+                value={form.estimatedHours}
+                onChange={(event) => setField('estimatedHours', event.target.value)}
+              />
+
+              <Input
+                label="שעות בפועל"
+                type="number"
+                min="0"
+                step="0.25"
+                value={form.actualHours}
+                onChange={(event) => setField('actualHours', event.target.value)}
               />
             </div>
-            <Button
-              type="button"
-              variant="secondary"
-              onClick={handleAssignEmployee}
-              disabled={isSaving}
-            >
-              שייך עובד
-            </Button>
-          </section>
-        )}
+          </DetailsSection>
 
-        {error && <p className="serviceCallDrawer__error">{error}</p>}
+          <DetailsSection title="שיבוץ ותפקיד">
+            <div className="serviceCallDrawer__grid">
+              <Input
+                label="תפקיד נדרש"
+                value={form.requiredRole}
+                onChange={(event) => setField('requiredRole', event.target.value)}
+              />
+            </div>
 
-        <div className="serviceCallDrawer__actions">
-          <Button type="button" onClick={handleSave} disabled={isSaving}>
-            {isSaving ? 'שומר...' : 'שמור'}
-          </Button>
-          <Button type="button" variant="secondary" onClick={onClose} disabled={isSaving}>
-            ביטול
-          </Button>
+            {isExistingServiceCall && (
+              <div className="serviceCallDrawer__assignAction">
+                <p className="serviceCallDrawer__hint">
+                  שיוך עובד מתבצע מיידית ואינו תלוי בלחיצה על שמירה.
+                </p>
+                <div className="serviceCallDrawer__grid">
+                  <label className="serviceCallDrawer__field">
+                    <span>עובד</span>
+                    <select
+                      className="serviceCallDrawer__select"
+                      value={employeeIdToAssign}
+                      onChange={(event) => setEmployeeIdToAssign(event.target.value)}
+                    >
+                      <option value="">בחר עובד</option>
+                      {assignableEmployees.map((employee) => (
+                        <option key={employee.employeeId} value={employee.employeeId}>
+                          {employee.fullName}
+                          {employee.primaryRole ? ` — ${employee.primaryRole}` : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
 
-          {isEditMode && !currentServiceCall?.closedAt && (
-            <>
-              {isCloseConfirmVisible ? (
-                <>
-                  <span className="serviceCallDrawer__confirmText">לסגור את קריאת השירות?</span>
+                  <Input
+                    label="תפקיד בשיוך"
+                    value={assignmentRole}
+                    onChange={(event) => setAssignmentRole(event.target.value)}
+                  />
+                </div>
+                <div>
                   <Button
                     type="button"
-                    variant="danger"
-                    onClick={handleCloseServiceCall}
+                    variant="secondary"
+                    onClick={handleAssignEmployee}
                     disabled={isSaving}
                   >
-                    אישור סגירה
+                    שייך עובד
                   </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={() => setIsCloseConfirmVisible(false)}
-                    disabled={isSaving}
-                  >
-                    ביטול סגירה
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  type="button"
-                  variant="danger"
-                  onClick={() => setIsCloseConfirmVisible(true)}
-                  disabled={isSaving}
-                >
-                  סגור קריאה
-                </Button>
-              )}
-            </>
-          )}
+                </div>
+              </div>
+            )}
+          </DetailsSection>
+
+          <DetailsSection title="תיאור">
+            <label className="serviceCallDrawer__field">
+              <span>תיאור</span>
+              <textarea
+                className="serviceCallDrawer__textarea"
+                value={form.description}
+                onChange={(event) => setField('description', event.target.value)}
+                rows={4}
+              />
+            </label>
+          </DetailsSection>
         </div>
-      </div>
+      )}
     </Drawer>
+  );
+}
+
+interface ServiceCallReviewDetailsProps {
+  serviceCall: ServiceCallDetails;
+  customers: ServiceCallCustomerOption[];
+  sites: ServiceCallSiteOption[];
+}
+
+function ServiceCallReviewDetails({ serviceCall, customers, sites }: ServiceCallReviewDetailsProps) {
+  // The list/detail payload may omit display names, so they fall back to the
+  // lookup lists already loaded by the page.
+  const customerName =
+    serviceCall.customerName ??
+    customers.find((customer) => customer.customerId === serviceCall.customerId)?.customerName;
+  const site = sites.find((siteOption) => siteOption.siteId === serviceCall.siteId);
+  const siteName = serviceCall.siteName ?? site?.siteName;
+
+  return (
+    <div className="serviceCallDrawer serviceCallDrawer--review">
+      <DetailsSection title="פרטי קריאה">
+        <div className="serviceCallDrawer__detailsGrid">
+          <DetailsField label="מספר" value={`SC-${serviceCall.workItemId}`} />
+          <DetailsField label="כותרת" value={serviceCall.title} />
+          <DetailsField
+            label="סטטוס"
+            value={
+              <Badge variant={STATUS_VARIANTS[serviceCall.status] ?? 'neutral'}>
+                {getStatusLabel(serviceCall.status)}
+              </Badge>
+            }
+          />
+          <DetailsField
+            label="עדיפות"
+            value={
+              serviceCall.priority ? (
+                <Badge variant={PRIORITY_VARIANTS[serviceCall.priority] ?? 'neutral'}>
+                  {getPriorityLabel(serviceCall.priority)}
+                </Badge>
+              ) : undefined
+            }
+          />
+          <DetailsField label="סוג חיוב" value={getBillingTypeLabel(serviceCall.billingType)} />
+          <DetailsField
+            label="נעילה תפעולית"
+            value={
+              <Badge variant={serviceCall.isLocked ? 'warning' : 'neutral'}>
+                {serviceCall.isLocked ? 'נעולה' : 'לא נעולה'}
+              </Badge>
+            }
+          />
+        </div>
+      </DetailsSection>
+
+      <DetailsSection title="לקוח ואתר">
+        <div className="serviceCallDrawer__detailsGrid">
+          <DetailsField label="לקוח" value={customerName} />
+          <DetailsField
+            label="אתר"
+            value={siteName ? `${siteName}${site?.city ? ` — ${site.city}` : ''}` : undefined}
+          />
+        </div>
+      </DetailsSection>
+
+      <DetailsSection title="תזמון ושיבוץ">
+        <div className="serviceCallDrawer__detailsGrid">
+          <DetailsField label="התחלה מתוכננת" value={formatDateTime(serviceCall.plannedStart)} />
+          <DetailsField label="סיום מתוכנן" value={formatDateTime(serviceCall.plannedEnd)} />
+          <DetailsField label="התחלה בפועל" value={formatDateTime(serviceCall.actualStart)} />
+          <DetailsField label="סיום בפועל" value={formatDateTime(serviceCall.actualEnd)} />
+          <DetailsField label="שעות מתוכננות" value={formatHours(serviceCall.estimatedHours)} />
+          <DetailsField label="שעות בפועל" value={formatHours(serviceCall.actualHours)} />
+          <DetailsField label="תפקיד נדרש" value={serviceCall.requiredRole} />
+        </div>
+      </DetailsSection>
+
+      <DetailsSection title="תיאור">
+        {serviceCall.description?.trim() ? (
+          <p className="serviceCallDrawer__multilineValue">{serviceCall.description}</p>
+        ) : (
+          <p className="serviceCallDrawer__hint">לא הוזן תיאור לקריאה זו.</p>
+        )}
+      </DetailsSection>
+
+      <DetailsSection title="היסטוריה">
+        <div className="serviceCallDrawer__detailsGrid">
+          <DetailsField label="נוצרה בתאריך" value={formatDateTime(serviceCall.createdAt)} />
+          <DetailsField label="נסגרה בתאריך" value={formatDateTime(serviceCall.closedAt)} />
+        </div>
+      </DetailsSection>
+    </div>
   );
 }
