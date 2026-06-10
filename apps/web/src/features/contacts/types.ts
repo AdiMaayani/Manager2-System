@@ -24,9 +24,11 @@ export interface CreateContactRequest {
   customerId?: number;
   companyName?: string;
   phone?: string;
+  secondaryPhone?: string;
   email?: string;
   preferredChannel?: string;
   city?: string;
+  address?: string;
   status?: string;
   notes?: string;
   isActive?: boolean;
