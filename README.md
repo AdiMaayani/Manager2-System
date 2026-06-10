@@ -66,6 +66,22 @@ Set it for production to the deployed API base path or origin, such as `/api` or
 
 ## Run locally (end-to-end)
 
+### First-time database setup (required for login)
+
+On a fresh database, build the schema and create the bootstrap admin (a schema-only DB has no users, so login is
+impossible until the seed runs):
+
+1. Build the DB from `database/` (`schema/tables.sql`, then `functions/`, then `SP/`) — see [`database/README.md`](database/README.md).
+2. Run the initial-admin seed once:
+   ```powershell
+   sqlcmd -S localhost -d ManageR2_Dev -b -i ".\database\seed\initial_admin\00_seed_initial_admin.sql"
+   ```
+3. Ensure API secrets are set (`ConnectionStrings:DefaultConnection`, `Jwt:Key`) via user secrets or environment
+   variables — the API fails fast on startup if they are missing (see [Configuration](#configuration)).
+
+Default dev login: **`admin@manager2.local`** / **`Admin#2026!`** (change for any shared environment; regenerate the
+hash with `database/seed/initial_admin/generate_password_hash.ps1`).
+
 **Terminal 1 — API**
 
 ```bash
