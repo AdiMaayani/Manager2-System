@@ -3,6 +3,7 @@ import { Badge } from '@shared/components/Badge';
 import { Button } from '@shared/components/Button';
 import { EmptyState } from '@shared/components/EmptyState';
 import { ErrorState } from '@shared/components/ErrorState';
+import { FilterBar } from '@shared/components/FilterBar';
 import { Input } from '@shared/components/Input';
 import { PageShell } from '@shared/components/PageShell';
 import { PageSpinner } from '@shared/components/PageSpinner';
@@ -29,6 +30,7 @@ export function InventoryPage() {
   const [category, setCategory] = useState('');
   const [status, setStatus] = useState<InventoryStatusFilter>('active');
   const [lowStockOnly, setLowStockOnly] = useState(false);
+  // undefined = drawer closed, null = create mode, InventoryItem = review existing.
   const [drawerInventoryItem, setDrawerInventoryItem] =
     useState<InventoryItem | null | undefined>(undefined);
 
@@ -64,6 +66,7 @@ export function InventoryPage() {
   const { data: categorySourceItems } = useInventory(categorySourceFilters);
 
   const isDrawerOpen = drawerInventoryItem !== undefined;
+  const selectedInventoryItemId = drawerInventoryItem?.inventoryItemId ?? null;
   const hasFilters = Boolean(search.trim() || category.trim() || lowStockOnly || status !== 'active');
   const categoryOptions = useMemo(
     () =>
@@ -76,6 +79,10 @@ export function InventoryPage() {
       ).sort((first, second) => first.localeCompare(second, 'he')),
     [categorySourceItems],
   );
+
+  const openInventoryItem = (inventoryItem: InventoryItem) => {
+    setDrawerInventoryItem(inventoryItem);
+  };
 
   if (isLoading) {
     return (
@@ -95,15 +102,19 @@ export function InventoryPage() {
 
   return (
     <PageShell title="מלאי">
-      <div className="inventoryPage__toolbar">
-        <Input
-          label="חיפוש"
-          placeholder="שם פריט, מק״ט, מיקום..."
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-        />
+      <FilterBar
+        actions={<Button onClick={() => setDrawerInventoryItem(null)}>+ פריט חדש</Button>}
+      >
+        <div className="inventoryPage__filter inventoryPage__filter--search">
+          <Input
+            label="חיפוש"
+            placeholder="שם פריט, מק״ט, מיקום..."
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </div>
 
-        <div className="inventoryPage__field">
+        <div className="inventoryPage__filter">
           <label className="inventoryPage__label">קטגוריה</label>
           <select
             className="inventoryPage__select"
@@ -119,7 +130,7 @@ export function InventoryPage() {
           </select>
         </div>
 
-        <div className="inventoryPage__field">
+        <div className="inventoryPage__filter">
           <label className="inventoryPage__label">סטטוס</label>
           <select
             className="inventoryPage__select"
@@ -140,9 +151,7 @@ export function InventoryPage() {
           />
           <span>מתחת למינימום</span>
         </label>
-
-        <Button onClick={() => setDrawerInventoryItem(null)}>+ פריט חדש</Button>
-      </div>
+      </FilterBar>
 
       {!inventoryItems || inventoryItems.length === 0 ? (
         <EmptyState
@@ -165,12 +174,27 @@ export function InventoryPage() {
                 <th>מינימום</th>
                 <th>מיקום</th>
                 <th>סטטוס</th>
-                <th>פעולות</th>
               </tr>
             </thead>
             <tbody>
               {inventoryItems.map((inventoryItem) => (
-                <tr key={inventoryItem.inventoryItemId}>
+                <tr
+                  key={inventoryItem.inventoryItemId}
+                  role="button"
+                  tabIndex={0}
+                  className={`inventoryPage__row ${
+                    selectedInventoryItemId === inventoryItem.inventoryItemId
+                      ? 'inventoryPage__row--selected'
+                      : ''
+                  }`.trim()}
+                  onClick={() => openInventoryItem(inventoryItem)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      openInventoryItem(inventoryItem);
+                    }
+                  }}
+                >
                   <td className="inventoryPage__sku">{inventoryItem.skuCode}</td>
                   <td>
                     <div className="inventoryPage__itemName">{inventoryItem.itemName}</div>
@@ -178,7 +202,7 @@ export function InventoryPage() {
                       <div className="inventoryPage__notes">{inventoryItem.notes}</div>
                     )}
                   </td>
-                  <td>{inventoryItem.category ?? '-'}</td>
+                  <td>{inventoryItem.category ?? '—'}</td>
                   <td>
                     <span className={isLowStock(inventoryItem) ? 'inventoryPage__lowStock' : ''}>
                       {formatQuantity(inventoryItem.quantityOnHand, inventoryItem.unit)}
@@ -186,10 +210,10 @@ export function InventoryPage() {
                   </td>
                   <td>
                     {inventoryItem.minimumQuantity == null
-                      ? '-'
+                      ? '—'
                       : formatQuantity(inventoryItem.minimumQuantity, inventoryItem.unit)}
                   </td>
-                  <td>{inventoryItem.locationName ?? '-'}</td>
+                  <td>{inventoryItem.locationName ?? '—'}</td>
                   <td>
                     <div className="inventoryPage__badges">
                       <Badge variant={inventoryItem.isActive ? 'success' : 'neutral'}>
@@ -197,14 +221,6 @@ export function InventoryPage() {
                       </Badge>
                       {isLowStock(inventoryItem) && <Badge variant="warning">מלאי נמוך</Badge>}
                     </div>
-                  </td>
-                  <td>
-                    <Button
-                      variant="ghost"
-                      onClick={() => setDrawerInventoryItem(inventoryItem)}
-                    >
-                      עריכה
-                    </Button>
                   </td>
                 </tr>
               ))}
@@ -216,6 +232,7 @@ export function InventoryPage() {
       <InventoryDrawer
         isOpen={isDrawerOpen}
         onClose={() => setDrawerInventoryItem(undefined)}
+        onSaved={(savedInventoryItem) => setDrawerInventoryItem(savedInventoryItem)}
         inventoryItem={drawerInventoryItem}
       />
     </PageShell>
