@@ -19,6 +19,7 @@ interface QuoteDrawerProps {
   isOpen: boolean;
   quoteId: number | null;
   onClose: () => void;
+  onSaved?: () => void;
   initialProjectId?: number;
 }
 
@@ -54,7 +55,13 @@ function buildCreateState(initialProjectId?: number): QuoteFormState {
   };
 }
 
-export function QuoteDrawer({ isOpen, quoteId, onClose, initialProjectId }: QuoteDrawerProps) {
+export function QuoteDrawer({
+  isOpen,
+  quoteId,
+  onClose,
+  onSaved,
+  initialProjectId,
+}: QuoteDrawerProps) {
   const isEditMode = quoteId != null;
   const { data: quote, isLoading: isLoadingQuote } = useQuote(isOpen && isEditMode ? quoteId : null);
   const { data: customerOptions } = useQuoteCustomerOptions();
@@ -215,6 +222,7 @@ export function QuoteDrawer({ isOpen, quoteId, onClose, initialProjectId }: Quot
       } else {
         await createMutation.mutateAsync(request);
       }
+      onSaved?.();
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'שמירת הצעת המחיר נכשלה');
@@ -227,6 +235,7 @@ export function QuoteDrawer({ isOpen, quoteId, onClose, initialProjectId }: Quot
 
     try {
       await deactivateMutation.mutateAsync(quoteId);
+      onSaved?.();
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'ביטול הצעת המחיר נכשל');

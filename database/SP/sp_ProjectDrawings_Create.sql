@@ -4,6 +4,11 @@ CREATE OR ALTER PROCEDURE dbo.sp_ProjectDrawings_Create
     @Type NVARCHAR(20),
     @DrawingDate DATE,
     @Note NVARCHAR(500) = NULL,
+    @OriginalFileName NVARCHAR(260) = NULL,
+    @StoredFileName NVARCHAR(260) = NULL,
+    @FilePath NVARCHAR(500) = NULL,
+    @ContentType NVARCHAR(120) = NULL,
+    @FileSizeBytes BIGINT = NULL,
     @SortOrder INT = NULL
 AS
 BEGIN
@@ -51,6 +56,11 @@ BEGIN
         [Type],
         DrawingDate,
         Note,
+        OriginalFileName,
+        StoredFileName,
+        FilePath,
+        ContentType,
+        FileSizeBytes,
         SortOrder,
         CreatedAt
     )
@@ -61,6 +71,11 @@ BEGIN
         @Type,
         @DrawingDate,
         NULLIF(LTRIM(RTRIM(@Note)), N''),
+        NULLIF(LTRIM(RTRIM(@OriginalFileName)), N''),
+        NULLIF(LTRIM(RTRIM(@StoredFileName)), N''),
+        NULLIF(LTRIM(RTRIM(@FilePath)), N''),
+        NULLIF(LTRIM(RTRIM(@ContentType)), N''),
+        @FileSizeBytes,
         @SortOrder,
         SYSUTCDATETIME()
     );

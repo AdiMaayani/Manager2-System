@@ -1,9 +1,15 @@
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useState } from 'react';
 import { Button } from '@shared/components/Button';
 import { EmptyState } from '@shared/components/EmptyState';
 import { ErrorState } from '@shared/components/ErrorState';
 import { PageSpinner } from '@shared/components/PageSpinner';
-import { QuoteStatusBadge, formatCurrency, formatDate, useQuotes } from '@features/quotes';
+import {
+  QuoteDrawer,
+  QuoteStatusBadge,
+  formatCurrency,
+  formatDate,
+  useQuotes,
+} from '@features/quotes';
 import './ProjectQuoteTab.css';
 
 interface ProjectQuoteTabProps {
@@ -11,17 +17,18 @@ interface ProjectQuoteTabProps {
 }
 
 export function ProjectQuoteTab({ projectId }: ProjectQuoteTabProps) {
-  const navigate = useNavigate();
-  const location = useLocation();
   const { data: quotes, isLoading, error, refetch } = useQuotes({ projectId });
+  const [quoteDrawerState, setQuoteDrawerState] = useState<{
+    isOpen: boolean;
+    quoteId: number | null;
+  }>({ isOpen: false, quoteId: null });
 
-  function openInQuotesScreen(quoteId?: number) {
-    const params = new URLSearchParams({ projectId: String(projectId) });
-    params.set('returnTo', `${location.pathname}${location.search}`);
-    if (quoteId) {
-      params.set('quoteId', String(quoteId));
-    }
-    navigate(`/quotes?${params.toString()}`);
+  function openQuoteDrawer(quoteId: number | null = null) {
+    setQuoteDrawerState({ isOpen: true, quoteId });
+  }
+
+  function closeQuoteDrawer() {
+    setQuoteDrawerState({ isOpen: false, quoteId: null });
   }
 
   if (isLoading) {
@@ -36,15 +43,15 @@ export function ProjectQuoteTab({ projectId }: ProjectQuoteTabProps) {
     <div className="projectQuoteTab">
       <div className="projectQuoteTab__header">
         <h3 className="projectQuoteTab__title">הצעות מחיר לפרויקט</h3>
-        <Button variant="secondary" onClick={() => openInQuotesScreen()}>
-          נהל במסך הצעות מחיר
+        <Button variant="secondary" onClick={() => openQuoteDrawer()}>
+          הצעת מחיר חדשה
         </Button>
       </div>
 
       {!quotes || quotes.length === 0 ? (
         <EmptyState
           title="אין הצעות מחיר לפרויקט"
-          description="צרו הצעת מחיר חדשה במסך הצעות המחיר ושייכו אותה לפרויקט זה."
+          description="צרו הצעת מחיר חדשה והיא תשויך אוטומטית לפרויקט הזה."
         />
       ) : (
         <div className="projectQuoteTab__tableWrap">
@@ -68,8 +75,8 @@ export function ProjectQuoteTab({ projectId }: ProjectQuoteTabProps) {
                   </td>
                   <td className="projectQuoteTab__total">{formatCurrency(quote.total)}</td>
                   <td>
-                    <Button variant="ghost" onClick={() => openInQuotesScreen(quote.quoteId)}>
-                      פתח
+                    <Button variant="ghost" onClick={() => openQuoteDrawer(quote.quoteId)}>
+                      ערוך
                     </Button>
                   </td>
                 </tr>
@@ -78,6 +85,13 @@ export function ProjectQuoteTab({ projectId }: ProjectQuoteTabProps) {
           </table>
         </div>
       )}
+      <QuoteDrawer
+        isOpen={quoteDrawerState.isOpen}
+        quoteId={quoteDrawerState.quoteId}
+        initialProjectId={projectId}
+        onClose={closeQuoteDrawer}
+        onSaved={() => refetch()}
+      />
     </div>
   );
 }

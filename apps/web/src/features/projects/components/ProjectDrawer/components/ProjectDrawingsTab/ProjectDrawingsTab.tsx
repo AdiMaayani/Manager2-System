@@ -2,10 +2,12 @@ import { useState } from 'react';
 import { Button } from '@shared/components/Button';
 import { EmptyState } from '@shared/components/EmptyState';
 import { Input } from '@shared/components/Input';
+import { downloadProjectDrawingFileAsync } from '../../../../api/projectsApiClient';
 import type {
   CreateProjectDrawingRequest,
   ProjectDrawing,
   UpdateProjectDrawingRequest,
+  UploadProjectDrawingRequest,
 } from '../../../../types';
 import { formatProjectDate } from '../../../../utils/projectDisplayUtils';
 import './ProjectDrawingsTab.css';
@@ -15,6 +17,7 @@ interface ProjectDrawingsTabProps {
   isEditMode: boolean;
   isSaving: boolean;
   onCreate: (body: CreateProjectDrawingRequest) => Promise<void>;
+  onUpload: (body: UploadProjectDrawingRequest) => Promise<void>;
   onUpdate: (
     projectDrawingId: number,
     body: UpdateProjectDrawingRequest,
@@ -27,6 +30,7 @@ interface DrawingDraft {
   type: 'PDF' | 'DWG';
   date: string;
   note: string;
+  file: File | null;
 }
 
 function todayYmd() {
@@ -39,6 +43,7 @@ function draftFromDrawing(drawing: ProjectDrawing): DrawingDraft {
     type: drawing.type,
     date: drawing.date?.slice(0, 10) || todayYmd(),
     note: drawing.note ?? '',
+    file: null,
   };
 }
 
@@ -61,6 +66,24 @@ function buildDrawingRequest(
     drawingDate: draft.date,
     note: draft.note.trim() || undefined,
   };
+}
+
+function formatFileSize(fileSizeBytes?: number): string {
+  if (!fileSizeBytes) return '';
+  if (fileSizeBytes < 1024 * 1024) {
+    return `${Math.round(fileSizeBytes / 1024)} KB`;
+  }
+  return `${(fileSizeBytes / 1024 / 1024).toFixed(1)} MB`;
+}
+
+async function downloadDrawing(drawing: ProjectDrawing) {
+  const blob = await downloadProjectDrawingFileAsync(drawing.projectId, drawing.projectDrawingId);
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = drawing.originalFileName ?? drawing.name;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 interface DrawingEditCardProps {
@@ -131,9 +154,23 @@ function DrawingEditCard({
         value={draft.note}
         onChange={(event) => setDraft((current) => ({ ...current, note: event.target.value }))}
       />
+      {drawing.originalFileName && (
+        <div className="projectDrawingsTab__fileMeta">
+          <span>{drawing.originalFileName}</span>
+          {drawing.fileSizeBytes && <span>{formatFileSize(drawing.fileSizeBytes)}</span>}
+        </div>
+      )}
       <div className="projectDrawingsTab__actions">
         <Button type="button" variant="secondary" onClick={saveDrawing} disabled={isSaving}>
           שמור שרטוט
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          onClick={() => downloadDrawing(drawing)}
+          disabled={isSaving || !drawing.filePath}
+        >
+          הורד קובץ
         </Button>
         <Button
           type="button"
@@ -153,6 +190,7 @@ export function ProjectDrawingsTab({
   isEditMode,
   isSaving,
   onCreate,
+  onUpload,
   onUpdate,
   onDelete,
 }: ProjectDrawingsTabProps) {
@@ -161,6 +199,7 @@ export function ProjectDrawingsTab({
     type: 'PDF',
     date: todayYmd(),
     note: '',
+    file: null,
   });
   const [error, setError] = useState<string | null>(null);
 
@@ -173,16 +212,25 @@ export function ProjectDrawingsTab({
     }
 
     setError(null);
-    await onCreate({
-      ...request,
-      sortOrder: drawings.length + 1,
-    });
+    if (newDrawingDraft.file) {
+      await onUpload({
+        ...request,
+        sortOrder: drawings.length + 1,
+        file: newDrawingDraft.file,
+      });
+    } else {
+      await onCreate({
+        ...request,
+        sortOrder: drawings.length + 1,
+      });
+    }
 
     setNewDrawingDraft({
       name: '',
       type: 'PDF',
       date: todayYmd(),
       note: '',
+      file: null,
     });
   };
 
@@ -248,8 +296,22 @@ export function ProjectDrawingsTab({
               setNewDrawingDraft((current) => ({ ...current, note: event.target.value }))
             }
           />
+          <label className="projectDrawingsTab__field">
+            <span>קובץ PDF/DWG</span>
+            <input
+              className="projectDrawingsTab__fileInput"
+              type="file"
+              accept=".pdf,.dwg"
+              onChange={(event) =>
+                setNewDrawingDraft((current) => ({
+                  ...current,
+                  file: event.target.files?.[0] ?? null,
+                }))
+              }
+            />
+          </label>
           <Button type="button" variant="secondary" onClick={addDrawing} disabled={isSaving}>
-            הוסף שרטוט
+            {newDrawingDraft.file ? 'העלה שרטוט' : 'הוסף שרטוט'}
           </Button>
         </div>
       </div>
@@ -268,7 +330,21 @@ export function ProjectDrawingsTab({
               <strong>{drawing.name}</strong>
               <span>{drawing.type}</span>
               <span>{formatProjectDate(drawing.date)}</span>
+              {drawing.originalFileName && (
+                <span>
+                  {drawing.originalFileName}
+                  {drawing.fileSizeBytes ? ` · ${formatFileSize(drawing.fileSizeBytes)}` : ''}
+                </span>
+              )}
               {drawing.note && <p>{drawing.note}</p>}
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => downloadDrawing(drawing)}
+                disabled={!drawing.filePath}
+              >
+                הורד קובץ
+              </Button>
             </div>
           ))}
         </div>

@@ -60,6 +60,11 @@ public class ProjectDrawingRepository : IProjectDrawingRepository
             command.Parameters.AddWithValue("@Type", drawing.Type);
             command.Parameters.AddWithValue("@DrawingDate", drawing.DrawingDate.ToDateTime(TimeOnly.MinValue));
             command.Parameters.AddWithValue("@Note", (object?)drawing.Note ?? DBNull.Value);
+            command.Parameters.AddWithValue("@OriginalFileName", (object?)drawing.OriginalFileName ?? DBNull.Value);
+            command.Parameters.AddWithValue("@StoredFileName", (object?)drawing.StoredFileName ?? DBNull.Value);
+            command.Parameters.AddWithValue("@FilePath", (object?)drawing.FilePath ?? DBNull.Value);
+            command.Parameters.AddWithValue("@ContentType", (object?)drawing.ContentType ?? DBNull.Value);
+            command.Parameters.AddWithValue("@FileSizeBytes", (object?)drawing.FileSizeBytes ?? DBNull.Value);
             command.Parameters.AddWithValue("@SortOrder", drawing.SortOrder > 0 ? drawing.SortOrder : DBNull.Value);
 
             await connection.OpenAsync();
@@ -138,6 +143,11 @@ public class ProjectDrawingRepository : IProjectDrawingRepository
             Type = GetStringValue(reader, "Type") ?? string.Empty,
             DrawingDate = GetDateOnlyValue(reader, "DrawingDate") ?? DateOnly.MinValue,
             Note = GetStringValue(reader, "Note"),
+            OriginalFileName = GetStringValue(reader, "OriginalFileName"),
+            StoredFileName = GetStringValue(reader, "StoredFileName"),
+            FilePath = GetStringValue(reader, "FilePath"),
+            ContentType = GetStringValue(reader, "ContentType"),
+            FileSizeBytes = GetNullableLongValue(reader, "FileSizeBytes"),
             SortOrder = GetIntValue(reader, "SortOrder"),
             CreatedAt = GetDateTimeValue(reader, "CreatedAt") ?? DateTime.MinValue,
             UpdatedAt = GetDateTimeValue(reader, "UpdatedAt")
@@ -152,6 +162,11 @@ public class ProjectDrawingRepository : IProjectDrawingRepository
     private static int GetIntValue(SqlDataReader reader, string columnName)
     {
         return reader[columnName] == DBNull.Value ? 0 : Convert.ToInt32(reader[columnName]);
+    }
+
+    private static long? GetNullableLongValue(SqlDataReader reader, string columnName)
+    {
+        return reader[columnName] == DBNull.Value ? null : Convert.ToInt64(reader[columnName]);
     }
 
     private static DateOnly? GetDateOnlyValue(SqlDataReader reader, string columnName)

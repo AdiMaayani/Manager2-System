@@ -6,11 +6,13 @@ import {
   createProjectDrawingAsync,
   deleteProjectDrawingAsync,
   getProjectDrawingsAsync,
+  uploadProjectDrawingAsync,
   updateProjectDrawingAsync,
 } from '../api/projectsApiClient';
 import type {
   CreateProjectDrawingRequest,
   UpdateProjectDrawingRequest,
+  UploadProjectDrawingRequest,
 } from '../types';
 
 export function useProjectDrawings(projectId: number | null, enabled = true) {
@@ -49,6 +51,17 @@ export function useProjectDrawingMutations(projectId: number | null) {
     onSuccess: invalidateDrawings,
   });
 
+  const uploadMutation = useMutation({
+    mutationFn: (body: UploadProjectDrawingRequest) => {
+      if (projectId == null) {
+        throw new Error('Project id is required.');
+      }
+
+      return uploadProjectDrawingAsync(projectId, body);
+    },
+    onSuccess: invalidateDrawings,
+  });
+
   const updateMutation = useMutation({
     mutationFn: ({
       projectDrawingId,
@@ -79,6 +92,7 @@ export function useProjectDrawingMutations(projectId: number | null) {
 
   return {
     createMutation,
+    uploadMutation,
     updateMutation,
     deleteMutation,
   };

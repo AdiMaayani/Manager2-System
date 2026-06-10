@@ -3,43 +3,92 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  background: var(--color-neutral-100);
-  padding: var(--spacing-md);
+  position: relative;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at top right, rgba(37, 99, 235, 0.16), transparent 32rem),
+    linear-gradient(135deg, var(--color-neutral-50), var(--color-neutral-200));
+  padding: var(--spacing-xl);
+}
+
+.loginPage__ambient {
+  position: absolute;
+  width: 18rem;
+  height: 18rem;
+  border-radius: var(--radius-full);
+  opacity: 0.45;
+  filter: blur(24px);
+  pointer-events: none;
+}
+
+.loginPage__ambient--primary {
+  inset-block-start: 8%;
+  inset-inline-start: 10%;
+  background: var(--color-primary-200);
+}
+
+.loginPage__ambient--secondary {
+  inset-block-end: 10%;
+  inset-inline-end: 12%;
+  background: var(--color-primary-100);
 }
 
 .loginPage__card {
   width: 100%;
-  max-width: 400px;
-  background: #fff;
+  max-width: 430px;
+  position: relative;
+  background: rgba(255, 255, 255, 0.96);
   border-radius: var(--radius-xl);
+  border: 1px solid rgba(255, 255, 255, 0.74);
   box-shadow: var(--shadow-xl);
   overflow: hidden;
 }
 
 .loginPage__logo {
   display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  padding: var(--spacing-2xl) var(--spacing-xl) var(--spacing-lg);
-  background: var(--color-primary-600);
+  gap: var(--spacing-sm);
+  padding: var(--spacing-2xl) var(--spacing-xl) var(--spacing-xl);
+  background:
+    linear-gradient(135deg, rgba(30, 64, 175, 0.95), rgba(37, 99, 235, 0.88)),
+    var(--color-primary-600);
 }
 
 .loginPage__logoImg {
-  height: 56px;
+  height: 104px;
   width: auto;
   object-fit: contain;
   filter: brightness(0) invert(1);
 }
 
+.loginPage__eyebrow {
+  margin: 0;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.08em;
+}
+
 .loginPage__body {
-  padding: var(--spacing-xl);
+  padding: var(--spacing-2xl);
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-lg);
+  gap: var(--spacing-md);
 }
 
 .loginPage__title {
-  font-size: var(--font-size-xl);
+  margin: 0;
+  font-size: var(--font-size-2xl);
   font-weight: var(--font-weight-semibold);
-  color: var(--color-neutral-800);
+  color: var(--color-neutral-900);
+  text-align: center;
+}
+
+.loginPage__subtitle {
+  margin: calc(var(--spacing-xs) * -1) 0 var(--spacing-md);
+  color: var(--color-neutral-600);
+  font-size: var(--font-size-sm);
   text-align: center;
 }

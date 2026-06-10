@@ -67,6 +67,12 @@
   min-width: 0;
 }
 
+.projectEquipmentTab__inventoryMeta {
+  color: var(--color-neutral-500);
+  font-size: var(--font-size-xs);
+  margin-inline-start: auto;
+}
+
 .projectEquipmentTab__editList {
   display: flex;
   flex-direction: column;

@@ -57,9 +57,11 @@ public class ProjectBoqRepository : IProjectBoqRepository
 
             command.Parameters.AddWithValue("@ProjectId", boqItem.ProjectId);
             command.Parameters.AddWithValue("@SystemName", (object?)boqItem.SystemName ?? DBNull.Value);
+            command.Parameters.AddWithValue("@InventoryItemId", (object?)boqItem.InventoryItemId ?? DBNull.Value);
             command.Parameters.AddWithValue("@ItemDescription", boqItem.ItemDescription);
             command.Parameters.AddWithValue("@Quantity", boqItem.Quantity);
             command.Parameters.AddWithValue("@Unit", boqItem.Unit);
+            command.Parameters.AddWithValue("@UnitPrice", (object?)boqItem.UnitPrice ?? DBNull.Value);
             command.Parameters.AddWithValue("@SortOrder", boqItem.SortOrder > 0 ? boqItem.SortOrder : DBNull.Value);
 
             await connection.OpenAsync();
@@ -86,9 +88,11 @@ public class ProjectBoqRepository : IProjectBoqRepository
             command.Parameters.AddWithValue("@ProjectBoqItemId", boqItem.ProjectBoqItemId);
             command.Parameters.AddWithValue("@ProjectId", boqItem.ProjectId);
             command.Parameters.AddWithValue("@SystemName", (object?)boqItem.SystemName ?? DBNull.Value);
+            command.Parameters.AddWithValue("@InventoryItemId", (object?)boqItem.InventoryItemId ?? DBNull.Value);
             command.Parameters.AddWithValue("@ItemDescription", boqItem.ItemDescription);
             command.Parameters.AddWithValue("@Quantity", boqItem.Quantity);
             command.Parameters.AddWithValue("@Unit", boqItem.Unit);
+            command.Parameters.AddWithValue("@UnitPrice", (object?)boqItem.UnitPrice ?? DBNull.Value);
             command.Parameters.AddWithValue("@SortOrder", boqItem.SortOrder);
 
             await connection.OpenAsync();
@@ -183,9 +187,14 @@ public class ProjectBoqRepository : IProjectBoqRepository
             ProjectBoqItemId = GetIntValue(reader, "ProjectBoqItemId"),
             ProjectId = GetIntValue(reader, "ProjectId"),
             SystemName = GetStringValue(reader, "SystemName"),
+            InventoryItemId = GetNullableIntValue(reader, "InventoryItemId"),
+            InventorySkuCode = GetStringValue(reader, "InventorySkuCode"),
+            InventoryItemName = GetStringValue(reader, "InventoryItemName"),
+            InventoryCategory = GetStringValue(reader, "InventoryCategory"),
             ItemDescription = GetStringValue(reader, "ItemDescription") ?? string.Empty,
             Quantity = GetDecimalValue(reader, "Quantity"),
             Unit = GetStringValue(reader, "Unit") ?? string.Empty,
+            UnitPrice = GetNullableDecimalValue(reader, "UnitPrice"),
             SortOrder = GetIntValue(reader, "SortOrder"),
             CreatedAt = GetDateTimeValue(reader, "CreatedAt") ?? DateTime.MinValue,
             UpdatedAt = GetDateTimeValue(reader, "UpdatedAt")
@@ -202,9 +211,19 @@ public class ProjectBoqRepository : IProjectBoqRepository
         return reader[columnName] == DBNull.Value ? 0 : Convert.ToInt32(reader[columnName]);
     }
 
+    private static int? GetNullableIntValue(SqlDataReader reader, string columnName)
+    {
+        return reader[columnName] == DBNull.Value ? null : Convert.ToInt32(reader[columnName]);
+    }
+
     private static decimal GetDecimalValue(SqlDataReader reader, string columnName)
     {
         return reader[columnName] == DBNull.Value ? 0 : Convert.ToDecimal(reader[columnName]);
+    }
+
+    private static decimal? GetNullableDecimalValue(SqlDataReader reader, string columnName)
+    {
+        return reader[columnName] == DBNull.Value ? null : Convert.ToDecimal(reader[columnName]);
     }
 
     private static DateTime? GetDateTimeValue(SqlDataReader reader, string columnName)
