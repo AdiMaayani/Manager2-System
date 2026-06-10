@@ -121,6 +121,9 @@ so run it against an empty database).
 3. **Functions** — run every file in `functions/` (order does not matter; they are independent scalar UDFs).
 4. **Stored procedures** — run every file in `SP/` (order does not matter; `CREATE OR ALTER` does not require
    referenced objects to pre-exist at create time).
+5. **Initial admin (required for first login)** — run `seed/initial_admin/00_seed_initial_admin.sql`.
+   A schema-only database has no `Roles` and no `Users`, so login is impossible until this runs. See
+   [Initial admin bootstrap](#initial-admin-bootstrap-first-login) below.
 
 The manual cleanup script in `cleanup/2026-06-01_drop_legacy_functions.sql` is not part of a fresh rebuild. Run it
 manually in SSMS against existing target databases that still contain the removed legacy functions.
@@ -152,6 +155,49 @@ Get-ChildItem ".\database\SP\*.sql" -Exclude '2026-*' | ForEach-Object {
 
 > `-b` makes `sqlcmd` stop on the first error so a broken deploy fails loudly.
 > The `-Exclude '2026-*'` skips the two historical migration/seed scripts (see notes below).
+
+After the three steps above, run the initial-admin seed once:
+
+```powershell
+# 4) initial admin (first login)
+sqlcmd -S $server -d $db -b -i ".\database\seed\initial_admin\00_seed_initial_admin.sql"
+```
+
+---
+
+## Initial admin bootstrap (first login)
+
+A database built only from `schema/` + `SP/` (or from the production dump `igroup30_prod.sql`, which contains
+**no row data**) has zero `Roles` and zero `Users`. Because `POST /api/Users` itself requires an authenticated
+Admin, you cannot create the first user through the API — login must be bootstrapped in the database.
+
+`seed/initial_admin/00_seed_initial_admin.sql` creates exactly one administrator and is **idempotent** (safe to
+re-run; it never overwrites an existing user's password). It:
+
+1. ensures the `Admin` role row exists,
+2. ensures a linked `Employees` row (required: `Users.EmployeeId` is `NOT NULL`),
+3. creates the user via `sp_CreateUser`, and
+4. grants the active `Admin` role via `sp_UpsertUserRole`.
+
+It calls the same stored procedures the application uses, with signatures verified against `igroup30_prod.sql`.
+
+**Default dev credentials (change before any shared/real environment):**
+
+| Field | Value |
+|---|---|
+| Email (login) | `admin@manager2.local` |
+| Username | `admin` |
+| Password | `Admin#2026!` |
+
+### Changing the password
+
+The stored `PasswordHash`/`PasswordSalt` are PBKDF2-SHA256 (100000 iterations, 16-byte salt, 32-byte key, Base64),
+matching `apps/api/ManageR2.Infrastructure/Features/Users/Services/PasswordService.cs`. T-SQL cannot compute this,
+so the values are precomputed. To use a different password, regenerate the two literals and paste them into the seed:
+
+```powershell
+.\database\seed\initial_admin\generate_password_hash.ps1 -Password 'YourNewPassword'
+```
 
 ---
 
