@@ -4,15 +4,26 @@
   gap: var(--spacing-lg);
 }
 
-.employeeDrawer__grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
+/* Edit mode: DetailsSection cards with extra vertical air between them so the
+   form does not read as one dense block (same rhythm as the other drawers). */
+.employeeDrawer--edit {
+  gap: var(--spacing-lg);
+}
+
+/* Read-only review mode: sectioned cards with a responsive field grid. */
+.employeeDrawer--review {
   gap: var(--spacing-md);
 }
 
-.employeeDrawer__toggles {
-  display: flex;
-  flex-wrap: wrap;
+.employeeDrawer__detailsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.employeeDrawer__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: var(--spacing-md);
 }
 
@@ -33,19 +44,87 @@
   padding: var(--spacing-sm) var(--spacing-md);
 }
 
+/* Footer styles: the shared Drawer footer slot provides background and border. */
+.employeeDrawer__footerContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
 .employeeDrawer__actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--spacing-sm);
   align-items: center;
-  padding-top: var(--spacing-md);
-  border-top: 1px solid var(--color-neutral-200);
 }
 
 .employeeDrawer__confirmText {
   font-size: var(--font-size-sm);
   color: var(--color-danger-700);
   font-weight: var(--font-weight-medium);
+}
+
+/* Related operational records inside review mode. */
+.employeeDrawer__relatedList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.employeeDrawer__relatedItem {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding: var(--spacing-sm) var(--spacing-xs);
+  border-bottom: 1px solid var(--color-neutral-100);
+}
+
+.employeeDrawer__relatedList > li:last-child .employeeDrawer__relatedItem {
+  border-bottom: none;
+}
+
+.employeeDrawer__relatedItem--link {
+  text-decoration: none;
+  color: inherit;
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast);
+}
+
+.employeeDrawer__relatedItem--link:hover,
+.employeeDrawer__relatedItem--link:focus-visible {
+  background: var(--color-neutral-50);
+  outline: none;
+}
+
+.employeeDrawer__relatedPrimary {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-primary-700);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.employeeDrawer__relatedMeta {
+  flex: 1;
+  min-width: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-neutral-500);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.employeeDrawer__relatedHint {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-500);
+}
+
+.employeeDrawer__relatedHint--error {
+  color: var(--color-danger-600);
 }
 
 @media (max-width: 720px) {

@@ -1,16 +1,28 @@
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
+import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { Drawer } from '@shared/components/Drawer';
+import { Badge } from '@shared/components/Badge';
 import { Button } from '@shared/components/Button';
+import { DetailsField } from '@shared/components/DetailsField';
+import { DetailsSection } from '@shared/components/DetailsSection';
 import { Input } from '@shared/components/Input';
+import { isLocalDataMode } from '@/config/appConfig';
+import { getUsersAsync } from '@features/users/api/usersApiClient';
+import { getAllWorkPlansAsync } from '@features/workplan/api/workplanApiClient';
 import { useEmployeeMutations } from '../../hooks/useEmployees';
 import type { Employee, UpsertEmployeeRequest } from '../../types';
 import './EmployeeDrawer.css';
+
+const MAX_RELATED_ITEMS = 5;
 
 interface EmployeeDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   employee?: Employee | null;
-  onSaved: (message: string) => void;
+  /** Admin-only: gates edit/create/status actions. Review mode is open to all. */
+  canEdit: boolean;
+  onSaved: (employee: Employee, message: string) => void;
 }
 
 interface EmployeeFormState {
@@ -23,7 +35,7 @@ interface EmployeeFormState {
   isActive: boolean;
 }
 
-function buildInitialState(employee: Employee | null | undefined): EmployeeFormState {
+function buildInitialState(employee: Employee | null): EmployeeFormState {
   return {
     fullName: employee?.fullName ?? '',
     primaryRole: employee?.primaryRole ?? '',
@@ -45,15 +57,68 @@ function trimOptionalValue(value: string): string | undefined {
   return trimmedValue || undefined;
 }
 
-export function EmployeeDrawer({ isOpen, onClose, employee, onSaved }: EmployeeDrawerProps) {
-  const isEditMode = employee != null;
+function formatEmployeeDate(value?: string | null): string | undefined {
+  if (!value) return undefined;
+  const parsedDate = new Date(value);
+  return Number.isNaN(parsedDate.getTime()) ? undefined : parsedDate.toLocaleDateString('he-IL');
+}
+
+export function EmployeeDrawer({ isOpen, onClose, employee, canEdit, onSaved }: EmployeeDrawerProps) {
+  if (!isOpen) return null;
+
+  // Remount per employee so form/edit state always resets when the drawer
+  // opens for a different record (or switches from create to a saved record).
+  return (
+    <EmployeeDrawerContent
+      key={employee?.employeeId ?? 'new'}
+      employee={employee ?? null}
+      canEdit={canEdit}
+      onClose={onClose}
+      onSaved={onSaved}
+    />
+  );
+}
+
+interface EmployeeDrawerContentProps {
+  employee: Employee | null;
+  canEdit: boolean;
+  onClose: () => void;
+  onSaved: (employee: Employee, message: string) => void;
+}
+
+function EmployeeDrawerContent({ employee, canEdit, onClose, onSaved }: EmployeeDrawerContentProps) {
+  const isExistingEmployee = employee != null;
   const { createMutation, updateMutation, activeStatusMutation } = useEmployeeMutations();
+
+  // Existing employees open in read-only review mode; create opens editable
+  // (create is only reachable for users with manage permission).
+  const [isEditing, setIsEditing] = useState(!isExistingEmployee && canEdit);
   const [form, setForm] = useState<EmployeeFormState>(() => buildInitialState(employee));
   const [error, setError] = useState<string | null>(null);
   const [confirmStatusChange, setConfirmStatusChange] = useState(false);
 
   function setField<K extends keyof EmployeeFormState>(key: K, value: EmployeeFormState[K]) {
     setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  function handleStartEdit() {
+    if (!canEdit) return;
+    setForm(buildInitialState(employee));
+    setError(null);
+    setConfirmStatusChange(false);
+    setIsEditing(true);
+  }
+
+  function handleCancelEdit() {
+    if (!isExistingEmployee) {
+      onClose();
+      return;
+    }
+
+    setForm(buildInitialState(employee));
+    setError(null);
+    setConfirmStatusChange(false);
+    setIsEditing(false);
   }
 
   function validate(): string | null {
@@ -95,29 +160,42 @@ export function EmployeeDrawer({ isOpen, onClose, employee, onSaved }: EmployeeD
     setError(null);
 
     try {
-      if (isEditMode) {
-        await updateMutation.mutateAsync({ id: employee.employeeId, request: buildRequest() });
-        onSaved('העובד עודכן בהצלחה.');
+      let savedEmployee: Employee;
+      let message: string;
+      if (isExistingEmployee) {
+        const updatedEmployee = await updateMutation.mutateAsync({
+          id: employee.employeeId,
+          request: buildRequest(),
+        });
+        savedEmployee = updatedEmployee ?? { ...employee, ...buildRequest() };
+        message = 'העובד עודכן בהצלחה.';
       } else {
-        await createMutation.mutateAsync(buildRequest());
-        onSaved('העובד נוצר בהצלחה.');
+        savedEmployee = await createMutation.mutateAsync(buildRequest());
+        message = 'העובד נוצר בהצלחה.';
       }
-      onClose();
+
+      setIsEditing(false);
+      setConfirmStatusChange(false);
+      onSaved(savedEmployee, message);
     } catch (err) {
+      setIsEditing(true);
       setError(err instanceof Error ? err.message : 'שמירת העובד נכשלה');
     }
   }
 
   async function handleStatusChange() {
-    if (!isEditMode) return;
+    if (!isExistingEmployee) return;
 
     setError(null);
     try {
-      await activeStatusMutation.mutateAsync({
+      const updatedEmployee = await activeStatusMutation.mutateAsync({
         id: employee.employeeId,
         isActive: !employee.isActive,
       });
-      onSaved(employee.isActive ? 'העובד הושבת בהצלחה.' : 'העובד הופעל מחדש בהצלחה.');
+      onSaved(
+        updatedEmployee ?? { ...employee, isActive: !employee.isActive },
+        employee.isActive ? 'העובד הושבת בהצלחה.' : 'העובד הופעל מחדש בהצלחה.',
+      );
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'עדכון סטטוס העובד נכשל');
@@ -127,118 +205,368 @@ export function EmployeeDrawer({ isOpen, onClose, employee, onSaved }: EmployeeD
   const isSaving =
     createMutation.isPending || updateMutation.isPending || activeStatusMutation.isPending;
 
+  const title = !isExistingEmployee
+    ? 'עובד חדש'
+    : isEditing
+      ? `עריכת עובד — ${employee.fullName}`
+      : `פרטי עובד — ${employee.fullName}`;
+
   return (
     <Drawer
-      isOpen={isOpen}
+      isOpen
       onClose={onClose}
-      title={isEditMode ? `עריכת עובד — ${employee.fullName}` : 'עובד חדש'}
-    >
-      <div className="employeeDrawer">
-        <div className="employeeDrawer__grid">
-          <Input
-            label="שם מלא *"
-            value={form.fullName}
-            onChange={(event) => setField('fullName', event.target.value)}
-            required
-          />
-
-          <Input
-            label="תפקיד ראשי *"
-            value={form.primaryRole}
-            onChange={(event) => setField('primaryRole', event.target.value)}
-            required
-          />
-
-          <Input
-            label="טלפון"
-            type="tel"
-            value={form.phone}
-            onChange={(event) => setField('phone', event.target.value)}
-          />
-
-          <Input
-            label="אימייל"
-            type="email"
-            value={form.email}
-            onChange={(event) => setField('email', event.target.value)}
-          />
-
-          <Input
-            label="קיבולת יומית בשעות"
-            type="number"
-            min="0"
-            max="24"
-            step="0.25"
-            value={form.dailyCapacityHours}
-            onChange={(event) => setField('dailyCapacityHours', event.target.value)}
-          />
-        </div>
-
-        <div className="employeeDrawer__toggles">
-          <label className="employeeDrawer__checkboxRow">
-            <input
-              type="checkbox"
-              checked={form.isAssignable}
-              onChange={(event) => setField('isAssignable', event.target.checked)}
-            />
-            <span>ניתן לשיבוץ</span>
-          </label>
-
-          <label className="employeeDrawer__checkboxRow">
-            <input
-              type="checkbox"
-              checked={form.isActive}
-              onChange={(event) => setField('isActive', event.target.checked)}
-            />
-            <span>עובד פעיל</span>
-          </label>
-        </div>
-
-        {error && <p className="employeeDrawer__error">{error}</p>}
-
-        <div className="employeeDrawer__actions">
-          <Button onClick={handleSave} disabled={isSaving}>
-            {isSaving ? 'שומר...' : 'שמור'}
+      title={title}
+      headerActions={
+        isExistingEmployee && !isEditing && canEdit ? (
+          <Button type="button" variant="secondary" onClick={handleStartEdit}>
+            ערוך פרטים
           </Button>
-          <Button variant="secondary" onClick={onClose} disabled={isSaving}>
-            ביטול
-          </Button>
+        ) : undefined
+      }
+      footer={
+        isEditing ? (
+          <div className="employeeDrawer__footerContent">
+            {error && <p className="employeeDrawer__error">{error}</p>}
+            <div className="employeeDrawer__actions">
+              <Button onClick={handleSave} disabled={isSaving}>
+                {isSaving ? 'שומר...' : 'שמור'}
+              </Button>
+              <Button variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
+                ביטול
+              </Button>
 
-          {isEditMode && (
-            <>
-              {confirmStatusChange ? (
+              {isExistingEmployee && (
                 <>
-                  <span className="employeeDrawer__confirmText">
-                    {employee.isActive ? 'להשבית את העובד?' : 'להפעיל את העובד מחדש?'}
-                  </span>
-                  <Button
-                    variant={employee.isActive ? 'danger' : 'primary'}
-                    onClick={handleStatusChange}
-                    disabled={isSaving}
-                  >
-                    אישור
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={() => setConfirmStatusChange(false)}
-                    disabled={isSaving}
-                  >
-                    חזור
-                  </Button>
+                  {confirmStatusChange ? (
+                    <>
+                      <span className="employeeDrawer__confirmText">
+                        {employee.isActive ? 'להשבית את העובד?' : 'להפעיל את העובד מחדש?'}
+                      </span>
+                      <Button
+                        variant={employee.isActive ? 'danger' : 'primary'}
+                        onClick={handleStatusChange}
+                        disabled={isSaving}
+                      >
+                        אישור
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        onClick={() => setConfirmStatusChange(false)}
+                        disabled={isSaving}
+                      >
+                        חזור
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      variant={employee.isActive ? 'danger' : 'primary'}
+                      onClick={() => setConfirmStatusChange(true)}
+                      disabled={isSaving}
+                    >
+                      {employee.isActive ? 'השבת עובד' : 'הפעל עובד'}
+                    </Button>
+                  )}
                 </>
-              ) : (
-                <Button
-                  variant={employee.isActive ? 'danger' : 'primary'}
-                  onClick={() => setConfirmStatusChange(true)}
-                  disabled={isSaving}
-                >
-                  {employee.isActive ? 'השבת עובד' : 'הפעל עובד'}
-                </Button>
               )}
-            </>
-          )}
+            </div>
+          </div>
+        ) : undefined
+      }
+    >
+      {!isEditing && isExistingEmployee ? (
+        <EmployeeReviewDetails employee={employee} canViewLinkedUser={canEdit} />
+      ) : (
+        <div className="employeeDrawer employeeDrawer--edit">
+          <DetailsSection title="פרטים כלליים">
+            <Input
+              label="שם מלא *"
+              value={form.fullName}
+              onChange={(event) => setField('fullName', event.target.value)}
+              required
+            />
+            <div className="employeeDrawer__grid">
+              <Input
+                label="תפקיד ראשי *"
+                value={form.primaryRole}
+                onChange={(event) => setField('primaryRole', event.target.value)}
+                required
+              />
+            </div>
+
+            <label className="employeeDrawer__checkboxRow">
+              <input
+                type="checkbox"
+                checked={form.isActive}
+                onChange={(event) => setField('isActive', event.target.checked)}
+              />
+              <span>עובד פעיל</span>
+            </label>
+          </DetailsSection>
+
+          <DetailsSection title="פרטי התקשרות">
+            <div className="employeeDrawer__grid">
+              <Input
+                label="טלפון"
+                type="tel"
+                value={form.phone}
+                onChange={(event) => setField('phone', event.target.value)}
+              />
+
+              <Input
+                label="אימייל"
+                type="email"
+                value={form.email}
+                onChange={(event) => setField('email', event.target.value)}
+              />
+            </div>
+          </DetailsSection>
+
+          <DetailsSection title="זמינות ושיבוץ">
+            <div className="employeeDrawer__grid">
+              <Input
+                label="קיבולת יומית בשעות"
+                type="number"
+                min="0"
+                max="24"
+                step="0.25"
+                value={form.dailyCapacityHours}
+                onChange={(event) => setField('dailyCapacityHours', event.target.value)}
+              />
+            </div>
+
+            <label className="employeeDrawer__checkboxRow">
+              <input
+                type="checkbox"
+                checked={form.isAssignable}
+                onChange={(event) => setField('isAssignable', event.target.checked)}
+              />
+              <span>ניתן לשיבוץ</span>
+            </label>
+          </DetailsSection>
         </div>
-      </div>
+      )}
     </Drawer>
   );
+}
+
+interface EmployeeReviewDetailsProps {
+  employee: Employee;
+  /** The /Users endpoint is admin-only, so the linked-user section is gated. */
+  canViewLinkedUser: boolean;
+}
+
+interface AssignedTaskContext {
+  workItemId: number;
+  taskTitle: string;
+  taskStatus?: string;
+  projectId: number;
+  projectTitle: string;
+  assignmentRole?: string | null;
+  assignedHours?: number | null;
+}
+
+function EmployeeReviewDetails({ employee, canViewLinkedUser }: EmployeeReviewDetailsProps) {
+  // Related operational data is read through existing feature API clients.
+  // In mock mode these endpoints are unavailable, so the queries stay
+  // disabled and each section explains that instead of inventing data.
+  const areRelatedQueriesEnabled = isLocalDataMode;
+
+  const usersQuery = useQuery({
+    queryKey: ['employees', 'related', 'users'],
+    queryFn: getUsersAsync,
+    enabled: areRelatedQueriesEnabled && canViewLinkedUser,
+    staleTime: 60_000,
+  });
+
+  const workPlansQuery = useQuery({
+    queryKey: ['employees', 'related', 'workPlans'],
+    queryFn: getAllWorkPlansAsync,
+    enabled: areRelatedQueriesEnabled,
+  });
+
+  const linkedUser = (usersQuery.data ?? []).find(
+    (user) => user.employeeId === employee.employeeId,
+  );
+
+  const assignedTasks: AssignedTaskContext[] = (workPlansQuery.data ?? []).flatMap((workPlan) =>
+    workPlan.assignments
+      .filter((assignment) => assignment.employeeId === employee.employeeId)
+      .map((assignment) => {
+        const task = workPlan.tasks.find((planTask) => planTask.workItemId === assignment.workItemId);
+        return {
+          workItemId: assignment.workItemId,
+          taskTitle: task?.title ?? `משימה #${assignment.workItemId}`,
+          taskStatus: task?.status,
+          projectId: workPlan.project.id,
+          projectTitle: workPlan.project.title,
+          assignmentRole: assignment.assignmentRole,
+          assignedHours: assignment.assignedHours,
+        };
+      }),
+  );
+
+  return (
+    <div className="employeeDrawer employeeDrawer--review">
+      <DetailsSection title="פרטי עובד">
+        <div className="employeeDrawer__detailsGrid">
+          <DetailsField label="שם מלא" value={employee.fullName} />
+          <DetailsField label="תפקיד ראשי" value={employee.primaryRole} />
+          <DetailsField
+            label="סטטוס"
+            value={
+              <Badge variant={employee.isActive ? 'success' : 'neutral'}>
+                {employee.isActive ? 'פעיל' : 'לא פעיל'}
+              </Badge>
+            }
+          />
+          <DetailsField label="נוצר בתאריך" value={formatEmployeeDate(employee.createdAt)} />
+        </div>
+      </DetailsSection>
+
+      <DetailsSection title="פרטי התקשרות">
+        <div className="employeeDrawer__detailsGrid">
+          <DetailsField label="טלפון" value={employee.phone} />
+          <DetailsField label="אימייל" value={employee.email} />
+        </div>
+      </DetailsSection>
+
+      <DetailsSection title="זמינות ושיבוץ">
+        <div className="employeeDrawer__detailsGrid">
+          <DetailsField
+            label="קיבולת יומית"
+            value={
+              employee.dailyCapacityHours != null
+                ? `${employee.dailyCapacityHours} שעות`
+                : undefined
+            }
+          />
+          <DetailsField
+            label="ניתן לשיבוץ"
+            value={
+              <Badge variant={employee.isAssignable ? 'success' : 'neutral'}>
+                {employee.isAssignable ? 'כן' : 'לא'}
+              </Badge>
+            }
+          />
+        </div>
+      </DetailsSection>
+
+      {canViewLinkedUser && (
+        <RelatedSection
+          title="משתמש מערכת"
+          count={null}
+          isLoading={usersQuery.isLoading}
+          isError={usersQuery.isError}
+          isUnavailable={!areRelatedQueriesEnabled}
+          emptyText=""
+        >
+          {linkedUser ? (
+            <div className="employeeDrawer__detailsGrid">
+              <DetailsField label="שם משתמש" value={linkedUser.username} />
+              <DetailsField label="אימייל משתמש" value={linkedUser.email} />
+              <DetailsField
+                label="תפקידים"
+                value={linkedUser.roles.length > 0 ? linkedUser.roles.join(', ') : undefined}
+              />
+              <DetailsField
+                label="סטטוס משתמש"
+                value={
+                  <Badge variant={linkedUser.isActive ? 'success' : 'neutral'}>
+                    {linkedUser.isActive ? 'פעיל' : 'לא פעיל'}
+                  </Badge>
+                }
+              />
+            </div>
+          ) : (
+            <p className="employeeDrawer__relatedHint">אין משתמש מערכת מקושר לעובד זה.</p>
+          )}
+        </RelatedSection>
+      )}
+
+      <RelatedSection
+        title="משימות מוקצות"
+        count={workPlansQuery.data ? assignedTasks.length : null}
+        isLoading={workPlansQuery.isLoading}
+        isError={workPlansQuery.isError}
+        isUnavailable={!areRelatedQueriesEnabled}
+        emptyText="אין משימות מוקצות לעובד זה בתוכניות העבודה."
+      >
+        <ul className="employeeDrawer__relatedList">
+          {assignedTasks.slice(0, MAX_RELATED_ITEMS).map((assignedTask, index) => (
+            <li key={`${assignedTask.workItemId}-${index}`}>
+              <Link
+                className="employeeDrawer__relatedItem employeeDrawer__relatedItem--link"
+                to={`/projects?projectId=${assignedTask.projectId}`}
+              >
+                <span className="employeeDrawer__relatedPrimary">{assignedTask.taskTitle}</span>
+                <span className="employeeDrawer__relatedMeta">
+                  {[
+                    assignedTask.projectTitle,
+                    assignedTask.assignmentRole,
+                    assignedTask.assignedHours != null
+                      ? `${assignedTask.assignedHours} שעות`
+                      : null,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </span>
+                {assignedTask.taskStatus && (
+                  <Badge variant="neutral">{assignedTask.taskStatus}</Badge>
+                )}
+              </Link>
+            </li>
+          ))}
+        </ul>
+        {assignedTasks.length > MAX_RELATED_ITEMS && (
+          <p className="employeeDrawer__relatedHint">
+            ועוד {assignedTasks.length - MAX_RELATED_ITEMS} משימות נוספות.
+          </p>
+        )}
+      </RelatedSection>
+    </div>
+  );
+}
+
+interface RelatedSectionProps {
+  title: string;
+  /** Number of related records, or null when a count is not meaningful/loaded. */
+  count: number | null;
+  isLoading: boolean;
+  isError: boolean;
+  isUnavailable: boolean;
+  emptyText: string;
+  children: ReactNode;
+}
+
+function RelatedSection({
+  title,
+  count,
+  isLoading,
+  isError,
+  isUnavailable,
+  emptyText,
+  children,
+}: RelatedSectionProps) {
+  const sectionTitle = count != null ? `${title} (${count})` : title;
+
+  let body: ReactNode;
+  if (isUnavailable) {
+    body = (
+      <p className="employeeDrawer__relatedHint">נתונים מקושרים זמינים בחיבור לשרת בלבד.</p>
+    );
+  } else if (isLoading) {
+    body = <p className="employeeDrawer__relatedHint">טוען נתונים מקושרים…</p>;
+  } else if (isError) {
+    body = (
+      <p className="employeeDrawer__relatedHint employeeDrawer__relatedHint--error">
+        טעינת הנתונים המקושרים נכשלה.
+      </p>
+    );
+  } else if (count === 0) {
+    body = <p className="employeeDrawer__relatedHint">{emptyText}</p>;
+  } else {
+    body = children;
+  }
+
+  return <DetailsSection title={sectionTitle}>{body}</DetailsSection>;
 }
