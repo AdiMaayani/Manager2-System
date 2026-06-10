@@ -100,7 +100,14 @@ export async function updateWorkItemAsync(
       priority: request.priority,
       requiredRole: request.requiredRole,
       isLocked: request.isLocked,
-      parentWorkItemId: request.parentWorkItemId,
+      // sp_UpdateWorkItem overwrites every column, so untouched values must be
+      // echoed back or the update silently NULLs them in the database.
+      dealCloseDate: request.dealCloseDate,
+      financeProjectNumber: request.financeProjectNumber,
+      invoiceNumber: request.invoiceNumber,
+      actualStart: request.actualStart,
+      actualEnd: request.actualEnd,
+      actualHours: request.actualHours,
     }),
   });
 }

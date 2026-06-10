@@ -152,7 +152,6 @@ export function buildWorkPlanTaskSelection(
   workPlan: MappedWorkPlan,
   task: MappedWorkPlan['tasks'][number],
   fallbackIndex = 0,
-  isPersonal = false,
 ): WorkPlanTaskSelection {
   const assignment = resolveAssignment(task, workPlan);
   const fallbackStartHour = Math.min(8 + fallbackIndex * 2, 22);
@@ -167,12 +166,12 @@ export function buildWorkPlanTaskSelection(
     projectId: workPlan.project.id,
     projectTitle: workPlan.project.title,
     assigneeName: assignment.displayName,
+    assigneeEmployeeId: assignment.employeeId,
     startHour: timeWindow.startHour,
     endHour: timeWindow.endHour,
     plannedStart: task.plannedStart,
     plannedEnd: task.plannedEnd,
     isLocked: task.isLocked,
-    isPersonal,
     estimatedHours: task.estimatedHours,
     priority: task.priority,
     requiredRole: task.requiredRole,
@@ -253,7 +252,6 @@ export function buildEmployeeDailyBars(
         priority: task.priority,
         requiredRole: task.requiredRole,
         isLocked: task.isLocked,
-        isPersonal: false,
         isUrgent: isWorkPlanPriorityUrgent(task.priority),
         assignmentSource: assignment.source,
         violationCount: insights.violationCount,
@@ -309,7 +307,6 @@ export function buildProjectDailyBars(
             priority: task.priority,
             requiredRole: task.requiredRole,
             isLocked: task.isLocked,
-            isPersonal: false,
             isUrgent: isWorkPlanPriorityUrgent(task.priority),
             assignmentSource: assignment.source,
             violationCount: insights.violationCount,
