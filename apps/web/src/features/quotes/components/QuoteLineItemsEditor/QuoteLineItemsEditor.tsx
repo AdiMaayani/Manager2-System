@@ -33,8 +33,8 @@ export function QuoteLineItemsEditor({
 }: QuoteLineItemsEditorProps) {
   return (
     <div className="quoteLineItemsEditor">
+      {/* The section title is provided by the wrapping DetailsSection card. */}
       <div className="quoteLineItemsEditor__header">
-        <h3 className="quoteLineItemsEditor__title">שורות תמחור</h3>
         <Button variant="secondary" onClick={onAddLine}>
           + הוסף שורה
         </Button>

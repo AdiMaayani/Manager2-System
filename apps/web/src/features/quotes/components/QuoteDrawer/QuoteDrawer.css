@@ -4,6 +4,17 @@
   gap: var(--spacing-lg);
 }
 
+/* Edit mode: DetailsSection cards with extra vertical air between them so the
+   form does not read as one dense block (same rhythm as Customer/Contact). */
+.quoteDrawer--edit {
+  gap: var(--spacing-lg);
+}
+
+/* Read-only review mode: sectioned cards with a responsive field grid. */
+.quoteDrawer--review {
+  gap: var(--spacing-md);
+}
+
 .quoteDrawer__grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -92,19 +103,99 @@
   padding: var(--spacing-sm) var(--spacing-md);
 }
 
+.quoteDrawer__loadError {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-danger-600);
+}
+
+/* Footer styles: the shared Drawer footer slot provides background and border. */
+.quoteDrawer__footerContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
 .quoteDrawer__actions {
   display: flex;
   flex-wrap: wrap;
   gap: var(--spacing-sm);
   align-items: center;
-  padding-top: var(--spacing-md);
-  border-top: 1px solid var(--color-neutral-200);
 }
 
 .quoteDrawer__confirmText {
   font-size: var(--font-size-sm);
   color: var(--color-danger-600);
   font-weight: var(--font-weight-medium);
+}
+
+/* Review mode details. */
+.quoteDrawer__detailsGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.quoteDrawer__numberValue {
+  font-family: monospace;
+  direction: ltr;
+  font-weight: var(--font-weight-semibold);
+}
+
+.quoteDrawer__statusBadges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+}
+
+.quoteDrawer__projectLink {
+  color: var(--color-primary-700);
+}
+
+.quoteDrawer__reviewHint {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-500);
+}
+
+/* Compact read-only line-items table inside review mode. */
+.quoteDrawer__reviewLinesWrap {
+  overflow-x: auto;
+}
+
+.quoteDrawer__reviewLines {
+  width: 100%;
+  border-collapse: collapse;
+  min-width: 480px;
+}
+
+.quoteDrawer__reviewLines th,
+.quoteDrawer__reviewLines td {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-bottom: 1px solid var(--color-neutral-100);
+  text-align: start;
+  font-size: var(--font-size-sm);
+  white-space: nowrap;
+}
+
+.quoteDrawer__reviewLines th {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-500);
+  background: var(--color-neutral-50);
+}
+
+.quoteDrawer__reviewLines tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.quoteDrawer__reviewLineDesc {
+  white-space: normal;
+  min-width: 160px;
+}
+
+.quoteDrawer__reviewLineTotal {
+  font-weight: var(--font-weight-semibold);
 }
 
 @media (max-width: 720px) {
