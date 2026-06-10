@@ -6,6 +6,7 @@ import { ErrorState } from '@shared/components/ErrorState';
 import { EmptyState } from '@shared/components/EmptyState';
 import { Badge } from '@shared/components/Badge';
 import { Button } from '@shared/components/Button';
+import { FilterBar } from '@shared/components/FilterBar';
 import { Input } from '@shared/components/Input';
 import { getEmployeesAsync, type Employee } from '@features/employees';
 import { UserDrawer } from '../../components/UserDrawer';
@@ -49,7 +50,12 @@ export function UsersPage() {
 
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>('הכל');
+  // undefined = drawer closed, null = create mode, User = review existing.
   const [drawerUser, setDrawerUser] = useState<User | null | undefined>(undefined);
+  const [pageMessage, setPageMessage] = useState<string | null>(null);
+
+  const isDrawerOpen = drawerUser !== undefined;
+  const selectedUserId = drawerUser?.userId ?? null;
 
   const employees = useMemo(() => employeesQuery.data ?? [], [employeesQuery.data]);
   const employeesById = useMemo(
@@ -79,6 +85,11 @@ export function UsersPage() {
       return matchesSearch && matchesActive;
     });
   }, [users, employeesById, search, activeFilter]);
+
+  const openUser = (user: User) => {
+    setPageMessage(null);
+    setDrawerUser(user);
+  };
 
   const isLookupLoading =
     employeesQuery.isLoading || rolesQuery.isLoading || departmentsQuery.isLoading;
@@ -117,29 +128,45 @@ export function UsersPage() {
 
   return (
     <PageShell title="ניהול משתמשים" wide>
-      <div className="usersPage__toolbar">
-        <div className="usersPage__filters">
-          {ACTIVE_FILTERS.map((filter) => (
-            <button
-              key={filter}
-              type="button"
-              className={`usersPage__chip${activeFilter === filter ? ' usersPage__chip--active' : ''}`}
-              onClick={() => setActiveFilter(filter)}
-            >
-              {filter}
-            </button>
-          ))}
-        </div>
-
-        <div className="usersPage__toolbarActions">
+      <FilterBar
+        actions={
+          <Button
+            onClick={() => {
+              setPageMessage(null);
+              setDrawerUser(null);
+            }}
+          >
+            + משתמש חדש
+          </Button>
+        }
+      >
+        <div className="usersPage__filter usersPage__filter--search">
+          <span className="usersPage__filterLabel">חיפוש</span>
           <Input
             placeholder="חיפוש משתמש, עובד, תפקיד או מחלקה..."
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
-          <Button onClick={() => setDrawerUser(null)}>+ משתמש חדש</Button>
         </div>
-      </div>
+
+        <div className="usersPage__filter">
+          <span className="usersPage__filterLabel">סטטוס</span>
+          <div className="usersPage__chips">
+            {ACTIVE_FILTERS.map((filter) => (
+              <button
+                key={filter}
+                type="button"
+                className={`usersPage__chip${activeFilter === filter ? ' usersPage__chip--active' : ''}`}
+                onClick={() => setActiveFilter(filter)}
+              >
+                {filter}
+              </button>
+            ))}
+          </div>
+        </div>
+      </FilterBar>
+
+      {pageMessage && <p className="usersPage__success">{pageMessage}</p>}
 
       {filteredUsers.length === 0 ? (
         <EmptyState
@@ -158,12 +185,25 @@ export function UsersPage() {
                 <th>מחלקות</th>
                 <th>סטטוס</th>
                 <th>כניסה אחרונה</th>
-                <th />
               </tr>
             </thead>
             <tbody>
               {filteredUsers.map((user) => (
-                <tr key={user.userId}>
+                <tr
+                  key={user.userId}
+                  role="button"
+                  tabIndex={0}
+                  className={`usersPage__row ${
+                    selectedUserId === user.userId ? 'usersPage__row--selected' : ''
+                  }`.trim()}
+                  onClick={() => openUser(user)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      openUser(user);
+                    }
+                  }}
+                >
                   <td>
                     <div className="usersPage__primaryCell">
                       <span>{user.username}</span>
@@ -196,11 +236,6 @@ export function UsersPage() {
                     </Badge>
                   </td>
                   <td>{formatDate(user.lastLoginAt)}</td>
-                  <td>
-                    <Button variant="ghost" onClick={() => setDrawerUser(user)}>
-                      עריכה
-                    </Button>
-                  </td>
                 </tr>
               ))}
             </tbody>
@@ -209,14 +244,17 @@ export function UsersPage() {
       )}
 
       <UserDrawer
-        key={drawerUser ? `user-${drawerUser.userId}` : drawerUser === null ? 'new-user' : 'closed'}
-        isOpen={drawerUser !== undefined}
+        isOpen={isDrawerOpen}
         onClose={() => setDrawerUser(undefined)}
         user={drawerUser}
         employees={employees}
         roles={rolesQuery.data ?? []}
         departments={departmentsQuery.data ?? []}
         isLookupLoading={isLookupLoading}
+        onSaved={(savedUser, message) => {
+          setPageMessage(message);
+          setDrawerUser(savedUser);
+        }}
       />
     </PageShell>
   );
