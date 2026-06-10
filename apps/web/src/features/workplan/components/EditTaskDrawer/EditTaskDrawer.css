@@ -80,6 +80,22 @@
   display: flex;
   flex-wrap: wrap;
   gap: var(--spacing-sm);
+  align-items: center;
+}
+
+/* Destructive actions sit apart from save/cancel on the opposite edge. */
+.editTaskDrawer__dangerActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  align-items: center;
+  margin-inline-start: auto;
+}
+
+.editTaskDrawer__confirmText {
+  font-size: var(--font-size-sm);
+  color: var(--color-danger-700);
+  font-weight: var(--font-weight-medium);
 }
 
 .editTaskDrawer__error {

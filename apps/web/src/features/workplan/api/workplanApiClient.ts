@@ -79,6 +79,14 @@ export async function getWorkItemByIdAsync(workItemId: number): Promise<WorkItem
   return apiRequest<WorkItemResponse>(`/WorkItems/${workItemId}`);
 }
 
+// Reuses the existing milestones/cancel endpoint: it soft-deletes any work
+// item whose WorkType is "Task", which is exactly what WorkPlan tasks are.
+export async function cancelWorkPlanTaskAsync(taskId: number): Promise<{ message?: string }> {
+  return apiRequest<{ message?: string }>(`/WorkItems/milestones/${taskId}/cancel`, {
+    method: 'PUT',
+  });
+}
+
 export async function updateWorkItemAsync(
   workItemId: number,
   request: UpdateTaskRequest,

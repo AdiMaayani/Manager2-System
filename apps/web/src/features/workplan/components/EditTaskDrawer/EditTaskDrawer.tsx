@@ -5,7 +5,11 @@ import { Button } from '@shared/components/Button';
 import { ErrorState } from '@shared/components/ErrorState';
 import { Input } from '@shared/components/Input';
 import { isLocalDataMode } from '@/config/appConfig';
-import { getWorkItemByIdAsync, updateWorkItemAsync } from '../../api/workplanApiClient';
+import {
+  cancelWorkPlanTaskAsync,
+  getWorkItemByIdAsync,
+  updateWorkItemAsync,
+} from '../../api/workplanApiClient';
 import {
   normalizeWorkPlanPriorityCode,
   normalizeWorkPlanStatusCode,
@@ -180,6 +184,7 @@ function EditTaskForm({ taskId, initialValues, workItem, onClose, onSaved }: Edi
   );
   const [requiredRole, setRequiredRole] = useState(initialValues.requiredRole || '');
   const [error, setError] = useState<string | null>(null);
+  const [confirmCancelTask, setConfirmCancelTask] = useState(false);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -223,6 +228,22 @@ function EditTaskForm({ taskId, initialValues, workItem, onClose, onSaved }: Edi
       setError(err instanceof Error ? err.message : 'שמירת המשימה נכשלה');
     },
   });
+
+  // Soft-cancels the task through the existing WorkItems cancel endpoint; the
+  // cancelled task drops out of the work plan once the queries refetch.
+  const cancelTaskMutation = useMutation({
+    mutationFn: () => cancelWorkPlanTaskAsync(taskId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['workplan'] });
+      onSaved?.();
+      onClose();
+    },
+    onError: (err) => {
+      setError(err instanceof Error ? err.message : 'ביטול המשימה נכשל');
+    },
+  });
+
+  const isBusy = saveMutation.isPending || cancelTaskMutation.isPending;
 
   return (
     <form
@@ -344,12 +365,48 @@ function EditTaskForm({ taskId, initialValues, workItem, onClose, onSaved }: Edi
       <div className="editTaskDrawer__footer">
         {error && <p className="editTaskDrawer__error">{error}</p>}
         <div className="editTaskDrawer__actions">
-          <Button type="submit" disabled={saveMutation.isPending || !workItem}>
+          <Button type="submit" disabled={isBusy || !workItem}>
             {saveMutation.isPending ? 'שומר...' : 'שמור'}
           </Button>
-          <Button type="button" variant="secondary" onClick={onClose}>
-            ביטול
+          <Button type="button" variant="secondary" onClick={onClose} disabled={isBusy}>
+            בטל שינויים
           </Button>
+
+          {/* Locked tasks keep the existing lock rule: no destructive action. */}
+          {workItem && !workItem.isLocked && (
+            <div className="editTaskDrawer__dangerActions">
+              {confirmCancelTask ? (
+                <>
+                  <span className="editTaskDrawer__confirmText">לבטל את המשימה?</span>
+                  <Button
+                    type="button"
+                    variant="danger"
+                    onClick={() => cancelTaskMutation.mutate()}
+                    disabled={isBusy}
+                  >
+                    {cancelTaskMutation.isPending ? 'מבטל...' : 'אישור ביטול'}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => setConfirmCancelTask(false)}
+                    disabled={isBusy}
+                  >
+                    חזור
+                  </Button>
+                </>
+              ) : (
+                <Button
+                  type="button"
+                  variant="danger"
+                  onClick={() => setConfirmCancelTask(true)}
+                  disabled={isBusy}
+                >
+                  בטל משימה
+                </Button>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </form>
