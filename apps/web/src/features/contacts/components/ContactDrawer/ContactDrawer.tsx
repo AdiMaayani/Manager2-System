@@ -40,7 +40,6 @@ interface ContactFormState {
   preferredChannel: string;
   city: string;
   address: string;
-  status: string;
   notes: string;
   isActive: boolean;
 }
@@ -58,7 +57,6 @@ function buildInitialState(contact: Contact | null): ContactFormState {
     preferredChannel: contact?.preferredChannel ?? '',
     city: contact?.city ?? '',
     address: contact?.address ?? '',
-    status: contact?.status ?? 'פעיל',
     notes: contact?.notes ?? '',
     isActive: contact?.isActive ?? true,
   };
@@ -165,7 +163,9 @@ function ContactDrawerContent({ contact, onClose, onSaved }: ContactDrawerConten
       preferredChannel: form.preferredChannel || undefined,
       city: form.city.trim() || undefined,
       address: form.address.trim() || undefined,
-      status: form.status || undefined,
+      // The textual status mirrors the single isActive control so the badge
+      // and the boolean never disagree.
+      status: form.isActive ? 'פעיל' : 'לא פעיל',
       notes: form.notes.trim() || undefined,
       isActive: form.isActive,
     };
@@ -238,11 +238,11 @@ function ContactDrawerContent({ contact, onClose, onSaved }: ContactDrawerConten
                 {isSaving ? 'שומר...' : 'שמור'}
               </Button>
               <Button variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
-                ביטול
+                בטל שינויים
               </Button>
 
               {isExistingContact && (
-                <>
+                <div className="contactDrawer__dangerActions">
                   {confirmDelete ? (
                     <>
                       <span className="contactDrawer__confirmText">למחוק את איש הקשר?</span>
@@ -263,10 +263,10 @@ function ContactDrawerContent({ contact, onClose, onSaved }: ContactDrawerConten
                       onClick={() => setConfirmDelete(true)}
                       disabled={isSaving}
                     >
-                      מחיקה
+                      מחק איש קשר
                     </Button>
                   )}
-                </>
+                </div>
               )}
             </div>
           </div>
@@ -304,11 +304,6 @@ function ContactDrawerContent({ contact, onClose, onSaved }: ContactDrawerConten
                 </select>
               </div>
 
-              <Input
-                label="סטטוס"
-                value={form.status}
-                onChange={(e) => setField('status', e.target.value)}
-              />
             </div>
 
             {isExistingContact && (
@@ -466,13 +461,20 @@ function ContactReviewDetails({ contact }: ContactReviewDetailsProps) {
     (site) => site.customerId === contact.customerId,
   );
 
-  const linkedCustomerValue = !hasLinkedCustomer
-    ? undefined
-    : !isLocalDataMode
-      ? 'זמין בחיבור לשרת בלבד'
-      : customersQuery.isLoading
-        ? 'טוען…'
-        : (linkedCustomer?.customerName ?? `לקוח #${contact.customerId}`);
+  const linkedCustomerDisplayName = !isLocalDataMode
+    ? `לקוח #${contact.customerId}`
+    : customersQuery.isLoading
+      ? 'טוען…'
+      : (linkedCustomer?.customerName ?? `לקוח #${contact.customerId}`);
+
+  const linkedCustomerValue = !hasLinkedCustomer ? undefined : (
+    <Link
+      className="contactDrawer__inlineLink"
+      to={`/customers?customerId=${contact.customerId}`}
+    >
+      {linkedCustomerDisplayName}
+    </Link>
+  );
 
   return (
     <div className="contactDrawer contactDrawer--review">
@@ -503,8 +505,6 @@ function ContactReviewDetails({ contact }: ContactReviewDetailsProps) {
 
       <DetailsSection title="הקשר עסקי">
         <div className="contactDrawer__detailsGrid">
-          {/* The Customers screen has no per-customer deep link route, so the
-              linked customer is shown read-only rather than as a link. */}
           <DetailsField label="לקוח מקושר" value={linkedCustomerValue} />
           <DetailsField label="חברה" value={contact.companyName} />
         </div>

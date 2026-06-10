@@ -239,16 +239,16 @@ function InventoryDrawerContent({ inventoryItem, onClose, onSaved }: InventoryDr
                 {isSaving ? 'שומר...' : 'שמור'}
               </Button>
               <Button variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
-                ביטול
+                בטל שינויים
               </Button>
 
               {isExistingItem && inventoryItem.isActive && (
-                <>
+                <div className="inventoryDrawer__dangerActions">
                   {confirmDeactivate ? (
                     <>
-                      <span className="inventoryDrawer__confirmText">לבטל את פעילות הפריט?</span>
+                      <span className="inventoryDrawer__confirmText">להשבית את הפריט?</span>
                       <Button variant="danger" onClick={handleDeactivate} disabled={isSaving}>
-                        אישור ביטול
+                        אישור השבתה
                       </Button>
                       <Button
                         variant="secondary"
@@ -264,10 +264,10 @@ function InventoryDrawerContent({ inventoryItem, onClose, onSaved }: InventoryDr
                       onClick={() => setConfirmDeactivate(true)}
                       disabled={isSaving}
                     >
-                      ביטול פעילות
+                      השבת פריט
                     </Button>
                   )}
-                </>
+                </div>
               )}
             </div>
           </div>

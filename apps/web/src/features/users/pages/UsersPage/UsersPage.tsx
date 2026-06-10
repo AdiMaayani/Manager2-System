@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { PageShell } from '@shared/components/PageShell';
 import { PageSpinner } from '@shared/components/PageSpinner';
@@ -48,11 +49,28 @@ export function UsersPage() {
     staleTime: 60_000,
   });
 
+  const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>('הכל');
   // undefined = drawer closed, null = create mode, User = review existing.
   const [drawerUser, setDrawerUser] = useState<User | null | undefined>(undefined);
   const [pageMessage, setPageMessage] = useState<string | null>(null);
+
+  // Deep link: ?userId opens that user in read-only review mode, then the
+  // param is removed (matching the Quotes ?quoteId behavior).
+  useEffect(() => {
+    const userIdParam = searchParams.get('userId');
+    if (!userIdParam || !users) return;
+
+    const requestedUser = users.find((user) => user.userId === Number(userIdParam));
+    if (requestedUser) {
+      setDrawerUser(requestedUser);
+    }
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('userId');
+    setSearchParams(nextParams, { replace: true });
+  }, [users, searchParams, setSearchParams]);
 
   const isDrawerOpen = drawerUser !== undefined;
   const selectedUserId = drawerUser?.userId ?? null;

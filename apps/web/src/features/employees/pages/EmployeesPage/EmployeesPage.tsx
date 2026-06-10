@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { PageShell } from '@shared/components/PageShell';
 import { PageSpinner } from '@shared/components/PageSpinner';
 import { ErrorState } from '@shared/components/ErrorState';
@@ -15,12 +16,31 @@ import './EmployeesPage.css';
 
 export function EmployeesPage() {
   const { data: employees, isLoading, error, refetch } = useEmployees();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   // undefined = drawer closed, null = create mode, Employee = review existing.
   const [drawerEmployee, setDrawerEmployee] = useState<Employee | null | undefined>(undefined);
   const [pageMessage, setPageMessage] = useState<string | null>(null);
   const currentUser = getCurrentUser();
   const canManageEmployees = currentUser?.roles.includes('Admin') ?? false;
+
+  // Deep link: ?employeeId opens that employee in read-only review mode, then
+  // the param is removed (matching the Quotes ?quoteId behavior).
+  useEffect(() => {
+    const employeeIdParam = searchParams.get('employeeId');
+    if (!employeeIdParam || !employees) return;
+
+    const requestedEmployee = employees.find(
+      (employee) => employee.employeeId === Number(employeeIdParam),
+    );
+    if (requestedEmployee) {
+      setDrawerEmployee(requestedEmployee);
+    }
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('employeeId');
+    setSearchParams(nextParams, { replace: true });
+  }, [employees, searchParams, setSearchParams]);
 
   const isDrawerOpen = drawerEmployee !== undefined;
   const selectedEmployeeId = drawerEmployee?.employeeId ?? null;

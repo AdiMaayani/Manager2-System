@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Drawer } from '@shared/components/Drawer';
 import { Badge } from '@shared/components/Badge';
 import { Button } from '@shared/components/Button';
@@ -269,11 +270,11 @@ function UserDrawerContent({
                 {isSaving ? 'שומר...' : 'שמור'}
               </Button>
               <Button variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
-                ביטול
+                בטל שינויים
               </Button>
 
               {isExistingUser && (
-                <>
+                <div className="userDrawer__dangerActions">
                   {confirmDelete ? (
                     <>
                       <span className="userDrawer__confirmText">
@@ -297,10 +298,10 @@ function UserDrawerContent({
                       onClick={() => setConfirmDelete(true)}
                       disabled={isSaving}
                     >
-                      מחיקה
+                      מחק משתמש
                     </Button>
                   )}
-                </>
+                </div>
               )}
             </div>
           </div>
@@ -474,7 +475,17 @@ function UserReviewDetails({ user, linkedEmployee }: UserReviewDetailsProps) {
       <DetailsSection title="עובד מקושר">
         {linkedEmployee ? (
           <div className="userDrawer__detailsGrid">
-            <DetailsField label="שם מלא" value={linkedEmployee.fullName} />
+            <DetailsField
+              label="שם מלא"
+              value={
+                <Link
+                  className="userDrawer__inlineLink"
+                  to={`/employees?employeeId=${linkedEmployee.employeeId}`}
+                >
+                  {linkedEmployee.fullName}
+                </Link>
+              }
+            />
             <DetailsField label="תפקיד ראשי" value={linkedEmployee.primaryRole} />
             <DetailsField label="טלפון" value={linkedEmployee.phone} />
             <DetailsField label="אימייל" value={linkedEmployee.email} />

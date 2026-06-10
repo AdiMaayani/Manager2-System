@@ -21,7 +21,6 @@ import type { Customer, CreateCustomerRequest } from '../../types';
 import './CustomerDrawer.css';
 
 const CUSTOMER_TYPE_OPTIONS = ['עסקי', 'פרטי', 'גוף ציבורי', 'תאגיד'];
-const STATUS_OPTIONS = ['פעיל', 'לא פעיל', 'ממתין'];
 const MAX_RELATED_ITEMS = 5;
 
 // Local copies of the Service Calls screen labels; components/constants of that
@@ -58,7 +57,6 @@ interface CustomerFormState {
   city: string;
   region: string;
   address: string;
-  status: string;
   notes: string;
   isActive: boolean;
 }
@@ -72,7 +70,6 @@ function buildInitialState(customer: Customer | null): CustomerFormState {
     city: customer?.city ?? '',
     region: customer?.region ?? '',
     address: customer?.address ?? '',
-    status: customer?.status ?? STATUS_OPTIONS[0],
     notes: customer?.notes ?? '',
     isActive: customer?.isActive ?? true,
   };
@@ -169,7 +166,9 @@ function CustomerDrawerContent({ customer, onClose, onSaved }: CustomerDrawerCon
       city: form.city.trim() || undefined,
       region: form.region.trim() || undefined,
       address: form.address.trim() || undefined,
-      status: form.status || undefined,
+      // The textual status mirrors the single isActive control so the badge
+      // and the boolean never disagree.
+      status: form.isActive ? 'פעיל' : 'לא פעיל',
       notes: form.notes.trim() || undefined,
       isActive: form.isActive,
     };
@@ -242,16 +241,16 @@ function CustomerDrawerContent({ customer, onClose, onSaved }: CustomerDrawerCon
                 {isSaving ? 'שומר...' : 'שמור'}
               </Button>
               <Button variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
-                ביטול
+                בטל שינויים
               </Button>
 
               {isExistingCustomer && customer.isActive && (
-                <>
+                <div className="customerDrawer__dangerActions">
                   {confirmDeactivate ? (
                     <>
-                      <span className="customerDrawer__confirmText">לבטל את פעילות הלקוח?</span>
+                      <span className="customerDrawer__confirmText">להשבית את הלקוח?</span>
                       <Button variant="danger" onClick={handleDeactivate} disabled={isSaving}>
-                        אישור ביטול
+                        אישור השבתה
                       </Button>
                       <Button
                         variant="secondary"
@@ -267,10 +266,10 @@ function CustomerDrawerContent({ customer, onClose, onSaved }: CustomerDrawerCon
                       onClick={() => setConfirmDeactivate(true)}
                       disabled={isSaving}
                     >
-                      ביטול פעילות
+                      השבת לקוח
                     </Button>
                   )}
-                </>
+                </div>
               )}
             </div>
           </div>
@@ -297,19 +296,6 @@ function CustomerDrawerContent({ customer, onClose, onSaved }: CustomerDrawerCon
                   onChange={(e) => setField('customerType', e.target.value)}
                 >
                   {CUSTOMER_TYPE_OPTIONS.map((opt) => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="customerDrawer__field">
-                <label className="customerDrawer__label">סטטוס</label>
-                <select
-                  className="customerDrawer__select"
-                  value={form.status}
-                  onChange={(e) => setField('status', e.target.value)}
-                >
-                  {STATUS_OPTIONS.map((opt) => (
                     <option key={opt} value={opt}>{opt}</option>
                   ))}
                 </select>
@@ -541,19 +527,24 @@ function CustomerReviewDetails({ customer }: CustomerReviewDetailsProps) {
       >
         <ul className="customerDrawer__relatedList">
           {relatedServiceCalls.slice(0, MAX_RELATED_ITEMS).map((serviceCall) => (
-            <li key={serviceCall.workItemId} className="customerDrawer__relatedItem">
-              <span className="customerDrawer__relatedPrimary">{serviceCall.title}</span>
-              <span className="customerDrawer__relatedMeta">
-                {[
-                  serviceCall.siteName,
-                  formatRelatedDate(serviceCall.plannedStart ?? serviceCall.createdAt),
-                ]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </span>
-              <Badge variant={SERVICE_CALL_STATUS_VARIANTS[serviceCall.status] ?? 'neutral'}>
-                {SERVICE_CALL_STATUS_LABELS[serviceCall.status] ?? serviceCall.status}
-              </Badge>
+            <li key={serviceCall.workItemId}>
+              <Link
+                className="customerDrawer__relatedItem customerDrawer__relatedItem--link"
+                to={`/service-calls?serviceCallId=${serviceCall.workItemId}`}
+              >
+                <span className="customerDrawer__relatedPrimary">{serviceCall.title}</span>
+                <span className="customerDrawer__relatedMeta">
+                  {[
+                    serviceCall.siteName,
+                    formatRelatedDate(serviceCall.plannedStart ?? serviceCall.createdAt),
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+                </span>
+                <Badge variant={SERVICE_CALL_STATUS_VARIANTS[serviceCall.status] ?? 'neutral'}>
+                  {SERVICE_CALL_STATUS_LABELS[serviceCall.status] ?? serviceCall.status}
+                </Badge>
+              </Link>
             </li>
           ))}
         </ul>
@@ -577,11 +568,16 @@ function CustomerReviewDetails({ customer }: CustomerReviewDetailsProps) {
       >
         <ul className="customerDrawer__relatedList">
           {relatedContacts.slice(0, MAX_RELATED_ITEMS).map((contact) => (
-            <li key={contact.contactId} className="customerDrawer__relatedItem">
-              <span className="customerDrawer__relatedPrimary">{contact.fullName}</span>
-              <span className="customerDrawer__relatedMeta">
-                {[contact.jobTitle, contact.phone].filter(Boolean).join(' · ')}
-              </span>
+            <li key={contact.contactId}>
+              <Link
+                className="customerDrawer__relatedItem customerDrawer__relatedItem--link"
+                to={`/contacts?contactId=${contact.contactId}`}
+              >
+                <span className="customerDrawer__relatedPrimary">{contact.fullName}</span>
+                <span className="customerDrawer__relatedMeta">
+                  {[contact.jobTitle, contact.phone].filter(Boolean).join(' · ')}
+                </span>
+              </Link>
             </li>
           ))}
         </ul>

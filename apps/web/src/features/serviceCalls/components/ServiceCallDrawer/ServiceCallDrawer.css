@@ -81,6 +81,11 @@
   background: var(--color-neutral-50);
 }
 
+.serviceCallDrawer__inlineLink {
+  color: var(--color-primary-700);
+  font-weight: var(--font-weight-medium);
+}
+
 .serviceCallDrawer__multilineValue {
   margin: 0;
   font-size: var(--font-size-sm);
@@ -119,6 +124,15 @@
   flex-wrap: wrap;
   gap: var(--spacing-sm);
   align-items: center;
+}
+
+/* Destructive actions sit apart from save/cancel on the opposite edge. */
+.serviceCallDrawer__dangerActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  align-items: center;
+  margin-inline-start: auto;
 }
 
 .serviceCallDrawer__confirmText {

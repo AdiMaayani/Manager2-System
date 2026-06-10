@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { PageShell } from '@shared/components/PageShell';
 import { PageSpinner } from '@shared/components/PageSpinner';
 import { ErrorState } from '@shared/components/ErrorState';
@@ -23,11 +24,30 @@ function formatContactDate(value?: string | null) {
 
 export function ContactsPage() {
   const { data: contacts, isLoading, error, refetch } = useContacts();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [segment, setSegment] = useState('הכל');
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>('הכל');
   const [search, setSearch] = useState('');
   // undefined = drawer closed, null = create mode, Contact = review existing.
   const [drawerContact, setDrawerContact] = useState<Contact | null | undefined>(undefined);
+
+  // Deep link: ?contactId opens that contact in read-only review mode, then
+  // the param is removed (matching the Quotes ?quoteId behavior).
+  useEffect(() => {
+    const contactIdParam = searchParams.get('contactId');
+    if (!contactIdParam || !contacts) return;
+
+    const requestedContact = contacts.find(
+      (contact) => contact.contactId === Number(contactIdParam),
+    );
+    if (requestedContact) {
+      setDrawerContact(requestedContact);
+    }
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('contactId');
+    setSearchParams(nextParams, { replace: true });
+  }, [contacts, searchParams, setSearchParams]);
 
   const isDrawerOpen = drawerContact !== undefined;
   const selectedContactId = drawerContact?.contactId ?? null;

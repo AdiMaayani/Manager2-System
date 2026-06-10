@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Drawer } from '@shared/components/Drawer';
 import { Badge } from '@shared/components/Badge';
@@ -415,11 +416,11 @@ function ServiceCallDrawerContent({
                 {isSaving ? 'שומר...' : 'שמור'}
               </Button>
               <Button type="button" variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
-                ביטול
+                בטל שינויים
               </Button>
 
               {isExistingServiceCall && !currentServiceCall?.closedAt && (
-                <>
+                <div className="serviceCallDrawer__dangerActions">
                   {isCloseConfirmVisible ? (
                     <>
                       <span className="serviceCallDrawer__confirmText">
@@ -435,11 +436,11 @@ function ServiceCallDrawerContent({
                       </Button>
                       <Button
                         type="button"
-                        variant="ghost"
+                        variant="secondary"
                         onClick={() => setIsCloseConfirmVisible(false)}
                         disabled={isSaving}
                       >
-                        ביטול סגירה
+                        חזור
                       </Button>
                     </>
                   ) : (
@@ -452,7 +453,7 @@ function ServiceCallDrawerContent({
                       סגור קריאה
                     </Button>
                   )}
-                </>
+                </div>
               )}
             </div>
           </div>
@@ -759,7 +760,21 @@ function ServiceCallReviewDetails({ serviceCall, customers, sites }: ServiceCall
 
       <DetailsSection title="לקוח ואתר">
         <div className="serviceCallDrawer__detailsGrid">
-          <DetailsField label="לקוח" value={customerName} />
+          <DetailsField
+            label="לקוח"
+            value={
+              serviceCall.customerId ? (
+                <Link
+                  className="serviceCallDrawer__inlineLink"
+                  to={`/customers?customerId=${serviceCall.customerId}`}
+                >
+                  {customerName ?? `לקוח #${serviceCall.customerId}`}
+                </Link>
+              ) : (
+                customerName
+              )
+            }
+          />
           <DetailsField
             label="אתר"
             value={siteName ? `${siteName}${site?.city ? ` — ${site.city}` : ''}` : undefined}

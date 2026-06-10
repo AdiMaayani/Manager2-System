@@ -316,11 +316,11 @@ function QuoteDrawerContent({ quoteId, onClose, onSaved, initialProjectId }: Quo
                 {isSaving ? 'שומר...' : 'שמור'}
               </Button>
               <Button variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
-                ביטול
+                בטל שינויים
               </Button>
 
               {isExistingQuote && quote?.isActive && (
-                <>
+                <div className="quoteDrawer__dangerActions">
                   {confirmDeactivate ? (
                     <>
                       <span className="quoteDrawer__confirmText">לבטל את הצעת המחיר?</span>
@@ -341,10 +341,10 @@ function QuoteDrawerContent({ quoteId, onClose, onSaved, initialProjectId }: Quo
                       onClick={() => setConfirmDeactivate(true)}
                       disabled={isSaving}
                     >
-                      ביטול הצעה
+                      בטל הצעה
                     </Button>
                   )}
-                </>
+                </div>
               )}
             </div>
           </div>
@@ -525,9 +525,17 @@ function QuoteReviewDetails({ quote }: QuoteReviewDetailsProps) {
 
       <DetailsSection title="לקוח ופרויקט">
         <div className="quoteDrawer__detailsGrid">
-          {/* The Customers screen has no per-customer deep link route, so the
-              customer is shown read-only rather than as a link. */}
-          <DetailsField label="לקוח" value={quote.customerName} />
+          <DetailsField
+            label="לקוח"
+            value={
+              <Link
+                className="quoteDrawer__projectLink"
+                to={`/customers?customerId=${quote.customerId}`}
+              >
+                {quote.customerName}
+              </Link>
+            }
+          />
           <DetailsField
             label="פרויקט"
             value={

@@ -1,8 +1,11 @@
 .filterBar {
   display: flex;
+  /* Let the actions slot drop below the filters when zoom/narrow widths
+     squeeze the row, instead of overlapping or overflowing. */
+  flex-wrap: wrap;
   align-items: flex-end;
   justify-content: space-between;
-  gap: var(--spacing-lg);
+  gap: var(--spacing-md) var(--spacing-lg);
   margin-bottom: var(--spacing-lg);
   padding: var(--spacing-lg);
   background: #fff;

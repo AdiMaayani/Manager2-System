@@ -232,11 +232,11 @@ function EmployeeDrawerContent({ employee, canEdit, onClose, onSaved }: Employee
                 {isSaving ? 'שומר...' : 'שמור'}
               </Button>
               <Button variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
-                ביטול
+                בטל שינויים
               </Button>
 
               {isExistingEmployee && (
-                <>
+                <div className="employeeDrawer__dangerActions">
                   {confirmStatusChange ? (
                     <>
                       <span className="employeeDrawer__confirmText">
@@ -266,7 +266,7 @@ function EmployeeDrawerContent({ employee, canEdit, onClose, onSaved }: Employee
                       {employee.isActive ? 'השבת עובד' : 'הפעל עובד'}
                     </Button>
                   )}
-                </>
+                </div>
               )}
             </div>
           </div>
@@ -462,7 +462,17 @@ function EmployeeReviewDetails({ employee, canViewLinkedUser }: EmployeeReviewDe
         >
           {linkedUser ? (
             <div className="employeeDrawer__detailsGrid">
-              <DetailsField label="שם משתמש" value={linkedUser.username} />
+              <DetailsField
+                label="שם משתמש"
+                value={
+                  <Link
+                    className="employeeDrawer__inlineLink"
+                    to={`/users?userId=${linkedUser.userId}`}
+                  >
+                    {linkedUser.username}
+                  </Link>
+                }
+              />
               <DetailsField label="אימייל משתמש" value={linkedUser.email} />
               <DetailsField
                 label="תפקידים"

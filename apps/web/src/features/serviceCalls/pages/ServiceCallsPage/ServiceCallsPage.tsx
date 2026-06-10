@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { PageShell } from '@shared/components/PageShell';
 import { PageSpinner } from '@shared/components/PageSpinner';
 import { ErrorState } from '@shared/components/ErrorState';
@@ -65,6 +66,7 @@ function buildSearchText(serviceCall: ServiceCallListItem): string {
 export function ServiceCallsPage() {
   const { data: serviceCalls, isLoading, error, refetch } = useServiceCalls();
   const lookups = useServiceCallLookups();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   // undefined = drawer closed, null = create mode, ServiceCallDetails = review existing.
@@ -72,6 +74,24 @@ export function ServiceCallsPage() {
     undefined,
   );
   const [pageMessage, setPageMessage] = useState<string | null>(null);
+
+  // Deep link: ?serviceCallId opens that call in read-only review mode, then
+  // the param is removed (matching the Quotes ?quoteId behavior).
+  useEffect(() => {
+    const serviceCallIdParam = searchParams.get('serviceCallId');
+    if (!serviceCallIdParam || !serviceCalls) return;
+
+    const requestedServiceCall = serviceCalls.find(
+      (serviceCall) => serviceCall.workItemId === Number(serviceCallIdParam),
+    );
+    if (requestedServiceCall) {
+      setDrawerServiceCall(requestedServiceCall);
+    }
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('serviceCallId');
+    setSearchParams(nextParams, { replace: true });
+  }, [serviceCalls, searchParams, setSearchParams]);
 
   const isDrawerOpen = drawerServiceCall !== undefined;
   const selectedServiceCallId = drawerServiceCall?.workItemId ?? null;

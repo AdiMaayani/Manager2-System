@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { PageShell } from '@shared/components/PageShell';
 import { PageSpinner } from '@shared/components/PageSpinner';
 import { ErrorState } from '@shared/components/ErrorState';
@@ -14,9 +15,28 @@ import './CustomersPage.css';
 
 export function CustomersPage() {
   const { data: customers, isLoading, error, refetch } = useCustomers();
+  const [searchParams, setSearchParams] = useSearchParams();
   // undefined = drawer closed, null = create mode, Customer = review existing.
   const [drawerCustomer, setDrawerCustomer] = useState<Customer | null | undefined>(undefined);
   const [search, setSearch] = useState('');
+
+  // Deep link: ?customerId opens that customer in read-only review mode, then
+  // the param is removed (matching the Quotes ?quoteId behavior).
+  useEffect(() => {
+    const customerIdParam = searchParams.get('customerId');
+    if (!customerIdParam || !customers) return;
+
+    const requestedCustomer = customers.find(
+      (customer) => customer.customerId === Number(customerIdParam),
+    );
+    if (requestedCustomer) {
+      setDrawerCustomer(requestedCustomer);
+    }
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('customerId');
+    setSearchParams(nextParams, { replace: true });
+  }, [customers, searchParams, setSearchParams]);
 
   const isDrawerOpen = drawerCustomer !== undefined;
   const selectedCustomerId = drawerCustomer?.customerId ?? null;
