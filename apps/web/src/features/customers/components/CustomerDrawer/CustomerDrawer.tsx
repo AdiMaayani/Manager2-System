@@ -280,9 +280,8 @@ function CustomerDrawerContent({ customer, onClose, onSaved }: CustomerDrawerCon
       {!isEditing && isExistingCustomer ? (
         <CustomerReviewDetails customer={customer} />
       ) : (
-        <div className="customerDrawer">
-          <section className="customerDrawer__section">
-            <h3 className="customerDrawer__sectionTitle">פרטים כלליים</h3>
+        <div className="customerDrawer customerDrawer--edit">
+          <DetailsSection title="פרטים כלליים">
             <Input
               label="שם לקוח *"
               value={form.customerName}
@@ -316,10 +315,20 @@ function CustomerDrawerContent({ customer, onClose, onSaved }: CustomerDrawerCon
                 </select>
               </div>
             </div>
-          </section>
 
-          <section className="customerDrawer__section">
-            <h3 className="customerDrawer__sectionTitle">פרטי התקשרות</h3>
+            {isExistingCustomer && (
+              <label className="customerDrawer__checkboxRow">
+                <input
+                  type="checkbox"
+                  checked={form.isActive}
+                  onChange={(e) => setField('isActive', e.target.checked)}
+                />
+                <span>לקוח פעיל</span>
+              </label>
+            )}
+          </DetailsSection>
+
+          <DetailsSection title="פרטי התקשרות">
             <div className="customerDrawer__grid">
               <Input
                 label="טלפון"
@@ -334,10 +343,9 @@ function CustomerDrawerContent({ customer, onClose, onSaved }: CustomerDrawerCon
                 onChange={(e) => setField('primaryEmail', e.target.value)}
               />
             </div>
-          </section>
+          </DetailsSection>
 
-          <section className="customerDrawer__section">
-            <h3 className="customerDrawer__sectionTitle">מיקום</h3>
+          <DetailsSection title="מיקום">
             <div className="customerDrawer__grid">
               <Input
                 label="עיר"
@@ -355,10 +363,9 @@ function CustomerDrawerContent({ customer, onClose, onSaved }: CustomerDrawerCon
               value={form.address}
               onChange={(e) => setField('address', e.target.value)}
             />
-          </section>
+          </DetailsSection>
 
-          <section className="customerDrawer__section">
-            <h3 className="customerDrawer__sectionTitle">מידע נוסף</h3>
+          <DetailsSection title="מידע נוסף">
             <div className="customerDrawer__field">
               <label className="customerDrawer__label">הערות</label>
               <textarea
@@ -368,18 +375,7 @@ function CustomerDrawerContent({ customer, onClose, onSaved }: CustomerDrawerCon
                 onChange={(e) => setField('notes', e.target.value)}
               />
             </div>
-
-            {isExistingCustomer && (
-              <label className="customerDrawer__checkboxRow">
-                <input
-                  type="checkbox"
-                  checked={form.isActive}
-                  onChange={(e) => setField('isActive', e.target.checked)}
-                />
-                <span>לקוח פעיל</span>
-              </label>
-            )}
-          </section>
+          </DetailsSection>
         </div>
       )}
     </Drawer>

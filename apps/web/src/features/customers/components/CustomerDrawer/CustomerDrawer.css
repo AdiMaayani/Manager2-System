@@ -4,27 +4,22 @@
   gap: var(--spacing-lg);
 }
 
-/* Edit mode: grouped sections with bordered titles, matching the drawer style
-   used across the system (Project Drawer / task drawer). */
-.customerDrawer__section {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-md);
-}
-
-.customerDrawer__sectionTitle {
-  margin: 0;
-  padding-bottom: var(--spacing-sm);
-  border-bottom: 1px solid var(--color-neutral-200);
-  font-size: var(--font-size-base);
-  font-weight: var(--font-weight-semibold);
-  color: var(--color-neutral-800);
+/* Edit mode: the same DetailsSection cards as review mode, with extra
+   vertical air between cards so the form does not read as one dense block. */
+.customerDrawer--edit {
+  gap: var(--spacing-lg);
 }
 
 .customerDrawer__grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: var(--spacing-md);
+}
+
+@media (max-width: 640px) {
+  .customerDrawer__grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .customerDrawer__field {
