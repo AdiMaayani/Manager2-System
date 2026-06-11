@@ -42,7 +42,7 @@ export async function apiRequest<T>(
   const token = getAuthToken();
   const headers = new Headers(options.headers);
 
-  if (options.body && !headers.has('Content-Type')) {
+  if (options.body && !(options.body instanceof FormData) && !headers.has('Content-Type')) {
     headers.set('Content-Type', 'application/json');
   }
   if (token) {
@@ -62,4 +62,29 @@ export async function apiRequest<T>(
   }
 
   return responseBody as T;
+}
+
+export async function apiBlobRequest(
+  path: string,
+  options: RequestInit = {},
+): Promise<Blob> {
+  const token = getAuthToken();
+  const headers = new Headers(options.headers);
+
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+
+  const response = await fetch(`${API_BASE_URL}${path}`, { ...options, headers });
+
+  if (!response.ok) {
+    const responseBody = await parseBody(response);
+    const message = extractErrorMessage(responseBody, response.status);
+    if (response.status === 401) {
+      redirectToLogin();
+    }
+    throw new ApiError(message, response.status, responseBody);
+  }
+
+  return response.blob();
 }

@@ -37,7 +37,7 @@ BEGIN
         FROM dbo.WorkEmployeeAssignments wea
         INNER JOIN dbo.Employees e
             ON wea.EmployeeId = e.EmployeeId
-        WHERE LTRIM(RTRIM(LOWER(wea.AssignmentRole))) = 'team leader'
+        WHERE LTRIM(RTRIM(LOWER(wea.AssignmentRole))) IN ('project manager', N'מנהל פרויקט', 'team leader')
     ) pm
         ON wi.WorkItemId = pm.WorkItemId
        AND pm.RowNum = 1

@@ -253,6 +253,9 @@ function QuoteDrawerContent({ quoteId, onClose, onSaved, initialProjectId }: Quo
         await updateMutation.mutateAsync({ id: quoteId, request });
         setIsEditing(false);
         setConfirmDeactivate(false);
+        // Notify the parent (e.g. project quote tab) without closing — the
+        // drawer returns to review mode after a successful update.
+        onSaved?.(quoteId);
       } else {
         const createdQuote = await createMutation.mutateAsync(request);
         if (onSaved) {
@@ -273,6 +276,7 @@ function QuoteDrawerContent({ quoteId, onClose, onSaved, initialProjectId }: Quo
 
     try {
       await deactivateMutation.mutateAsync(quoteId);
+      onSaved?.(quoteId);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'ביטול הצעת המחיר נכשל');

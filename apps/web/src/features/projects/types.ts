@@ -219,9 +219,14 @@ export interface ProjectBoqItem {
   projectBoqItemId: number;
   projectId: number;
   systemName?: string;
+  inventoryItemId?: number;
+  inventorySkuCode?: string;
+  inventoryItemName?: string;
+  inventoryCategory?: string;
   itemDescription: string;
   quantity: number;
   unit: string;
+  unitPrice?: number;
   sortOrder: number;
   createdAt?: string;
   updatedAt?: string;
@@ -229,17 +234,21 @@ export interface ProjectBoqItem {
 
 export interface CreateProjectBoqItemRequest {
   systemName?: string;
+  inventoryItemId?: number;
   itemDescription: string;
   quantity: number;
   unit: string;
+  unitPrice?: number;
   sortOrder?: number;
 }
 
 export interface UpdateProjectBoqItemRequest {
   systemName?: string;
+  inventoryItemId?: number;
   itemDescription: string;
   quantity: number;
   unit: string;
+  unitPrice?: number;
   sortOrder: number;
 }
 
@@ -259,6 +268,11 @@ export interface ProjectDrawing {
   type: 'PDF' | 'DWG';
   date: string;
   note?: string;
+  originalFileName?: string;
+  storedFileName?: string;
+  filePath?: string;
+  contentType?: string;
+  fileSizeBytes?: number;
   sortOrder: number;
   createdAt?: string;
   updatedAt?: string;
@@ -272,6 +286,10 @@ export interface CreateProjectDrawingRequest {
   sortOrder?: number;
 }
 
+export interface UploadProjectDrawingRequest extends CreateProjectDrawingRequest {
+  file: File;
+}
+
 export interface UpdateProjectDrawingRequest {
   name: string;
   type: 'PDF' | 'DWG';
@@ -283,6 +301,10 @@ export interface UpdateProjectDrawingRequest {
 export interface ProjectEquipmentItem {
   projectEquipmentItemId: number;
   projectId: number;
+  inventoryItemId?: number;
+  inventorySkuCode?: string;
+  inventoryItemName?: string;
+  inventoryCategory?: string;
   name: string;
   status: string;
   location: string;
@@ -293,6 +315,7 @@ export interface ProjectEquipmentItem {
 
 export interface CreateProjectEquipmentItemRequest {
   equipmentName: string;
+  inventoryItemId?: number;
   status: string;
   location?: string;
   sortOrder?: number;
@@ -300,6 +323,7 @@ export interface CreateProjectEquipmentItemRequest {
 
 export interface UpdateProjectEquipmentItemRequest {
   equipmentName: string;
+  inventoryItemId?: number;
   status: string;
   location?: string;
   sortOrder: number;

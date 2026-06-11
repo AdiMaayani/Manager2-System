@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useInventory, type InventoryItem } from '@features/inventory';
 import { Button } from '@shared/components/Button';
 import { Input } from '@shared/components/Input';
 import type {
@@ -21,16 +22,22 @@ interface ProjectBoqTabProps {
 
 interface BoqDraft {
   systemName: string;
+  inventoryCategory: string;
+  inventoryItemId: string;
   itemDescription: string;
   quantity: string;
   unit: string;
+  unitPrice: string;
 }
 
 const EMPTY_BOQ_DRAFT: BoqDraft = {
   systemName: '',
+  inventoryCategory: '',
+  inventoryItemId: '',
   itemDescription: '',
   quantity: '1',
   unit: BOQ_UNIT_OPTIONS[0],
+  unitPrice: '',
 };
 
 function formatQuantity(quantity: number): string {
@@ -40,10 +47,17 @@ function formatQuantity(quantity: number): string {
 function draftFromItem(item: ProjectBoqItem): BoqDraft {
   return {
     systemName: item.systemName ?? '',
+    inventoryCategory: item.inventoryCategory ?? '',
+    inventoryItemId: item.inventoryItemId ? String(item.inventoryItemId) : '',
     itemDescription: item.itemDescription,
     quantity: formatQuantity(item.quantity),
     unit: item.unit,
+    unitPrice: item.unitPrice != null ? String(item.unitPrice) : '',
   };
+}
+
+function inventoryLabel(item: InventoryItem): string {
+  return `${item.skuCode} · ${item.itemName}`;
 }
 
 function buildBoqRequest(
@@ -52,6 +66,8 @@ function buildBoqRequest(
   const itemDescription = draft.itemDescription.trim();
   const unit = draft.unit.trim();
   const quantity = Number(draft.quantity.replace(',', '.'));
+  const unitPriceText = draft.unitPrice.trim().replace(',', '.');
+  const unitPrice = unitPriceText ? Number(unitPriceText) : undefined;
 
   if (!itemDescription) {
     return { error: 'יש להזין תיאור פריט.' };
@@ -65,11 +81,17 @@ function buildBoqRequest(
     return { error: 'יש לבחור יחידה.' };
   }
 
+  if (unitPrice != null && (Number.isNaN(unitPrice) || unitPrice < 0)) {
+    return { error: 'מחיר יחידה חייב להיות מספר לא שלילי.' };
+  }
+
   return {
     systemName: draft.systemName.trim() || undefined,
+    inventoryItemId: draft.inventoryItemId ? Number(draft.inventoryItemId) : undefined,
     itemDescription,
     quantity,
     unit,
+    unitPrice,
   };
 }
 
@@ -82,6 +104,7 @@ export function ProjectBoqTab({
   onDelete,
   onReorder,
 }: ProjectBoqTabProps) {
+  const { data: inventoryItems = [] } = useInventory({ status: 'active', lowStockOnly: false });
   const sortedItems = useMemo(
     () =>
       [...items].sort(
@@ -94,6 +117,34 @@ export function ProjectBoqTab({
   const [drafts, setDrafts] = useState<Record<number, BoqDraft>>({});
   const [newItemDraft, setNewItemDraft] = useState<BoqDraft>(EMPTY_BOQ_DRAFT);
   const [error, setError] = useState<string | null>(null);
+
+  const inventoryCategories = useMemo(
+    () =>
+      Array.from(
+        new Set(
+          inventoryItems
+            .map((inventoryItem) => inventoryItem.category?.trim())
+            .filter((category): category is string => Boolean(category)),
+        ),
+      ).sort((firstCategory, secondCategory) => firstCategory.localeCompare(secondCategory, 'he')),
+    [inventoryItems],
+  );
+
+  const inventoryItemsByCategory = useMemo(() => {
+    const itemsByCategory = new Map<string, InventoryItem[]>();
+    inventoryItems.forEach((inventoryItem) => {
+      const key = inventoryItem.category?.trim() || 'ללא קטגוריה';
+      const categoryItems = itemsByCategory.get(key) ?? [];
+      categoryItems.push(inventoryItem);
+      itemsByCategory.set(key, categoryItems);
+    });
+    return itemsByCategory;
+  }, [inventoryItems]);
+
+  function getFilteredInventoryItems(category: string): InventoryItem[] {
+    if (!category) return inventoryItems;
+    return inventoryItemsByCategory.get(category) ?? [];
+  }
 
   useEffect(() => {
     setDrafts(
@@ -111,6 +162,28 @@ export function ProjectBoqTab({
         ...patch,
       },
     }));
+  };
+
+  const applyInventoryItemToDraft = (
+    inventoryItemId: string,
+    setDraft: (patch: Partial<BoqDraft>) => void,
+  ) => {
+    const inventoryItem = inventoryItems.find(
+      (item) => item.inventoryItemId === Number(inventoryItemId),
+    );
+
+    if (!inventoryItem) {
+      setDraft({ inventoryItemId: '', inventoryCategory: '' });
+      return;
+    }
+
+    setDraft({
+      inventoryItemId,
+      inventoryCategory: inventoryItem.category ?? '',
+      systemName: inventoryItem.category ?? '',
+      itemDescription: inventoryItem.itemName,
+      unit: inventoryItem.unit || BOQ_UNIT_OPTIONS[0],
+    });
   };
 
   const handleCreate = async () => {
@@ -188,9 +261,12 @@ export function ProjectBoqTab({
           <thead>
             <tr>
               <th>מערכת</th>
+              <th>קטגוריה</th>
+              <th>פריט מלאי</th>
               <th>פריט</th>
               <th>כמות</th>
               <th>יחידה</th>
+              <th>מחיר יחידה</th>
               <th>פעולות</th>
             </tr>
           </thead>
@@ -207,6 +283,46 @@ export function ProjectBoqTab({
                         updateDraft(item.projectBoqItemId, { systemName: event.target.value })
                       }
                     />
+                  </td>
+                  <td>
+                    <select
+                      className="projectBoqTab__select"
+                      value={draft.inventoryCategory}
+                      onChange={(event) =>
+                        updateDraft(item.projectBoqItemId, {
+                          inventoryCategory: event.target.value,
+                          inventoryItemId: '',
+                        })
+                      }
+                    >
+                      <option value="">כל הקטגוריות</option>
+                      {inventoryCategories.map((category) => (
+                        <option key={category} value={category}>
+                          {category}
+                        </option>
+                      ))}
+                    </select>
+                  </td>
+                  <td>
+                    <select
+                      className="projectBoqTab__select"
+                      value={draft.inventoryItemId}
+                      onChange={(event) =>
+                        applyInventoryItemToDraft(event.target.value, (patch) =>
+                          updateDraft(item.projectBoqItemId, patch),
+                        )
+                      }
+                    >
+                      <option value="">ללא קישור</option>
+                      {getFilteredInventoryItems(draft.inventoryCategory).map((inventoryItem) => (
+                        <option
+                          key={inventoryItem.inventoryItemId}
+                          value={inventoryItem.inventoryItemId}
+                        >
+                          {inventoryLabel(inventoryItem)}
+                        </option>
+                      ))}
+                    </select>
                   </td>
                   <td>
                     <Input
@@ -240,6 +356,14 @@ export function ProjectBoqTab({
                         </option>
                       ))}
                     </select>
+                  </td>
+                  <td>
+                    <Input
+                      value={draft.unitPrice}
+                      onChange={(event) =>
+                        updateDraft(item.projectBoqItemId, { unitPrice: event.target.value })
+                      }
+                    />
                   </td>
                   <td>
                     <div className="projectBoqTab__actions">
@@ -293,6 +417,47 @@ export function ProjectBoqTab({
                 />
               </td>
               <td>
+                <select
+                  className="projectBoqTab__select"
+                  value={newItemDraft.inventoryCategory}
+                  onChange={(event) =>
+                    setNewItemDraft((currentDraft) => ({
+                      ...currentDraft,
+                      inventoryCategory: event.target.value,
+                      inventoryItemId: '',
+                    }))
+                  }
+                >
+                  <option value="">כל הקטגוריות</option>
+                  {inventoryCategories.map((category) => (
+                    <option key={category} value={category}>
+                      {category}
+                    </option>
+                  ))}
+                </select>
+              </td>
+              <td>
+                <select
+                  className="projectBoqTab__select"
+                  value={newItemDraft.inventoryItemId}
+                  onChange={(event) =>
+                    applyInventoryItemToDraft(event.target.value, (patch) =>
+                      setNewItemDraft((currentDraft) => ({ ...currentDraft, ...patch })),
+                    )
+                  }
+                >
+                  <option value="">ללא קישור</option>
+                  {getFilteredInventoryItems(newItemDraft.inventoryCategory).map((inventoryItem) => (
+                    <option
+                      key={inventoryItem.inventoryItemId}
+                      value={inventoryItem.inventoryItemId}
+                    >
+                      {inventoryLabel(inventoryItem)}
+                    </option>
+                  ))}
+                </select>
+              </td>
+              <td>
                 <Input
                   value={newItemDraft.itemDescription}
                   onChange={(event) =>
@@ -333,6 +498,17 @@ export function ProjectBoqTab({
                 </select>
               </td>
               <td>
+                <Input
+                  value={newItemDraft.unitPrice}
+                  onChange={(event) =>
+                    setNewItemDraft((currentDraft) => ({
+                      ...currentDraft,
+                      unitPrice: event.target.value,
+                    }))
+                  }
+                />
+              </td>
+              <td>
                 <Button
                   type="button"
                   variant="secondary"
@@ -363,18 +539,22 @@ export function ProjectBoqTab({
         <thead>
           <tr>
             <th>מערכת</th>
+            <th>מלאי</th>
             <th>פריט</th>
             <th>כמות</th>
             <th>יחידה</th>
+            <th>מחיר יחידה</th>
           </tr>
         </thead>
         <tbody>
           {sortedItems.map((item) => (
             <tr key={item.projectBoqItemId}>
               <td>{item.systemName || '-'}</td>
+              <td>{item.inventorySkuCode ? `${item.inventorySkuCode} · ${item.inventoryItemName}` : '-'}</td>
               <td>{item.itemDescription}</td>
               <td>{formatQuantity(item.quantity)}</td>
               <td>{item.unit}</td>
+              <td>{item.unitPrice != null ? item.unitPrice.toLocaleString('he-IL') : '-'}</td>
             </tr>
           ))}
         </tbody>

@@ -1,4 +1,4 @@
-import { apiRequest } from '@api/client';
+import { apiBlobRequest, apiRequest } from '@api/client';
 import type {
   CreateMilestoneRequest,
   CreateProjectBoqItemRequest,
@@ -23,6 +23,7 @@ import type {
   UpdateProjectEquipmentItemRequest,
   UpdateProjectRequest,
   UpdateSiteRequest,
+  UploadProjectDrawingRequest,
 } from '../types';
 
 interface RawEmployeeResponse {
@@ -35,6 +36,10 @@ interface RawEmployeeResponse {
 interface RawProjectEquipmentItemResponse {
   projectEquipmentItemId: number;
   projectId: number;
+  inventoryItemId?: number | null;
+  inventorySkuCode?: string | null;
+  inventoryItemName?: string | null;
+  inventoryCategory?: string | null;
   equipmentName: string;
   status: string;
   location?: string | null;
@@ -47,9 +52,14 @@ interface RawProjectBoqItemResponse {
   projectBoqItemId: number;
   projectId: number;
   systemName?: string | null;
+  inventoryItemId?: number | null;
+  inventorySkuCode?: string | null;
+  inventoryItemName?: string | null;
+  inventoryCategory?: string | null;
   itemDescription: string;
   quantity: number;
   unit: string;
+  unitPrice?: number | null;
   sortOrder: number;
   createdAt?: string;
   updatedAt?: string | null;
@@ -62,6 +72,11 @@ interface RawProjectDrawingResponse {
   type: 'PDF' | 'DWG';
   drawingDate: string;
   note?: string | null;
+  originalFileName?: string | null;
+  storedFileName?: string | null;
+  filePath?: string | null;
+  contentType?: string | null;
+  fileSizeBytes?: number | null;
   sortOrder: number;
   createdAt?: string;
   updatedAt?: string | null;
@@ -72,9 +87,14 @@ function mapProjectBoqItem(boqItem: RawProjectBoqItemResponse): ProjectBoqItem {
     projectBoqItemId: boqItem.projectBoqItemId,
     projectId: boqItem.projectId,
     systemName: boqItem.systemName ?? undefined,
+    inventoryItemId: boqItem.inventoryItemId ?? undefined,
+    inventorySkuCode: boqItem.inventorySkuCode ?? undefined,
+    inventoryItemName: boqItem.inventoryItemName ?? undefined,
+    inventoryCategory: boqItem.inventoryCategory ?? undefined,
     itemDescription: boqItem.itemDescription,
     quantity: boqItem.quantity,
     unit: boqItem.unit,
+    unitPrice: boqItem.unitPrice ?? undefined,
     sortOrder: boqItem.sortOrder,
     createdAt: boqItem.createdAt,
     updatedAt: boqItem.updatedAt ?? undefined,
@@ -87,6 +107,10 @@ function mapProjectEquipmentItem(
   return {
     projectEquipmentItemId: equipmentItem.projectEquipmentItemId,
     projectId: equipmentItem.projectId,
+    inventoryItemId: equipmentItem.inventoryItemId ?? undefined,
+    inventorySkuCode: equipmentItem.inventorySkuCode ?? undefined,
+    inventoryItemName: equipmentItem.inventoryItemName ?? undefined,
+    inventoryCategory: equipmentItem.inventoryCategory ?? undefined,
     name: equipmentItem.equipmentName,
     status: equipmentItem.status,
     location: equipmentItem.location ?? '',
@@ -104,6 +128,11 @@ function mapProjectDrawing(drawing: RawProjectDrawingResponse): ProjectDrawing {
     type: drawing.type,
     date: drawing.drawingDate,
     note: drawing.note ?? undefined,
+    originalFileName: drawing.originalFileName ?? undefined,
+    storedFileName: drawing.storedFileName ?? undefined,
+    filePath: drawing.filePath ?? undefined,
+    contentType: drawing.contentType ?? undefined,
+    fileSizeBytes: drawing.fileSizeBytes ?? undefined,
     sortOrder: drawing.sortOrder,
     createdAt: drawing.createdAt,
     updatedAt: drawing.updatedAt ?? undefined,
@@ -214,6 +243,33 @@ export function createProjectDrawingAsync(
     method: 'POST',
     body: JSON.stringify(body),
   }).then(mapProjectDrawing);
+}
+
+export function uploadProjectDrawingAsync(
+  projectId: number,
+  body: UploadProjectDrawingRequest,
+): Promise<ProjectDrawing> {
+  const formData = new FormData();
+  formData.append('name', body.name);
+  formData.append('type', body.type);
+  formData.append('drawingDate', body.drawingDate);
+  formData.append('sortOrder', String(body.sortOrder ?? 0));
+  if (body.note) {
+    formData.append('note', body.note);
+  }
+  formData.append('file', body.file);
+
+  return apiRequest<RawProjectDrawingResponse>(`/Projects/${projectId}/drawings/upload`, {
+    method: 'POST',
+    body: formData,
+  }).then(mapProjectDrawing);
+}
+
+export function downloadProjectDrawingFileAsync(
+  projectId: number,
+  projectDrawingId: number,
+): Promise<Blob> {
+  return apiBlobRequest(`/Projects/${projectId}/drawings/${projectDrawingId}/file`);
 }
 
 export function updateProjectDrawingAsync(

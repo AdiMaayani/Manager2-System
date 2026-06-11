@@ -56,6 +56,7 @@ public class ProjectEquipmentRepository : IProjectEquipmentRepository
             };
 
             command.Parameters.AddWithValue("@ProjectId", equipmentItem.ProjectId);
+            command.Parameters.AddWithValue("@InventoryItemId", (object?)equipmentItem.InventoryItemId ?? DBNull.Value);
             command.Parameters.AddWithValue("@EquipmentName", equipmentItem.EquipmentName);
             command.Parameters.AddWithValue("@Status", equipmentItem.Status);
             command.Parameters.AddWithValue("@Location", (object?)equipmentItem.Location ?? DBNull.Value);
@@ -84,6 +85,7 @@ public class ProjectEquipmentRepository : IProjectEquipmentRepository
 
             command.Parameters.AddWithValue("@ProjectEquipmentItemId", equipmentItem.ProjectEquipmentItemId);
             command.Parameters.AddWithValue("@ProjectId", equipmentItem.ProjectId);
+            command.Parameters.AddWithValue("@InventoryItemId", (object?)equipmentItem.InventoryItemId ?? DBNull.Value);
             command.Parameters.AddWithValue("@EquipmentName", equipmentItem.EquipmentName);
             command.Parameters.AddWithValue("@Status", equipmentItem.Status);
             command.Parameters.AddWithValue("@Location", (object?)equipmentItem.Location ?? DBNull.Value);
@@ -182,6 +184,10 @@ public class ProjectEquipmentRepository : IProjectEquipmentRepository
         {
             ProjectEquipmentItemId = GetIntValue(reader, "ProjectEquipmentItemId"),
             ProjectId = GetIntValue(reader, "ProjectId"),
+            InventoryItemId = GetNullableIntValue(reader, "InventoryItemId"),
+            InventorySkuCode = GetStringValue(reader, "InventorySkuCode"),
+            InventoryItemName = GetStringValue(reader, "InventoryItemName"),
+            InventoryCategory = GetStringValue(reader, "InventoryCategory"),
             EquipmentName = GetStringValue(reader, "EquipmentName") ?? string.Empty,
             Status = GetStringValue(reader, "Status") ?? string.Empty,
             Location = GetStringValue(reader, "Location"),
@@ -199,6 +205,11 @@ public class ProjectEquipmentRepository : IProjectEquipmentRepository
     private static int GetIntValue(SqlDataReader reader, string columnName)
     {
         return reader[columnName] == DBNull.Value ? 0 : Convert.ToInt32(reader[columnName]);
+    }
+
+    private static int? GetNullableIntValue(SqlDataReader reader, string columnName)
+    {
+        return reader[columnName] == DBNull.Value ? null : Convert.ToInt32(reader[columnName]);
     }
 
     private static DateTime? GetDateTimeValue(SqlDataReader reader, string columnName)
