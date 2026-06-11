@@ -1,5 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
+import { Badge } from '@shared/components/Badge';
 import { Button } from '@shared/components/Button';
+import { DetailsField } from '@shared/components/DetailsField';
+import { DetailsSection } from '@shared/components/DetailsSection';
 import { Drawer } from '@shared/components/Drawer';
 import { Input } from '@shared/components/Input';
 import { useInventoryMutations } from '../../hooks/useInventory';
@@ -12,6 +15,7 @@ const CATEGORY_OPTIONS = ['בקרי חשמל', 'מצלמות', 'רמקולים',
 interface InventoryDrawerProps {
   isOpen: boolean;
   onClose: () => void;
+  onSaved?: (inventoryItem: InventoryItem) => void | Promise<void>;
   inventoryItem?: InventoryItem | null;
 }
 
@@ -27,7 +31,7 @@ interface InventoryFormState {
   isActive: boolean;
 }
 
-function buildInitialState(inventoryItem: InventoryItem | null | undefined): InventoryFormState {
+function buildInitialState(inventoryItem: InventoryItem | null): InventoryFormState {
   return {
     skuCode: inventoryItem?.skuCode ?? '',
     itemName: inventoryItem?.itemName ?? '',
@@ -52,24 +56,70 @@ function parseOptionalQuantity(value: string): number | undefined | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-export function InventoryDrawer({ isOpen, onClose, inventoryItem }: InventoryDrawerProps) {
-  const isEditMode = inventoryItem != null;
+function formatQuantity(value: number, unit: string): string {
+  return `${value.toLocaleString('he-IL', { maximumFractionDigits: 3 })} ${unit}`;
+}
+
+function isLowStock(inventoryItem: InventoryItem): boolean {
+  return (
+    inventoryItem.minimumQuantity !== undefined &&
+    inventoryItem.minimumQuantity !== null &&
+    inventoryItem.quantityOnHand <= inventoryItem.minimumQuantity
+  );
+}
+
+export function InventoryDrawer({ isOpen, onClose, onSaved, inventoryItem }: InventoryDrawerProps) {
+  if (!isOpen) return null;
+
+  // Remount per item so form/edit state always resets when the drawer
+  // opens for a different record (or switches from create to a saved record).
+  return (
+    <InventoryDrawerContent
+      key={inventoryItem?.inventoryItemId ?? 'new'}
+      inventoryItem={inventoryItem ?? null}
+      onClose={onClose}
+      onSaved={onSaved}
+    />
+  );
+}
+
+interface InventoryDrawerContentProps {
+  inventoryItem: InventoryItem | null;
+  onClose: () => void;
+  onSaved?: (inventoryItem: InventoryItem) => void | Promise<void>;
+}
+
+function InventoryDrawerContent({ inventoryItem, onClose, onSaved }: InventoryDrawerContentProps) {
+  const isExistingItem = inventoryItem != null;
   const { createMutation, updateMutation, deactivateMutation } = useInventoryMutations();
 
+  // Existing items open in read-only review mode; create opens editable.
+  const [isEditing, setIsEditing] = useState(!isExistingItem);
   const [form, setForm] = useState<InventoryFormState>(() => buildInitialState(inventoryItem));
   const [error, setError] = useState<string | null>(null);
   const [confirmDeactivate, setConfirmDeactivate] = useState(false);
 
-  useEffect(() => {
-    if (isOpen) {
-      setForm(buildInitialState(inventoryItem));
-      setError(null);
-      setConfirmDeactivate(false);
-    }
-  }, [isOpen, inventoryItem]);
-
   function setField<K extends keyof InventoryFormState>(key: K, value: InventoryFormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function handleStartEdit() {
+    setForm(buildInitialState(inventoryItem));
+    setError(null);
+    setConfirmDeactivate(false);
+    setIsEditing(true);
+  }
+
+  function handleCancelEdit() {
+    if (!isExistingItem) {
+      onClose();
+      return;
+    }
+
+    setForm(buildInitialState(inventoryItem));
+    setError(null);
+    setConfirmDeactivate(false);
+    setIsEditing(false);
   }
 
   function buildRequest(): CreateInventoryItemRequest | null {
@@ -121,19 +171,34 @@ export function InventoryDrawer({ isOpen, onClose, inventoryItem }: InventoryDra
     setError(null);
 
     try {
-      if (isEditMode) {
-        await updateMutation.mutateAsync({ id: inventoryItem.inventoryItemId, request });
+      let savedInventoryItem: InventoryItem;
+      if (isExistingItem) {
+        const updatedInventoryItem = await updateMutation.mutateAsync({
+          id: inventoryItem.inventoryItemId,
+          request,
+        });
+        savedInventoryItem = updatedInventoryItem ?? { ...inventoryItem, ...request };
       } else {
-        await createMutation.mutateAsync(request);
+        savedInventoryItem = await createMutation.mutateAsync(request);
       }
-      onClose();
+
+      setIsEditing(false);
+      setConfirmDeactivate(false);
+      await onSaved?.(savedInventoryItem);
+
+      // Without a parent to hand the saved record back to, fall back to the
+      // previous behavior of closing after a successful save.
+      if (!onSaved) {
+        onClose();
+      }
     } catch (err) {
+      setIsEditing(true);
       setError(err instanceof Error ? err.message : 'שמירת פריט נכשלה');
     }
   }
 
   async function handleDeactivate() {
-    if (!isEditMode) return;
+    if (!isExistingItem) return;
     setError(null);
 
     try {
@@ -147,145 +212,248 @@ export function InventoryDrawer({ isOpen, onClose, inventoryItem }: InventoryDra
   const isSaving =
     createMutation.isPending || updateMutation.isPending || deactivateMutation.isPending;
 
+  const title = !isExistingItem
+    ? 'פריט מלאי חדש'
+    : isEditing
+      ? `עריכת פריט — ${inventoryItem.itemName}`
+      : `פרטי פריט — ${inventoryItem.itemName}`;
+
   return (
     <Drawer
-      isOpen={isOpen}
+      isOpen
       onClose={onClose}
-      title={isEditMode ? `עריכת פריט — ${inventoryItem.itemName}` : 'פריט מלאי חדש'}
-    >
-      <div className="inventoryDrawer">
-        <div className="inventoryDrawer__grid">
-          <Input
-            label="מק״ט *"
-            value={form.skuCode}
-            onChange={(event) => setField('skuCode', event.target.value)}
-            required
-          />
+      title={title}
+      headerActions={
+        isExistingItem && !isEditing ? (
+          <Button type="button" variant="secondary" onClick={handleStartEdit}>
+            ערוך פרטים
+          </Button>
+        ) : undefined
+      }
+      footer={
+        isEditing ? (
+          <div className="inventoryDrawer__footerContent">
+            {error && <p className="inventoryDrawer__error">{error}</p>}
+            <div className="inventoryDrawer__actions">
+              <Button onClick={handleSave} disabled={isSaving}>
+                {isSaving ? 'שומר...' : 'שמור'}
+              </Button>
+              <Button variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
+                בטל שינויים
+              </Button>
 
-          <Input
-            label="שם פריט *"
-            value={form.itemName}
-            onChange={(event) => setField('itemName', event.target.value)}
-            required
-          />
-
-          <div className="inventoryDrawer__field">
-            <label className="inventoryDrawer__label">קטגוריה</label>
-            <input
-              className="inventoryDrawer__input"
-              list="inventoryCategoryOptions"
-              value={form.category}
-              onChange={(event) => setField('category', event.target.value)}
-            />
-            <datalist id="inventoryCategoryOptions">
-              {CATEGORY_OPTIONS.map((option) => (
-                <option key={option} value={option} />
-              ))}
-            </datalist>
+              {isExistingItem && inventoryItem.isActive && (
+                <div className="inventoryDrawer__dangerActions">
+                  {confirmDeactivate ? (
+                    <>
+                      <span className="inventoryDrawer__confirmText">להשבית את הפריט?</span>
+                      <Button variant="danger" onClick={handleDeactivate} disabled={isSaving}>
+                        אישור השבתה
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        onClick={() => setConfirmDeactivate(false)}
+                        disabled={isSaving}
+                      >
+                        חזור
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      variant="danger"
+                      onClick={() => setConfirmDeactivate(true)}
+                      disabled={isSaving}
+                    >
+                      השבת פריט
+                    </Button>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-
-          <Input
-            label="מיקום"
-            value={form.locationName}
-            onChange={(event) => setField('locationName', event.target.value)}
-          />
-
-          <Input
-            label="כמות *"
-            type="number"
-            min="0"
-            step="0.001"
-            value={form.quantityOnHand}
-            onChange={(event) => setField('quantityOnHand', event.target.value)}
-            required
-          />
-
-          <div className="inventoryDrawer__field">
-            <label className="inventoryDrawer__label">יחידה *</label>
-            <input
-              className="inventoryDrawer__input"
-              list="inventoryUnitOptions"
-              value={form.unit}
-              onChange={(event) => setField('unit', event.target.value)}
+        ) : undefined
+      }
+    >
+      {!isEditing && isExistingItem ? (
+        <InventoryReviewDetails inventoryItem={inventoryItem} />
+      ) : (
+        <div className="inventoryDrawer inventoryDrawer--edit">
+          <DetailsSection title="פרטים כלליים">
+            <Input
+              label="שם פריט *"
+              value={form.itemName}
+              onChange={(event) => setField('itemName', event.target.value)}
               required
             />
-            <datalist id="inventoryUnitOptions">
-              {UNIT_OPTIONS.map((option) => (
-                <option key={option} value={option} />
-              ))}
-            </datalist>
-          </div>
+            <div className="inventoryDrawer__grid">
+              <Input
+                label="מק״ט *"
+                value={form.skuCode}
+                onChange={(event) => setField('skuCode', event.target.value)}
+                required
+              />
 
-          <Input
-            label="סף מינימום"
-            type="number"
-            min="0"
-            step="0.001"
-            value={form.minimumQuantity}
-            onChange={(event) => setField('minimumQuantity', event.target.value)}
-          />
+              <div className="inventoryDrawer__field">
+                <label className="inventoryDrawer__label">קטגוריה</label>
+                <input
+                  className="inventoryDrawer__input"
+                  list="inventoryCategoryOptions"
+                  value={form.category}
+                  onChange={(event) => setField('category', event.target.value)}
+                />
+                <datalist id="inventoryCategoryOptions">
+                  {CATEGORY_OPTIONS.map((option) => (
+                    <option key={option} value={option} />
+                  ))}
+                </datalist>
+              </div>
+            </div>
+
+            {isExistingItem && (
+              <label className="inventoryDrawer__checkboxRow">
+                <input
+                  type="checkbox"
+                  checked={form.isActive}
+                  onChange={(event) => setField('isActive', event.target.checked)}
+                />
+                <span>פריט פעיל</span>
+              </label>
+            )}
+          </DetailsSection>
+
+          <DetailsSection title="מלאי">
+            <div className="inventoryDrawer__grid">
+              <Input
+                label="כמות *"
+                type="number"
+                min="0"
+                step="0.001"
+                value={form.quantityOnHand}
+                onChange={(event) => setField('quantityOnHand', event.target.value)}
+                required
+              />
+
+              <div className="inventoryDrawer__field">
+                <label className="inventoryDrawer__label">יחידה *</label>
+                <input
+                  className="inventoryDrawer__input"
+                  list="inventoryUnitOptions"
+                  value={form.unit}
+                  onChange={(event) => setField('unit', event.target.value)}
+                  required
+                />
+                <datalist id="inventoryUnitOptions">
+                  {UNIT_OPTIONS.map((option) => (
+                    <option key={option} value={option} />
+                  ))}
+                </datalist>
+              </div>
+
+              <Input
+                label="סף מינימום"
+                type="number"
+                min="0"
+                step="0.001"
+                value={form.minimumQuantity}
+                onChange={(event) => setField('minimumQuantity', event.target.value)}
+              />
+            </div>
+          </DetailsSection>
+
+          <DetailsSection title="מיקום">
+            <div className="inventoryDrawer__grid">
+              <Input
+                label="מיקום"
+                value={form.locationName}
+                onChange={(event) => setField('locationName', event.target.value)}
+              />
+            </div>
+          </DetailsSection>
+
+          <DetailsSection title="הערות">
+            <div className="inventoryDrawer__field">
+              <label className="inventoryDrawer__label">הערות</label>
+              <textarea
+                className="inventoryDrawer__textarea"
+                rows={3}
+                value={form.notes}
+                onChange={(event) => setField('notes', event.target.value)}
+              />
+            </div>
+          </DetailsSection>
         </div>
-
-        <div className="inventoryDrawer__field">
-          <label className="inventoryDrawer__label">הערות</label>
-          <textarea
-            className="inventoryDrawer__textarea"
-            rows={3}
-            value={form.notes}
-            onChange={(event) => setField('notes', event.target.value)}
-          />
-        </div>
-
-        {isEditMode && (
-          <label className="inventoryDrawer__checkboxRow">
-            <input
-              type="checkbox"
-              checked={form.isActive}
-              onChange={(event) => setField('isActive', event.target.checked)}
-            />
-            <span>פריט פעיל</span>
-          </label>
-        )}
-
-        {error && <p className="inventoryDrawer__error">{error}</p>}
-
-        <div className="inventoryDrawer__actions">
-          <Button onClick={handleSave} disabled={isSaving}>
-            {isSaving ? 'שומר...' : 'שמור'}
-          </Button>
-          <Button variant="secondary" onClick={onClose} disabled={isSaving}>
-            ביטול
-          </Button>
-
-          {isEditMode && inventoryItem.isActive && (
-            <>
-              {confirmDeactivate ? (
-                <>
-                  <span className="inventoryDrawer__confirmText">לבטל את פעילות הפריט?</span>
-                  <Button variant="danger" onClick={handleDeactivate} disabled={isSaving}>
-                    אישור ביטול
-                  </Button>
-                  <Button
-                    variant="secondary"
-                    onClick={() => setConfirmDeactivate(false)}
-                    disabled={isSaving}
-                  >
-                    חזור
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  variant="danger"
-                  onClick={() => setConfirmDeactivate(true)}
-                  disabled={isSaving}
-                >
-                  ביטול פעילות
-                </Button>
-              )}
-            </>
-          )}
-        </div>
-      </div>
+      )}
     </Drawer>
+  );
+}
+
+interface InventoryReviewDetailsProps {
+  inventoryItem: InventoryItem;
+}
+
+function InventoryReviewDetails({ inventoryItem }: InventoryReviewDetailsProps) {
+  const isItemLowOnStock = isLowStock(inventoryItem);
+
+  return (
+    <div className="inventoryDrawer inventoryDrawer--review">
+      <DetailsSection title="פרטי פריט">
+        <div className="inventoryDrawer__detailsGrid">
+          <DetailsField label="שם פריט" value={inventoryItem.itemName} />
+          <DetailsField
+            label="מק״ט"
+            value={<span className="inventoryDrawer__skuValue">{inventoryItem.skuCode}</span>}
+          />
+          <DetailsField label="קטגוריה" value={inventoryItem.category} />
+          <DetailsField
+            label="סטטוס"
+            value={
+              <span className="inventoryDrawer__statusBadges">
+                <Badge variant={inventoryItem.isActive ? 'success' : 'neutral'}>
+                  {inventoryItem.isActive ? 'פעיל' : 'לא פעיל'}
+                </Badge>
+                {isItemLowOnStock && <Badge variant="warning">מלאי נמוך</Badge>}
+              </span>
+            }
+          />
+        </div>
+      </DetailsSection>
+
+      <DetailsSection title="מלאי וזמינות">
+        <div className="inventoryDrawer__detailsGrid">
+          <DetailsField
+            label="כמות במלאי"
+            value={
+              <span className={isItemLowOnStock ? 'inventoryDrawer__lowStockValue' : undefined}>
+                {formatQuantity(inventoryItem.quantityOnHand, inventoryItem.unit)}
+              </span>
+            }
+          />
+          <DetailsField
+            label="סף מינימום"
+            value={
+              inventoryItem.minimumQuantity == null
+                ? undefined
+                : formatQuantity(inventoryItem.minimumQuantity, inventoryItem.unit)
+            }
+          />
+          <DetailsField label="יחידת מידה" value={inventoryItem.unit} />
+        </div>
+        {isItemLowOnStock && (
+          <p className="inventoryDrawer__lowStockHint">
+            הכמות במלאי נמוכה מסף המינימום שהוגדר לפריט.
+          </p>
+        )}
+      </DetailsSection>
+
+      <DetailsSection title="מיקום">
+        <div className="inventoryDrawer__detailsGrid">
+          <DetailsField label="מיקום אחסון" value={inventoryItem.locationName} />
+        </div>
+      </DetailsSection>
+
+      <DetailsSection title="הערות">
+        <DetailsField label="הערות" value={inventoryItem.notes} />
+      </DetailsSection>
+    </div>
   );
 }

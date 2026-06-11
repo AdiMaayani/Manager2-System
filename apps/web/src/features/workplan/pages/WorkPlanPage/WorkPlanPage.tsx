@@ -23,12 +23,12 @@ function scheduledToSelection(task: ScheduledTaskBar): WorkPlanTaskSelection {
     projectId: task.projectId,
     projectTitle: task.projectTitle,
     assigneeName: task.assigneeName,
+    assigneeEmployeeId: task.employeeId || null,
     startHour: task.startHour,
     endHour: task.endHour,
     plannedStart: task.plannedStart,
     plannedEnd: task.plannedEnd,
     isLocked: task.isLocked,
-    isPersonal: task.isPersonal,
     estimatedHours: task.estimatedHours,
     priority: task.priority,
     requiredRole: task.requiredRole,
@@ -104,9 +104,14 @@ export function WorkPlanPage() {
     return 'תוכנית עבודה';
   }, [pageState.scope, pageState.projectFilter, scheduling.projectOptions]);
 
-  const canEditTask =
-    pageState.scope !== 'personal' ||
-    (selectedTask?.isPersonal === true && selectedTask.isLocked === false);
+  // In personal scope, users may edit only their own tasks; locked tasks are
+  // blocked separately inside the task panel.
+  const isSelectedTaskOwnedByCurrentUser =
+    selectedTask != null &&
+    scheduling.currentUserEmployeeId != null &&
+    selectedTask.assigneeEmployeeId === String(scheduling.currentUserEmployeeId);
+
+  const canEditTask = pageState.scope !== 'personal' || isSelectedTaskOwnedByCurrentUser;
 
   if (scheduling.isLoading) {
     return (

@@ -1,20 +1,18 @@
-.contactsPage__toolbar {
+/* Filter groups inside the shared FilterBar card. */
+.contactsPage__filter {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
-  margin-bottom: var(--spacing-lg);
+  gap: var(--spacing-xs);
 }
 
-.contactsPage__toolbarActions {
-  display: flex;
-  gap: var(--spacing-md);
-  align-items: flex-end;
-  flex-wrap: wrap;
-}
-
-.contactsPage__toolbarActions > :first-child {
-  flex: 1;
+.contactsPage__filter--search {
+  flex: 1 1 220px;
   min-width: 200px;
+}
+
+.contactsPage__filterLabel {
+  font-size: var(--font-size-xs);
+  color: var(--color-neutral-500);
 }
 
 .contactsPage__segments {
@@ -29,6 +27,7 @@
   border: 1px solid var(--color-neutral-300);
   background: #fff;
   font-size: var(--font-size-sm);
+  cursor: pointer;
 }
 
 .contactsPage__chip--active {
@@ -40,6 +39,7 @@
 .contactsPage__tableWrap {
   overflow-x: auto;
   background: #fff;
+  border: 1px solid var(--color-neutral-200);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
 }
@@ -51,16 +51,44 @@
 
 .contactsPage__table th,
 .contactsPage__table td {
-  padding: var(--spacing-md);
-  text-align: right;
+  padding: var(--spacing-md) var(--spacing-lg);
+  text-align: start;
   border-bottom: 1px solid var(--color-neutral-200);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .contactsPage__table th {
-  background: var(--color-neutral-50);
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-500);
+  background: var(--color-neutral-50);
 }
 
-.contactsPage__detail p {
-  margin-bottom: var(--spacing-sm);
+.contactsPage__table td {
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-900);
+}
+
+.contactsPage__table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Clickable summary rows, matching the Customers/Projects table behavior. */
+.contactsPage__row {
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.contactsPage__row:hover,
+.contactsPage__row:focus-visible {
+  background: var(--color-neutral-50);
+  outline: none;
+}
+
+.contactsPage__row--selected,
+.contactsPage__row--selected:hover {
+  background: var(--color-primary-50);
+  box-shadow: inset 3px 0 0 0 var(--color-primary-600);
 }

@@ -1,9 +1,11 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { PageShell } from '@shared/components/PageShell';
 import { PageSpinner } from '@shared/components/PageSpinner';
 import { ErrorState } from '@shared/components/ErrorState';
 import { EmptyState } from '@shared/components/EmptyState';
 import { Button } from '@shared/components/Button';
+import { FilterBar } from '@shared/components/FilterBar';
 import { Input } from '@shared/components/Input';
 import { Badge } from '@shared/components/Badge';
 import { useContacts } from '../../hooks/useContacts';
@@ -22,12 +24,33 @@ function formatContactDate(value?: string | null) {
 
 export function ContactsPage() {
   const { data: contacts, isLoading, error, refetch } = useContacts();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [segment, setSegment] = useState('הכל');
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>('הכל');
   const [search, setSearch] = useState('');
+  // undefined = drawer closed, null = create mode, Contact = review existing.
   const [drawerContact, setDrawerContact] = useState<Contact | null | undefined>(undefined);
 
+  // Deep link: ?contactId opens that contact in read-only review mode, then
+  // the param is removed (matching the Quotes ?quoteId behavior).
+  useEffect(() => {
+    const contactIdParam = searchParams.get('contactId');
+    if (!contactIdParam || !contacts) return;
+
+    const requestedContact = contacts.find(
+      (contact) => contact.contactId === Number(contactIdParam),
+    );
+    if (requestedContact) {
+      setDrawerContact(requestedContact);
+    }
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('contactId');
+    setSearchParams(nextParams, { replace: true });
+  }, [contacts, searchParams, setSearchParams]);
+
   const isDrawerOpen = drawerContact !== undefined;
+  const selectedContactId = drawerContact?.contactId ?? null;
 
   const filtered = useMemo(() => {
     if (!contacts) return [];
@@ -48,6 +71,10 @@ export function ContactsPage() {
     });
   }, [contacts, segment, search, activeFilter]);
 
+  const openContact = (contact: Contact) => {
+    setDrawerContact(contact);
+  };
+
   if (isLoading) return <PageShell title="אנשי קשר"><PageSpinner /></PageShell>;
   if (error) {
     return (
@@ -59,40 +86,50 @@ export function ContactsPage() {
 
   return (
     <PageShell title="אנשי קשר">
-      <div className="contactsPage__toolbar">
-        <div className="contactsPage__segments">
-          {SEGMENTS.map((s) => (
-            <button
-              key={s}
-              type="button"
-              className={`contactsPage__chip${segment === s ? ' contactsPage__chip--active' : ''}`}
-              onClick={() => setSegment(s)}
-            >
-              {s}
-            </button>
-          ))}
-        </div>
-        <div className="contactsPage__segments">
-          {ACTIVE_FILTERS.map((f) => (
-            <button
-              key={f}
-              type="button"
-              className={`contactsPage__chip${activeFilter === f ? ' contactsPage__chip--active' : ''}`}
-              onClick={() => setActiveFilter(f)}
-            >
-              {f}
-            </button>
-          ))}
-        </div>
-        <div className="contactsPage__toolbarActions">
+      <FilterBar
+        actions={<Button onClick={() => setDrawerContact(null)}>+ איש קשר חדש</Button>}
+      >
+        <div className="contactsPage__filter contactsPage__filter--search">
+          <span className="contactsPage__filterLabel">חיפוש</span>
           <Input
             placeholder="חיפוש איש קשר..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-          <Button onClick={() => setDrawerContact(null)}>+ איש קשר חדש</Button>
         </div>
-      </div>
+
+        <div className="contactsPage__filter">
+          <span className="contactsPage__filterLabel">קטגוריה</span>
+          <div className="contactsPage__segments">
+            {SEGMENTS.map((s) => (
+              <button
+                key={s}
+                type="button"
+                className={`contactsPage__chip${segment === s ? ' contactsPage__chip--active' : ''}`}
+                onClick={() => setSegment(s)}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="contactsPage__filter">
+          <span className="contactsPage__filterLabel">סטטוס</span>
+          <div className="contactsPage__segments">
+            {ACTIVE_FILTERS.map((f) => (
+              <button
+                key={f}
+                type="button"
+                className={`contactsPage__chip${activeFilter === f ? ' contactsPage__chip--active' : ''}`}
+                onClick={() => setActiveFilter(f)}
+              >
+                {f}
+              </button>
+            ))}
+          </div>
+        </div>
+      </FilterBar>
 
       {filtered.length === 0 ? (
         <EmptyState
@@ -106,33 +143,41 @@ export function ContactsPage() {
               <tr>
                 <th>שם</th>
                 <th>חברה</th>
+                <th>קטגוריה</th>
                 <th>טלפון</th>
                 <th>מייל</th>
-                <th>קטגוריה</th>
                 <th>סטטוס</th>
                 <th>עודכן</th>
-                <th />
               </tr>
             </thead>
             <tbody>
               {filtered.map((c) => (
-                <tr key={c.contactId}>
+                <tr
+                  key={c.contactId}
+                  role="button"
+                  tabIndex={0}
+                  className={`contactsPage__row ${
+                    selectedContactId === c.contactId ? 'contactsPage__row--selected' : ''
+                  }`.trim()}
+                  onClick={() => openContact(c)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      openContact(c);
+                    }
+                  }}
+                >
                   <td>{c.fullName}</td>
-                  <td>{c.companyName ?? '-'}</td>
-                  <td>{c.phone ?? '-'}</td>
-                  <td>{c.email ?? '-'}</td>
+                  <td>{c.companyName || '—'}</td>
                   <td>{c.contactCategory}</td>
+                  <td>{c.phone || '—'}</td>
+                  <td>{c.email || '—'}</td>
                   <td>
                     <Badge variant={c.isActive ? 'success' : 'neutral'}>
                       {c.status ?? (c.isActive ? 'פעיל' : 'לא פעיל')}
                     </Badge>
                   </td>
                   <td>{formatContactDate(c.updatedAt)}</td>
-                  <td>
-                    <Button variant="ghost" onClick={() => setDrawerContact(c)}>
-                      עריכה
-                    </Button>
-                  </td>
                 </tr>
               ))}
             </tbody>
@@ -143,6 +188,7 @@ export function ContactsPage() {
       <ContactDrawer
         isOpen={isDrawerOpen}
         onClose={() => setDrawerContact(undefined)}
+        onSaved={(savedContact) => setDrawerContact(savedContact)}
         contact={drawerContact}
       />
     </PageShell>

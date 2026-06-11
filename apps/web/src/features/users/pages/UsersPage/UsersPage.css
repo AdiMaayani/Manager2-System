@@ -1,11 +1,21 @@
-.usersPage__toolbar {
+/* Filter groups inside the shared FilterBar card. */
+.usersPage__filter {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
-  margin-bottom: var(--spacing-lg);
+  gap: var(--spacing-xs);
 }
 
-.usersPage__filters {
+.usersPage__filter--search {
+  flex: 1 1 240px;
+  min-width: 200px;
+}
+
+.usersPage__filterLabel {
+  font-size: var(--font-size-xs);
+  color: var(--color-neutral-500);
+}
+
+.usersPage__chips {
   display: flex;
   flex-wrap: wrap;
   gap: var(--spacing-sm);
@@ -27,21 +37,20 @@
   border-color: var(--color-primary-600);
 }
 
-.usersPage__toolbarActions {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--spacing-md);
-}
-
-.usersPage__toolbarActions > :first-child {
-  flex: 1;
-  min-width: 240px;
+.usersPage__success {
+  margin: 0 0 var(--spacing-lg);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  color: var(--color-success-700);
+  background: var(--color-success-50);
+  border: 1px solid var(--color-success-200);
 }
 
 .usersPage__tableWrap {
   overflow-x: auto;
   background: #fff;
+  border: 1px solid var(--color-neutral-200);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-sm);
 }
@@ -57,12 +66,36 @@
   text-align: right;
   border-bottom: 1px solid var(--color-neutral-200);
   vertical-align: top;
+  font-size: var(--font-size-sm);
 }
 
 .usersPage__table th {
-  background: var(--color-neutral-50);
-  color: var(--color-neutral-700);
+  font-size: var(--font-size-xs);
   font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-500);
+  background: var(--color-neutral-50);
+}
+
+.usersPage__table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* Clickable summary rows, matching the other operational tables. */
+.usersPage__row {
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.usersPage__row:hover,
+.usersPage__row:focus-visible {
+  background: var(--color-neutral-50);
+  outline: none;
+}
+
+.usersPage__row--selected,
+.usersPage__row--selected:hover {
+  background: var(--color-primary-50);
+  box-shadow: inset 3px 0 0 0 var(--color-primary-600);
 }
 
 .usersPage__primaryCell {

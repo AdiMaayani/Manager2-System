@@ -1,10 +1,12 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { PageShell } from '@shared/components/PageShell';
 import { PageSpinner } from '@shared/components/PageSpinner';
 import { ErrorState } from '@shared/components/ErrorState';
 import { EmptyState } from '@shared/components/EmptyState';
 import { Badge } from '@shared/components/Badge';
 import { Button } from '@shared/components/Button';
+import { FilterBar } from '@shared/components/FilterBar';
 import { Input } from '@shared/components/Input';
 import { ServiceCallDrawer } from '../../components/ServiceCallDrawer';
 import { useServiceCallLookups, useServiceCalls } from '../../hooks/useServiceCalls';
@@ -64,12 +66,35 @@ function buildSearchText(serviceCall: ServiceCallListItem): string {
 export function ServiceCallsPage() {
   const { data: serviceCalls, isLoading, error, refetch } = useServiceCalls();
   const lookups = useServiceCallLookups();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  // undefined = drawer closed, null = create mode, ServiceCallDetails = review existing.
   const [drawerServiceCall, setDrawerServiceCall] = useState<ServiceCallDetails | null | undefined>(
     undefined,
   );
   const [pageMessage, setPageMessage] = useState<string | null>(null);
+
+  // Deep link: ?serviceCallId opens that call in read-only review mode, then
+  // the param is removed (matching the Quotes ?quoteId behavior).
+  useEffect(() => {
+    const serviceCallIdParam = searchParams.get('serviceCallId');
+    if (!serviceCallIdParam || !serviceCalls) return;
+
+    const requestedServiceCall = serviceCalls.find(
+      (serviceCall) => serviceCall.workItemId === Number(serviceCallIdParam),
+    );
+    if (requestedServiceCall) {
+      setDrawerServiceCall(requestedServiceCall);
+    }
+
+    const nextParams = new URLSearchParams(searchParams);
+    nextParams.delete('serviceCallId');
+    setSearchParams(nextParams, { replace: true });
+  }, [serviceCalls, searchParams, setSearchParams]);
+
+  const isDrawerOpen = drawerServiceCall !== undefined;
+  const selectedServiceCallId = drawerServiceCall?.workItemId ?? null;
 
   const filteredServiceCalls = useMemo(() => {
     const calls = serviceCalls ?? [];
@@ -84,6 +109,11 @@ export function ServiceCallsPage() {
     });
   }, [search, serviceCalls, statusFilter]);
 
+  const openServiceCall = (serviceCall: ServiceCallListItem) => {
+    setPageMessage(null);
+    setDrawerServiceCall(serviceCall);
+  };
+
   if (isLoading) return <PageShell title="קריאות שירות"><PageSpinner /></PageShell>;
   if (error) {
     return (
@@ -95,15 +125,30 @@ export function ServiceCallsPage() {
 
   return (
     <PageShell title="קריאות שירות">
-      <div className="serviceCallsPage__toolbar">
-        <Input
-          placeholder="חיפוש לפי כותרת, לקוח, אתר או תפקיד..."
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-        />
+      <FilterBar
+        actions={
+          <Button
+            type="button"
+            onClick={() => {
+              setPageMessage(null);
+              setDrawerServiceCall(null);
+            }}
+          >
+            + קריאה חדשה
+          </Button>
+        }
+      >
+        <div className="serviceCallsPage__filter serviceCallsPage__filter--search">
+          <span className="serviceCallsPage__filterLabel">חיפוש</span>
+          <Input
+            placeholder="חיפוש לפי כותרת, לקוח, אתר או תפקיד..."
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </div>
 
-        <label className="serviceCallsPage__filter">
-          <span>סטטוס</span>
+        <div className="serviceCallsPage__filter">
+          <span className="serviceCallsPage__filterLabel">סטטוס</span>
           <select
             className="serviceCallsPage__select"
             value={statusFilter}
@@ -115,12 +160,8 @@ export function ServiceCallsPage() {
             <option value="Done">בוצעה</option>
             <option value="Cancelled">בוטלה</option>
           </select>
-        </label>
-
-        <Button type="button" onClick={() => setDrawerServiceCall(null)}>
-          קריאה חדשה
-        </Button>
-      </div>
+        </div>
+      </FilterBar>
 
       {pageMessage && <p className="serviceCallsPage__success">{pageMessage}</p>}
 
@@ -145,12 +186,27 @@ export function ServiceCallsPage() {
                 <th>עדיפות</th>
                 <th>מתוכנן</th>
                 <th>תפקיד</th>
-                <th>פעולות</th>
               </tr>
             </thead>
             <tbody>
               {filteredServiceCalls.map((serviceCall) => (
-                <tr key={serviceCall.workItemId}>
+                <tr
+                  key={serviceCall.workItemId}
+                  role="button"
+                  tabIndex={0}
+                  className={`serviceCallsPage__row ${
+                    selectedServiceCallId === serviceCall.workItemId
+                      ? 'serviceCallsPage__row--selected'
+                      : ''
+                  }`.trim()}
+                  onClick={() => openServiceCall(serviceCall)}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' || event.key === ' ') {
+                      event.preventDefault();
+                      openServiceCall(serviceCall);
+                    }
+                  }}
+                >
                   <td>SC-{serviceCall.workItemId}</td>
                   <td>{serviceCall.title}</td>
                   <td>{serviceCall.customerName ?? '-'}</td>
@@ -163,15 +219,6 @@ export function ServiceCallsPage() {
                   <td>{getPriorityLabel(serviceCall.priority)}</td>
                   <td>{formatDate(serviceCall.plannedStart)}</td>
                   <td>{serviceCall.requiredRole ?? '-'}</td>
-                  <td>
-                    <Button
-                      type="button"
-                      variant="secondary"
-                      onClick={() => setDrawerServiceCall(serviceCall)}
-                    >
-                      פרטים
-                    </Button>
-                  </td>
                 </tr>
               ))}
             </tbody>
@@ -179,21 +226,19 @@ export function ServiceCallsPage() {
         </div>
       )}
 
-      {drawerServiceCall !== undefined && (
-        <ServiceCallDrawer
-          key={drawerServiceCall ? `service-call-${drawerServiceCall.workItemId}` : 'new-service-call'}
-          isOpen={drawerServiceCall !== undefined}
-          serviceCall={drawerServiceCall}
-          customers={lookups.customers}
-          sites={lookups.sites}
-          employees={lookups.employees}
-          onClose={() => setDrawerServiceCall(undefined)}
-          onSaved={(message) => {
-            setPageMessage(message);
-            void refetch();
-          }}
-        />
-      )}
+      <ServiceCallDrawer
+        isOpen={isDrawerOpen}
+        serviceCall={drawerServiceCall}
+        customers={lookups.customers}
+        sites={lookups.sites}
+        employees={lookups.employees}
+        onClose={() => setDrawerServiceCall(undefined)}
+        onSaved={(message, savedServiceCall) => {
+          setPageMessage(message);
+          if (savedServiceCall) setDrawerServiceCall(savedServiceCall);
+          void refetch();
+        }}
+      />
     </PageShell>
   );
 }

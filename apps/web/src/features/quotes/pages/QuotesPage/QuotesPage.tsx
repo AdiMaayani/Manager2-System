@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Button } from '@shared/components/Button';
 import { EmptyState } from '@shared/components/EmptyState';
 import { ErrorState } from '@shared/components/ErrorState';
+import { FilterBar } from '@shared/components/FilterBar';
 import { Input } from '@shared/components/Input';
 import { PageShell } from '@shared/components/PageShell';
 import { PageSpinner } from '@shared/components/PageSpinner';
@@ -89,15 +90,21 @@ export function QuotesPage() {
 
   return (
     <PageShell title="הצעות מחיר">
-      <div className="quotesPage__toolbar">
-        <Input
-          label="חיפוש"
-          placeholder="מספר הצעה, לקוח, פרויקט..."
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-        />
+      <FilterBar
+        actions={
+          <Button onClick={() => setDrawer({ isOpen: true, quoteId: null })}>+ הצעה חדשה</Button>
+        }
+      >
+        <div className="quotesPage__filter quotesPage__filter--search">
+          <Input
+            label="חיפוש"
+            placeholder="מספר הצעה, לקוח, פרויקט..."
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
+          />
+        </div>
 
-        <div className="quotesPage__field">
+        <div className="quotesPage__filter">
           <label className="quotesPage__label">לקוח</label>
           <select
             className="quotesPage__select"
@@ -113,7 +120,7 @@ export function QuotesPage() {
           </select>
         </div>
 
-        <div className="quotesPage__field">
+        <div className="quotesPage__filter">
           <label className="quotesPage__label">פרויקט</label>
           <select
             className="quotesPage__select"
@@ -129,7 +136,7 @@ export function QuotesPage() {
           </select>
         </div>
 
-        <div className="quotesPage__field">
+        <div className="quotesPage__filter">
           <label className="quotesPage__label">סטטוס</label>
           <select
             className="quotesPage__select"
@@ -145,22 +152,24 @@ export function QuotesPage() {
           </select>
         </div>
 
-        <Input
-          label="מתאריך"
-          type="date"
-          value={fromDate}
-          onChange={(event) => setFromDate(event.target.value)}
-        />
+        <div className="quotesPage__filter">
+          <Input
+            label="מתאריך"
+            type="date"
+            value={fromDate}
+            onChange={(event) => setFromDate(event.target.value)}
+          />
+        </div>
 
-        <Input
-          label="עד תאריך"
-          type="date"
-          value={toDate}
-          onChange={(event) => setToDate(event.target.value)}
-        />
-
-        <Button onClick={() => setDrawer({ isOpen: true, quoteId: null })}>+ הצעה חדשה</Button>
-      </div>
+        <div className="quotesPage__filter">
+          <Input
+            label="עד תאריך"
+            type="date"
+            value={toDate}
+            onChange={(event) => setToDate(event.target.value)}
+          />
+        </div>
+      </FilterBar>
 
       {isLoading ? (
         <PageSpinner />
@@ -178,11 +187,17 @@ export function QuotesPage() {
       ) : (
         <QuotesTable
           quotes={quotes}
+          selectedQuoteId={drawer.isOpen ? drawer.quoteId : null}
           onSelectQuote={(quoteId) => setDrawer({ isOpen: true, quoteId })}
         />
       )}
 
-      <QuoteDrawer isOpen={drawer.isOpen} quoteId={drawer.quoteId} onClose={closeDrawer} />
+      <QuoteDrawer
+        isOpen={drawer.isOpen}
+        quoteId={drawer.quoteId}
+        onClose={closeDrawer}
+        onSaved={(savedQuoteId) => setDrawer({ isOpen: true, quoteId: savedQuoteId })}
+      />
     </PageShell>
   );
 }

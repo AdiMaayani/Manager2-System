@@ -79,6 +79,14 @@ export async function getWorkItemByIdAsync(workItemId: number): Promise<WorkItem
   return apiRequest<WorkItemResponse>(`/WorkItems/${workItemId}`);
 }
 
+// Reuses the existing milestones/cancel endpoint: it soft-deletes any work
+// item whose WorkType is "Task", which is exactly what WorkPlan tasks are.
+export async function cancelWorkPlanTaskAsync(taskId: number): Promise<{ message?: string }> {
+  return apiRequest<{ message?: string }>(`/WorkItems/milestones/${taskId}/cancel`, {
+    method: 'PUT',
+  });
+}
+
 export async function updateWorkItemAsync(
   workItemId: number,
   request: UpdateTaskRequest,
@@ -100,7 +108,14 @@ export async function updateWorkItemAsync(
       priority: request.priority,
       requiredRole: request.requiredRole,
       isLocked: request.isLocked,
-      parentWorkItemId: request.parentWorkItemId,
+      // sp_UpdateWorkItem overwrites every column, so untouched values must be
+      // echoed back or the update silently NULLs them in the database.
+      dealCloseDate: request.dealCloseDate,
+      financeProjectNumber: request.financeProjectNumber,
+      invoiceNumber: request.invoiceNumber,
+      actualStart: request.actualStart,
+      actualEnd: request.actualEnd,
+      actualHours: request.actualHours,
     }),
   });
 }

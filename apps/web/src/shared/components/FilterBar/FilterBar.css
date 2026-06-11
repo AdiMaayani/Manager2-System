@@ -1,0 +1,44 @@
+.filterBar {
+  display: flex;
+  /* Let the actions slot drop below the filters when zoom/narrow widths
+     squeeze the row, instead of overlapping or overflowing. */
+  flex-wrap: wrap;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--spacing-md) var(--spacing-lg);
+  margin-bottom: var(--spacing-lg);
+  padding: var(--spacing-lg);
+  background: #fff;
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Filter controls group on the inline start (physical right in RTL). */
+.filterBar__filters {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: var(--spacing-md);
+}
+
+/* Primary actions sit on the inline end, separated from the filters. */
+.filterBar__actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: flex-end;
+  gap: var(--spacing-sm);
+}
+
+@media (max-width: 640px) {
+  .filterBar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .filterBar__actions {
+    justify-content: flex-end;
+  }
+}

@@ -96,7 +96,6 @@ export interface ScheduledTaskBar {
   priority?: string | null;
   requiredRole?: string | null;
   isLocked: boolean;
-  isPersonal: boolean;
   isUrgent: boolean;
   assignmentSource: ResolvedAssignment['source'];
   violationCount: number;
@@ -112,12 +111,14 @@ export interface WorkPlanTaskSelection {
   projectId: number;
   projectTitle: string;
   assigneeName: string;
+  // Employee id of the resolved assignee, used for ownership checks
+  // (e.g. allowing personal-scope users to edit only their own tasks).
+  assigneeEmployeeId: string | null;
   startHour: number;
   endHour: number;
   plannedStart?: string | null;
   plannedEnd?: string | null;
   isLocked: boolean;
-  isPersonal: boolean;
   estimatedHours?: number | null;
   priority?: string | null;
   requiredRole?: string | null;
@@ -214,6 +215,12 @@ export interface WorkItemResponse {
   customerId: number;
   siteId: number;
   parentWorkItemId?: number | null;
+  dealCloseDate?: string | null;
+  financeProjectNumber?: string | null;
+  invoiceNumber?: string | null;
+  actualStart?: string | null;
+  actualEnd?: string | null;
+  actualHours?: number | null;
 }
 
 export interface UpdateTaskRequest {
@@ -230,7 +237,14 @@ export interface UpdateTaskRequest {
   priority?: string | null;
   requiredRole?: string | null;
   isLocked: boolean;
-  parentWorkItemId?: number | null;
+  // The backend PUT replaces every column via sp_UpdateWorkItem, so these
+  // fields must be echoed from the loaded work item or they get wiped to NULL.
+  dealCloseDate?: string | null;
+  financeProjectNumber?: string | null;
+  invoiceNumber?: string | null;
+  actualStart?: string | null;
+  actualEnd?: string | null;
+  actualHours?: number | null;
 }
 
 export interface TaskInsightCounts {

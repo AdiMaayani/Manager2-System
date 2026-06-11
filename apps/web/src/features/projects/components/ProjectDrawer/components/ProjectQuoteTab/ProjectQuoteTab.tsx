@@ -90,7 +90,11 @@ export function ProjectQuoteTab({ projectId }: ProjectQuoteTabProps) {
         quoteId={quoteDrawerState.quoteId}
         initialProjectId={projectId}
         onClose={closeQuoteDrawer}
-        onSaved={() => refetch()}
+        onSaved={(savedQuoteId) => {
+          refetch();
+          // Keep the drawer open on the saved quote so it shows review mode.
+          setQuoteDrawerState({ isOpen: true, quoteId: savedQuoteId });
+        }}
       />
     </div>
   );
