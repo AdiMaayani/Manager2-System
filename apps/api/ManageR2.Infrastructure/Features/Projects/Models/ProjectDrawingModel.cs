@@ -14,6 +14,16 @@ public class ProjectDrawingModel
 
     public string? Note { get; set; }
 
+    public string? OriginalFileName { get; set; }
+
+    public string? StoredFileName { get; set; }
+
+    public string? FilePath { get; set; }
+
+    public string? ContentType { get; set; }
+
+    public long? FileSizeBytes { get; set; }
+
     public int SortOrder { get; set; }
 
     public DateTime CreatedAt { get; set; }

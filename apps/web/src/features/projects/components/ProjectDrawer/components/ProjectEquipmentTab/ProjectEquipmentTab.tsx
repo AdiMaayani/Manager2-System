@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useInventory, type InventoryItem } from '@features/inventory';
 import { Badge } from '@shared/components/Badge';
 import { Button } from '@shared/components/Button';
 import { EmptyState } from '@shared/components/EmptyState';
@@ -28,10 +29,26 @@ function getEquipmentStatusLabel(status: string): string {
   return EQUIPMENT_STATUS_OPTIONS.find((option) => option.code === status)?.display ?? status;
 }
 
+function inventoryLabel(item: InventoryItem): string {
+  return `${item.skuCode} · ${item.itemName}`;
+}
+
+function getInventoryCategories(inventoryItems: InventoryItem[]): string[] {
+  return Array.from(
+    new Set(
+      inventoryItems
+        .map((inventoryItem) => inventoryItem.category?.trim())
+        .filter((category): category is string => Boolean(category)),
+    ),
+  ).sort((firstCategory, secondCategory) => firstCategory.localeCompare(secondCategory, 'he'));
+}
+
 interface EquipmentEditCardProps {
   item: ProjectEquipmentItem;
   index: number;
   itemCount: number;
+  inventoryItems: InventoryItem[];
+  inventoryCategories: string[];
   isSaving: boolean;
   onSave: (
     equipmentItemId: number,
@@ -46,6 +63,8 @@ function EquipmentEditCard({
   item,
   index,
   itemCount,
+  inventoryItems,
+  inventoryCategories,
   isSaving,
   onSave,
   onDelete,
@@ -53,8 +72,28 @@ function EquipmentEditCard({
   onValidationError,
 }: EquipmentEditCardProps) {
   const [draftName, setDraftName] = useState(item.name);
+  const [draftInventoryCategory, setDraftInventoryCategory] = useState(item.inventoryCategory ?? '');
+  const [draftInventoryItemId, setDraftInventoryItemId] = useState(
+    item.inventoryItemId ? String(item.inventoryItemId) : '',
+  );
   const [draftStatus, setDraftStatus] = useState(item.status);
   const [draftLocation, setDraftLocation] = useState(item.location);
+
+  const filteredInventoryItems = draftInventoryCategory
+    ? inventoryItems.filter((inventoryItem) => inventoryItem.category === draftInventoryCategory)
+    : inventoryItems;
+
+  function handleSelectInventoryItem(inventoryItemId: string) {
+    setDraftInventoryItemId(inventoryItemId);
+    const inventoryItem = inventoryItems.find(
+      (candidate) => candidate.inventoryItemId === Number(inventoryItemId),
+    );
+    if (!inventoryItem) return;
+
+    setDraftInventoryCategory(inventoryItem.category ?? '');
+    setDraftName(inventoryItem.itemName);
+    setDraftLocation(inventoryItem.locationName ?? '');
+  }
 
   const saveItem = async () => {
     if (!draftName.trim()) {
@@ -64,6 +103,7 @@ function EquipmentEditCard({
 
     await onSave(item.projectEquipmentItemId, {
       equipmentName: draftName.trim(),
+      inventoryItemId: draftInventoryItemId ? Number(draftInventoryItemId) : undefined,
       status: draftStatus,
       location: draftLocation.trim() || undefined,
       sortOrder: item.sortOrder,
@@ -77,6 +117,39 @@ function EquipmentEditCard({
         value={draftName}
         onChange={(event) => setDraftName(event.target.value)}
       />
+      <label className="projectEquipmentTab__field">
+        <span>קטגוריית מלאי</span>
+        <select
+          className="projectEquipmentTab__select"
+          value={draftInventoryCategory}
+          onChange={(event) => {
+            setDraftInventoryCategory(event.target.value);
+            setDraftInventoryItemId('');
+          }}
+        >
+          <option value="">כל הקטגוריות</option>
+          {inventoryCategories.map((category) => (
+            <option key={category} value={category}>
+              {category}
+            </option>
+          ))}
+        </select>
+      </label>
+      <label className="projectEquipmentTab__field">
+        <span>פריט מלאי</span>
+        <select
+          className="projectEquipmentTab__select"
+          value={draftInventoryItemId}
+          onChange={(event) => handleSelectInventoryItem(event.target.value)}
+        >
+          <option value="">ללא קישור</option>
+          {filteredInventoryItems.map((inventoryItem) => (
+            <option key={inventoryItem.inventoryItemId} value={inventoryItem.inventoryItemId}>
+              {inventoryLabel(inventoryItem)}
+            </option>
+          ))}
+        </select>
+      </label>
       <label className="projectEquipmentTab__field">
         <span>סטטוס</span>
         <select
@@ -138,10 +211,33 @@ export function ProjectEquipmentTab({
   onDelete,
   onReorder,
 }: ProjectEquipmentTabProps) {
+  const { data: inventoryItems = [] } = useInventory({ status: 'active', lowStockOnly: false });
+  const inventoryCategories = useMemo(
+    () => getInventoryCategories(inventoryItems),
+    [inventoryItems],
+  );
   const [name, setName] = useState('');
+  const [inventoryCategory, setInventoryCategory] = useState('');
+  const [inventoryItemId, setInventoryItemId] = useState('');
   const [status, setStatus] = useState('waiting');
   const [location, setLocation] = useState('');
   const [error, setError] = useState<string | null>(null);
+
+  const filteredInventoryItems = inventoryCategory
+    ? inventoryItems.filter((inventoryItem) => inventoryItem.category === inventoryCategory)
+    : inventoryItems;
+
+  function handleSelectInventoryItem(nextInventoryItemId: string) {
+    setInventoryItemId(nextInventoryItemId);
+    const inventoryItem = inventoryItems.find(
+      (candidate) => candidate.inventoryItemId === Number(nextInventoryItemId),
+    );
+    if (!inventoryItem) return;
+
+    setInventoryCategory(inventoryItem.category ?? '');
+    setName(inventoryItem.itemName);
+    setLocation(inventoryItem.locationName ?? '');
+  }
 
   // Group items by location so the view mirrors the Inventory layout:
   // a location/category header first, with its products listed inside.
@@ -187,12 +283,15 @@ export function ProjectEquipmentTab({
     setError(null);
     await onCreate({
       equipmentName: name.trim(),
+      inventoryItemId: inventoryItemId ? Number(inventoryItemId) : undefined,
       status,
       location: location.trim() || undefined,
       sortOrder: items.length + 1,
     });
 
     setName('');
+    setInventoryCategory('');
+    setInventoryItemId('');
     setStatus('waiting');
     setLocation('');
   };
@@ -208,6 +307,8 @@ export function ProjectEquipmentTab({
               item={item}
               index={index}
               itemCount={items.length}
+              inventoryItems={inventoryItems}
+              inventoryCategories={inventoryCategories}
               isSaving={isSaving}
               onSave={onUpdate}
               onDelete={removeItem}
@@ -221,6 +322,39 @@ export function ProjectEquipmentTab({
         </div>
         <div className="projectEquipmentTab__addForm">
           <Input label="שם" value={name} onChange={(event) => setName(event.target.value)} />
+          <label className="projectEquipmentTab__field">
+            <span>קטגוריית מלאי</span>
+            <select
+              className="projectEquipmentTab__select"
+              value={inventoryCategory}
+              onChange={(event) => {
+                setInventoryCategory(event.target.value);
+                setInventoryItemId('');
+              }}
+            >
+              <option value="">כל הקטגוריות</option>
+              {inventoryCategories.map((category) => (
+                <option key={category} value={category}>
+                  {category}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label className="projectEquipmentTab__field">
+            <span>פריט מלאי</span>
+            <select
+              className="projectEquipmentTab__select"
+              value={inventoryItemId}
+              onChange={(event) => handleSelectInventoryItem(event.target.value)}
+            >
+              <option value="">ללא קישור</option>
+              {filteredInventoryItems.map((inventoryItem) => (
+                <option key={inventoryItem.inventoryItemId} value={inventoryItem.inventoryItemId}>
+                  {inventoryLabel(inventoryItem)}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="projectEquipmentTab__field">
             <span>סטטוס</span>
             <select
@@ -267,6 +401,12 @@ export function ProjectEquipmentTab({
                     key={item.projectEquipmentItemId}
                   >
                     <span className="projectEquipmentTab__itemName">{item.name}</span>
+                    {item.inventorySkuCode && (
+                      <span className="projectEquipmentTab__inventoryMeta">
+                        {item.inventorySkuCode}
+                        {item.inventoryCategory ? ` · ${item.inventoryCategory}` : ''}
+                      </span>
+                    )}
                     <Badge variant="primary">{getEquipmentStatusLabel(item.status)}</Badge>
                   </li>
                 ))}

@@ -6,6 +6,14 @@ public class ProjectEquipmentItemModel
 
     public int ProjectId { get; set; }
 
+    public int? InventoryItemId { get; set; }
+
+    public string? InventorySkuCode { get; set; }
+
+    public string? InventoryItemName { get; set; }
+
+    public string? InventoryCategory { get; set; }
+
     public string EquipmentName { get; set; } = string.Empty;
 
     public string Status { get; set; } = string.Empty;

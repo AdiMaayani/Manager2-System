@@ -20,18 +20,25 @@ BEGIN
     END;
 
     SELECT
-        ProjectBoqItemId,
-        ProjectId,
-        SystemName,
-        ItemDescription,
-        Quantity,
-        Unit,
-        SortOrder,
-        CreatedAt,
-        UpdatedAt
-    FROM dbo.ProjectBoqItems
-    WHERE ProjectId = @ProjectId
-      AND IsActive = 1
-    ORDER BY SortOrder ASC, ProjectBoqItemId ASC;
+        b.ProjectBoqItemId,
+        b.ProjectId,
+        b.SystemName,
+        b.InventoryItemId,
+        i.SkuCode AS InventorySkuCode,
+        i.ItemName AS InventoryItemName,
+        i.Category AS InventoryCategory,
+        b.ItemDescription,
+        b.Quantity,
+        b.Unit,
+        b.UnitPrice,
+        b.SortOrder,
+        b.CreatedAt,
+        b.UpdatedAt
+    FROM dbo.ProjectBoqItems b
+    LEFT JOIN dbo.InventoryItems i
+        ON b.InventoryItemId = i.InventoryItemId
+    WHERE b.ProjectId = @ProjectId
+      AND b.IsActive = 1
+    ORDER BY b.SortOrder ASC, b.ProjectBoqItemId ASC;
 END
 GO

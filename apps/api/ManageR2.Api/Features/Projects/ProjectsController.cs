@@ -13,22 +13,32 @@ namespace ManageR2.Api.Controllers;
 // Thin controller: handles HTTP concerns and delegates lifecycle data loading to the repository.
 public class ProjectsController : ControllerBase
 {
+    private const long MaxDrawingFileSizeBytes = 25 * 1024 * 1024;
+    private static readonly HashSet<string> AllowedDrawingExtensions = new(StringComparer.OrdinalIgnoreCase)
+    {
+        ".pdf",
+        ".dwg"
+    };
+
     // Aggregates project header, milestones, assignments, reports, and KPI summary (often via stored procedures).
     private readonly IProjectLifecycleRepository _projectLifecycleRepository;
     private readonly IProjectEquipmentRepository _projectEquipmentRepository;
     private readonly IProjectBoqRepository _projectBoqRepository;
     private readonly IProjectDrawingRepository _projectDrawingRepository;
+    private readonly IWebHostEnvironment _environment;
 
     public ProjectsController(
         IProjectLifecycleRepository projectLifecycleRepository,
         IProjectEquipmentRepository projectEquipmentRepository,
         IProjectBoqRepository projectBoqRepository,
-        IProjectDrawingRepository projectDrawingRepository)
+        IProjectDrawingRepository projectDrawingRepository,
+        IWebHostEnvironment environment)
     {
         _projectLifecycleRepository = projectLifecycleRepository;
         _projectEquipmentRepository = projectEquipmentRepository;
         _projectBoqRepository = projectBoqRepository;
         _projectDrawingRepository = projectDrawingRepository;
+        _environment = environment;
     }
 
     [HttpGet("{id:int}/lifecycle")]
@@ -152,7 +162,8 @@ public class ProjectsController : ControllerBase
         var validationError = ValidateProjectBoqRequest(
             request.ItemDescription,
             request.Quantity,
-            request.Unit);
+            request.Unit,
+            request.UnitPrice);
 
         if (validationError != null)
         {
@@ -167,9 +178,11 @@ public class ProjectsController : ControllerBase
                 SystemName = string.IsNullOrWhiteSpace(request.SystemName)
                     ? null
                     : request.SystemName.Trim(),
+                InventoryItemId = request.InventoryItemId,
                 ItemDescription = request.ItemDescription.Trim(),
                 Quantity = request.Quantity,
                 Unit = request.Unit.Trim(),
+                UnitPrice = request.UnitPrice,
                 SortOrder = request.SortOrder ?? 0
             };
 
@@ -201,7 +214,8 @@ public class ProjectsController : ControllerBase
         var validationError = ValidateProjectBoqRequest(
             request.ItemDescription,
             request.Quantity,
-            request.Unit);
+            request.Unit,
+            request.UnitPrice);
 
         if (validationError != null)
         {
@@ -217,9 +231,11 @@ public class ProjectsController : ControllerBase
                 SystemName = string.IsNullOrWhiteSpace(request.SystemName)
                     ? null
                     : request.SystemName.Trim(),
+                InventoryItemId = request.InventoryItemId,
                 ItemDescription = request.ItemDescription.Trim(),
                 Quantity = request.Quantity,
                 Unit = request.Unit.Trim(),
+                UnitPrice = request.UnitPrice,
                 SortOrder = request.SortOrder
             };
 
@@ -360,6 +376,120 @@ public class ProjectsController : ControllerBase
         }
     }
 
+    [HttpPost("{projectId:int}/drawings/upload")]
+    [RequestSizeLimit(MaxDrawingFileSizeBytes)]
+    public async Task<ActionResult<ProjectDrawingDto>> UploadDrawing(
+        int projectId,
+        [FromForm] UploadProjectDrawingRequestDto request)
+    {
+        var validationError = ValidateProjectDrawingRequest(
+            request.Name,
+            request.Type,
+            request.DrawingDate);
+
+        if (validationError != null)
+        {
+            return BadRequest(new { message = validationError });
+        }
+
+        var fileValidationError = ValidateDrawingFile(request.File);
+        if (fileValidationError != null)
+        {
+            return BadRequest(new { message = fileValidationError });
+        }
+
+        var file = request.File!;
+        var originalFileName = Path.GetFileName(file.FileName);
+        var extension = Path.GetExtension(originalFileName);
+        var storedFileName = $"{Guid.NewGuid():N}{extension.ToLowerInvariant()}";
+        var relativeDirectory = projectId.ToString();
+        var storageRoot = GetDrawingStorageRoot();
+        var projectDirectory = Path.Combine(storageRoot, relativeDirectory);
+        Directory.CreateDirectory(projectDirectory);
+
+        var fullFilePath = Path.GetFullPath(Path.Combine(projectDirectory, storedFileName));
+        if (!fullFilePath.StartsWith(storageRoot, StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new { message = "Invalid upload path." });
+        }
+
+        try
+        {
+            await using (var stream = System.IO.File.Create(fullFilePath))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            var drawing = new ProjectDrawingModel
+            {
+                ProjectId = projectId,
+                Name = request.Name.Trim(),
+                Type = request.Type.Trim().ToUpperInvariant(),
+                DrawingDate = request.DrawingDate,
+                Note = string.IsNullOrWhiteSpace(request.Note)
+                    ? null
+                    : request.Note.Trim(),
+                OriginalFileName = originalFileName,
+                StoredFileName = storedFileName,
+                FilePath = Path.Combine(relativeDirectory, storedFileName),
+                ContentType = string.IsNullOrWhiteSpace(file.ContentType)
+                    ? "application/octet-stream"
+                    : file.ContentType,
+                FileSizeBytes = file.Length,
+                SortOrder = request.SortOrder ?? 0
+            };
+
+            var drawingId = await _projectDrawingRepository.CreateAsync(drawing);
+            var created = await GetProjectDrawingOrNullAsync(projectId, drawingId);
+
+            if (created == null)
+            {
+                DeleteDrawingFileIfExists(drawing.FilePath);
+                return BadRequest(new { message = "Project drawing was uploaded but could not be reloaded." });
+            }
+
+            return CreatedAtAction(
+                nameof(GetDrawings),
+                new { projectId },
+                MapProjectDrawing(created));
+        }
+        catch (UserValidationException ex)
+        {
+            DeleteDrawingFileIfExists(Path.Combine(relativeDirectory, storedFileName));
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [HttpGet("{projectId:int}/drawings/{projectDrawingId:int}/file")]
+    public async Task<IActionResult> DownloadDrawingFile(int projectId, int projectDrawingId)
+    {
+        var drawing = await GetProjectDrawingOrNullAsync(projectId, projectDrawingId);
+        if (drawing == null)
+        {
+            return NotFound(new { message = $"Project drawing with id {projectDrawingId} was not found." });
+        }
+
+        if (string.IsNullOrWhiteSpace(drawing.FilePath))
+        {
+            return NotFound(new { message = "Project drawing has no uploaded file." });
+        }
+
+        var fullFilePath = GetSafeDrawingFilePath(drawing.FilePath);
+        if (fullFilePath == null || !System.IO.File.Exists(fullFilePath))
+        {
+            return NotFound(new { message = "Project drawing file was not found." });
+        }
+
+        var contentType = string.IsNullOrWhiteSpace(drawing.ContentType)
+            ? "application/octet-stream"
+            : drawing.ContentType;
+        var downloadName = string.IsNullOrWhiteSpace(drawing.OriginalFileName)
+            ? drawing.Name
+            : drawing.OriginalFileName;
+
+        return PhysicalFile(fullFilePath, contentType, downloadName);
+    }
+
     [HttpPut("{projectId:int}/drawings/{projectDrawingId:int}")]
     public async Task<ActionResult<ProjectDrawingDto>> UpdateDrawing(
         int projectId,
@@ -418,6 +548,7 @@ public class ProjectsController : ControllerBase
     {
         try
         {
+            var drawing = await GetProjectDrawingOrNullAsync(projectId, projectDrawingId);
             var deleted = await _projectDrawingRepository.DeleteAsync(projectId, projectDrawingId);
 
             if (!deleted)
@@ -425,6 +556,7 @@ public class ProjectsController : ControllerBase
                 return NotFound(new { message = $"Project drawing with id {projectDrawingId} was not found." });
             }
 
+            DeleteDrawingFileIfExists(drawing?.FilePath);
             return NoContent();
         }
         catch (UserValidationException ex)
@@ -466,6 +598,7 @@ public class ProjectsController : ControllerBase
             var equipmentItem = new ProjectEquipmentItemModel
             {
                 ProjectId = projectId,
+                InventoryItemId = request.InventoryItemId,
                 EquipmentName = request.EquipmentName.Trim(),
                 Status = request.Status.Trim(),
                 Location = string.IsNullOrWhiteSpace(request.Location)
@@ -514,6 +647,7 @@ public class ProjectsController : ControllerBase
             {
                 ProjectEquipmentItemId = equipmentItemId,
                 ProjectId = projectId,
+                InventoryItemId = request.InventoryItemId,
                 EquipmentName = request.EquipmentName.Trim(),
                 Status = request.Status.Trim(),
                 Location = string.IsNullOrWhiteSpace(request.Location)
@@ -624,7 +758,8 @@ public class ProjectsController : ControllerBase
     private static string? ValidateProjectBoqRequest(
         string itemDescription,
         decimal quantity,
-        string unit)
+        string unit,
+        decimal? unitPrice)
     {
         if (string.IsNullOrWhiteSpace(itemDescription))
         {
@@ -639,6 +774,11 @@ public class ProjectsController : ControllerBase
         if (string.IsNullOrWhiteSpace(unit))
         {
             return "Unit is required.";
+        }
+
+        if (unitPrice < 0)
+        {
+            return "UnitPrice must be non-negative.";
         }
 
         return null;
@@ -695,9 +835,14 @@ public class ProjectsController : ControllerBase
             ProjectBoqItemId = boqItem.ProjectBoqItemId,
             ProjectId = boqItem.ProjectId,
             SystemName = boqItem.SystemName,
+            InventoryItemId = boqItem.InventoryItemId,
+            InventorySkuCode = boqItem.InventorySkuCode,
+            InventoryItemName = boqItem.InventoryItemName,
+            InventoryCategory = boqItem.InventoryCategory,
             ItemDescription = boqItem.ItemDescription,
             Quantity = boqItem.Quantity,
             Unit = boqItem.Unit,
+            UnitPrice = boqItem.UnitPrice,
             SortOrder = boqItem.SortOrder,
             CreatedAt = boqItem.CreatedAt,
             UpdatedAt = boqItem.UpdatedAt
@@ -711,6 +856,10 @@ public class ProjectsController : ControllerBase
         {
             ProjectEquipmentItemId = equipmentItem.ProjectEquipmentItemId,
             ProjectId = equipmentItem.ProjectId,
+            InventoryItemId = equipmentItem.InventoryItemId,
+            InventorySkuCode = equipmentItem.InventorySkuCode,
+            InventoryItemName = equipmentItem.InventoryItemName,
+            InventoryCategory = equipmentItem.InventoryCategory,
             EquipmentName = equipmentItem.EquipmentName,
             Status = equipmentItem.Status,
             Location = equipmentItem.Location,
@@ -730,9 +879,65 @@ public class ProjectsController : ControllerBase
             Type = drawing.Type,
             DrawingDate = drawing.DrawingDate,
             Note = drawing.Note,
+            OriginalFileName = drawing.OriginalFileName,
+            StoredFileName = drawing.StoredFileName,
+            FilePath = drawing.FilePath,
+            ContentType = drawing.ContentType,
+            FileSizeBytes = drawing.FileSizeBytes,
             SortOrder = drawing.SortOrder,
             CreatedAt = drawing.CreatedAt,
             UpdatedAt = drawing.UpdatedAt
         };
+    }
+
+    private string GetDrawingStorageRoot()
+    {
+        var storageRoot = Path.GetFullPath(Path.Combine(
+            _environment.ContentRootPath,
+            "App_Data",
+            "project-drawings"));
+        Directory.CreateDirectory(storageRoot);
+        return storageRoot;
+    }
+
+    private string? GetSafeDrawingFilePath(string relativeFilePath)
+    {
+        var storageRoot = GetDrawingStorageRoot();
+        var fullFilePath = Path.GetFullPath(Path.Combine(storageRoot, relativeFilePath));
+        return fullFilePath.StartsWith(storageRoot, StringComparison.OrdinalIgnoreCase)
+            ? fullFilePath
+            : null;
+    }
+
+    private void DeleteDrawingFileIfExists(string? relativeFilePath)
+    {
+        if (string.IsNullOrWhiteSpace(relativeFilePath)) return;
+
+        var fullFilePath = GetSafeDrawingFilePath(relativeFilePath);
+        if (fullFilePath != null && System.IO.File.Exists(fullFilePath))
+        {
+            System.IO.File.Delete(fullFilePath);
+        }
+    }
+
+    private static string? ValidateDrawingFile(IFormFile? file)
+    {
+        if (file == null || file.Length == 0)
+        {
+            return "Drawing file is required.";
+        }
+
+        if (file.Length > MaxDrawingFileSizeBytes)
+        {
+            return "Drawing file is too large.";
+        }
+
+        var extension = Path.GetExtension(file.FileName);
+        if (!AllowedDrawingExtensions.Contains(extension))
+        {
+            return "Drawing file must be PDF or DWG.";
+        }
+
+        return null;
     }
 }

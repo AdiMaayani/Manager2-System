@@ -20,16 +20,22 @@ BEGIN
     END;
 
     SELECT
-        ProjectEquipmentItemId,
-        ProjectId,
-        EquipmentName,
-        Status,
-        Location,
-        SortOrder,
-        CreatedAt,
-        UpdatedAt
-    FROM dbo.ProjectEquipmentItems
-    WHERE ProjectId = @ProjectId
-    ORDER BY SortOrder ASC, ProjectEquipmentItemId ASC;
+        e.ProjectEquipmentItemId,
+        e.ProjectId,
+        e.InventoryItemId,
+        i.SkuCode AS InventorySkuCode,
+        i.ItemName AS InventoryItemName,
+        i.Category AS InventoryCategory,
+        e.EquipmentName,
+        e.Status,
+        e.Location,
+        e.SortOrder,
+        e.CreatedAt,
+        e.UpdatedAt
+    FROM dbo.ProjectEquipmentItems e
+    LEFT JOIN dbo.InventoryItems i
+        ON e.InventoryItemId = i.InventoryItemId
+    WHERE e.ProjectId = @ProjectId
+    ORDER BY e.SortOrder ASC, e.ProjectEquipmentItemId ASC;
 END
 GO

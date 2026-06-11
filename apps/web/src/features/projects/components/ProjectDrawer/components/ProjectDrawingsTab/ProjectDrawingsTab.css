@@ -55,6 +55,22 @@
   border-radius: var(--radius-md);
 }
 
+.projectDrawingsTab__fileInput {
+  padding: var(--spacing-sm);
+  border: 1px dashed var(--color-neutral-300);
+  border-radius: var(--radius-md);
+  background: #fff;
+}
+
+.projectDrawingsTab__fileMeta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  justify-content: center;
+  color: var(--color-neutral-600);
+  font-size: var(--font-size-sm);
+}
+
 .projectDrawingsTab__actions {
   display: flex;
   flex-wrap: wrap;

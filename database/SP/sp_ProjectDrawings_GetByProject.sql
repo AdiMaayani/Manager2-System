@@ -21,6 +21,11 @@ BEGIN
         [Type],
         DrawingDate,
         Note,
+        OriginalFileName,
+        StoredFileName,
+        FilePath,
+        ContentType,
+        FileSizeBytes,
         SortOrder,
         CreatedAt,
         UpdatedAt

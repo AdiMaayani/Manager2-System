@@ -43,6 +43,7 @@ import type {
   UpdateProjectBoqItemRequest,
   UpdateProjectDrawingRequest,
   UpdateProjectEquipmentItemRequest,
+  UploadProjectDrawingRequest,
 } from '../../types';
 import {
   deactivateSiteAsync,
@@ -336,6 +337,13 @@ export function ProjectDrawer({
       await drawingMutations.createMutation.mutateAsync(body);
     },
     [drawingMutations.createMutation],
+  );
+
+  const handleUploadDrawing = useCallback(
+    async (body: UploadProjectDrawingRequest) => {
+      await drawingMutations.uploadMutation.mutateAsync(body);
+    },
+    [drawingMutations.uploadMutation],
   );
 
   const handleUpdateDrawing = useCallback(
@@ -643,10 +651,12 @@ export function ProjectDrawer({
             isEditMode={isEditMode}
             isSaving={
               drawingMutations.createMutation.isPending ||
+              drawingMutations.uploadMutation.isPending ||
               drawingMutations.updateMutation.isPending ||
               drawingMutations.deleteMutation.isPending
             }
             onCreate={handleCreateDrawing}
+            onUpload={handleUploadDrawing}
             onUpdate={handleUpdateDrawing}
             onDelete={handleDeleteDrawing}
           />
