@@ -4,17 +4,32 @@ import { resolveDataAsync } from '@shared/data/resolveDataAsync';
 import { mockEmployees, delayMock } from '@shared/mock';
 import {
   createEmployeeAsync,
+  getEmployeeLookupAsync,
   getEmployeesAsync,
   setEmployeeActiveStatusAsync,
   updateEmployeeAsync,
 } from '../api/employeesApiClient';
-import type { UpsertEmployeeRequest } from '../types';
+import type { EmployeeLookupItem, UpsertEmployeeRequest } from '../types';
 
 export function useEmployees() {
   return useQuery({
     queryKey: ['employees', isLocalDataMode],
     queryFn: () =>
       resolveDataAsync(getEmployeesAsync, () => delayMock(mockEmployees)),
+  });
+}
+
+// Lightweight employee lookup (id/name/scheduling fields only). Used where full roster access is not
+// granted (e.g. the shared dashboard) and gated by the caller via `enabled`.
+export function useEmployeeLookup(options?: { enabled?: boolean }) {
+  return useQuery({
+    queryKey: ['employees', 'lookup', isLocalDataMode],
+    queryFn: () =>
+      resolveDataAsync<EmployeeLookupItem[]>(
+        getEmployeeLookupAsync,
+        () => delayMock(mockEmployees as EmployeeLookupItem[]),
+      ),
+    enabled: options?.enabled ?? true,
   });
 }
 

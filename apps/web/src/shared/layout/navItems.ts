@@ -11,28 +11,31 @@ import {
   Settings,
   ClipboardList,
 } from 'lucide-react';
+import type { Permission } from '@shared/auth/permissions';
 
 export interface NavItem {
   path: string;
   label: string;
   icon: LucideIcon;
-  requiredRole?: string;
+  // When set, the item is only shown to users whose roles grant this permission.
+  // Items without a permission (e.g. the dashboard) are visible to every authenticated user.
+  requiredPermission?: Permission;
 }
 
 export const mainNavItems: NavItem[] = [
   { path: '/', label: 'לוח בקרה', icon: LayoutDashboard },
-  { path: '/workplan', label: 'תוכנית עבודה', icon: CalendarDays },
-  { path: '/projects', label: 'פרויקטים', icon: FolderKanban },
-  { path: '/service-calls', label: 'שירות', icon: Wrench },
-  { path: '/customers', label: 'לקוחות', icon: Users },
-  { path: '/contacts', label: 'אנשי קשר', icon: Contact },
-  { path: '/quotes', label: 'הצעות מחיר', icon: FileText },
-  { path: '/inventory', label: 'מלאי', icon: Package },
-  { path: '/reports', label: 'דיווחים', icon: ClipboardList },
-  { path: '/employees', label: 'עובדים', icon: Users },
-  { path: '/users', label: 'ניהול משתמשים', icon: Users, requiredRole: 'Admin' },
+  { path: '/workplan', label: 'תוכנית עבודה', icon: CalendarDays, requiredPermission: 'viewWorkPlan' },
+  { path: '/projects', label: 'פרויקטים', icon: FolderKanban, requiredPermission: 'viewProjects' },
+  { path: '/service-calls', label: 'שירות', icon: Wrench, requiredPermission: 'viewServiceCalls' },
+  { path: '/customers', label: 'לקוחות', icon: Users, requiredPermission: 'viewCustomers' },
+  { path: '/contacts', label: 'אנשי קשר', icon: Contact, requiredPermission: 'viewContacts' },
+  { path: '/quotes', label: 'הצעות מחיר', icon: FileText, requiredPermission: 'viewQuotes' },
+  { path: '/inventory', label: 'מלאי', icon: Package, requiredPermission: 'viewInventory' },
+  { path: '/reports', label: 'דיווחים', icon: ClipboardList, requiredPermission: 'viewReports' },
+  { path: '/employees', label: 'עובדים', icon: Users, requiredPermission: 'viewEmployees' },
+  { path: '/users', label: 'ניהול משתמשים', icon: Users, requiredPermission: 'viewUsers' },
 ];
 
 export const bottomNavItems: NavItem[] = [
-  { path: '/settings', label: 'הגדרות', icon: Settings },
+  { path: '/settings', label: 'הגדרות', icon: Settings, requiredPermission: 'viewSettings' },
 ];

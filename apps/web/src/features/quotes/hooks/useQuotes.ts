@@ -10,11 +10,12 @@ import {
 } from '../api/quotesApiClient';
 import type { QuoteFilters, SaveQuoteRequest } from '../types';
 
-export function useQuotes(filters: QuoteFilters) {
+export function useQuotes(filters: QuoteFilters, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['quotes', filters],
     queryFn: () => getQuotesAsync(filters),
     placeholderData: (previousData) => previousData,
+    enabled: options?.enabled ?? true,
   });
 }
 

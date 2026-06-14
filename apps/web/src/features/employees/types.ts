@@ -10,6 +10,16 @@ export interface Employee {
   createdAt?: string;
 }
 
+// Minimal employee projection returned by GET /Employees/lookup (no contact PII).
+export interface EmployeeLookupItem {
+  employeeId: number;
+  fullName: string;
+  primaryRole: string;
+  dailyCapacityHours?: number | null;
+  isAssignable: boolean;
+  isActive: boolean;
+}
+
 export interface UpsertEmployeeRequest {
   fullName: string;
   primaryRole: string;

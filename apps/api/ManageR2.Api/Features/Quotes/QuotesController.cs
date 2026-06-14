@@ -1,3 +1,4 @@
+using ManageR2.Api.Authorization;
 using ManageR2.Api.DTOs;
 using ManageR2.Domain.Entities;
 using ManageR2.Domain.Exceptions;
@@ -10,7 +11,7 @@ namespace ManageR2.Api.Controllers;
 // Quotes: customer/project price quotes with priced line items; backed by IQuoteRepository (stored procedures only).
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
+[Authorize(Policy = Policies.CanViewQuotes)]
 public class QuotesController : ControllerBase
 {
     private static readonly string[] AllowedStatuses =
@@ -74,6 +75,7 @@ public class QuotesController : ControllerBase
         }
     }
 
+    [Authorize(Policy = Policies.CanManageQuotes)]
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateQuoteRequestDto dto)
     {
@@ -109,6 +111,7 @@ public class QuotesController : ControllerBase
         }
     }
 
+    [Authorize(Policy = Policies.CanManageQuotes)]
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateQuoteRequestDto dto)
     {
@@ -155,6 +158,7 @@ public class QuotesController : ControllerBase
         }
     }
 
+    [Authorize(Policy = Policies.CanManageQuotes)]
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {

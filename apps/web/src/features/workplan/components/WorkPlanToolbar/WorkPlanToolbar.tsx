@@ -39,6 +39,7 @@ interface WorkPlanToolbarProps {
   onToday: () => void;
   onPrint: () => void;
   onNewTask: () => void;
+  canCreateTask: boolean;
 }
 
 const SCOPES: WorkPlanScope[] = ['company', 'personal', 'employee', 'project'];
@@ -73,6 +74,7 @@ export function WorkPlanToolbar({
   onToday,
   onPrint,
   onNewTask,
+  canCreateTask,
 }: WorkPlanToolbarProps) {
   const isProjectScope = scope === 'project';
 
@@ -173,10 +175,12 @@ export function WorkPlanToolbar({
         </div>
 
         <div className="workPlanToolbar__actions">
-          <Button type="button" onClick={onNewTask}>
-            <PlusCircle size={18} aria-hidden />
-            משימה חדשה
-          </Button>
+          {canCreateTask && (
+            <Button type="button" onClick={onNewTask}>
+              <PlusCircle size={18} aria-hidden />
+              משימה חדשה
+            </Button>
+          )}
           <div className="workPlanToolbar__iconActions">
             <button
               type="button"

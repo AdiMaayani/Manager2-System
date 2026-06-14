@@ -386,7 +386,7 @@ export function deactivateSiteAsync(siteId: number): Promise<void> {
 }
 
 export function getProjectEmployeesAsync(): Promise<ProjectEmployeeOption[]> {
-  return apiRequest<RawEmployeeResponse[]>('/Employees').then((employees) =>
+  return apiRequest<RawEmployeeResponse[]>('/Employees/lookup').then((employees) =>
     employees
       .filter((employee) => employee.employeeId != null && employee.fullName)
       .map((employee) => ({

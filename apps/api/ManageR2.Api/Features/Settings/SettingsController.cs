@@ -1,4 +1,5 @@
 using System.Net.Mail;
+using ManageR2.Api.Authorization;
 using ManageR2.Api.DTOs;
 using ManageR2.Domain.Entities;
 using ManageR2.Domain.Exceptions;
@@ -21,6 +22,7 @@ public class SettingsController : ControllerBase
         _companySettingsRepository = companySettingsRepository;
     }
 
+    [Authorize(Policy = Policies.CanViewSettings)]
     [HttpGet("company")]
     public async Task<IActionResult> GetCompanySettings()
     {
@@ -40,7 +42,7 @@ public class SettingsController : ControllerBase
         }
     }
 
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = Policies.CanManageSettings)]
     [HttpPut("company")]
     public async Task<IActionResult> UpdateCompanySettings([FromBody] UpdateCompanySettingsRequestDto dto)
     {

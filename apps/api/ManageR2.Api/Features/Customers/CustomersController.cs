@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using ManageR2.Api.Authorization;
 using ManageR2.Api.DTOs;
 using ManageR2.Domain.Entities;
 using ManageR2.Domain.Exceptions;
@@ -11,7 +12,7 @@ namespace ManageR2.Api.Controllers;
 // Customer master data: CRUD for organizations served by the system; backed by ICustomerRepository.
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
+[Authorize(Policy = Policies.CanViewCustomers)]
 public class CustomersController : ControllerBase
 {
     // Data access isolated in repository; controller enforces HTTP validation and DTO mapping.
@@ -88,6 +89,7 @@ public class CustomersController : ControllerBase
     }
 
     // Create customer with audit user from JWT; repository enforces business rules (throws UserValidationException).
+    [Authorize(Policy = Policies.CanManageCustomers)]
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CustomerDto dto)
     {
@@ -154,6 +156,7 @@ public class CustomersController : ControllerBase
     }
 
     // Update existing customer row and refresh DTO from database after successful save.
+    [Authorize(Policy = Policies.CanManageCustomers)]
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, [FromBody] CustomerDto dto)
     {
@@ -228,6 +231,7 @@ public class CustomersController : ControllerBase
     }
 
     // Deactivate customer (logical delete) while recording which user performed the change.
+    [Authorize(Policy = Policies.CanManageCustomers)]
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {

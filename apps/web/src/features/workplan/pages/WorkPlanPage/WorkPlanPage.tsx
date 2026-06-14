@@ -9,6 +9,7 @@ import { WorkPlanMonthlyView } from '../../components/WorkPlanMonthlyView';
 import { WorkPlanYearlyView } from '../../components/WorkPlanYearlyView';
 import { WorkPlanTaskPanel } from '../../components/WorkPlanTaskPanel';
 import { NewTaskModal } from '../../components/NewTaskModal';
+import { usePermissions } from '@shared/auth/usePermissions';
 import { useWorkPlanPageState } from '../../hooks/useWorkPlanPageState';
 import { useWorkPlanScheduling } from '../../hooks/useWorkPlanData';
 import type { ScheduledTaskBar, WorkPlanTaskSelection } from '../../types';
@@ -36,6 +37,7 @@ function scheduledToSelection(task: ScheduledTaskBar): WorkPlanTaskSelection {
 }
 
 export function WorkPlanPage() {
+  const { can } = usePermissions();
   const pageState = useWorkPlanPageState();
   const scheduling = useWorkPlanScheduling({
     scope: pageState.scope,
@@ -164,6 +166,7 @@ export function WorkPlanPage() {
           onToday={pageState.goToToday}
           onPrint={handlePrint}
           onNewTask={() => setIsNewTaskModalOpen(true)}
+          canCreateTask={can('manageWorkPlan')}
         />
 
         {personalScopeInfo && (

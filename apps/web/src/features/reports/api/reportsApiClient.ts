@@ -68,7 +68,7 @@ export function getReportServiceCallsAsync(): Promise<ReportServiceCallOption[]>
 }
 
 export function getReportEmployeesAsync(): Promise<ReportEmployeeOption[]> {
-  return apiRequest<ReportEmployeeOption[]>('/Employees');
+  return apiRequest<ReportEmployeeOption[]>('/Employees/lookup');
 }
 
 export function createWorkReportAsync(

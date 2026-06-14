@@ -8,6 +8,7 @@ import { Badge } from '@shared/components/Badge';
 import { Button } from '@shared/components/Button';
 import { FilterBar } from '@shared/components/FilterBar';
 import { Input } from '@shared/components/Input';
+import { usePermissions } from '@shared/auth/usePermissions';
 import { ServiceCallDrawer } from '../../components/ServiceCallDrawer';
 import { useServiceCallLookups, useServiceCalls } from '../../hooks/useServiceCalls';
 import type { ServiceCallDetails, ServiceCallListItem } from '../../types';
@@ -64,8 +65,12 @@ function buildSearchText(serviceCall: ServiceCallListItem): string {
 }
 
 export function ServiceCallsPage() {
+  const { can } = usePermissions();
+  // Creating/editing a service call needs the customer & site pickers, which require customer read
+  // access. View-only roles (e.g. technicians) skip those lookups and the "new call" action entirely.
+  const canManageServiceCalls = can('manageServiceCalls') && can('viewCustomers');
   const { data: serviceCalls, isLoading, error, refetch } = useServiceCalls();
-  const lookups = useServiceCallLookups();
+  const lookups = useServiceCallLookups({ enabled: canManageServiceCalls });
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
@@ -127,15 +132,17 @@ export function ServiceCallsPage() {
     <PageShell title="קריאות שירות">
       <FilterBar
         actions={
-          <Button
-            type="button"
-            onClick={() => {
-              setPageMessage(null);
-              setDrawerServiceCall(null);
-            }}
-          >
-            + קריאה חדשה
-          </Button>
+          canManageServiceCalls ? (
+            <Button
+              type="button"
+              onClick={() => {
+                setPageMessage(null);
+                setDrawerServiceCall(null);
+              }}
+            >
+              + קריאה חדשה
+            </Button>
+          ) : undefined
         }
       >
         <div className="serviceCallsPage__filter serviceCallsPage__filter--search">

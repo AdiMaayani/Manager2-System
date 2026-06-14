@@ -32,13 +32,14 @@ export function useWorkPlanEmployees() {
   });
 }
 
-export function useAllWorkPlans() {
+export function useAllWorkPlans(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['workplan', 'all', isLocalDataMode],
     queryFn: () =>
       resolveDataAsync(getAllWorkPlansAsync, () =>
         delayMock(mapAllWorkPlansResponse(mockAllWorkPlans)),
       ),
+    enabled: options?.enabled ?? true,
   });
 }
 

@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { getCurrentUser } from '@api/auth';
-import { useEmployees } from '@features/employees/hooks/useEmployees';
+import { hasPermission } from '@shared/auth/permissions';
+import { useEmployeeLookup } from '@features/employees/hooks/useEmployees';
 import { useProjects } from '@features/projects/hooks/useProjects';
 import { useReports } from '@features/reports/hooks/useReports';
 import { useServiceCalls } from '@features/serviceCalls/hooks/useServiceCalls';
@@ -159,13 +160,25 @@ function isTodayTask(task: Pick<DashboardTask, 'plannedStart' | 'plannedEnd'>): 
 }
 
 export function useDashboardData() {
-  const projectsQuery = useProjects();
-  const reportsQuery = useReports();
-  const employeesQuery = useEmployees();
-  const workPlansQuery = useAllWorkPlans();
-  const serviceCallsQuery = useServiceCalls();
-  const quotesQuery = useQuotes(ALL_QUOTES_FILTER);
-  const inventoryQuery = useInventory(LOW_STOCK_FILTER);
+  // Only fetch the domains the current role is allowed to read, so the shared dashboard never calls
+  // a now-protected endpoint it lacks permission for (which would 403). Disabled queries stay idle and
+  // surface as empty data, so the relevant KPIs/widgets simply read as zero for that role.
+  const dashboardRoles = getCurrentUser()?.roles ?? [];
+  const canViewWorkPlan = hasPermission(dashboardRoles, 'viewWorkPlan');
+  const canViewReports = hasPermission(dashboardRoles, 'viewReports');
+  const canViewServiceCalls = hasPermission(dashboardRoles, 'viewServiceCalls');
+  const canViewQuotes = hasPermission(dashboardRoles, 'viewQuotes');
+  const canViewInventory = hasPermission(dashboardRoles, 'viewInventory');
+  const canLookupEmployees = hasPermission(dashboardRoles, 'lookupEmployees');
+
+  const projectsQuery = useProjects({ enabled: canViewWorkPlan });
+  const reportsQuery = useReports({ enabled: canViewReports });
+  // Active-employee KPI uses the minimal lookup (no roster PII) so it works for every picker-capable role.
+  const employeesQuery = useEmployeeLookup({ enabled: canLookupEmployees });
+  const workPlansQuery = useAllWorkPlans({ enabled: canViewWorkPlan });
+  const serviceCallsQuery = useServiceCalls({ enabled: canViewServiceCalls });
+  const quotesQuery = useQuotes(ALL_QUOTES_FILTER, { enabled: canViewQuotes });
+  const inventoryQuery = useInventory(LOW_STOCK_FILTER, { enabled: canViewInventory });
 
   const projects = projectsQuery.data;
   const reports = reportsQuery.data;

@@ -1,8 +1,18 @@
 import { apiRequest } from '@api/client';
-import type { Employee, SetEmployeeActiveStatusRequest, UpsertEmployeeRequest } from '../types';
+import type {
+  Employee,
+  EmployeeLookupItem,
+  SetEmployeeActiveStatusRequest,
+  UpsertEmployeeRequest,
+} from '../types';
 
 export function getEmployeesAsync(): Promise<Employee[]> {
   return apiRequest<Employee[]>('/Employees');
+}
+
+// Minimal employee list for selection/aggregation contexts that should not require full roster access.
+export function getEmployeeLookupAsync(): Promise<EmployeeLookupItem[]> {
+  return apiRequest<EmployeeLookupItem[]>('/Employees/lookup');
 }
 
 export function getEmployeeByIdAsync(id: number): Promise<Employee> {

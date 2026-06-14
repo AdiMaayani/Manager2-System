@@ -8,12 +8,14 @@ import { Badge } from '@shared/components/Badge';
 import { Button } from '@shared/components/Button';
 import { FilterBar } from '@shared/components/FilterBar';
 import { Input } from '@shared/components/Input';
+import { usePermissions } from '@shared/auth/usePermissions';
 import { useCustomers } from '../../hooks/useCustomers';
 import { CustomerDrawer } from '../../components/CustomerDrawer';
 import type { Customer } from '../../types';
 import './CustomersPage.css';
 
 export function CustomersPage() {
+  const { can } = usePermissions();
   const { data: customers, isLoading, error, refetch } = useCustomers();
   const [searchParams, setSearchParams] = useSearchParams();
   // undefined = drawer closed, null = create mode, Customer = review existing.
@@ -67,7 +69,11 @@ export function CustomersPage() {
   return (
     <PageShell title="לקוחות">
       <FilterBar
-        actions={<Button onClick={() => setDrawerCustomer(null)}>+ לקוח חדש</Button>}
+        actions={
+          can('manageCustomers') ? (
+            <Button onClick={() => setDrawerCustomer(null)}>+ לקוח חדש</Button>
+          ) : undefined
+        }
       >
         <label className="customersPage__filter customersPage__filter--search">
           <span>חיפוש</span>
