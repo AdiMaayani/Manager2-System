@@ -4,6 +4,7 @@ const SESSION_TOKEN_KEY = 'manager2_token';
 const MOCK_TOKEN = 'mock-jwt-token';
 const SESSION_USER_KEY = 'manager2_user';
 const SESSION_RETURN_URL_KEY = 'manager2_return_url';
+const SESSION_EXPIRED_NOTICE_KEY = 'manager2_session_expired';
 
 export interface AuthUser {
   userId: number;
@@ -123,6 +124,21 @@ export function getReturnUrl(): string {
 
 export function clearReturnUrl(): void {
   sessionStorage.removeItem(SESSION_RETURN_URL_KEY);
+}
+
+// Records that the session expired so the login page can show a non-blocking notice instead of a blocking alert().
+export function flagSessionExpired(): void {
+  sessionStorage.setItem(SESSION_EXPIRED_NOTICE_KEY, '1');
+}
+
+// Pure read of the session-expired notice (no mutation) — safe to call from a render-time state initializer.
+export function peekSessionExpiredNotice(): boolean {
+  return sessionStorage.getItem(SESSION_EXPIRED_NOTICE_KEY) === '1';
+}
+
+// Clears the one-shot session-expired notice; call from an effect after it has been read.
+export function clearSessionExpiredNotice(): void {
+  sessionStorage.removeItem(SESSION_EXPIRED_NOTICE_KEY);
 }
 
 export function redirectToLogin(): void {

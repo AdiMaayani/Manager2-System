@@ -612,6 +612,87 @@ public class UserRepository : IUserRepository
         }
     }
 
+    // sp_Users_GetLoginSecurity: returns the active lockout end (UTC) for the user, or null when not locked.
+    // Best-effort: a missing column/procedure (migration not yet applied) must not block login, so SQL errors
+    // are logged and treated as "not locked".
+    public async Task<DateTime?> GetLockoutEndUtcAsync(int userId)
+    {
+        try
+        {
+            await using var connection = _dbServices.CreateConnection();
+            await using var command = new SqlCommand("dbo.sp_Users_GetLoginSecurity", connection)
+            {
+                CommandType = CommandType.StoredProcedure
+            };
+
+            command.Parameters.AddWithValue("@UserId", userId);
+
+            await connection.OpenAsync();
+            await using var reader = await command.ExecuteReaderAsync();
+
+            if (await reader.ReadAsync())
+            {
+                var lockoutUntil = reader["LockoutUntilUtc"];
+                if (lockoutUntil != DBNull.Value)
+                {
+                    return Convert.ToDateTime(lockoutUntil);
+                }
+            }
+
+            return null;
+        }
+        catch (SqlException ex)
+        {
+            _logger.LogWarning(ex, "GetLockoutEndUtcAsync failed for UserId={UserId}; treating account as not locked.", userId);
+            return null;
+        }
+    }
+
+    // sp_Users_RegisterFailedLogin: increments the failed-attempt counter and applies a lockout window
+    // once the threshold is reached. Best-effort so a missing procedure never breaks authentication.
+    public async Task RegisterFailedLoginAsync(int userId)
+    {
+        try
+        {
+            await using var connection = _dbServices.CreateConnection();
+            await using var command = new SqlCommand("dbo.sp_Users_RegisterFailedLogin", connection)
+            {
+                CommandType = CommandType.StoredProcedure
+            };
+
+            command.Parameters.AddWithValue("@UserId", userId);
+
+            await connection.OpenAsync();
+            await command.ExecuteNonQueryAsync();
+        }
+        catch (SqlException ex)
+        {
+            _logger.LogWarning(ex, "RegisterFailedLoginAsync failed for UserId={UserId}.", userId);
+        }
+    }
+
+    // sp_Users_ClearFailedLogin: resets the failed-attempt counter and lockout after a successful login.
+    public async Task ClearFailedLoginAsync(int userId)
+    {
+        try
+        {
+            await using var connection = _dbServices.CreateConnection();
+            await using var command = new SqlCommand("dbo.sp_Users_ClearFailedLogin", connection)
+            {
+                CommandType = CommandType.StoredProcedure
+            };
+
+            command.Parameters.AddWithValue("@UserId", userId);
+
+            await connection.OpenAsync();
+            await command.ExecuteNonQueryAsync();
+        }
+        catch (SqlException ex)
+        {
+            _logger.LogWarning(ex, "ClearFailedLoginAsync failed for UserId={UserId}.", userId);
+        }
+    }
+
     // Reader → User including password material consumed only on server (never forwarded to API DTOs).
     private static User MapUser(SqlDataReader reader)
     {

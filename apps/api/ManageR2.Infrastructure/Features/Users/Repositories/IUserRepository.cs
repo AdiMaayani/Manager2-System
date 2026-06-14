@@ -20,4 +20,10 @@ public interface IUserRepository
 
     Task<List<string>> GetAllRoleNamesAsync();
     Task<List<string>> GetAllDepartmentNamesAsync();
+
+    // Login lockout (defense-in-depth alongside rate limiting). Implementations are best-effort:
+    // if the lockout schema/procedures are not yet deployed they must not break the login flow.
+    Task<DateTime?> GetLockoutEndUtcAsync(int userId);
+    Task RegisterFailedLoginAsync(int userId);
+    Task ClearFailedLoginAsync(int userId);
 }

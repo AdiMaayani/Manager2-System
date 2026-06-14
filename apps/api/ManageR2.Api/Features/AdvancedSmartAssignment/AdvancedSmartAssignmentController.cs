@@ -30,49 +30,41 @@ namespace ManageR2.Api.Controllers
         [HttpGet("{workItemId}")]
         public async Task<IActionResult> GetRecommendations(int workItemId)
         {
-            try
-            {
-                // קבלת התוצאה המלאה מהאלגוריתם
-                var candidates = await _service.GetRecommendationsAsync(workItemId);
+            // קבלת התוצאה המלאה מהאלגוריתם
+            // Unhandled exceptions intentionally propagate to the global exception handler, which returns a
+            // safe RFC7807 ProblemDetails response instead of leaking raw exception messages to clients.
+            var candidates = await _service.GetRecommendationsAsync(workItemId);
 
-                // מיפוי ל-DTO (רק מה שצריך למנהל)
-                // Map service candidates to API DTO: hides internal scoring breakdown, keeps rank and eligibility.
-                var result = candidates
-                    .Select(c => new AdvancedSmartAssignmentRecommendationDto
-                    {
-                        // דירוג
-                        RankOrder = c.RankOrder,
-
-                        // מזהים ופרטים בסיסיים
-                        EmployeeId = c.EmployeeId,
-                        FullName = c.FullName,
-                        PrimaryRole = c.PrimaryRole,
-
-                        // ציון כולל בלבד
-                        TotalScore = c.TotalScore,
-
-                        // כשירות
-                        IsEligible = c.IsEligible,
-                        ExclusionReason = c.ExclusionReason,
-
-                        // סטטוס תצוגה נוח
-                        Status = c.IsEligible
-                            ? "כשיר"
-                            : (string.IsNullOrWhiteSpace(c.ExclusionReason) ? "לא כשיר" : c.ExclusionReason)
-                    })
-                    // ודא מיון לפי הדירוג (אם כבר ממוין אצלך זה לא מזיק)
-                    .OrderBy(x => x.RankOrder ?? int.MaxValue)
-                    .ToList();
-
-                return Ok(result);
-            }
-            catch (Exception ex)
-            {
-                return BadRequest(new
+            // מיפוי ל-DTO (רק מה שצריך למנהל)
+            // Map service candidates to API DTO: hides internal scoring breakdown, keeps rank and eligibility.
+            var result = candidates
+                .Select(c => new AdvancedSmartAssignmentRecommendationDto
                 {
-                    message = ex.Message
-                });
-            }
+                    // דירוג
+                    RankOrder = c.RankOrder,
+
+                    // מזהים ופרטים בסיסיים
+                    EmployeeId = c.EmployeeId,
+                    FullName = c.FullName,
+                    PrimaryRole = c.PrimaryRole,
+
+                    // ציון כולל בלבד
+                    TotalScore = c.TotalScore,
+
+                    // כשירות
+                    IsEligible = c.IsEligible,
+                    ExclusionReason = c.ExclusionReason,
+
+                    // סטטוס תצוגה נוח
+                    Status = c.IsEligible
+                        ? "כשיר"
+                        : (string.IsNullOrWhiteSpace(c.ExclusionReason) ? "לא כשיר" : c.ExclusionReason)
+                })
+                // ודא מיון לפי הדירוג (אם כבר ממוין אצלך זה לא מזיק)
+                .OrderBy(x => x.RankOrder ?? int.MaxValue)
+                .ToList();
+
+            return Ok(result);
         }
     }
 }
