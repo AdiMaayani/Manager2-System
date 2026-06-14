@@ -6,6 +6,7 @@ using ManageR2.Infrastructure.Repositories;
 using ManageR2.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.RateLimiting;
 
 namespace ManageR2.Api.Controllers;
 
@@ -337,7 +338,9 @@ public class UsersController : ControllerBase
     }
 
     // Public login: verify credentials, block inactive users, refresh last login, return JWT + role/department claims payload.
+    // Rate limited per client IP (see the "login" policy in Program.cs) and backed by account lockout for defense-in-depth.
     [AllowAnonymous]
+    [EnableRateLimiting("login")]
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequestDto dto)
     {
@@ -353,13 +356,27 @@ public class UsersController : ControllerBase
         if (user == null)
             return Unauthorized(new { message = "Invalid email or password." });
 
+        // Reject locked accounts before checking the password so brute-force attempts cannot succeed
+        // even with the correct credentials during the lockout window.
+        var lockoutEndUtc = await _userRepository.GetLockoutEndUtcAsync(user.UserId);
+        if (lockoutEndUtc.HasValue && lockoutEndUtc.Value > DateTime.UtcNow)
+        {
+            return StatusCode(
+                StatusCodes.Status423Locked,
+                new { message = "Account temporarily locked due to multiple failed login attempts. Please try again later." });
+        }
+
         var isValid = _passwordService.VerifyPassword(dto.Password, user.PasswordHash, user.PasswordSalt);
         if (!isValid)
+        {
+            await _userRepository.RegisterFailedLoginAsync(user.UserId);
             return Unauthorized(new { message = "Invalid email or password." });
+        }
 
         if (!user.IsActive)
             return StatusCode(StatusCodes.Status403Forbidden, new { message = "User is inactive and cannot log in." });
 
+        await _userRepository.ClearFailedLoginAsync(user.UserId);
         await _userRepository.UpdateLastLoginAtAsync(user.UserId);
 
         var refreshedUser = await _userRepository.GetUserByIdAsync(user.UserId);

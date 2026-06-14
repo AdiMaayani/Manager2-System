@@ -53,6 +53,10 @@ export function useLogin(): UseLoginReturn {
       if (err instanceof ApiError) {
         if (err.status === 401 || err.status === 403) {
           setError('אימייל או סיסמה שגויים.');
+        } else if (err.status === 423) {
+          setError('החשבון ננעל זמנית עקב ניסיונות התחברות כושלים. נסה שוב מאוחר יותר.');
+        } else if (err.status === 429) {
+          setError('יותר מדי ניסיונות התחברות. נסה שוב בעוד מספר דקות.');
         } else if (err.status === 400) {
           setError(err.message || 'הבקשה אינה תקינה.');
         } else {

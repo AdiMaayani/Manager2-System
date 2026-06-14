@@ -1,9 +1,12 @@
 using System.Text;
+using System.Threading.RateLimiting;
+using ManageR2.Api.Middleware;
 using ManageR2.Infrastructure.DAL;
 using ManageR2.Infrastructure.Interfaces;
 using ManageR2.Infrastructure.Repositories;
 using ManageR2.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using AdvancedSmartAssignmentService = ManageR2.Infrastructure.Services.SmartAssignment.SmartAssignmentService;
@@ -19,6 +22,30 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
+
+// Global exception handling: unhandled exceptions are turned into RFC7807 ProblemDetails responses
+// (see GlobalExceptionHandler) instead of leaking stack traces or raw messages to clients.
+builder.Services.AddProblemDetails();
+builder.Services.AddExceptionHandler<GlobalExceptionHandler>();
+
+// Login rate limiting: throttles repeated login attempts per client IP to slow brute-force attacks.
+// Limits are configurable via RateLimiting:Login in appsettings/environment with safe defaults.
+var loginPermitLimit = builder.Configuration.GetValue<int?>("RateLimiting:Login:PermitLimit") ?? 10;
+var loginWindowSeconds = builder.Configuration.GetValue<int?>("RateLimiting:Login:WindowSeconds") ?? 60;
+builder.Services.AddRateLimiter(rateLimiterOptions =>
+{
+    rateLimiterOptions.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    rateLimiterOptions.AddPolicy("login", httpContext =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            factory: _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = loginPermitLimit,
+                Window = TimeSpan.FromSeconds(loginWindowSeconds),
+                QueueLimit = 0,
+                QueueProcessingOrder = QueueProcessingOrder.OldestFirst
+            }));
+});
 // OpenAPI document with Bearer JWT scheme so Swagger UI can authorize test calls.
 builder.Services.AddSwaggerGen(options =>
 {
@@ -48,18 +75,34 @@ builder.Services.AddSwaggerGen(options =>
     });
 });
 
-// CORS: allow local frontend dev servers to call this API with credentials/headers.
+// CORS: always allow local frontend dev servers, plus any production origins configured through
+// Cors:AllowedOrigins in appsettings/environment (e.g. Cors__AllowedOrigins__0=https://app.example.com).
+var localDevOrigins = new[]
+{
+    "http://127.0.0.1:5500",
+    "http://localhost:5500",
+    "http://127.0.0.1:5173",
+    "http://localhost:5173"
+};
+
+var configuredCorsOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>() ?? Array.Empty<string>();
+
+var allowedCorsOrigins = localDevOrigins
+    .Concat(configuredCorsOrigins)
+    .Where(origin => !string.IsNullOrWhiteSpace(origin))
+    .Select(origin => origin.Trim().TrimEnd('/'))
+    .Distinct(StringComparer.OrdinalIgnoreCase)
+    .ToArray();
+
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("AllowFrontend",
         policy =>
         {
             policy
-                .WithOrigins(
-                    "http://127.0.0.1:5500",
-                    "http://localhost:5500",
-                    "http://127.0.0.1:5173",
-                    "http://localhost:5173")
+                .WithOrigins(allowedCorsOrigins)
                 .AllowAnyHeader()
                 .AllowAnyMethod();
         });
@@ -124,6 +167,9 @@ builder.Services.AddScoped<IAdvancedSmartAssignmentService, AdvancedSmartAssignm
 
 var app = builder.Build();
 
+// Catch-all: converts unhandled exceptions into ProblemDetails. Registered first so it wraps the whole pipeline.
+app.UseExceptionHandler();
+
 // HTTP pipeline order: CORS early, then TLS, then auth middleware, then endpoint routing to controllers.
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())
@@ -140,6 +186,9 @@ app.UseHttpsRedirection();
 // Populates HttpContext.User from JWT; UseAuthorization enforces policies/roles on endpoints.
 app.UseAuthentication();
 app.UseAuthorization();
+
+// Enforces the per-endpoint rate limiting policies declared with [EnableRateLimiting].
+app.UseRateLimiter();
 
 // Discovers controller actions under ManageR2.Api.Controllers and maps routes (e.g. api/[controller]).
 app.MapControllers();

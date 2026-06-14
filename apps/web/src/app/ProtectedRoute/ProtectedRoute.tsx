@@ -2,6 +2,7 @@ import { useEffect, useRef, type ReactNode } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import {
   ensureValidToken,
+  flagSessionExpired,
   redirectToLogin,
   setReturnUrl,
 } from '@api/auth';
@@ -22,7 +23,7 @@ export function ProtectedRoute({ children }: ProtectedRouteProps) {
     intervalRef.current = setInterval(() => {
       if (!ensureValidToken()) {
         clearInterval(intervalRef.current!);
-        alert('פג תוקף ההתחברות. יש להתחבר מחדש.');
+        flagSessionExpired();
         redirectToLogin();
       }
     }, 5000);
