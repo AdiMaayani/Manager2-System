@@ -1,3 +1,4 @@
+using ManageR2.Api.Authorization;
 using ManageR2.Api.DTOs;
 using ManageR2.Domain.Exceptions;
 using ManageR2.Infrastructure.Models;
@@ -9,7 +10,7 @@ namespace ManageR2.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
+[Authorize(Policy = Policies.CanViewProjects)]
 // Thin controller: handles HTTP concerns and delegates lifecycle data loading to the repository.
 public class ProjectsController : ControllerBase
 {
@@ -154,6 +155,7 @@ public class ProjectsController : ControllerBase
         }
     }
 
+    [Authorize(Policy = Policies.CanManageProjects)]
     [HttpPost("{projectId:int}/boq")]
     public async Task<ActionResult<ProjectBoqItemDto>> CreateBoqItem(
         int projectId,
@@ -205,6 +207,7 @@ public class ProjectsController : ControllerBase
         }
     }
 
+    [Authorize(Policy = Policies.CanManageProjects)]
     [HttpPut("{projectId:int}/boq/{boqItemId:int}")]
     public async Task<ActionResult<ProjectBoqItemDto>> UpdateBoqItem(
         int projectId,
@@ -261,6 +264,7 @@ public class ProjectsController : ControllerBase
         }
     }
 
+    [Authorize(Policy = Policies.CanManageProjects)]
     [HttpDelete("{projectId:int}/boq/{boqItemId:int}")]
     public async Task<IActionResult> DeleteBoqItem(int projectId, int boqItemId)
     {
@@ -281,6 +285,7 @@ public class ProjectsController : ControllerBase
         }
     }
 
+    [Authorize(Policy = Policies.CanManageProjects)]
     [HttpPut("{projectId:int}/boq/order")]
     public async Task<IActionResult> ReorderBoqItems(
         int projectId,
@@ -328,6 +333,7 @@ public class ProjectsController : ControllerBase
         }
     }
 
+    [Authorize(Policy = Policies.CanManageProjects)]
     [HttpPost("{projectId:int}/drawings")]
     public async Task<ActionResult<ProjectDrawingDto>> CreateDrawing(
         int projectId,
@@ -376,6 +382,7 @@ public class ProjectsController : ControllerBase
         }
     }
 
+    [Authorize(Policy = Policies.CanManageProjects)]
     [HttpPost("{projectId:int}/drawings/upload")]
     [RequestSizeLimit(MaxDrawingFileSizeBytes)]
     public async Task<ActionResult<ProjectDrawingDto>> UploadDrawing(
@@ -490,6 +497,7 @@ public class ProjectsController : ControllerBase
         return PhysicalFile(fullFilePath, contentType, downloadName);
     }
 
+    [Authorize(Policy = Policies.CanManageProjects)]
     [HttpPut("{projectId:int}/drawings/{projectDrawingId:int}")]
     public async Task<ActionResult<ProjectDrawingDto>> UpdateDrawing(
         int projectId,
@@ -543,6 +551,7 @@ public class ProjectsController : ControllerBase
         }
     }
 
+    [Authorize(Policy = Policies.CanManageProjects)]
     [HttpDelete("{projectId:int}/drawings/{projectDrawingId:int}")]
     public async Task<IActionResult> DeleteDrawing(int projectId, int projectDrawingId)
     {
@@ -579,6 +588,7 @@ public class ProjectsController : ControllerBase
         }
     }
 
+    [Authorize(Policy = Policies.CanManageProjects)]
     [HttpPost("{projectId:int}/equipment")]
     public async Task<ActionResult<ProjectEquipmentItemDto>> CreateEquipment(
         int projectId,
@@ -626,6 +636,7 @@ public class ProjectsController : ControllerBase
         }
     }
 
+    [Authorize(Policy = Policies.CanManageProjects)]
     [HttpPut("{projectId:int}/equipment/{equipmentItemId:int}")]
     public async Task<ActionResult<ProjectEquipmentItemDto>> UpdateEquipment(
         int projectId,
@@ -678,6 +689,7 @@ public class ProjectsController : ControllerBase
         }
     }
 
+    [Authorize(Policy = Policies.CanManageProjects)]
     [HttpDelete("{projectId:int}/equipment/{equipmentItemId:int}")]
     public async Task<IActionResult> DeleteEquipment(int projectId, int equipmentItemId)
     {
@@ -698,6 +710,7 @@ public class ProjectsController : ControllerBase
         }
     }
 
+    [Authorize(Policy = Policies.CanManageProjects)]
     [HttpPut("{projectId:int}/equipment/order")]
     public async Task<IActionResult> ReorderEquipment(
         int projectId,

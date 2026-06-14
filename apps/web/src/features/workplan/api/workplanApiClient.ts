@@ -39,7 +39,7 @@ export async function getAllWorkPlansAsync(): Promise<MappedWorkPlan[]> {
 }
 
 export async function getWorkPlanEmployeesAsync(): Promise<WorkPlanEmployee[]> {
-  const response = await apiRequest<unknown>('/Employees');
+  const response = await apiRequest<unknown>('/Employees/lookup');
   return mapEmployeeResponse(response);
 }
 

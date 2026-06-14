@@ -70,5 +70,5 @@ export function getServiceCallSitesAsync(): Promise<ServiceCallSiteOption[]> {
 }
 
 export function getServiceCallEmployeesAsync(): Promise<ServiceCallEmployeeOption[]> {
-  return apiRequest<ServiceCallEmployeeOption[]>('/Employees');
+  return apiRequest<ServiceCallEmployeeOption[]>('/Employees/lookup');
 }

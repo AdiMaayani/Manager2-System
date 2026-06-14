@@ -1,5 +1,6 @@
 using System.Text;
 using System.Threading.RateLimiting;
+using ManageR2.Api.Authorization;
 using ManageR2.Api.Middleware;
 using ManageR2.Infrastructure.DAL;
 using ManageR2.Infrastructure.Interfaces;
@@ -131,14 +132,9 @@ builder.Services
         };
     });
 
-// Global fallback: every endpoint requires authentication unless it carries [AllowAnonymous].
-// The only intentionally public endpoint is POST /users/login, which is marked [AllowAnonymous].
-builder.Services.AddAuthorization(options =>
-{
-    options.FallbackPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
-        .RequireAuthenticatedUser()
-        .Build();
-});
+// Role/permission matrix: registers named policies (CanManage*, CanView*/CanEdit*) plus the global
+// fallback that requires authentication unless an endpoint carries [AllowAnonymous] (e.g. POST /users/login).
+builder.Services.AddManageR2AuthorizationPolicies();
 
 // DI: scoped lifetime ties one DBServices + repositories per HTTP request (safe for SqlConnection usage).
 // DI

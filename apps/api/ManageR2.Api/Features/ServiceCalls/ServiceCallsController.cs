@@ -1,3 +1,4 @@
+using ManageR2.Api.Authorization;
 using ManageR2.Api.Features.ServiceCalls.DTOs;
 using ManageR2.Domain.Entities;
 using ManageR2.Infrastructure.Repositories;
@@ -8,7 +9,7 @@ namespace ManageR2.Api.Features.ServiceCalls;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
+[Authorize(Policy = Policies.CanViewServiceCalls)]
 public class ServiceCallsController : ControllerBase
 {
     private const string ServiceCallWorkType = "ServiceCall";
@@ -39,6 +40,7 @@ public class ServiceCallsController : ControllerBase
         return Ok(MapToResponse(serviceCall));
     }
 
+    [Authorize(Policy = Policies.CanManageServiceCalls)]
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateServiceCallRequestDto request)
     {
@@ -63,6 +65,7 @@ public class ServiceCallsController : ControllerBase
         });
     }
 
+    [Authorize(Policy = Policies.CanManageServiceCalls)]
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateServiceCallRequestDto request)
     {
@@ -89,6 +92,7 @@ public class ServiceCallsController : ControllerBase
         return Ok(new { message = "Service call updated successfully." });
     }
 
+    [Authorize(Policy = Policies.CanManageServiceCalls)]
     [HttpPut("{id:int}/close")]
     public async Task<IActionResult> Close(int id)
     {
@@ -107,6 +111,7 @@ public class ServiceCallsController : ControllerBase
         return Ok(new { message = "Service call closed successfully." });
     }
 
+    [Authorize(Policy = Policies.CanManageServiceCalls)]
     [HttpPost("{id:int}/assign-employee")]
     public async Task<IActionResult> AssignEmployee(int id, [FromBody] AssignServiceCallEmployeeRequestDto request)
     {

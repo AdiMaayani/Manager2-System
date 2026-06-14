@@ -1,3 +1,4 @@
+using ManageR2.Api.Authorization;
 using ManageR2.Api.DTOs;
 using ManageR2.Domain.Entities;
 using ManageR2.Infrastructure.Repositories;
@@ -9,7 +10,7 @@ namespace ManageR2.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
+[Authorize(Policy = Policies.CanViewWorkPlan)]
 // API layer for work items (projects, tasks, milestones) and assignment-related work-plan views.
 public class WorkItemsController : ControllerBase
 {
@@ -314,6 +315,7 @@ public class WorkItemsController : ControllerBase
         return Ok(response);
     }
 
+    [Authorize(Policy = Policies.CanManageWorkPlan)]
     [HttpPost]
     // Creates a generic work item. WorkType defines if it is project/task/service call.
     public async Task<IActionResult> Create([FromBody] WorkItem workItem)
@@ -377,6 +379,7 @@ public class WorkItemsController : ControllerBase
         });
     }
 
+    [Authorize(Policy = Policies.CanManageWorkPlan)]
     [HttpPost("project")]
     // Creates a top-level project work item.
     public async Task<IActionResult> CreateProject([FromBody] CreateProjectRequest request)
@@ -441,6 +444,7 @@ public class WorkItemsController : ControllerBase
         });
     }
 
+    [Authorize(Policy = Policies.CanManageWorkPlan)]
     [HttpPost("task")]
     // Creates a task under an existing project.
     public async Task<IActionResult> CreateTask([FromBody] CreateTaskRequest request)
@@ -534,6 +538,7 @@ public class WorkItemsController : ControllerBase
         });
     }
 
+    [Authorize(Policy = Policies.CanManageWorkPlan)]
     [HttpPut("{id}")]
     // Updates core fields of an existing work item.
     public async Task<IActionResult> Update(int id, [FromBody] WorkItem workItem)
@@ -559,6 +564,7 @@ public class WorkItemsController : ControllerBase
         return Ok(new { message = "Work item updated successfully." });
     }
 
+    [Authorize(Policy = Policies.CanManageWorkPlan)]
     [HttpPut("{id}/close")]
     // Soft-closes a work item by status/date handling in the repository and DB layer.
     public async Task<IActionResult> Close(int id)
@@ -579,6 +585,7 @@ public class WorkItemsController : ControllerBase
         return Ok(new { message = "Work item closed successfully." });
     }
 
+    [Authorize(Policy = Policies.CanManageWorkPlan)]
     [HttpPost("{id}/assign-employee")]
     // Links an employee to a work item through assignment records.
     public async Task<IActionResult> AssignEmployee(int id, [FromBody] AssignEmployeeRequest request)
@@ -605,6 +612,7 @@ public class WorkItemsController : ControllerBase
         }
     }
 
+    [Authorize(Policy = Policies.CanManageWorkPlan)]
     [HttpPut("{projectId}/employee-assignments")]
     // Replaces project-level employee assignments without touching child task assignments or contractors.
     public async Task<IActionResult> SyncProjectEmployeeAssignments(int projectId, [FromBody] SyncEmployeeAssignmentsRequest request)
@@ -672,6 +680,7 @@ public class WorkItemsController : ControllerBase
         }
     }
 
+    [Authorize(Policy = Policies.CanManageWorkPlan)]
     [HttpPost("{id}/assign-contractor")]
     // Links a contractor to a work item through assignment records.
     public async Task<IActionResult> AssignContractor(int id, [FromBody] AssignContractorRequest request)
@@ -698,6 +707,7 @@ public class WorkItemsController : ControllerBase
         }
     }
 
+    [Authorize(Policy = Policies.CanManageWorkPlan)]
     [HttpPost("{projectId}/milestones")]
     // Creates a milestone (stored as task type) under a project and attaches assignments.
     public async Task<IActionResult> CreateMilestone(int projectId, [FromBody] CreateMilestoneRequest request)
@@ -855,6 +865,7 @@ public class WorkItemsController : ControllerBase
         });
     }
 
+    [Authorize(Policy = Policies.CanManageWorkPlan)]
     [HttpPut("milestones/{milestoneId}")]
     // Updates a milestone and refreshes its assignment links.
     public async Task<IActionResult> UpdateMilestone(int milestoneId, [FromBody] UpdateMilestoneRequest request)
@@ -1024,6 +1035,7 @@ public class WorkItemsController : ControllerBase
         });
     }
 
+    [Authorize(Policy = Policies.CanManageWorkPlan)]
     [HttpPut("milestones/{milestoneId}/cancel")]
     // Cancels a milestone using repository soft-delete behavior.
     public async Task<IActionResult> SoftDeleteMilestone(int milestoneId)

@@ -15,6 +15,7 @@ import { SettingsPage } from '@features/settings';
 import { AppLayout } from '@shared/components/AppLayout';
 import { AdminRoute } from './AdminRoute';
 import { ProtectedRoute } from './ProtectedRoute';
+import { RequirePermission } from './RequirePermission';
 
 export const router = createBrowserRouter([
   { path: '/Users/login', element: <Navigate to="/login" replace /> },
@@ -27,10 +28,38 @@ export const router = createBrowserRouter([
     ),
     children: [
       { path: '/', element: <DashboardPage /> },
-      { path: '/workplan', element: <WorkPlanPage /> },
-      { path: '/projects', element: <ProjectsPage /> },
-      { path: '/reports', element: <ReportsPage /> },
-      { path: '/employees', element: <EmployeesPage /> },
+      {
+        path: '/workplan',
+        element: (
+          <RequirePermission permission="viewWorkPlan">
+            <WorkPlanPage />
+          </RequirePermission>
+        ),
+      },
+      {
+        path: '/projects',
+        element: (
+          <RequirePermission permission="viewProjects">
+            <ProjectsPage />
+          </RequirePermission>
+        ),
+      },
+      {
+        path: '/reports',
+        element: (
+          <RequirePermission permission="viewReports">
+            <ReportsPage />
+          </RequirePermission>
+        ),
+      },
+      {
+        path: '/employees',
+        element: (
+          <RequirePermission permission="viewEmployees">
+            <EmployeesPage />
+          </RequirePermission>
+        ),
+      },
       {
         path: '/users',
         element: (
@@ -39,13 +68,55 @@ export const router = createBrowserRouter([
           </AdminRoute>
         ),
       },
-      { path: '/contacts', element: <ContactsPage /> },
-      { path: '/customers', element: <CustomersPage /> },
-      { path: '/quotes', element: <QuotesPage /> },
-      { path: '/inventory', element: <InventoryPage /> },
-      { path: '/service-calls', element: <ServiceCallsPage /> },
+      {
+        path: '/contacts',
+        element: (
+          <RequirePermission permission="viewContacts">
+            <ContactsPage />
+          </RequirePermission>
+        ),
+      },
+      {
+        path: '/customers',
+        element: (
+          <RequirePermission permission="viewCustomers">
+            <CustomersPage />
+          </RequirePermission>
+        ),
+      },
+      {
+        path: '/quotes',
+        element: (
+          <RequirePermission permission="viewQuotes">
+            <QuotesPage />
+          </RequirePermission>
+        ),
+      },
+      {
+        path: '/inventory',
+        element: (
+          <RequirePermission permission="viewInventory">
+            <InventoryPage />
+          </RequirePermission>
+        ),
+      },
+      {
+        path: '/service-calls',
+        element: (
+          <RequirePermission permission="viewServiceCalls">
+            <ServiceCallsPage />
+          </RequirePermission>
+        ),
+      },
       { path: '/cashflow', element: <Navigate to="/" replace /> },
-      { path: '/settings', element: <SettingsPage /> },
+      {
+        path: '/settings',
+        element: (
+          <RequirePermission permission="viewSettings">
+            <SettingsPage />
+          </RequirePermission>
+        ),
+      },
       { path: '*', element: <Navigate to="/" replace /> },
     ],
   },

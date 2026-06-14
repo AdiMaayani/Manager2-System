@@ -7,11 +7,12 @@ import {
 } from '../api/inventoryApiClient';
 import type { CreateInventoryItemRequest, InventoryFilters } from '../types';
 
-export function useInventory(filters: InventoryFilters) {
+export function useInventory(filters: InventoryFilters, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['inventoryItems', filters],
     queryFn: () => getInventoryItemsAsync(filters),
     placeholderData: (previousData) => previousData,
+    enabled: options?.enabled ?? true,
   });
 }
 

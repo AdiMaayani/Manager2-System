@@ -1,3 +1,4 @@
+using ManageR2.Api.Authorization;
 using ManageR2.Api.DTOs;
 using ManageR2.Domain.Entities;
 using ManageR2.Domain.Exceptions;
@@ -10,7 +11,7 @@ namespace ManageR2.Api.Controllers;
 // Physical customer sites/locations; links to CustomerId; CRUD via ISiteRepository under JWT auth.
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
+[Authorize(Policy = Policies.CanViewCustomers)]
 public class SitesController : ControllerBase
 {
     // Site persistence and validation are centralized in the repository layer (uses DBServices internally).
@@ -83,6 +84,7 @@ public class SitesController : ControllerBase
     }
 
     // Create site under a valid customer; repository assigns timestamps and enforces referential rules.
+    [Authorize(Policy = Policies.CanManageProjects)]
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] SiteDto dto)
     {
@@ -136,6 +138,7 @@ public class SitesController : ControllerBase
     }
 
     // Update site fields; full replace pattern on entity loaded from repository before save.
+    [Authorize(Policy = Policies.CanManageProjects)]
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, [FromBody] SiteDto dto)
     {
@@ -196,6 +199,7 @@ public class SitesController : ControllerBase
         }
     }
 
+    [Authorize(Policy = Policies.CanManageProjects)]
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Deactivate(int id)
     {

@@ -14,29 +14,38 @@ import {
 } from '../api/serviceCallsApiClient';
 import type { AssignServiceCallEmployeeRequest, UpsertServiceCallRequest } from '../types';
 
-export function useServiceCalls() {
+export function useServiceCalls(options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ['serviceCalls', isLocalDataMode],
     queryFn: () => resolveDataAsync(getServiceCallsAsync, () => delayMock(mockServiceCalls)),
+    enabled: options?.enabled ?? true,
   });
 }
 
-export function useServiceCallLookups() {
+// The create/edit form lookups (customers, sites, employees) are only needed by users who can manage
+// service calls and read customer/site data. `enabled` lets the page skip these fetches for view-only
+// roles (e.g. technicians) so they never hit the now-protected /Customers and /Sites endpoints.
+export function useServiceCallLookups(options?: { enabled?: boolean }) {
+  const isEnabled = options?.enabled ?? true;
+
   const customersQuery = useQuery({
     queryKey: ['serviceCalls', 'customers', isLocalDataMode],
     queryFn: () =>
       resolveDataAsync(getServiceCallCustomersAsync, () => delayMock(mockCustomers)),
+    enabled: isEnabled,
   });
 
   const sitesQuery = useQuery({
     queryKey: ['serviceCalls', 'sites', isLocalDataMode],
     queryFn: () => resolveDataAsync(getServiceCallSitesAsync, () => delayMock(mockSites)),
+    enabled: isEnabled,
   });
 
   const employeesQuery = useQuery({
     queryKey: ['serviceCalls', 'employees', isLocalDataMode],
     queryFn: () =>
       resolveDataAsync(getServiceCallEmployeesAsync, () => delayMock(mockEmployees)),
+    enabled: isEnabled,
   });
 
   return {

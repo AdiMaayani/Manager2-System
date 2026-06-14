@@ -1,3 +1,4 @@
+using ManageR2.Api.Authorization;
 using ManageR2.Api.DTOs;
 using ManageR2.Infrastructure.Models;
 using ManageR2.Infrastructure.Repositories;
@@ -8,7 +9,7 @@ namespace ManageR2.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
+[Authorize(Policy = Policies.CanViewReports)]
 // Thin API controller for creating and reading work reports linked to work items.
 public class ReportsController : ControllerBase
 {
@@ -42,6 +43,7 @@ public async Task<IActionResult> GetById(int id)
     return Ok(report);
 }
 
+    [Authorize(Policy = Policies.CanEditReports)]
     [HttpPost]
     // Creates a report and delegates persistence to the report repository.
     public async Task<IActionResult> Create([FromBody] CreateWorkReportRequest request)
@@ -65,6 +67,7 @@ public async Task<IActionResult> GetById(int id)
         return Ok(response);
     }
 
+    [Authorize(Policy = Policies.CanEditReports)]
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, [FromBody] CreateWorkReportRequest request)
     {
@@ -90,6 +93,7 @@ public async Task<IActionResult> GetById(int id)
         return Ok(updatedReport);
     }
 
+    [Authorize(Policy = Policies.CanEditReports)]
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {

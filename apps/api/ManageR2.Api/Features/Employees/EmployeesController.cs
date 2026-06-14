@@ -1,4 +1,5 @@
 using System.Net.Mail;
+using ManageR2.Api.Authorization;
 using ManageR2.Api.DTOs;
 using ManageR2.Domain.Entities;
 using ManageR2.Infrastructure.Repositories;
@@ -20,14 +21,26 @@ public class EmployeesController : ControllerBase
         _employeeRepository = employeeRepository;
     }
 
+    [Authorize(Policy = Policies.CanViewEmployees)]
     [HttpGet]
-    // Returns all employees that can be assigned to work items.
+    // Full employee roster (includes contact details); restricted to the employee-management audience.
     public async Task<IActionResult> GetAll()
     {
         var employees = await _employeeRepository.GetAllAsync();
         return Ok(employees.Select(ToDto));
     }
 
+    [Authorize(Policy = Policies.CanLookupEmployees)]
+    [HttpGet("lookup")]
+    // Minimal employee list for selection pickers (work plan, reports, service-call/project assignment).
+    // Returns only id/display/scheduling fields — no contact PII — so it can be exposed to more roles.
+    public async Task<IActionResult> GetLookup()
+    {
+        var employees = await _employeeRepository.GetAllAsync();
+        return Ok(employees.Select(ToLookupDto));
+    }
+
+    [Authorize(Policy = Policies.CanViewEmployees)]
     [HttpGet("{id:int}")]
     // Returns one employee used in assignment validation flows.
     public async Task<IActionResult> GetById(int id)
@@ -126,6 +139,19 @@ public class EmployeesController : ControllerBase
             IsAssignable = employee.IsAssignable,
             IsActive = employee.IsActive,
             CreatedAt = employee.CreatedAt
+        };
+    }
+
+    private static EmployeeLookupDto ToLookupDto(Employee employee)
+    {
+        return new EmployeeLookupDto
+        {
+            EmployeeId = employee.EmployeeId,
+            FullName = employee.FullName,
+            PrimaryRole = employee.PrimaryRole,
+            DailyCapacityHours = employee.DailyCapacityHours,
+            IsAssignable = employee.IsAssignable,
+            IsActive = employee.IsActive
         };
     }
 

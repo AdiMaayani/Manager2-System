@@ -69,6 +69,11 @@ export function getRoleDisplayLabel(role?: string | null): string {
 
   const roleLabels: Record<string, string> = {
     Admin: 'מנהל',
+    SeniorManagement: 'הנהלה בכירה',
+    ProjectManager: 'מנהל פרויקטים',
+    Office: 'משרד',
+    Technician: 'טכנאי',
+    Inventory: 'מלאי',
     DepartmentManager: 'מנהל מחלקה',
     TeamLeader: 'ראש צוות',
   };

@@ -1,5 +1,6 @@
 import { NavLink, useNavigate } from 'react-router-dom';
 import { clearAuthSession, getCurrentUser, getRoleDisplayLabel } from '@api/auth';
+import { hasPermission } from '@shared/auth/permissions';
 import { bottomNavItems, mainNavItems } from '@shared/layout/navItems';
 import '@shared/layout/layout.css';
 
@@ -8,10 +9,10 @@ export function Sidebar() {
   const user = getCurrentUser();
   const userRoles = user?.roles ?? [];
   const visibleMainNavItems = mainNavItems.filter(
-    (item) => !item.requiredRole || userRoles.includes(item.requiredRole),
+    (item) => !item.requiredPermission || hasPermission(userRoles, item.requiredPermission),
   );
   const visibleBottomNavItems = bottomNavItems.filter(
-    (item) => !item.requiredRole || userRoles.includes(item.requiredRole),
+    (item) => !item.requiredPermission || hasPermission(userRoles, item.requiredPermission),
   );
 
   function handleLogout() {

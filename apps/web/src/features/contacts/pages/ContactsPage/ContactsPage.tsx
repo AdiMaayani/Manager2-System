@@ -8,6 +8,7 @@ import { Button } from '@shared/components/Button';
 import { FilterBar } from '@shared/components/FilterBar';
 import { Input } from '@shared/components/Input';
 import { Badge } from '@shared/components/Badge';
+import { usePermissions } from '@shared/auth/usePermissions';
 import { useContacts } from '../../hooks/useContacts';
 import { ContactDrawer } from '../../components/ContactDrawer';
 import type { Contact } from '../../types';
@@ -23,6 +24,7 @@ function formatContactDate(value?: string | null) {
 }
 
 export function ContactsPage() {
+  const { can } = usePermissions();
   const { data: contacts, isLoading, error, refetch } = useContacts();
   const [searchParams, setSearchParams] = useSearchParams();
   const [segment, setSegment] = useState('הכל');
@@ -87,7 +89,11 @@ export function ContactsPage() {
   return (
     <PageShell title="אנשי קשר">
       <FilterBar
-        actions={<Button onClick={() => setDrawerContact(null)}>+ איש קשר חדש</Button>}
+        actions={
+          can('manageContacts') ? (
+            <Button onClick={() => setDrawerContact(null)}>+ איש קשר חדש</Button>
+          ) : undefined
+        }
       >
         <div className="contactsPage__filter contactsPage__filter--search">
           <span className="contactsPage__filterLabel">חיפוש</span>

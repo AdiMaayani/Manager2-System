@@ -1,3 +1,4 @@
+using ManageR2.Api.Authorization;
 using ManageR2.Api.DTOs;
 using ManageR2.Domain.Entities;
 using ManageR2.Domain.Exceptions;
@@ -10,7 +11,7 @@ namespace ManageR2.Api.Controllers;
 // Inventory MVP: company-wide stock catalog CRUD backed by stored procedures.
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
+[Authorize(Policy = Policies.CanViewInventory)]
 public class InventoryController : ControllerBase
 {
     private readonly IInventoryItemRepository _repository;
@@ -59,6 +60,7 @@ public class InventoryController : ControllerBase
         }
     }
 
+    [Authorize(Policy = Policies.CanManageInventory)]
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] InventoryItemDto dto)
     {
@@ -87,6 +89,7 @@ public class InventoryController : ControllerBase
         }
     }
 
+    [Authorize(Policy = Policies.CanManageInventory)]
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, [FromBody] InventoryItemDto dto)
     {
@@ -128,6 +131,7 @@ public class InventoryController : ControllerBase
         }
     }
 
+    [Authorize(Policy = Policies.CanManageInventory)]
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {

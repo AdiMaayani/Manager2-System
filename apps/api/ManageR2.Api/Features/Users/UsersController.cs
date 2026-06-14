@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using ManageR2.Api.Authorization;
 using ManageR2.Api.DTOs;
 using ManageR2.Domain.Entities;
 using ManageR2.Domain.Exceptions;
@@ -158,7 +159,7 @@ public class UsersController : ControllerBase
     }
 
     // Admin directory: enumerate all users with roles/departments for back-office management.
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = Policies.CanViewUsers)]
     [HttpGet]
     public async Task<IActionResult> GetUsers()
     {
@@ -175,7 +176,7 @@ public class UsersController : ControllerBase
     }
 
     // Lookup list for role assignment UI (admin only).
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = Policies.CanViewUsers)]
     [HttpGet("roles")]
     public async Task<IActionResult> GetAllRoles()
     {
@@ -184,7 +185,7 @@ public class UsersController : ControllerBase
     }
 
     // Lookup list for department assignment UI (admin only).
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = Policies.CanViewUsers)]
     [HttpGet("departments")]
     public async Task<IActionResult> GetAllDepartments()
     {
@@ -218,7 +219,7 @@ public class UsersController : ControllerBase
     }
 
     // Create user + hash password + persist role/department links in a single transactional flow (repository).
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = Policies.CanManageUsers)]
     [HttpPost]
     public async Task<IActionResult> CreateUser([FromBody] CreateUserDto dto)
     {
@@ -263,7 +264,7 @@ public class UsersController : ControllerBase
     }
 
     // Update profile fields; optional password rotation re-hashes via IPasswordService then updates role/department sets.
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = Policies.CanManageUsers)]
     [HttpPut("{id:int}")]
     public async Task<IActionResult> UpdateUser(int id, [FromBody] UpdateUserDto dto)
     {
@@ -318,7 +319,7 @@ public class UsersController : ControllerBase
     }
 
     // Hard delete user row through repository (guarded by domain validation exceptions).
-    [Authorize(Roles = "Admin")]
+    [Authorize(Policy = Policies.CanManageUsers)]
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> DeleteUser(int id)
     {

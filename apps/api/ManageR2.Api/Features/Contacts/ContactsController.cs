@@ -1,4 +1,5 @@
 using System.Security.Claims;
+using ManageR2.Api.Authorization;
 using ManageR2.Api.DTOs;
 using ManageR2.Domain.Entities;
 using ManageR2.Domain.Exceptions;
@@ -11,7 +12,7 @@ namespace ManageR2.Api.Controllers;
 // Customer contact directory: authenticated CRUD; persistence and validation rules live in IContactRepository.
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
+[Authorize(Policy = Policies.CanViewCustomers)]
 public class ContactsController : ControllerBase
 {
     // Repository performs SQL access via DBServices; controller maps entities to ContactDto for the client.
@@ -96,6 +97,7 @@ public class ContactsController : ControllerBase
     }
 
     // Create flow: validate input, stamp CreatedByUserId from JWT, insert via repository, return 201 + body.
+    [Authorize(Policy = Policies.CanManageCustomers)]
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] ContactDto dto)
     {
@@ -175,6 +177,7 @@ public class ContactsController : ControllerBase
     }
 
     // Update flow: merge DTO onto existing row, set UpdatedByUserId from JWT, persist through repository.
+    [Authorize(Policy = Policies.CanManageCustomers)]
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, [FromBody] ContactDto dto)
     {
@@ -262,6 +265,7 @@ public class ContactsController : ControllerBase
     }
 
     // Soft-delete flow: deactivate contact for audit trail (repository receives acting user id).
+    [Authorize(Policy = Policies.CanManageCustomers)]
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Delete(int id)
     {
