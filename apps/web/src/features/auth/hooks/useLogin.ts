@@ -60,10 +60,12 @@ export function useLogin(): UseLoginReturn {
         } else if (err.status === 400) {
           setError(err.message || 'הבקשה אינה תקינה.');
         } else {
-          setError(err.message || 'אירעה שגיאה בעת ההתחברות. נסה שוב.');
+          // 5xx / unexpected statuses: never surface the raw English "Request failed with status N".
+          setError('אירעה שגיאה בעת ההתחברות. נסה שוב מאוחר יותר.');
         }
       } else {
-        setError(err instanceof Error ? err.message : 'אירעה שגיאה בעת ההתחברות. נסה שוב.');
+        // Network/connection failures (e.g. "Failed to fetch") should read as Hebrew, not raw text.
+        setError('לא ניתן להתחבר לשרת. בדוק את החיבור ונסה שוב.');
       }
     } finally {
       setIsSubmitting(false);

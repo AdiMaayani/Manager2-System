@@ -8,6 +8,7 @@ import { DetailsField } from '@shared/components/DetailsField';
 import { DetailsSection } from '@shared/components/DetailsSection';
 import { Input } from '@shared/components/Input';
 import { PageSpinner } from '@shared/components/PageSpinner';
+import { usePermissions } from '@shared/auth/usePermissions';
 import { isLocalDataMode } from '@/config/appConfig';
 import { getServiceCallByIdAsync } from '../../api/serviceCallsApiClient';
 import { useServiceCallMutations } from '../../hooks/useServiceCalls';
@@ -197,6 +198,10 @@ function ServiceCallDrawerContent({
     enabled: isExistingServiceCall && isLocalDataMode,
   });
   const currentServiceCall = serviceCallDetailsQuery.data ?? serviceCall;
+  const { can } = usePermissions();
+  // Technicians have viewServiceCalls but not manageServiceCalls — they may review a call but must
+  // not reach edit/close/assign actions (the edit form, which holds those, stays hidden for them).
+  const canManage = can('manageServiceCalls');
   const { createMutation, updateMutation, closeMutation, assignEmployeeMutation } =
     useServiceCallMutations();
 
@@ -401,7 +406,7 @@ function ServiceCallDrawerContent({
       onClose={onClose}
       title={title}
       headerActions={
-        isExistingServiceCall && !isEditing ? (
+        isExistingServiceCall && !isEditing && canManage ? (
           <Button type="button" variant="secondary" onClick={handleStartEdit}>
             ערוך פרטים
           </Button>

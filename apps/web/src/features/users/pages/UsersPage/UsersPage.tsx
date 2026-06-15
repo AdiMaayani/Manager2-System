@@ -9,6 +9,7 @@ import { Badge } from '@shared/components/Badge';
 import { Button } from '@shared/components/Button';
 import { FilterBar } from '@shared/components/FilterBar';
 import { Input } from '@shared/components/Input';
+import { getRoleDisplayLabel } from '@api/auth';
 import { getEmployeesAsync, type Employee } from '@features/employees';
 import { UserDrawer } from '../../components/UserDrawer';
 import { useUserLookups, useUsers } from '../../hooks/useUsers';
@@ -24,16 +25,6 @@ function formatDate(value?: string | null): string {
     dateStyle: 'short',
     timeStyle: 'short',
   }).format(new Date(value));
-}
-
-function getRoleDisplayLabel(role: string): string {
-  const labels: Record<string, string> = {
-    Admin: 'מנהל',
-    DepartmentManager: 'מנהל מחלקה',
-    TeamLeader: 'ראש צוות',
-  };
-
-  return labels[role] ?? role;
 }
 
 function getEmployeeName(employeesById: Map<number, Employee>, employeeId: number): string {

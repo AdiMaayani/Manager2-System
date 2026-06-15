@@ -259,7 +259,7 @@ export function NewTaskModal({
       employeeName: candidate.fullName ?? `עובד #${candidate.employeeId}`,
       score: candidate.totalScore ?? null,
       reasons: candidate.recommendationSummary ? [candidate.recommendationSummary] : [],
-      warnings: candidate.warnings,
+      warnings: candidate.warnings ?? [],
     });
     setError(null);
   }
@@ -646,7 +646,7 @@ export function NewTaskModal({
                     )}
 
                     <ul className="newTaskModal__factors">
-                      {candidate.factors.map((factor) => (
+                      {(candidate.factors ?? []).map((factor) => (
                         <li key={factor.key} className="newTaskModal__factor">
                           <div className="newTaskModal__factorHead">
                             <span className="newTaskModal__factorLabel">
@@ -664,8 +664,8 @@ export function NewTaskModal({
                       ))}
                     </ul>
 
-                    {candidate.warnings.length > 0 && (
-                      <p className="newTaskModal__warning">{candidate.warnings.join(' · ')}</p>
+                    {(candidate.warnings ?? []).length > 0 && (
+                      <p className="newTaskModal__warning">{(candidate.warnings ?? []).join(' · ')}</p>
                     )}
 
                     <Button
@@ -723,7 +723,7 @@ export function NewTaskModal({
             {step === 'recommendation' && (
               <Button
                 type="submit"
-                disabled={mutation.isPending || isSmartLoading || !isTaskPersistenceAvailable}
+                disabled={mutation.isPending || !isTaskPersistenceAvailable}
                 title={!isTaskPersistenceAvailable ? taskPersistenceMessage : undefined}
               >
                 {mutation.isPending

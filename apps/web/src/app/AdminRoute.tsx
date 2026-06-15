@@ -8,7 +8,9 @@ interface AdminRouteProps {
 
 export function AdminRoute({ children }: AdminRouteProps) {
   const user = getCurrentUser();
-  const canAccessAdmin = user?.roles.includes('Admin') ?? false;
+  // Guard against a corrupt/legacy session object where `roles` is missing —
+  // `(user?.roles).includes(...)` would throw and crash the whole route tree.
+  const canAccessAdmin = (user?.roles ?? []).includes('Admin');
 
   return canAccessAdmin ? children : <Navigate to="/" replace />;
 }

@@ -7,6 +7,7 @@ import { Button } from '@shared/components/Button';
 import { DetailsField } from '@shared/components/DetailsField';
 import { DetailsSection } from '@shared/components/DetailsSection';
 import { Input } from '@shared/components/Input';
+import { usePermissions } from '@shared/auth/usePermissions';
 import { isLocalDataMode } from '@/config/appConfig';
 import { getProjectsListAsync, getSitesAsync } from '@features/projects/api/projectsApiClient';
 import { getQuotesAsync } from '@features/quotes/api/quotesApiClient';
@@ -113,6 +114,10 @@ interface CustomerDrawerContentProps {
 
 function CustomerDrawerContent({ customer, onClose, onSaved }: CustomerDrawerContentProps) {
   const isExistingCustomer = customer != null;
+  const { can } = usePermissions();
+  // View-only roles (e.g. ProjectManager) can open a customer for review but must not reach the
+  // edit/deactivate UI, which would only 403 on save. The API still enforces this server-side.
+  const canManage = can('manageCustomers');
   const { createMutation, updateMutation, deactivateMutation } = useCustomerMutations();
 
   // Existing customers open in read-only review mode; create opens editable.
@@ -227,7 +232,7 @@ function CustomerDrawerContent({ customer, onClose, onSaved }: CustomerDrawerCon
       onClose={onClose}
       title={title}
       headerActions={
-        isExistingCustomer && !isEditing ? (
+        isExistingCustomer && !isEditing && canManage ? (
           <Button type="button" variant="secondary" onClick={handleStartEdit}>
             ערוך פרטים
           </Button>
