@@ -39,25 +39,37 @@ namespace ManageR2.Infrastructure.Services.SmartAssignment
             if (input == null)
                 throw new Exception($"No data found for WorkItemId = {workItemId}");
 
-            // מחשבים ציונים לכל עובד לפי הנתונים שהתקבלו.
-            var candidates = CalculateScores(input);
+            // מחשבים ציונים לכל עובד לפי הנתונים שהתקבלו, ממיינים ומדרגים.
+            return RankCandidates(CalculateScores(input));
+        }
 
-            // ממיינים את העובדים:
-            // קודם עובדים כשירים לבחירה, אחר כך לא כשירים.
-            // בתוך כל קבוצה ממיינים לפי הציון הכולל מהגבוה לנמוך.
+        // English: same scoring engine, but for a not-yet-saved (draft) task built from the New Task form
+        // context (project/date/duration/site) instead of an unrelated existing work item.
+        // נקודת כניסה להמלצות עבור משימת טיוטה (משימה חדשה שעדיין לא נשמרה).
+        public async Task<List<EmployeeCandidateModel>> GetRecommendationsForDraftAsync(
+            DraftTaskRecommendationContextModel context)
+        {
+            var input = await _repository.GetDraftTaskRecommendationInputAsync(context);
+
+            if (input == null)
+                throw new Exception("No data found for draft recommendation context.");
+
+            return RankCandidates(CalculateScores(input));
+        }
+
+        // מיון ודירוג: כשירים תחילה, ואז לפי ציון כולל יורד; קובע RankOrder.
+        private List<EmployeeCandidateModel> RankCandidates(List<EmployeeCandidateModel> candidates)
+        {
             var ranked = candidates
-                .OrderByDescending(c => c.IsEligible) // true לפני false
-                .ThenByDescending(c => c.TotalScore) // ציון גבוה לפני נמוך
-                .ToList(); // הפיכת התוצאה לרשימה
+                .OrderByDescending(c => c.IsEligible)
+                .ThenByDescending(c => c.TotalScore)
+                .ToList();
 
-            // קביעת מספר דירוג לאחר המיון.
-            // העובד הראשון ברשימה יקבל RankOrder = 1.
             for (int i = 0; i < ranked.Count; i++)
             {
                 ranked[i].RankOrder = i + 1;
             }
 
-            // החזרת הרשימה הסופית.
             return ranked;
         }
 
@@ -114,6 +126,10 @@ namespace ManageR2.Infrastructure.Services.SmartAssignment
                 // הגנה: מוודאים שהציון הסופי נשאר בין 0 ל-100.
                 totalScore = ClampScore(totalScore);
 
+                // נתוני עזר להסבר (כמה כישורים תאמו/חסרו, פרטי נסיעה).
+                var (matchedSkillsCount, missingSkillsCount) = CountSkillMatch(input, employee.EmployeeId);
+                var routeDetail = GetRouteDetail(input, employee.EmployeeId, originType);
+
                 // יצירת אובייקט עובד חדש עם כל הנתונים והציונים שחושבו.
                 result.Add(new EmployeeCandidateModel
                 {
@@ -160,7 +176,27 @@ namespace ManageR2.Infrastructure.Services.SmartAssignment
                         geographicScore,
                         eligibility.IsEligible,
                         eligibility.ExclusionReason
-                    )
+                    ),
+
+                    // פרטי הסבר לשקיפות.
+                    OriginTypeUsed = originType,
+                    MatchedSkillsCount = matchedSkillsCount,
+                    MissingSkillsCount = missingSkillsCount,
+                    TravelMinutes = routeDetail.Minutes,
+                    DistanceKm = routeDetail.DistanceKm,
+
+                    // פירוט גורמים קריא להצגה למנהל (ציון, משקל, הסבר, מקור נתונים).
+                    Factors = BuildFactors(
+                        input,
+                        professionalScore,
+                        availabilityScore,
+                        workloadScore,
+                        geographicScore,
+                        experienceScore,
+                        matchedSkillsCount,
+                        missingSkillsCount,
+                        originType,
+                        routeDetail)
                 });
             }
 
@@ -545,6 +581,137 @@ namespace ManageR2.Infrastructure.Services.SmartAssignment
 
             // JSON פשוט: ["אזהרה 1","אזהרה 2"]
             return "[\"" + string.Join("\",\"", warnings) + "\"]";
+        }
+
+        // ספירת כישורים תואמים/חסרים בין דרישות המשימה לכישורי העובד (לצורך הסבר).
+        private (int Matched, int Missing) CountSkillMatch(TaskRecommendationInputModel input, int employeeId)
+        {
+            if (input.RequiredSkills == null || input.RequiredSkills.Count == 0)
+                return (0, 0);
+
+            var employeeSkillIds = input.EmployeeSkills
+                .Where(s => s.EmployeeId == employeeId)
+                .Select(s => s.SkillId)
+                .ToHashSet();
+
+            var matched = input.RequiredSkills.Count(r => employeeSkillIds.Contains(r.SkillId));
+            var missing = input.RequiredSkills.Count - matched;
+            return (matched, missing);
+        }
+
+        // איתור פרטי נסיעה (דקות/ק"מ) למוצא שנבחר, אם קיימים נתוני Route.
+        private (int? Minutes, decimal? DistanceKm, bool HasRoute) GetRouteDetail(
+            TaskRecommendationInputModel input,
+            int employeeId,
+            string originType)
+        {
+            var targetSiteId = input.Task?.SiteId;
+
+            var route = input.RouteEstimates.FirstOrDefault(r =>
+                r.EmployeeId == employeeId &&
+                r.OriginType == originType &&
+                (!targetSiteId.HasValue || r.TargetSiteId == targetSiteId.Value))
+                ?? input.RouteEstimates.FirstOrDefault(r =>
+                r.EmployeeId == employeeId &&
+                (!targetSiteId.HasValue || r.TargetSiteId == targetSiteId.Value));
+
+            if (route == null)
+                return (null, null, false);
+
+            return (route.EstimatedTravelMinutes, route.EstimatedDistanceKm, true);
+        }
+
+        // בניית פירוט הגורמים: לכל גורם — ציון, משקל, הסבר קריא, מקור הנתונים, והאם היו נתונים.
+        // English: builds the per-factor explanation list (score/weight/explanation/data source/has-data).
+        private List<RecommendationFactorModel> BuildFactors(
+            TaskRecommendationInputModel input,
+            decimal professional,
+            decimal? availability,
+            decimal workload,
+            decimal geographic,
+            decimal experience,
+            int matchedSkills,
+            int missingSkills,
+            string originType,
+            (int? Minutes, decimal? DistanceKm, bool HasRoute) routeDetail)
+        {
+            var factors = new List<RecommendationFactorModel>();
+
+            // 1) התאמה מקצועית (35%) — דרישות כישורי המשימה מול כישורי העובד.
+            var hasSkillRequirements = input.RequiredSkills != null && input.RequiredSkills.Count > 0;
+            factors.Add(new RecommendationFactorModel
+            {
+                Key = "professional",
+                Label = "התאמה מקצועית",
+                Score = professional,
+                WeightPercent = 35m,
+                HasData = hasSkillRequirements,
+                DataSource = "כישורי העובד מול דרישות הכישורים של המשימה",
+                Explanation = hasSkillRequirements
+                    ? $"{matchedSkills} מתוך {matchedSkills + missingSkills} כישורים נדרשים תואמים."
+                    : "למשימה אין דרישות כישורים מוגדרות — ציון מקצועי ניטרלי (50)."
+            });
+
+            // 2) זמינות (25%) — יומן הזמינות של העובד מול חלון הזמן של המשימה.
+            factors.Add(new RecommendationFactorModel
+            {
+                Key = "availability",
+                Label = "זמינות",
+                Score = availability,
+                WeightPercent = 25m,
+                HasData = availability.HasValue,
+                DataSource = "יומן זמינות העובד מול חלון הזמן המתוכנן של המשימה",
+                Explanation = availability.HasValue
+                    ? "העובד זמין לכל חלון הזמן של המשימה."
+                    : "אין חלון זמינות מלא תואם — העובד מסומן כלא זמין ואינו כשיר לבחירה."
+            });
+
+            // 3) עומס עבודה (15%) — הגדרת קיבולת העובד.
+            var hasCapacity = input.EmployeeCapacities != null && input.EmployeeCapacities.Count > 0;
+            factors.Add(new RecommendationFactorModel
+            {
+                Key = "workload",
+                Label = "עומס עבודה",
+                Score = workload,
+                WeightPercent = 15m,
+                HasData = hasCapacity,
+                DataSource = "הגדרת קיבולת העובד (Rec_EmployeeCapacity)",
+                Explanation = hasCapacity
+                    ? "לעובד מוגדרת קיבולת לתכנון."
+                    : "אין נתוני קיבולת — נעשה שימוש בציון ניטרלי (50)."
+            });
+
+            // 4) גיאוגרפיה (15%) — הערכת זמן נסיעה מהמוצא שנבחר אל אתר המשימה.
+            var travelText = routeDetail.HasRoute && routeDetail.Minutes.HasValue
+                ? $"זמן נסיעה משוער: {routeDetail.Minutes} דקות (מקור מוצא: {originType})."
+                : $"אין נתוני נסיעה זמינים (מקור מוצא: {originType}) — נעשה שימוש בציון ניטרלי (50).";
+            factors.Add(new RecommendationFactorModel
+            {
+                Key = "geographic",
+                Label = "מרחק / נסיעה",
+                Score = geographic,
+                WeightPercent = 15m,
+                HasData = routeDetail.HasRoute,
+                DataSource = "הערכות נסיעה (Rec_RouteEstimates) מהמוצא של העובד אל אתר המשימה",
+                Explanation = travelText
+            });
+
+            // 5) ניסיון (10%) — שנות ניסיון ממוצעות בכישורי העובד.
+            var hasSkillData = input.EmployeeSkills != null && input.EmployeeSkills.Count > 0;
+            factors.Add(new RecommendationFactorModel
+            {
+                Key = "experience",
+                Label = "ניסיון",
+                Score = experience,
+                WeightPercent = 10m,
+                HasData = hasSkillData,
+                DataSource = "שנות הניסיון בכישורי העובד (Rec_EmployeeSkills)",
+                Explanation = hasSkillData
+                    ? "מבוסס על ממוצע שנות הניסיון בכישורי העובד."
+                    : "אין נתוני כישורים לעובד — נעשה שימוש בציון ניסיון נמוך-בינוני (40)."
+            });
+
+            return factors;
         }
     }
 }

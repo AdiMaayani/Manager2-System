@@ -8,13 +8,14 @@ import { isLocalDataMode } from '@/config/appConfig';
 import {
   assignEmployeeToWorkItemAsync,
   createWorkItemAsync,
+  getDraftRecommendationsAsync,
   getInternalWorkContextAsync,
+  getSmartAssignmentRecommendationsAsync,
 } from '../../api/workplanApiClient';
-import { fetchSmartAssignmentAsync } from '../../hooks/useWorkPlanData';
 import { WORKPLAN_PRIORITY_OPTIONS, WORKPLAN_STATUS_OPTIONS } from '../../constants';
 import type {
+  DraftRecommendationCandidate,
   NewTaskKind,
-  SmartAssignmentResponse,
   WorkPlanEmployee,
   WorkPlanProjectFilter,
 } from '../../types';
@@ -96,36 +97,6 @@ function formatRecommendationScore(score?: number | null): string {
   return `${Math.round(numericScore <= 1 ? numericScore * 100 : numericScore)}%`;
 }
 
-function resolveRecommendation(result: SmartAssignmentResponse): AcceptedRecommendation | null {
-  const loadBasedEmployee = [...result.employeeLoad]
-    .filter((employee) => employee.employeeId > 0)
-    .sort((left, right) => left.loadPercentage - right.loadPercentage)[0];
-
-  if (loadBasedEmployee) {
-    return {
-      employeeId: loadBasedEmployee.employeeId,
-      employeeName: loadBasedEmployee.employeeName,
-      score: null,
-      reasons: ['נבחר לפי עומס העובדים הנמוך ביותר בפרויקט.'],
-      warnings: [],
-    };
-  }
-
-  const taskRecommendation = [...result.taskResults]
-    .filter((row) => row.recommendedEmployeeId != null)
-    .sort((left, right) => right.score - left.score)[0];
-
-  if (!taskRecommendation?.recommendedEmployeeId) return null;
-
-  return {
-    employeeId: taskRecommendation.recommendedEmployeeId,
-    employeeName: taskRecommendation.recommendedEmployeeName ?? `עובד #${taskRecommendation.recommendedEmployeeId}`,
-    score: taskRecommendation.score,
-    reasons: taskRecommendation.reasons,
-    warnings: [...taskRecommendation.warnings, ...taskRecommendation.violations],
-  };
-}
-
 export function NewTaskModal({
   isOpen,
   onClose,
@@ -149,8 +120,8 @@ export function NewTaskModal({
   const [priority, setPriority] = useState<string>(WORKPLAN_PRIORITY_OPTIONS[1].code);
   const [requiredRole, setRequiredRole] = useState('');
   const [employeeId, setEmployeeId] = useState('');
-  const [smartResult, setSmartResult] = useState<SmartAssignmentResponse | null>(null);
-  const [recommendation, setRecommendation] = useState<AcceptedRecommendation | null>(null);
+  const [draftCandidates, setDraftCandidates] = useState<DraftRecommendationCandidate[] | null>(null);
+  const [draftMessage, setDraftMessage] = useState<string | null>(null);
   const [acceptedRecommendation, setAcceptedRecommendation] = useState<AcceptedRecommendation | null>(null);
   const [isSmartLoading, setIsSmartLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -220,8 +191,8 @@ export function NewTaskModal({
     setPriority(WORKPLAN_PRIORITY_OPTIONS[1].code);
     setRequiredRole('');
     setEmployeeId('');
-    setSmartResult(null);
-    setRecommendation(null);
+    setDraftCandidates(null);
+    setDraftMessage(null);
     setAcceptedRecommendation(null);
     setIsSmartLoading(false);
     setError(null);
@@ -247,15 +218,32 @@ export function NewTaskModal({
   async function handleRunSmartRecommendation() {
     try {
       validateDetails();
+      if (!isTaskPersistenceAvailable) {
+        setError('שיבוץ חכם זמין בחיבור לשרת בלבד.');
+        return;
+      }
+      if (!parentId) return;
+
+      const timeRange = validatePlannedTimeRange(plannedDate, plannedStart, plannedEnd);
       setIsSmartLoading(true);
       setError(null);
-      const result = await fetchSmartAssignmentAsync(parentId);
-      const resolvedRecommendation = resolveRecommendation(result);
-      setSmartResult(result);
-      setRecommendation(resolvedRecommendation);
+
+      // Recommendations are scored for THIS draft task (project/date/duration/role), not for
+      // unrelated existing project tasks.
+      const result = await getDraftRecommendationsAsync({
+        projectId: parentId,
+        plannedStart: timeRange.plannedStart,
+        plannedEnd: timeRange.plannedEnd,
+        estimatedHours: estimatedHours ? Number(estimatedHours) : null,
+        priority: priority || null,
+        requiredRole: requiredRole || null,
+      });
+
+      setDraftCandidates(result.candidates);
+      setDraftMessage(result.message);
       setAcceptedRecommendation(null);
-      if (!resolvedRecommendation) {
-        setError('לא נמצאה המלצת שיבוץ לפרויקט. ניתן לבחור עובד ידנית ולשמור.');
+      if (result.candidates.length === 0) {
+        setError('לא נמצאו עובדים מתאימים. ניתן לבחור עובד ידנית ולשמור.');
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'הרצת שיבוץ חכם נכשלה');
@@ -264,10 +252,15 @@ export function NewTaskModal({
     }
   }
 
-  function handleAcceptRecommendation() {
-    if (!recommendation) return;
-    setEmployeeId(String(recommendation.employeeId));
-    setAcceptedRecommendation(recommendation);
+  function handleAcceptRecommendation(candidate: DraftRecommendationCandidate) {
+    setEmployeeId(String(candidate.employeeId));
+    setAcceptedRecommendation({
+      employeeId: candidate.employeeId,
+      employeeName: candidate.fullName ?? `עובד #${candidate.employeeId}`,
+      score: candidate.totalScore ?? null,
+      reasons: candidate.recommendationSummary ? [candidate.recommendationSummary] : [],
+      warnings: candidate.warnings,
+    });
     setError(null);
   }
 
@@ -311,6 +304,18 @@ export function NewTaskModal({
         employeeId: parsedEmployeeId,
         assignmentRole: requiredRole || 'Executor',
       });
+
+      // Best-effort: persist a recommendation run for the now-created task so the choice is recorded
+      // (saveRun). Never blocks task creation if persistence fails.
+      try {
+        await getSmartAssignmentRecommendationsAsync({
+          workItemIds: [workItemId],
+          includeLockedTasks: true,
+          saveRun: true,
+        });
+      } catch {
+        // Intentionally ignored — recommendation persistence is a non-critical side effect.
+      }
 
       return created;
     },
@@ -411,8 +416,8 @@ export function NewTaskModal({
                         }`}
                         onClick={() => {
                           setTaskKind(option.id);
-                          setSmartResult(null);
-                          setRecommendation(null);
+                          setDraftCandidates(null);
+                          setDraftMessage(null);
                           setAcceptedRecommendation(null);
                           setError(null);
                         }}
@@ -432,8 +437,8 @@ export function NewTaskModal({
                     value={selectedProjectId}
                     onChange={(event) => {
                       setSelectedProjectId(event.target.value);
-                      setSmartResult(null);
-                      setRecommendation(null);
+                      setDraftCandidates(null);
+                      setDraftMessage(null);
                       setAcceptedRecommendation(null);
                     }}
                     required
@@ -590,7 +595,8 @@ export function NewTaskModal({
               <div className="newTaskModal__smartHead">
                 <h3 className="newTaskModal__sectionTitle">שיבוץ חכם</h3>
                 <p className="newTaskModal__hint">
-                  ההמלצה נבנית לפי משימות הפרויקט, עומסי העובדים והכללים הקיימים.
+                  ההמלצה מחושבת עבור המשימה החדשה לפי התאמה מקצועית, זמינות, עומס, מרחק וניסיון.
+                  זוהי תצוגה מקדימה — ההמלצה תתועד ביומן ההמלצות בעת שמירת המשימה.
                 </p>
               </div>
 
@@ -608,62 +614,71 @@ export function NewTaskModal({
                 </div>
               )}
 
-              {!isSmartLoading && smartResult && (
+              {!isSmartLoading && draftMessage && (
                 <div className="newTaskModal__smartSummary">
-                  <strong className="newTaskModal__smartMessage">
-                    {smartResult.summary.message}
-                  </strong>
-                  <div className="newTaskModal__smartStats">
-                    <span className="newTaskModal__stat">
-                      <strong>{smartResult.summary.totalTasks}</strong> משימות
-                    </span>
-                    <span className="newTaskModal__stat">
-                      <strong>{smartResult.summary.tasksWithRecommendations}</strong> המלצות
-                    </span>
-                    <span className="newTaskModal__stat">
-                      <strong>{smartResult.summary.warningsCount}</strong> אזהרות
-                    </span>
-                  </div>
+                  <strong className="newTaskModal__smartMessage">{draftMessage}</strong>
                 </div>
               )}
 
-              {!isSmartLoading && recommendation && (
-                <div className="newTaskModal__recommendation">
-                  <div className="newTaskModal__recommendationHead">
-                    <div className="newTaskModal__recommendationWho">
-                      <span className="newTaskModal__recommendationLabel">עובד מומלץ</span>
-                      <strong className="newTaskModal__recommendationName">
-                        {recommendation.employeeName}
-                      </strong>
+              {!isSmartLoading && draftCandidates && draftCandidates.slice(0, 5).map((candidate) => {
+                const isAccepted = acceptedRecommendation?.employeeId === candidate.employeeId;
+                return (
+                  <div className="newTaskModal__recommendation" key={candidate.employeeId}>
+                    <div className="newTaskModal__recommendationHead">
+                      <div className="newTaskModal__recommendationWho">
+                        <span className="newTaskModal__recommendationLabel">
+                          {candidate.rankOrder ? `#${candidate.rankOrder} ` : ''}עובד מומלץ
+                        </span>
+                        <strong className="newTaskModal__recommendationName">
+                          {candidate.fullName ?? `עובד #${candidate.employeeId}`}
+                          {candidate.primaryRole ? ` · ${candidate.primaryRole}` : ''}
+                        </strong>
+                      </div>
+                      {candidate.totalScore != null && (
+                        <span className="newTaskModal__score">
+                          {formatRecommendationScore(candidate.totalScore)}
+                        </span>
+                      )}
                     </div>
-                    {recommendation.score != null && (
-                      <span className="newTaskModal__score">
-                        {formatRecommendationScore(recommendation.score)}
-                      </span>
-                    )}
-                  </div>
 
-                  {recommendation.reasons.length > 0 && (
-                    <ul className="newTaskModal__reasons">
-                      {recommendation.reasons.map((reason) => (
-                        <li key={reason}>{reason}</li>
+                    {!candidate.isEligible && (
+                      <p className="newTaskModal__warning">{candidate.status}</p>
+                    )}
+
+                    <ul className="newTaskModal__factors">
+                      {candidate.factors.map((factor) => (
+                        <li key={factor.key} className="newTaskModal__factor">
+                          <div className="newTaskModal__factorHead">
+                            <span className="newTaskModal__factorLabel">
+                              {factor.label} · {factor.weightPercent}%
+                            </span>
+                            <span className="newTaskModal__factorScore">
+                              {factor.hasData && factor.score != null
+                                ? Math.round(Number(factor.score))
+                                : 'אין נתונים'}
+                            </span>
+                          </div>
+                          <span className="newTaskModal__factorExplain">{factor.explanation}</span>
+                          <span className="newTaskModal__factorSource">מקור: {factor.dataSource}</span>
+                        </li>
                       ))}
                     </ul>
-                  )}
 
-                  {recommendation.warnings.length > 0 && (
-                    <p className="newTaskModal__warning">{recommendation.warnings.join(' · ')}</p>
-                  )}
+                    {candidate.warnings.length > 0 && (
+                      <p className="newTaskModal__warning">{candidate.warnings.join(' · ')}</p>
+                    )}
 
-                  <Button
-                    type="button"
-                    variant={acceptedRecommendation ? 'secondary' : 'primary'}
-                    onClick={handleAcceptRecommendation}
-                  >
-                    {acceptedRecommendation ? 'ההמלצה התקבלה' : 'קבל המלצה'}
-                  </Button>
-                </div>
-              )}
+                    <Button
+                      type="button"
+                      variant={isAccepted ? 'secondary' : 'primary'}
+                      onClick={() => handleAcceptRecommendation(candidate)}
+                      disabled={!candidate.isEligible}
+                    >
+                      {isAccepted ? 'ההמלצה התקבלה' : 'קבל המלצה'}
+                    </Button>
+                  </div>
+                );
+              })}
 
               <div className="newTaskModal__smartRun">
                 <Button
@@ -672,7 +687,7 @@ export function NewTaskModal({
                   onClick={handleRunSmartRecommendation}
                   disabled={isSmartLoading}
                 >
-                  {smartResult ? 'הרץ המלצה מחדש' : 'הרץ שיבוץ חכם'}
+                  {draftCandidates ? 'הרץ המלצה מחדש' : 'הרץ שיבוץ חכם'}
                 </Button>
               </div>
             </section>

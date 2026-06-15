@@ -140,6 +140,17 @@ export interface SmartAssignmentRequest {
   saveRun?: boolean;
 }
 
+// One explainability factor behind a candidate's score.
+export interface RecommendationFactor {
+  key: string;
+  label: string;
+  score?: number | null;
+  weightPercent: number;
+  explanation: string;
+  dataSource: string;
+  hasData: boolean;
+}
+
 export interface SmartAssignmentTaskResult {
   workItemId: number;
   taskTitle: string;
@@ -151,6 +162,38 @@ export interface SmartAssignmentTaskResult {
   violations: string[];
   warnings: string[];
   reasons: string[];
+  factors?: RecommendationFactor[];
+}
+
+// New Task draft recommendation (scored for the not-yet-saved task context).
+export interface DraftRecommendationRequest {
+  projectId: number;
+  plannedStart: string;
+  plannedEnd: string;
+  estimatedHours?: number | null;
+  priority?: string | null;
+  requiredRole?: string | null;
+  siteId?: number | null;
+}
+
+export interface DraftRecommendationCandidate {
+  rankOrder?: number | null;
+  employeeId: number;
+  fullName?: string | null;
+  primaryRole?: string | null;
+  totalScore?: number | null;
+  isEligible: boolean;
+  exclusionReason?: string | null;
+  status: string;
+  recommendationSummary?: string | null;
+  warnings: string[];
+  factors: RecommendationFactor[];
+}
+
+export interface DraftRecommendationResponse {
+  generatedAt: string;
+  message: string;
+  candidates: DraftRecommendationCandidate[];
 }
 
 export interface SmartAssignmentResponse {

@@ -2,23 +2,32 @@ using ManageR2.Domain.Entities;
 using ManageR2.Infrastructure.Models;
 using ManageR2.Infrastructure.Models.SmartAssignment;
 using ManageR2.Infrastructure.Repositories;
+using ManageR2.Infrastructure.Repositories.SmartAssignment;
 using ManageR2.Infrastructure.Services.SmartAssignment;
 
 namespace ManageR2.Infrastructure.Services;
 
 // Adapter for the existing project-level SmartAssignment endpoint.
-// It keeps the public API stable while delegating scoring to the advanced per-task algorithm.
+// It keeps the public API stable while delegating scoring to the advanced per-task algorithm,
+// and (when SaveRun is true) persists the run + ranked candidates via the Rec_ procedures.
 public class SmartAssignmentBatchService : ISmartAssignmentService
 {
+    // How many ranked candidates to persist per task when a run is saved.
+    private const int MaxPersistedCandidatesPerTask = 5;
+    private const string AlgorithmVersion = "1.0";
+
     private readonly IWorkItemRepository _workItemRepository;
     private readonly IAdvancedSmartAssignmentService _advancedSmartAssignmentService;
+    private readonly SmartAssignmentRepository _smartAssignmentRepository;
 
     public SmartAssignmentBatchService(
         IWorkItemRepository workItemRepository,
-        IAdvancedSmartAssignmentService advancedSmartAssignmentService)
+        IAdvancedSmartAssignmentService advancedSmartAssignmentService,
+        SmartAssignmentRepository smartAssignmentRepository)
     {
         _workItemRepository = workItemRepository;
         _advancedSmartAssignmentService = advancedSmartAssignmentService;
+        _smartAssignmentRepository = smartAssignmentRepository;
     }
 
     public async Task<SmartAssignmentRunResultModel> GenerateRecommendationsAsync(
@@ -27,9 +36,14 @@ public class SmartAssignmentBatchService : ISmartAssignmentService
         var tasks = await ResolveTasksAsync(request);
         var taskResults = new List<SmartAssignmentTaskResultModel>();
 
+        // Keep the full ranked candidate list per task so a saved run can persist all of them.
+        var rankedByTask = new Dictionary<int, List<EmployeeCandidateModel>>();
+
         foreach (var task in tasks)
         {
             var candidates = await _advancedSmartAssignmentService.GetRecommendationsAsync(task.WorkItemId);
+            rankedByTask[task.WorkItemId] = candidates;
+
             var recommendation = candidates.FirstOrDefault(candidate => candidate.IsEligible)
                 ?? candidates.FirstOrDefault();
 
@@ -50,12 +64,21 @@ public class SmartAssignmentBatchService : ISmartAssignmentService
                     ? new List<string>()
                     : new List<string> { recommendation.ExclusionReason ?? "No eligible employee found." },
                 Warnings = BuildWarnings(recommendation),
-                Reasons = BuildReasons(recommendation)
+                Reasons = BuildReasons(recommendation),
+                Factors = recommendation.Factors
             });
+        }
+
+        // Honor SaveRun: persist a run header plus the ranked candidates for every task in it.
+        int? recommendationRunId = null;
+        if (request.SaveRun && tasks.Count > 0)
+        {
+            recommendationRunId = await PersistRunAsync(request, rankedByTask);
         }
 
         return new SmartAssignmentRunResultModel
         {
+            RecommendationRunId = recommendationRunId,
             GeneratedAt = DateTime.UtcNow,
             TotalTasks = tasks.Count,
             TasksWithRecommendations = taskResults.Count(result => result.RecommendedEmployeeId.HasValue),
@@ -63,9 +86,59 @@ public class SmartAssignmentBatchService : ISmartAssignmentService
             WarningsCount = taskResults.Sum(result => result.Warnings.Count),
             Message = taskResults.Count == 0
                 ? "No tasks were available for smart assignment."
-                : "Smart assignment recommendations generated successfully.",
+                : recommendationRunId.HasValue
+                    ? "Smart assignment recommendations generated and saved successfully."
+                    : "Smart assignment recommendations generated successfully.",
             TaskResults = taskResults
         };
+    }
+
+    // Creates one run header and persists up to MaxPersistedCandidatesPerTask ranked rows per task.
+    private async Task<int?> PersistRunAsync(
+        SmartAssignmentRequestModel request,
+        Dictionary<int, List<EmployeeCandidateModel>> rankedByTask)
+    {
+        // ScopeType must match the DB CHECK constraint CK_Rec_RecommendationRuns_ScopeType,
+        // which only permits 'Project', 'Task', or 'AllProjects'.
+        string scopeType;
+        int? runTaskId = null;
+        if (request.ProjectId.HasValue)
+        {
+            scopeType = "Project";
+        }
+        else if (rankedByTask.Count == 1)
+        {
+            scopeType = "Task";
+            runTaskId = rankedByTask.Keys.First();
+        }
+        else
+        {
+            scopeType = "AllProjects";
+        }
+
+        var runId = await _smartAssignmentRepository.CreateRecommendationRunAsync(
+            scopeType,
+            request.ProjectId,
+            runTaskId,
+            request.RequestedByUserId,
+            AlgorithmVersion,
+            inputSnapshotJson: null);
+
+        if (runId <= 0)
+        {
+            return null;
+        }
+
+        foreach (var (taskId, candidates) in rankedByTask)
+        {
+            var topCandidates = candidates.Take(MaxPersistedCandidatesPerTask);
+            foreach (var candidate in topCandidates)
+            {
+                await _smartAssignmentRepository.SaveTaskAssignmentRecommendationAsync(runId, taskId, candidate);
+            }
+        }
+
+        return runId;
     }
 
     private async Task<List<WorkItem>> ResolveTasksAsync(SmartAssignmentRequestModel request)

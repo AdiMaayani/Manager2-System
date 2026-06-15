@@ -11,6 +11,9 @@ namespace ManageR2.Infrastructure.Models
         public DateTime? PlanningDate { get; set; }
         public bool IncludeLockedTasks { get; set; }
         public bool SaveRun { get; set; }
+
+        // Set by the controller from the JWT so persisted runs record who requested them.
+        public int? RequestedByUserId { get; set; }
     }
 
     // Working set loaded for one batch run (tasks, roster, current assignments) — internal to recommendation pipeline, not an API contract.
@@ -83,6 +86,10 @@ namespace ManageR2.Infrastructure.Models
         public List<string> Violations { get; set; } = new List<string>();
         public List<string> Warnings { get; set; } = new List<string>();
         public List<string> Reasons { get; set; } = new List<string>();
+
+        // Explainability for the recommended employee (factor scores/weights/explanations/data sources).
+        public List<ManageR2.Infrastructure.Models.SmartAssignment.RecommendationFactorModel> Factors { get; set; }
+            = new List<ManageR2.Infrastructure.Models.SmartAssignment.RecommendationFactorModel>();
     }
 
     // Alternate compact recommendation row shape (work item + ids + score) if used by older engine paths.

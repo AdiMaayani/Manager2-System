@@ -27,26 +27,41 @@ namespace ManageR2.Infrastructure.Repositories.SmartAssignment
         // English: one SP call hydrates TaskRecommendationInputModel lists consumed by SmartAssignmentService scoring.
         public async Task<TaskRecommendationInputModel> GetTaskRecommendationInputAsync(int workItemId)
         {
-            // אובייקט מאוחד שאליו נכניס את כל הנתונים שחוזרים מה-SP
-            var result = new TaskRecommendationInputModel();
-
-            // יצירת חיבור ל-DB דרך DBServices
             using var connection = _db.CreateConnection();
-
-            // יצירת פקודה שמריצה את ה-Stored Procedure המאוחד
             using var command = new SqlCommand("Rec_GetTaskRecommendationInput", connection);
-
-            // מגדיר שהפקודה היא Stored Procedure ולא SQL רגיל
             command.CommandType = CommandType.StoredProcedure;
-
-            // שולח ל-SP את מזהה המשימה שעבורה רוצים לחשב המלצות
             command.Parameters.AddWithValue("@WorkItemId", workItemId);
 
-            // פתיחת החיבור ל-DB
             await connection.OpenAsync();
-
-            // הרצת ה-SP וקבלת reader לקריאת התוצאות
             using var reader = await command.ExecuteReaderAsync();
+            return await MapInputAsync(reader);
+        }
+
+        // English: New Task draft path — same 12 result sets via Rec_GetDraftTaskRecommendationInput,
+        // built from the draft context (project/date/site) rather than a saved work item.
+        public async Task<TaskRecommendationInputModel> GetDraftTaskRecommendationInputAsync(
+            DraftTaskRecommendationContextModel context)
+        {
+            using var connection = _db.CreateConnection();
+            using var command = new SqlCommand("Rec_GetDraftTaskRecommendationInput", connection);
+            command.CommandType = CommandType.StoredProcedure;
+            command.Parameters.AddWithValue("@ProjectId", context.ProjectId);
+            command.Parameters.AddWithValue("@PlannedStart", context.PlannedStart);
+            command.Parameters.AddWithValue("@PlannedEnd", context.PlannedEnd);
+            command.Parameters.AddWithValue("@EstimatedHours", (object?)context.EstimatedHours ?? DBNull.Value);
+            command.Parameters.AddWithValue("@Priority", (object?)context.Priority ?? DBNull.Value);
+            command.Parameters.AddWithValue("@RequiredRole", (object?)context.RequiredRole ?? DBNull.Value);
+            command.Parameters.AddWithValue("@SiteId", (object?)context.SiteId ?? DBNull.Value);
+
+            await connection.OpenAsync();
+            using var reader = await command.ExecuteReaderAsync();
+            return await MapInputAsync(reader);
+        }
+
+        // English: shared mapping of the 12 recommendation-input result sets into the unified model.
+        private async Task<TaskRecommendationInputModel> MapInputAsync(SqlDataReader reader)
+        {
+            var result = new TaskRecommendationInputModel();
 
             // =====================================================
             // Result Set 1 - נתוני המשימה
@@ -264,6 +279,80 @@ namespace ManageR2.Infrastructure.Repositories.SmartAssignment
 
             // בסוף מחזירים את כל הקלט המאוחד לאלגוריתם
             return result;
+        }
+
+        // =====================================================
+        // Persistence (saveRun) — uses the existing Rec_ persistence procedures.
+        // =====================================================
+
+        // Creates a recommendation run header and returns its id (via OUTPUT parameter).
+        public async Task<int> CreateRecommendationRunAsync(
+            string scopeType,
+            int? projectId,
+            int? taskId,
+            int? requestedByUserId,
+            string algorithmVersion,
+            string? inputSnapshotJson)
+        {
+            using var connection = _db.CreateConnection();
+            using var command = new SqlCommand("Rec_CreateRecommendationRun", connection);
+            command.CommandType = CommandType.StoredProcedure;
+
+            command.Parameters.AddWithValue("@ScopeType", scopeType);
+            command.Parameters.AddWithValue("@ProjectId", (object?)projectId ?? DBNull.Value);
+            command.Parameters.AddWithValue("@TaskId", (object?)taskId ?? DBNull.Value);
+            command.Parameters.AddWithValue("@RequestedByUserId", (object?)requestedByUserId ?? DBNull.Value);
+            command.Parameters.AddWithValue(
+                "@AlgorithmVersion",
+                string.IsNullOrWhiteSpace(algorithmVersion) ? "1.0" : algorithmVersion);
+            command.Parameters.AddWithValue("@InputSnapshotJson", (object?)inputSnapshotJson ?? DBNull.Value);
+
+            var output = new SqlParameter("@RecommendationRunId", SqlDbType.Int)
+            {
+                Direction = ParameterDirection.Output
+            };
+            command.Parameters.Add(output);
+
+            await connection.OpenAsync();
+            await command.ExecuteNonQueryAsync();
+
+            return output.Value == DBNull.Value ? 0 : Convert.ToInt32(output.Value);
+        }
+
+        // Persists one ranked candidate row for a task within a run.
+        public async Task SaveTaskAssignmentRecommendationAsync(int runId, int taskId, EmployeeCandidateModel candidate)
+        {
+            using var connection = _db.CreateConnection();
+            using var command = new SqlCommand("Rec_SaveTaskAssignmentRecommendation", connection);
+            command.CommandType = CommandType.StoredProcedure;
+
+            command.Parameters.AddWithValue("@RecommendationRunId", runId);
+            command.Parameters.AddWithValue("@TaskId", taskId);
+            command.Parameters.AddWithValue("@EmployeeId", candidate.EmployeeId);
+            command.Parameters.AddWithValue("@UrgencyClass", DBNull.Value);
+            command.Parameters.AddWithValue("@OriginTypeUsed", (object?)candidate.OriginTypeUsed ?? DBNull.Value);
+            command.Parameters.AddWithValue("@RankOrder", candidate.RankOrder ?? 0);
+            command.Parameters.AddWithValue("@TotalScore", candidate.TotalScore ?? 0m);
+            command.Parameters.AddWithValue("@ProfessionalScore", (object?)candidate.ProfessionalScore ?? DBNull.Value);
+            command.Parameters.AddWithValue("@AvailabilityScore", (object?)candidate.AvailabilityScore ?? DBNull.Value);
+            command.Parameters.AddWithValue("@WorkloadScore", (object?)candidate.WorkloadScore ?? DBNull.Value);
+            command.Parameters.AddWithValue("@ExperienceScore", (object?)candidate.ExperienceScore ?? DBNull.Value);
+            command.Parameters.AddWithValue("@GeographicScore", (object?)candidate.GeographicScore ?? DBNull.Value);
+            command.Parameters.AddWithValue("@ContinuityScore", (object?)candidate.ContinuityScore ?? DBNull.Value);
+            command.Parameters.AddWithValue("@DistanceKm", (object?)candidate.DistanceKm ?? DBNull.Value);
+            command.Parameters.AddWithValue("@TravelMinutes", (object?)candidate.TravelMinutes ?? DBNull.Value);
+            command.Parameters.AddWithValue("@MatchedSkillsCount", (object?)candidate.MatchedSkillsCount ?? DBNull.Value);
+            command.Parameters.AddWithValue("@MissingSkillsCount", (object?)candidate.MissingSkillsCount ?? DBNull.Value);
+            command.Parameters.AddWithValue("@OpenAssignmentsCount", DBNull.Value);
+            command.Parameters.AddWithValue("@CurrentWorkloadHours", DBNull.Value);
+            command.Parameters.AddWithValue("@ZoneMatch", DBNull.Value);
+            command.Parameters.AddWithValue("@WorkedWithCustomerBefore", DBNull.Value);
+            command.Parameters.AddWithValue("@WorkedAtSiteBefore", DBNull.Value);
+            command.Parameters.AddWithValue("@RecommendationSummary", (object?)candidate.RecommendationSummary ?? DBNull.Value);
+            command.Parameters.AddWithValue("@WarningsJson", (object?)candidate.WarningsJson ?? DBNull.Value);
+
+            await connection.OpenAsync();
+            await command.ExecuteNonQueryAsync();
         }
 
         // =====================================================
