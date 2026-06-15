@@ -43,6 +43,11 @@ public static class Policies
 
     // Minimal employee selection lookup (id + display/scheduling fields only, no contact PII).
     public const string CanLookupEmployees = "CanLookupEmployees";
+
+    // Customer Systems Vault (sensitive customer system access details + encrypted secrets)
+    public const string CanViewCustomerSystems = "CanViewCustomerSystems";
+    public const string CanManageCustomerSystems = "CanManageCustomerSystems";
+    public const string CanRevealCustomerSystemSecrets = "CanRevealCustomerSystemSecrets";
 }
 
 public static class AuthorizationPolicyRegistration
@@ -119,6 +124,18 @@ public static class AuthorizationPolicyRegistration
             // service-call assignment, project assignment). Inventory has no employee picker and is excluded.
             options.AddPolicy(Policies.CanLookupEmployees, policy =>
                 policy.RequireRole(Roles.Admin, Roles.SeniorManagement, Roles.ProjectManager, Roles.Office, Roles.Technician));
+
+            // Customer Systems Vault. View = metadata read; Manage = create/update/deactivate records and
+            // secret metadata; Reveal = decrypt a stored secret (separately gated and always audited).
+            // Technician and Inventory get no vault access in this branch.
+            options.AddPolicy(Policies.CanViewCustomerSystems, policy =>
+                policy.RequireRole(Roles.Admin, Roles.SeniorManagement, Roles.ProjectManager, Roles.Office));
+
+            options.AddPolicy(Policies.CanManageCustomerSystems, policy =>
+                policy.RequireRole(Roles.Admin, Roles.SeniorManagement, Roles.ProjectManager));
+
+            options.AddPolicy(Policies.CanRevealCustomerSystemSecrets, policy =>
+                policy.RequireRole(Roles.Admin, Roles.SeniorManagement, Roles.ProjectManager));
 
             // Preserve the existing global default: every endpoint requires an authenticated user unless [AllowAnonymous].
             options.FallbackPolicy = new AuthorizationPolicyBuilder()

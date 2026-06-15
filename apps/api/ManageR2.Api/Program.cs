@@ -5,6 +5,7 @@ using ManageR2.Api.Middleware;
 using ManageR2.Infrastructure.DAL;
 using ManageR2.Infrastructure.Interfaces;
 using ManageR2.Infrastructure.Repositories;
+using ManageR2.Infrastructure.Security;
 using ManageR2.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.RateLimiting;
@@ -156,6 +157,10 @@ builder.Services.AddScoped<IInventoryItemRepository, InventoryItemRepository>();
 builder.Services.AddScoped<IQuoteRepository, QuoteRepository>();
 builder.Services.AddScoped<IEmployeeRepository, EmployeeRepository>();
 builder.Services.AddScoped<ICompanySettingsRepository, CompanySettingsRepository>();
+builder.Services.AddScoped<ICustomerSystemRepository, CustomerSystemRepository>();
+// Customer Systems Vault encryption. Singleton holds the validated AES-256 key; constructed lazily on
+// first vault request, so a missing/invalid key fails only vault operations (with a clear message), not startup.
+builder.Services.AddSingleton<ISecretProtector, AesGcmSecretProtector>();
 builder.Services.AddScoped<ISmartAssignmentService, SmartAssignmentBatchService>();
 // Advanced ranked recommendations: concrete repository + service from SmartAssignment module (aliased at top of file).
 builder.Services.AddScoped<AdvancedSmartAssignmentRepository>();
