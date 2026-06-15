@@ -12,6 +12,7 @@ import { QuotesPage } from '@features/quotes';
 import { InventoryPage } from '@features/inventory';
 import { ServiceCallsPage } from '@features/serviceCalls';
 import { SettingsPage } from '@features/settings';
+import { AuditLogPage } from '@features/audit';
 import { AppLayout } from '@shared/components/AppLayout';
 import { AdminRoute } from './AdminRoute';
 import { ProtectedRoute } from './ProtectedRoute';
@@ -109,6 +110,14 @@ export const router = createBrowserRouter([
         ),
       },
       { path: '/cashflow', element: <Navigate to="/" replace /> },
+      {
+        path: '/audit',
+        element: (
+          <RequirePermission permission="viewAuditLog">
+            <AuditLogPage />
+          </RequirePermission>
+        ),
+      },
       {
         path: '/settings',
         element: (

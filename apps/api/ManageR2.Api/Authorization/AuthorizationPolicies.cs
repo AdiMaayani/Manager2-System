@@ -48,6 +48,9 @@ public static class Policies
     public const string CanViewCustomerSystems = "CanViewCustomerSystems";
     public const string CanManageCustomerSystems = "CanManageCustomerSystems";
     public const string CanRevealCustomerSystemSecrets = "CanRevealCustomerSystemSecrets";
+
+    // Core audit trail (high-value security/operational events). Read-only; no public write endpoint.
+    public const string CanViewAuditLog = "CanViewAuditLog";
 }
 
 public static class AuthorizationPolicyRegistration
@@ -136,6 +139,11 @@ public static class AuthorizationPolicyRegistration
 
             options.AddPolicy(Policies.CanRevealCustomerSystemSecrets, policy =>
                 policy.RequireRole(Roles.Admin, Roles.SeniorManagement, Roles.ProjectManager));
+
+            // Audit trail is sensitive cross-cutting data (who did what, when, from where). Limited to
+            // Admin and SeniorManagement; no role can write to it through the API.
+            options.AddPolicy(Policies.CanViewAuditLog, policy =>
+                policy.RequireRole(Roles.Admin, Roles.SeniorManagement));
 
             // Preserve the existing global default: every endpoint requires an authenticated user unless [AllowAnonymous].
             options.FallbackPolicy = new AuthorizationPolicyBuilder()

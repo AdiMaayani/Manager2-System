@@ -1,7 +1,9 @@
 using ManageR2.Api.Authorization;
 using ManageR2.Api.DTOs;
+using ManageR2.Api.Features.Audit;
 using ManageR2.Domain.Entities;
 using ManageR2.Infrastructure.Repositories;
+using ManageR2.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using ManageR2.Infrastructure.Models;
@@ -16,11 +18,13 @@ public class WorkItemsController : ControllerBase
 {
     // Single entry point to work-item graph: hierarchy, assignments, milestones, and work-plan projections.
     private readonly IWorkItemRepository _workItemRepository;
+    private readonly IAuditLogService _auditLogService;
 
     // IWorkItemRepository is the bridge from HTTP to SQL/stored procedures for operational planning data.
-    public WorkItemsController(IWorkItemRepository workItemRepository)
+    public WorkItemsController(IWorkItemRepository workItemRepository, IAuditLogService auditLogService)
     {
         _workItemRepository = workItemRepository;
+        _auditLogService = auditLogService;
     }
 
     [HttpGet]
@@ -372,6 +376,19 @@ public class WorkItemsController : ControllerBase
             return BadRequest("Failed to create work item.");
         }
 
+        await _auditLogService.LogAsync(this.BuildAuditEvent(
+            AuditActions.WorkItemCreated,
+            AuditEntityTypes.WorkItem,
+            $"Work item '{workItem.Title}' (#{newWorkItemId}, type {workItem.WorkType}) created.",
+            entityId: newWorkItemId,
+            metadata: new Dictionary<string, object?>
+            {
+                ["workType"] = workItem.WorkType,
+                ["status"] = workItem.Status,
+                ["customerId"] = workItem.CustomerId,
+                ["siteId"] = workItem.SiteId
+            }));
+
         return Ok(new
         {
             message = "Work item created successfully.",
@@ -436,6 +453,19 @@ public class WorkItemsController : ControllerBase
         {
             return BadRequest("Failed to create project.");
         }
+
+        await _auditLogService.LogAsync(this.BuildAuditEvent(
+            AuditActions.WorkItemCreated,
+            AuditEntityTypes.WorkItem,
+            $"Project '{project.Title}' (#{newWorkItemId}) created.",
+            entityId: newWorkItemId,
+            metadata: new Dictionary<string, object?>
+            {
+                ["workType"] = project.WorkType,
+                ["status"] = project.Status,
+                ["customerId"] = project.CustomerId,
+                ["siteId"] = project.SiteId
+            }));
 
         return Ok(new
         {
@@ -531,6 +561,18 @@ public class WorkItemsController : ControllerBase
             return BadRequest("Failed to create task.");
         }
 
+        await _auditLogService.LogAsync(this.BuildAuditEvent(
+            AuditActions.WorkItemCreated,
+            AuditEntityTypes.WorkItem,
+            $"Task '{task.Title}' (#{newWorkItemId}) created under project #{task.ParentWorkItemId}.",
+            entityId: newWorkItemId,
+            metadata: new Dictionary<string, object?>
+            {
+                ["workType"] = task.WorkType,
+                ["status"] = task.Status,
+                ["parentWorkItemId"] = task.ParentWorkItemId
+            }));
+
         return Ok(new
         {
             message = "Task created successfully.",
@@ -561,6 +603,17 @@ public class WorkItemsController : ControllerBase
             return BadRequest("Failed to update work item.");
         }
 
+        await _auditLogService.LogAsync(this.BuildAuditEvent(
+            AuditActions.WorkItemUpdated,
+            AuditEntityTypes.WorkItem,
+            $"Work item #{id} ('{existingWorkItem.Title}') updated.",
+            entityId: id,
+            metadata: new Dictionary<string, object?>
+            {
+                ["workType"] = existingWorkItem.WorkType,
+                ["status"] = workItem.Status
+            }));
+
         return Ok(new { message = "Work item updated successfully." });
     }
 
@@ -581,6 +634,16 @@ public class WorkItemsController : ControllerBase
         {
             return BadRequest("Failed to close work item.");
         }
+
+        await _auditLogService.LogAsync(this.BuildAuditEvent(
+            AuditActions.WorkItemClosed,
+            AuditEntityTypes.WorkItem,
+            $"Work item #{id} ('{existingWorkItem.Title}') closed.",
+            entityId: id,
+            metadata: new Dictionary<string, object?>
+            {
+                ["workType"] = existingWorkItem.WorkType
+            }));
 
         return Ok(new { message = "Work item closed successfully." });
     }
@@ -603,6 +666,17 @@ public class WorkItemsController : ControllerBase
             {
                 return BadRequest(new { message = "Failed to assign employee to work item." });
             }
+
+            await _auditLogService.LogAsync(this.BuildAuditEvent(
+                AuditActions.WorkItemAssigned,
+                AuditEntityTypes.WorkItem,
+                $"Employee #{request.EmployeeId} assigned to work item #{id}.",
+                entityId: id,
+                metadata: new Dictionary<string, object?>
+                {
+                    ["employeeId"] = request.EmployeeId,
+                    ["assignmentRole"] = request.AssignmentRole
+                }));
 
             return Ok(new { message = "Employee assigned successfully." });
         }
