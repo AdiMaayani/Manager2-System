@@ -1,8 +1,10 @@
 using ManageR2.Api.Authorization;
+using ManageR2.Api.Features.Audit;
 using ManageR2.Api.Features.CustomerSystems.DTOs;
 using ManageR2.Domain.Entities;
 using ManageR2.Infrastructure.Interfaces;
 using ManageR2.Infrastructure.Security;
+using ManageR2.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -18,11 +20,19 @@ public class CustomerSystemsController : ControllerBase
 {
     private readonly ICustomerSystemRepository _repository;
     private readonly ISecretProtector _secretProtector;
+    // General audit trail. The authoritative, blocking reveal log remains the dedicated
+    // CustomerSystemSecretAccessLog (via _repository.LogSecretAccessAsync); this is an additional
+    // best-effort mirror for the unified audit screen.
+    private readonly IAuditLogService _auditLogService;
 
-    public CustomerSystemsController(ICustomerSystemRepository repository, ISecretProtector secretProtector)
+    public CustomerSystemsController(
+        ICustomerSystemRepository repository,
+        ISecretProtector secretProtector,
+        IAuditLogService auditLogService)
     {
         _repository = repository;
         _secretProtector = secretProtector;
+        _auditLogService = auditLogService;
     }
 
     // GET /api/customer-systems?customerId=123&includeInactive=false
@@ -84,6 +94,19 @@ public class CustomerSystemsController : ControllerBase
         };
 
         var id = await _repository.CreateSystemAsync(system);
+
+        await _auditLogService.LogAsync(this.BuildAuditEvent(
+            AuditActions.CustomerSystemCreated,
+            AuditEntityTypes.CustomerSystem,
+            $"Customer system '{system.SystemName}' (#{id}) created for customer #{system.CustomerId}.",
+            entityId: id,
+            metadata: new Dictionary<string, object?>
+            {
+                ["customerId"] = system.CustomerId,
+                ["systemType"] = system.SystemType,
+                ["systemName"] = system.SystemName
+            }));
+
         var created = await _repository.GetSystemByIdAsync(id);
         return CreatedAtAction(nameof(GetById), new { id }, created == null ? null : ToSystemDto(created));
     }
@@ -122,6 +145,18 @@ public class CustomerSystemsController : ControllerBase
             return BadRequest(new { message = "Failed to update the customer system." });
         }
 
+        await _auditLogService.LogAsync(this.BuildAuditEvent(
+            AuditActions.CustomerSystemUpdated,
+            AuditEntityTypes.CustomerSystem,
+            $"Customer system '{existing.SystemName}' (#{id}) updated.",
+            entityId: id,
+            metadata: new Dictionary<string, object?>
+            {
+                ["systemType"] = existing.SystemType,
+                ["systemName"] = existing.SystemName,
+                ["isActive"] = existing.IsActive
+            }));
+
         var refreshed = await _repository.GetSystemByIdAsync(id);
         return Ok(refreshed == null ? null : ToSystemDto(refreshed));
     }
@@ -137,6 +172,18 @@ public class CustomerSystemsController : ControllerBase
         }
 
         await _repository.DeactivateSystemAsync(id);
+
+        await _auditLogService.LogAsync(this.BuildAuditEvent(
+            AuditActions.CustomerSystemDeactivated,
+            AuditEntityTypes.CustomerSystem,
+            $"Customer system '{existing.SystemName}' (#{id}) deactivated.",
+            entityId: id,
+            severity: AuditSeverity.Warning,
+            metadata: new Dictionary<string, object?>
+            {
+                ["systemName"] = existing.SystemName
+            }));
+
         return NoContent();
     }
 
@@ -188,6 +235,17 @@ public class CustomerSystemsController : ControllerBase
 
         var secretId = await _repository.CreateSecretAsync(secret);
 
+        await _auditLogService.LogAsync(this.BuildAuditEvent(
+            AuditActions.CustomerSystemSecretCreated,
+            AuditEntityTypes.CustomerSystemSecret,
+            $"Secret (#{secretId}, type '{secret.SecretType}') created for customer system #{id}.",
+            entityId: secretId,
+            metadata: new Dictionary<string, object?>
+            {
+                ["customerSystemId"] = id,
+                ["secretType"] = secret.SecretType
+            }));
+
         var metadata = await _repository.GetSecretsMetadataAsync(id);
         var created = metadata.FirstOrDefault(s => s.SecretId == secretId);
         return Ok(created == null ? null : ToSecretMetadataDto(created));
@@ -232,6 +290,19 @@ public class CustomerSystemsController : ControllerBase
             return BadRequest(new { message = "Failed to update the secret." });
         }
 
+        await _auditLogService.LogAsync(this.BuildAuditEvent(
+            AuditActions.CustomerSystemSecretUpdated,
+            AuditEntityTypes.CustomerSystemSecret,
+            $"Secret (#{secretId}, type '{secret.SecretType}') updated for customer system #{id}.",
+            entityId: secretId,
+            metadata: new Dictionary<string, object?>
+            {
+                ["customerSystemId"] = id,
+                ["secretType"] = secret.SecretType,
+                ["secretValueReplaced"] = replaceSecretValue,
+                ["isActive"] = secret.IsActive
+            }));
+
         // Re-read metadata so the masked preview reflects the stored state.
         var metadata = await _repository.GetSecretsMetadataAsync(id);
         var refreshed = metadata.FirstOrDefault(s => s.SecretId == secretId);
@@ -249,6 +320,18 @@ public class CustomerSystemsController : ControllerBase
         }
 
         await _repository.DeactivateSecretAsync(secretId);
+
+        await _auditLogService.LogAsync(this.BuildAuditEvent(
+            AuditActions.CustomerSystemSecretDeactivated,
+            AuditEntityTypes.CustomerSystemSecret,
+            $"Secret (#{secretId}) deactivated for customer system #{id}.",
+            entityId: secretId,
+            severity: AuditSeverity.Warning,
+            metadata: new Dictionary<string, object?>
+            {
+                ["customerSystemId"] = id
+            }));
+
         return NoContent();
     }
 
@@ -277,6 +360,8 @@ public class CustomerSystemsController : ControllerBase
         var plaintext = _secretProtector.Unprotect(secret.EncryptedSecretValue);
 
         // Audit the reveal before returning the value. Never log the plaintext itself.
+        // This dedicated access log is authoritative and intentionally allowed to throw: if we cannot
+        // record a reveal, we must not return the secret.
         var clientIp = HttpContext.Connection.RemoteIpAddress?.ToString();
         await _repository.LogSecretAccessAsync(
             secretId,
@@ -285,6 +370,21 @@ public class CustomerSystemsController : ControllerBase
             CleanOptional(dto?.AccessReason),
             "RevealSecret",
             clientIp);
+
+        // Additionally mirror the reveal into the unified audit trail (best-effort; never the plaintext).
+        await _auditLogService.LogAsync(this.BuildAuditEvent(
+            AuditActions.CustomerSystemSecretRevealed,
+            AuditEntityTypes.CustomerSystemSecret,
+            $"Secret (#{secretId}, type '{secret.SecretType}') revealed for customer system #{id}.",
+            entityId: secretId,
+            severity: AuditSeverity.Critical,
+            metadata: new Dictionary<string, object?>
+            {
+                ["customerSystemId"] = id,
+                ["secretType"] = secret.SecretType,
+                ["hasAccessReason"] = !string.IsNullOrWhiteSpace(dto?.AccessReason)
+            },
+            userIdOverride: currentUserId));
 
         return Ok(new RevealSecretResponseDto
         {

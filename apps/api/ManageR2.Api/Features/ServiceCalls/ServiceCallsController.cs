@@ -1,7 +1,9 @@
 using ManageR2.Api.Authorization;
+using ManageR2.Api.Features.Audit;
 using ManageR2.Api.Features.ServiceCalls.DTOs;
 using ManageR2.Domain.Entities;
 using ManageR2.Infrastructure.Repositories;
+using ManageR2.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
@@ -15,10 +17,12 @@ public class ServiceCallsController : ControllerBase
     private const string ServiceCallWorkType = "ServiceCall";
 
     private readonly IWorkItemRepository _workItemRepository;
+    private readonly IAuditLogService _auditLogService;
 
-    public ServiceCallsController(IWorkItemRepository workItemRepository)
+    public ServiceCallsController(IWorkItemRepository workItemRepository, IAuditLogService auditLogService)
     {
         _workItemRepository = workItemRepository;
+        _auditLogService = auditLogService;
     }
 
     [HttpGet]
@@ -58,6 +62,19 @@ public class ServiceCallsController : ControllerBase
             return BadRequest("Failed to create service call.");
         }
 
+        await _auditLogService.LogAsync(this.BuildAuditEvent(
+            AuditActions.ServiceCallCreated,
+            AuditEntityTypes.ServiceCall,
+            $"Service call '{serviceCall.Title}' (#{newWorkItemId}) created.",
+            entityId: newWorkItemId,
+            metadata: new Dictionary<string, object?>
+            {
+                ["customerId"] = serviceCall.CustomerId,
+                ["siteId"] = serviceCall.SiteId,
+                ["status"] = serviceCall.Status,
+                ["priority"] = serviceCall.Priority
+            }));
+
         return Ok(new
         {
             message = "Service call created successfully.",
@@ -89,6 +106,17 @@ public class ServiceCallsController : ControllerBase
             return BadRequest("Failed to update service call.");
         }
 
+        await _auditLogService.LogAsync(this.BuildAuditEvent(
+            AuditActions.ServiceCallUpdated,
+            AuditEntityTypes.ServiceCall,
+            $"Service call '{serviceCall.Title}' (#{id}) updated.",
+            entityId: id,
+            metadata: new Dictionary<string, object?>
+            {
+                ["status"] = serviceCall.Status,
+                ["priority"] = serviceCall.Priority
+            }));
+
         return Ok(new { message = "Service call updated successfully." });
     }
 
@@ -107,6 +135,12 @@ public class ServiceCallsController : ControllerBase
         {
             return BadRequest("Failed to close service call.");
         }
+
+        await _auditLogService.LogAsync(this.BuildAuditEvent(
+            AuditActions.ServiceCallClosed,
+            AuditEntityTypes.ServiceCall,
+            $"Service call '{existingServiceCall.Title}' (#{id}) closed.",
+            entityId: id));
 
         return Ok(new { message = "Service call closed successfully." });
     }
@@ -137,6 +171,17 @@ public class ServiceCallsController : ControllerBase
             {
                 return BadRequest("Failed to assign employee to service call.");
             }
+
+            await _auditLogService.LogAsync(this.BuildAuditEvent(
+                AuditActions.ServiceCallAssigned,
+                AuditEntityTypes.ServiceCall,
+                $"Employee #{request.EmployeeId} assigned to service call '{existingServiceCall.Title}' (#{id}).",
+                entityId: id,
+                metadata: new Dictionary<string, object?>
+                {
+                    ["employeeId"] = request.EmployeeId,
+                    ["assignmentRole"] = request.AssignmentRole
+                }));
 
             return Ok(new { message = "Employee assigned to service call successfully." });
         }

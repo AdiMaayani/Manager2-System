@@ -17,6 +17,7 @@ export type Permission =
   | 'viewEmployees'
   | 'viewUsers'
   | 'viewSettings'
+  | 'viewAuditLog'
   // Minimal employee selection lookup (id + display fields) for pickers/forms
   | 'lookupEmployees'
   // Actions (write/management) — kept aligned with the backend policies
@@ -56,6 +57,7 @@ const ALL_PERMISSIONS: Permission[] = [
   'viewEmployees',
   'viewUsers',
   'viewSettings',
+  'viewAuditLog',
   'lookupEmployees',
   'manageCustomers',
   'manageContacts',
@@ -87,6 +89,7 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     'viewInventory',
     'viewReports',
     'viewEmployees',
+    'viewAuditLog',
     'lookupEmployees',
     'manageCustomers',
     'manageContacts',

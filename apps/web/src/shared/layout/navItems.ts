@@ -10,6 +10,7 @@ import {
   Package,
   Settings,
   ClipboardList,
+  ScrollText,
 } from 'lucide-react';
 import type { Permission } from '@shared/auth/permissions';
 
@@ -37,5 +38,6 @@ export const mainNavItems: NavItem[] = [
 ];
 
 export const bottomNavItems: NavItem[] = [
+  { path: '/audit', label: 'יומן ביקורת', icon: ScrollText, requiredPermission: 'viewAuditLog' },
   { path: '/settings', label: 'הגדרות', icon: Settings, requiredPermission: 'viewSettings' },
 ];

@@ -158,6 +158,9 @@ builder.Services.AddScoped<IQuoteRepository, QuoteRepository>();
 builder.Services.AddScoped<IEmployeeRepository, EmployeeRepository>();
 builder.Services.AddScoped<ICompanySettingsRepository, CompanySettingsRepository>();
 builder.Services.AddScoped<ICustomerSystemRepository, CustomerSystemRepository>();
+// Core audit trail: append-only repository + best-effort logging service used by security/operational endpoints.
+builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
+builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 // Customer Systems Vault encryption. Singleton holds the validated AES-256 key; constructed lazily on
 // first vault request, so a missing/invalid key fails only vault operations (with a clear message), not startup.
 builder.Services.AddSingleton<ISecretProtector, AesGcmSecretProtector>();

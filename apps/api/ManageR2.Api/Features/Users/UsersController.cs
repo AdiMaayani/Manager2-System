@@ -1,6 +1,7 @@
 using System.Security.Claims;
 using ManageR2.Api.Authorization;
 using ManageR2.Api.DTOs;
+using ManageR2.Api.Features.Audit;
 using ManageR2.Domain.Entities;
 using ManageR2.Domain.Exceptions;
 using ManageR2.Infrastructure.Repositories;
@@ -24,6 +25,8 @@ public class UsersController : ControllerBase
     private readonly IPasswordService _passwordService;
     // Fine-grained rules (e.g. who may view another user's record) beyond simple role checks.
     private readonly IUserAuthorizationService _userAuthorizationService;
+    // Best-effort audit trail for security-sensitive user/login events.
+    private readonly IAuditLogService _auditLogService;
     private readonly ILogger<UsersController> _logger;
 
     public UsersController(
@@ -31,12 +34,14 @@ public class UsersController : ControllerBase
         IJwtTokenService jwtTokenService,
         IPasswordService passwordService,
         IUserAuthorizationService userAuthorizationService,
+        IAuditLogService auditLogService,
         ILogger<UsersController> logger)
     {
         _userRepository = userRepository;
         _jwtTokenService = jwtTokenService;
         _passwordService = passwordService;
         _userAuthorizationService = userAuthorizationService;
+        _auditLogService = auditLogService;
         _logger = logger;
     }
 
@@ -255,6 +260,19 @@ public class UsersController : ControllerBase
 
             var created = await _userRepository.GetUserByIdAsync(id);
 
+            await _auditLogService.LogAsync(this.BuildAuditEvent(
+                AuditActions.UserCreated,
+                AuditEntityTypes.User,
+                $"User '{user.Username}' (#{id}) created.",
+                entityId: id,
+                metadata: new Dictionary<string, object?>
+                {
+                    ["username"] = user.Username,
+                    ["roles"] = normalizedRoles,
+                    ["departments"] = normalizedDepartments,
+                    ["isActive"] = user.IsActive
+                }));
+
             return CreatedAtAction(nameof(GetUserById), new { id }, await ToSafeUserAsync(created!));
         }
         catch (UserValidationException ex)
@@ -280,6 +298,9 @@ public class UsersController : ControllerBase
 
         var normalizedRoles = NormalizeNamesList(dto.Roles);
         var normalizedDepartments = NormalizeNamesList(dto.Departments);
+        // Captured before the write so the audit row can flag role changes and (de)activation.
+        var previousRoles = await _userRepository.GetUserRolesAsync(id);
+        var wasActive = existing.IsActive;
 
         try
         {
@@ -309,6 +330,31 @@ public class UsersController : ControllerBase
             await _userRepository.SetUserRolesAsync(id, normalizedRoles);
             await _userRepository.SetUserDepartmentsAsync(id, normalizedDepartments);
 
+            var rolesChanged = !previousRoles
+                .OrderBy(role => role, StringComparer.OrdinalIgnoreCase)
+                .SequenceEqual(
+                    normalizedRoles.OrderBy(role => role, StringComparer.OrdinalIgnoreCase),
+                    StringComparer.OrdinalIgnoreCase);
+            var deactivated = wasActive && !user.IsActive;
+            var passwordChanged = !string.IsNullOrWhiteSpace(dto.Password);
+
+            await _auditLogService.LogAsync(this.BuildAuditEvent(
+                AuditActions.UserUpdated,
+                AuditEntityTypes.User,
+                $"User '{user.Username}' (#{id}) updated.",
+                entityId: id,
+                severity: (rolesChanged || deactivated) ? AuditSeverity.Warning : AuditSeverity.Info,
+                metadata: new Dictionary<string, object?>
+                {
+                    ["username"] = user.Username,
+                    ["isActive"] = user.IsActive,
+                    ["deactivated"] = deactivated,
+                    ["rolesChanged"] = rolesChanged,
+                    ["previousRoles"] = previousRoles,
+                    ["newRoles"] = normalizedRoles,
+                    ["passwordChanged"] = passwordChanged
+                }));
+
             var updated = await _userRepository.GetUserByIdAsync(id);
             return Ok(await ToSafeUserAsync(updated!));
         }
@@ -330,6 +376,18 @@ public class UsersController : ControllerBase
         try
         {
             await _userRepository.DeleteUserAsync(id);
+
+            await _auditLogService.LogAsync(this.BuildAuditEvent(
+                AuditActions.UserDeleted,
+                AuditEntityTypes.User,
+                $"User '{existing.Username}' (#{id}) deleted.",
+                entityId: id,
+                severity: AuditSeverity.Warning,
+                metadata: new Dictionary<string, object?>
+                {
+                    ["username"] = existing.Username
+                }));
+
             return NoContent();
         }
         catch (UserValidationException ex)
@@ -355,13 +413,34 @@ public class UsersController : ControllerBase
 
         var user = await _userRepository.GetUserByEmailAsync(email);
         if (user == null)
+        {
+            // Unknown e-mail: record the attempt with no UserId. The e-mail is not a secret, but never
+            // log the supplied password.
+            await _auditLogService.LogAsync(this.BuildAuditEvent(
+                AuditActions.LoginFailed,
+                AuditEntityTypes.User,
+                $"Login failed: no account for '{email}'.",
+                severity: AuditSeverity.Warning,
+                metadata: new Dictionary<string, object?> { ["attemptedEmail"] = email, ["reason"] = "UnknownEmail" },
+                userIdOverride: null));
+
             return Unauthorized(new { message = "Invalid email or password." });
+        }
 
         // Reject locked accounts before checking the password so brute-force attempts cannot succeed
         // even with the correct credentials during the lockout window.
         var lockoutEndUtc = await _userRepository.GetLockoutEndUtcAsync(user.UserId);
         if (lockoutEndUtc.HasValue && lockoutEndUtc.Value > DateTime.UtcNow)
         {
+            await _auditLogService.LogAsync(this.BuildAuditEvent(
+                AuditActions.AccountLockoutBlocked,
+                AuditEntityTypes.User,
+                $"Login blocked: account '{user.Username}' (#{user.UserId}) is locked out.",
+                entityId: user.UserId,
+                severity: AuditSeverity.Warning,
+                metadata: new Dictionary<string, object?> { ["lockoutEndUtc"] = lockoutEndUtc.Value },
+                userIdOverride: user.UserId));
+
             return StatusCode(
                 StatusCodes.Status423Locked,
                 new { message = "Account temporarily locked due to multiple failed login attempts. Please try again later." });
@@ -371,11 +450,32 @@ public class UsersController : ControllerBase
         if (!isValid)
         {
             await _userRepository.RegisterFailedLoginAsync(user.UserId);
+
+            await _auditLogService.LogAsync(this.BuildAuditEvent(
+                AuditActions.LoginFailed,
+                AuditEntityTypes.User,
+                $"Login failed: wrong password for '{user.Username}' (#{user.UserId}).",
+                entityId: user.UserId,
+                severity: AuditSeverity.Warning,
+                metadata: new Dictionary<string, object?> { ["reason"] = "InvalidPassword" },
+                userIdOverride: user.UserId));
+
             return Unauthorized(new { message = "Invalid email or password." });
         }
 
         if (!user.IsActive)
+        {
+            await _auditLogService.LogAsync(this.BuildAuditEvent(
+                AuditActions.LoginFailed,
+                AuditEntityTypes.User,
+                $"Login failed: account '{user.Username}' (#{user.UserId}) is inactive.",
+                entityId: user.UserId,
+                severity: AuditSeverity.Warning,
+                metadata: new Dictionary<string, object?> { ["reason"] = "InactiveUser" },
+                userIdOverride: user.UserId));
+
             return StatusCode(StatusCodes.Status403Forbidden, new { message = "User is inactive and cannot log in." });
+        }
 
         await _userRepository.ClearFailedLoginAsync(user.UserId);
         await _userRepository.UpdateLastLoginAtAsync(user.UserId);
@@ -387,6 +487,14 @@ public class UsersController : ControllerBase
         var roles = await _userRepository.GetUserRolesAsync(refreshedUser.UserId);
         var departments = await _userRepository.GetUserDepartmentsAsync(refreshedUser.UserId);
         var token = _jwtTokenService.GenerateToken(refreshedUser, roles);
+
+        await _auditLogService.LogAsync(this.BuildAuditEvent(
+            AuditActions.LoginSucceeded,
+            AuditEntityTypes.User,
+            $"User '{refreshedUser.Username}' (#{refreshedUser.UserId}) logged in.",
+            entityId: refreshedUser.UserId,
+            metadata: new Dictionary<string, object?> { ["roles"] = roles },
+            userIdOverride: refreshedUser.UserId));
 
         return Ok(new LoginResponseDto
         {
