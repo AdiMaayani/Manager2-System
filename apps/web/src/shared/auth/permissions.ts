@@ -29,7 +29,11 @@ export type Permission =
   | 'manageServiceCalls'
   | 'editReports'
   | 'manageUsers'
-  | 'manageSettings';
+  | 'manageSettings'
+  // Customer Systems Vault
+  | 'viewCustomerSystems'
+  | 'manageCustomerSystems'
+  | 'revealCustomerSystemSecrets';
 
 export const ROLES = {
   Admin: 'Admin',
@@ -63,6 +67,9 @@ const ALL_PERMISSIONS: Permission[] = [
   'editReports',
   'manageUsers',
   'manageSettings',
+  'viewCustomerSystems',
+  'manageCustomerSystems',
+  'revealCustomerSystemSecrets',
 ];
 
 // Per-role permission grants. Admin receives every permission. Each other role lists exactly the
@@ -89,6 +96,9 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     'manageQuotes',
     'manageServiceCalls',
     'editReports',
+    'viewCustomerSystems',
+    'manageCustomerSystems',
+    'revealCustomerSystemSecrets',
   ],
 
   [ROLES.ProjectManager]: [
@@ -103,6 +113,9 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     'manageWorkPlan',
     'manageServiceCalls',
     'editReports',
+    'viewCustomerSystems',
+    'manageCustomerSystems',
+    'revealCustomerSystemSecrets',
   ],
 
   [ROLES.Office]: [
@@ -118,6 +131,7 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     'manageQuotes',
     'manageServiceCalls',
     'editReports',
+    'viewCustomerSystems',
   ],
 
   [ROLES.Technician]: [

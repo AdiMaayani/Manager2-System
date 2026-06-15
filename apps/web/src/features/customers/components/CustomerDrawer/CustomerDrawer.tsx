@@ -16,6 +16,7 @@ import {
 } from '@features/quotes/constants/quoteStatus';
 import { getServiceCallsAsync } from '@features/serviceCalls/api/serviceCallsApiClient';
 import { getContactsAsync } from '@features/contacts/api/contactsApiClient';
+import { CustomerVaultSection } from '@features/customerSystems';
 import { useCustomerMutations } from '../../hooks/useCustomers';
 import type { Customer, CreateCustomerRequest } from '../../types';
 import './CustomerDrawer.css';
@@ -452,6 +453,8 @@ function CustomerReviewDetails({ customer }: CustomerReviewDetailsProps) {
         </div>
         <DetailsField label="הערות" value={customer.notes} />
       </DetailsSection>
+
+      <CustomerVaultSection customerId={customer.customerId} />
 
       <RelatedSection
         title="פרויקטים"
