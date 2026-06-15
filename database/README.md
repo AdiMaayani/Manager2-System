@@ -1,5 +1,12 @@
 # ManageR2 Database — Version-Controlled Baseline
 
+> ⚠️ **For setup/rebuild/deployment, use [`RUNBOOK.md`](./RUNBOOK.md) — it is authoritative.**
+> The counts and run order below describe the **original 31/05/2026 baseline only** and are now
+> **out of date**: the live database has **41 tables / 132 stored procedures** (not 36 / 108), and the
+> recent feature migrations (login lockout, Customer Systems Vault, Smart Assignment persistence &
+> factor activation) are **required** for a fresh build — they are **not** optional/"historical".
+> See `RUNBOOK.md` §1 and §8 for the reconciliation against the current `igroup30_prod.sql` dump.
+
 This folder is the version-controlled, reproducible definition of the ManageR2 SQL Server database.
 It was originally produced by exporting the live production dump `igroup30_prod.sql`
 (Script Date **31/05/2026**, SQL Server 2016, compatibility level 100) into one script per object,
