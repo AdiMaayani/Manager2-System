@@ -179,5 +179,60 @@ BEGIN
         SELECT SiteId FROM dbo.WorkItems WHERE WorkItemId = @WorkItemId
     );
 
+    --------------------------------------------------
+    -- 13. CURRENT LOAD — open assignments + committed hours on the task day.
+    -- Sourced from existing WorkEmployeeAssignments + WorkItems (no new tables). Excludes the
+    -- current task. Feeds the workload factor (capacity vs already-committed hours).
+    --------------------------------------------------
+    SELECT
+        e.EmployeeId,
+        COALESCE(load.OpenAssignmentsCount, 0) AS OpenAssignmentsCount,
+        CAST(COALESCE(load.CurrentAssignedHours, 0) AS DECIMAL(10,2)) AS CurrentAssignedHours
+    FROM dbo.Employees e
+    OUTER APPLY (
+        SELECT
+            COUNT(DISTINCT wiLoad.WorkItemId) AS OpenAssignmentsCount,
+            SUM(COALESCE(wiLoad.EstimatedHours, 0)) AS CurrentAssignedHours
+        FROM dbo.WorkEmployeeAssignments wea
+        INNER JOIN dbo.WorkItems wiLoad
+            ON wiLoad.WorkItemId = wea.WorkItemId
+        WHERE wea.EmployeeId = e.EmployeeId
+          AND wiLoad.WorkItemId <> @WorkItemId
+          AND @StartAt IS NOT NULL
+          AND CAST(wiLoad.PlannedStart AS DATE) = CAST(@StartAt AS DATE)
+          AND ISNULL(wiLoad.Status, '') NOT IN ('Closed', 'Cancelled', 'Canceled', 'Deleted')
+    ) load
+    WHERE e.IsActive = 1
+      AND e.IsAssignable = 1;
+
+    --------------------------------------------------
+    -- 14. CONTINUITY — has the employee previously worked this project / customer / site?
+    -- Sourced from existing WorkEmployeeAssignments + WorkItems (no new tables). Excludes the
+    -- current task. Feeds the continuity factor.
+    --------------------------------------------------
+    DECLARE @ParentWorkItemId INT, @TaskCustomerId INT, @TaskSiteId INT;
+    SELECT
+        @ParentWorkItemId = ParentWorkItemId,
+        @TaskCustomerId = CustomerId,
+        @TaskSiteId = SiteId
+    FROM dbo.WorkItems
+    WHERE WorkItemId = @WorkItemId;
+
+    SELECT
+        e.EmployeeId,
+        CAST(MAX(CASE WHEN @ParentWorkItemId IS NOT NULL AND wiHist.ParentWorkItemId = @ParentWorkItemId THEN 1 ELSE 0 END) AS BIT) AS WorkedOnProjectBefore,
+        CAST(MAX(CASE WHEN @TaskCustomerId IS NOT NULL AND wiHist.CustomerId = @TaskCustomerId THEN 1 ELSE 0 END) AS BIT) AS WorkedWithCustomerBefore,
+        CAST(MAX(CASE WHEN @TaskSiteId IS NOT NULL AND wiHist.SiteId = @TaskSiteId THEN 1 ELSE 0 END) AS BIT) AS WorkedAtSiteBefore,
+        COUNT(DISTINCT wiHist.WorkItemId) AS TotalPriorAssignments
+    FROM dbo.Employees e
+    LEFT JOIN dbo.WorkEmployeeAssignments weaHist
+        ON weaHist.EmployeeId = e.EmployeeId
+    LEFT JOIN dbo.WorkItems wiHist
+        ON wiHist.WorkItemId = weaHist.WorkItemId
+       AND wiHist.WorkItemId <> @WorkItemId
+    WHERE e.IsActive = 1
+      AND e.IsAssignable = 1
+    GROUP BY e.EmployeeId;
+
 END
 GO

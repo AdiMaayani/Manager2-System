@@ -277,6 +277,42 @@ namespace ManageR2.Infrastructure.Repositories.SmartAssignment
                 });
             }
 
+            // =====================================================
+            // Result Set 13 - עומס נוכחי (שיבוצים פתוחים ושעות) ביום המשימה
+            // Additive result set. When running against a DB that has not yet applied the
+            // factor-activation migration, NextResultAsync simply returns false and the list stays empty.
+            // =====================================================
+            if (await reader.NextResultAsync())
+            {
+                while (await reader.ReadAsync())
+                {
+                    result.EmployeeCurrentLoads.Add(new EmployeeCurrentLoadModel
+                    {
+                        EmployeeId = GetInt(reader, "EmployeeId"),
+                        OpenAssignmentsCount = GetNullableInt(reader, "OpenAssignmentsCount") ?? 0,
+                        CurrentAssignedHours = GetNullableDecimal(reader, "CurrentAssignedHours") ?? 0m
+                    });
+                }
+            }
+
+            // =====================================================
+            // Result Set 14 - רציפות (עבודה קודמת מול פרויקט / לקוח / אתר)
+            // =====================================================
+            if (await reader.NextResultAsync())
+            {
+                while (await reader.ReadAsync())
+                {
+                    result.EmployeeContinuities.Add(new EmployeeContinuityModel
+                    {
+                        EmployeeId = GetInt(reader, "EmployeeId"),
+                        WorkedOnProjectBefore = GetBool(reader, "WorkedOnProjectBefore"),
+                        WorkedWithCustomerBefore = GetBool(reader, "WorkedWithCustomerBefore"),
+                        WorkedAtSiteBefore = GetBool(reader, "WorkedAtSiteBefore"),
+                        TotalPriorAssignments = GetNullableInt(reader, "TotalPriorAssignments") ?? 0
+                    });
+                }
+            }
+
             // בסוף מחזירים את כל הקלט המאוחד לאלגוריתם
             return result;
         }
@@ -343,11 +379,11 @@ namespace ManageR2.Infrastructure.Repositories.SmartAssignment
             command.Parameters.AddWithValue("@TravelMinutes", (object?)candidate.TravelMinutes ?? DBNull.Value);
             command.Parameters.AddWithValue("@MatchedSkillsCount", (object?)candidate.MatchedSkillsCount ?? DBNull.Value);
             command.Parameters.AddWithValue("@MissingSkillsCount", (object?)candidate.MissingSkillsCount ?? DBNull.Value);
-            command.Parameters.AddWithValue("@OpenAssignmentsCount", DBNull.Value);
-            command.Parameters.AddWithValue("@CurrentWorkloadHours", DBNull.Value);
+            command.Parameters.AddWithValue("@OpenAssignmentsCount", (object?)candidate.OpenAssignmentsCount ?? DBNull.Value);
+            command.Parameters.AddWithValue("@CurrentWorkloadHours", (object?)candidate.CurrentWorkloadHours ?? DBNull.Value);
             command.Parameters.AddWithValue("@ZoneMatch", DBNull.Value);
-            command.Parameters.AddWithValue("@WorkedWithCustomerBefore", DBNull.Value);
-            command.Parameters.AddWithValue("@WorkedAtSiteBefore", DBNull.Value);
+            command.Parameters.AddWithValue("@WorkedWithCustomerBefore", (object?)candidate.WorkedWithCustomerBefore ?? DBNull.Value);
+            command.Parameters.AddWithValue("@WorkedAtSiteBefore", (object?)candidate.WorkedAtSiteBefore ?? DBNull.Value);
             command.Parameters.AddWithValue("@RecommendationSummary", (object?)candidate.RecommendationSummary ?? DBNull.Value);
             command.Parameters.AddWithValue("@WarningsJson", (object?)candidate.WarningsJson ?? DBNull.Value);
 
