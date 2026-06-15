@@ -7,6 +7,7 @@ import { Button } from '@shared/components/Button';
 import { DetailsField } from '@shared/components/DetailsField';
 import { DetailsSection } from '@shared/components/DetailsSection';
 import { Input } from '@shared/components/Input';
+import { usePermissions } from '@shared/auth/usePermissions';
 import { isLocalDataMode } from '@/config/appConfig';
 import { getCustomersAsync } from '@features/customers';
 import { getProjectsListAsync, getSitesAsync } from '@features/projects/api/projectsApiClient';
@@ -85,6 +86,10 @@ interface ContactDrawerContentProps {
 
 function ContactDrawerContent({ contact, onClose, onSaved }: ContactDrawerContentProps) {
   const isExistingContact = contact != null;
+  const { can } = usePermissions();
+  // View-only roles can open a contact for review but must not reach the edit/delete UI
+  // (which would only 403 on save). The API still enforces this server-side.
+  const canManage = can('manageContacts');
   const { createMutation, updateMutation, deleteMutation } = useContactMutations();
 
   // Existing contacts open in read-only review mode; create opens editable.
@@ -223,7 +228,7 @@ function ContactDrawerContent({ contact, onClose, onSaved }: ContactDrawerConten
       onClose={onClose}
       title={title}
       headerActions={
-        isExistingContact && !isEditing ? (
+        isExistingContact && !isEditing && canManage ? (
           <Button type="button" variant="secondary" onClick={handleStartEdit}>
             ערוך פרטים
           </Button>

@@ -156,6 +156,9 @@ export function redirectToLogin(): void {
     clearReturnUrl();
   }
 
+  // An API 401 (or any forced redirect here) means the session is no longer valid, so flag it
+  // and the login page shows the Hebrew "session expired" notice instead of a bare form.
+  flagSessionExpired();
   clearAuthSession();
 
   if (!isAppLoginPath(pathname)) {

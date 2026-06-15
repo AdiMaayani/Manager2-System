@@ -6,6 +6,7 @@ import { Button } from '@shared/components/Button';
 import { DetailsField } from '@shared/components/DetailsField';
 import { DetailsSection } from '@shared/components/DetailsSection';
 import { Input } from '@shared/components/Input';
+import { getCurrentUser, getRoleDisplayLabel } from '@api/auth';
 import type { Employee } from '@features/employees';
 import { useUserMutations } from '../../hooks/useUsers';
 import type { CreateUserRequest, UpdateUserRequest, User } from '../../types';
@@ -46,16 +47,6 @@ function buildInitialState(user: User | null): UserFormState {
     roles: user?.roles ?? [],
     departments: user?.departments ?? [],
   };
-}
-
-function getRoleDisplayLabel(role: string): string {
-  const labels: Record<string, string> = {
-    Admin: 'מנהל',
-    DepartmentManager: 'מנהל מחלקה',
-    TeamLeader: 'ראש צוות',
-  };
-
-  return labels[role] ?? role;
 }
 
 function toggleSelection(values: string[], selectedValue: string): string[] {
@@ -122,6 +113,9 @@ function UserDrawerContent({
   onSaved,
 }: UserDrawerContentProps) {
   const isExistingUser = user != null;
+  // Guard against an admin locking themselves out mid-demo: editing your own user must not let you
+  // delete/deactivate yourself or strip your own Admin role (session roles wouldn't refresh until re-login).
+  const isSelf = isExistingUser && user.userId === getCurrentUser()?.userId;
   const { createMutation, updateMutation, deleteMutation } = useUserMutations();
 
   // Existing users open in read-only review mode; create opens editable.
@@ -161,6 +155,12 @@ function UserDrawerContent({
     if (!isExistingUser && !form.password.trim()) return 'סיסמה היא שדה חובה למשתמש חדש.';
     if (form.roles.length === 0) return 'יש לבחור לפחות תפקיד אחד.';
     if (form.departments.length === 0) return 'יש לבחור לפחות מחלקה אחת.';
+    if (isSelf && !form.isActive) {
+      return 'לא ניתן להשבית את המשתמש שאיתו אתה מחובר.';
+    }
+    if (isSelf && user.roles.includes('Admin') && !form.roles.includes('Admin')) {
+      return 'לא ניתן להסיר לעצמך את תפקיד המנהל.';
+    }
     return null;
   }
 
@@ -226,6 +226,10 @@ function UserDrawerContent({
 
   async function handleDelete() {
     if (!isExistingUser) return;
+    if (isSelf) {
+      setError('לא ניתן למחוק את המשתמש שאיתו אתה מחובר.');
+      return;
+    }
     setError(null);
 
     try {
@@ -273,7 +277,7 @@ function UserDrawerContent({
                 בטל שינויים
               </Button>
 
-              {isExistingUser && (
+              {isExistingUser && !isSelf && (
                 <div className="userDrawer__dangerActions">
                   {confirmDelete ? (
                     <>

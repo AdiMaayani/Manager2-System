@@ -1,5 +1,11 @@
 import { NavLink, useNavigate } from 'react-router-dom';
-import { clearAuthSession, getCurrentUser, getRoleDisplayLabel } from '@api/auth';
+import {
+  clearAuthSession,
+  clearReturnUrl,
+  clearSessionExpiredNotice,
+  getCurrentUser,
+  getRoleDisplayLabel,
+} from '@api/auth';
 import { hasPermission } from '@shared/auth/permissions';
 import { bottomNavItems, mainNavItems } from '@shared/layout/navItems';
 import '@shared/layout/layout.css';
@@ -16,7 +22,11 @@ export function Sidebar() {
   );
 
   function handleLogout() {
+    // Deliberate sign-out: clear the session plus the one-shot "session expired" notice and any
+    // stored return URL, so the next login shows a clean form rather than a stale expiry message.
     clearAuthSession();
+    clearSessionExpiredNotice();
+    clearReturnUrl();
     navigate('/login', { replace: true });
   }
 
