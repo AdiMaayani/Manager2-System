@@ -9,5 +9,9 @@ namespace ManageR2.Infrastructure.Services.SmartAssignment
     {
         // מקבל מזהה משימה ומחזיר רשימת עובדים מדורגת לפי האלגוריתם.
         Task<List<EmployeeCandidateModel>> GetRecommendationsAsync(int workItemId);
+
+        // מקבל הקשר של משימת טיוטה (משימה חדשה שעדיין לא נשמרה) ומחזיר רשימת עובדים מדורגת.
+        Task<List<EmployeeCandidateModel>> GetRecommendationsForDraftAsync(
+            DraftTaskRecommendationContextModel context);
     }
 }

@@ -325,3 +325,50 @@
   flex-wrap: wrap;
   gap: var(--spacing-sm);
 }
+
+/* Smart Assignment explainability — per-factor breakdown */
+.newTaskModal__factors {
+  list-style: none;
+  margin: var(--spacing-sm) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.newTaskModal__factor {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-neutral-100);
+  border-radius: var(--radius-md);
+  background: var(--color-neutral-50);
+}
+
+.newTaskModal__factorHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+}
+
+.newTaskModal__factorLabel {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-800);
+}
+
+.newTaskModal__factorScore {
+  font-family: monospace;
+  color: var(--color-primary-700);
+}
+
+.newTaskModal__factorExplain {
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-700);
+}
+
+.newTaskModal__factorSource {
+  font-size: var(--font-size-xs);
+  color: var(--color-neutral-500);
+}

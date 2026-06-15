@@ -1,4 +1,5 @@
 ﻿using System;
+using System.Collections.Generic;
 
 namespace ManageR2.Infrastructure.Models.SmartAssignment
 {
@@ -82,5 +83,23 @@ namespace ManageR2.Infrastructure.Models.SmartAssignment
 
         // סיבת אי-כשירות, לדוגמה: לא זמין
         public string? ExclusionReason { get; set; }
+
+        // =========================
+        // Explainability + persistence detail
+        // =========================
+
+        // Per-factor breakdown (score, weight, explanation, data source) shown to the manager.
+        public List<RecommendationFactorModel> Factors { get; set; } = new List<RecommendationFactorModel>();
+
+        // Origin used for the geographic factor (HomeBase / PlannedStop / LastKnownLocation / ManualOverride).
+        public string? OriginTypeUsed { get; set; }
+
+        // Skill match counts used for explanation and persistence.
+        public int? MatchedSkillsCount { get; set; }
+        public int? MissingSkillsCount { get; set; }
+
+        // Travel detail used by the geographic factor, when route data exists.
+        public int? TravelMinutes { get; set; }
+        public decimal? DistanceKm { get; set; }
     }
 }

@@ -1,23 +1,32 @@
+using ManageR2.Api.Authorization;
 using ManageR2.Api.DTOs;
 using ManageR2.Infrastructure.Models;
+using ManageR2.Infrastructure.Models.SmartAssignment;
 using ManageR2.Infrastructure.Services;
+using ManageR2.Infrastructure.Services.SmartAssignment;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace ManageR2.Api.Controllers;
 
-// Batch smart assignment: builds recommendations for a project or explicit work item set (legacy service path).
+// Smart assignment: batch recommendations for a project/work-item set (with optional persistence) and a
+// draft recommendation for the New Task flow. Restricted to roles that manage the work plan.
 [ApiController]
 [Route("api/[controller]")]
-[Authorize]
+[Authorize(Policy = Policies.CanManageWorkPlan)]
 public class SmartAssignmentController : ControllerBase
 {
     // Orchestrates recommendation generation, optional persistence of a run, and load balancing summary.
     private readonly ISmartAssignmentService _smartAssignmentService;
+    // Per-task / draft ranked recommendations with explainability.
+    private readonly IAdvancedSmartAssignmentService _advancedSmartAssignmentService;
 
-    public SmartAssignmentController(ISmartAssignmentService smartAssignmentService)
+    public SmartAssignmentController(
+        ISmartAssignmentService smartAssignmentService,
+        IAdvancedSmartAssignmentService advancedSmartAssignmentService)
     {
         _smartAssignmentService = smartAssignmentService;
+        _advancedSmartAssignmentService = advancedSmartAssignmentService;
     }
 
     // POST: map DTO to service model, run algorithm, map rich service response back to API DTO for the UI.
@@ -43,7 +52,8 @@ public class SmartAssignmentController : ControllerBase
             WorkItemIds = request.WorkItemIds,
             PlanningDate = request.PlanningDate,
             IncludeLockedTasks = request.IncludeLockedTasks,
-            SaveRun = request.SaveRun
+            SaveRun = request.SaveRun,
+            RequestedByUserId = GetCurrentUserId()
         };
 
         var serviceResponse = await _smartAssignmentService.GenerateRecommendationsAsync(serviceRequest);
@@ -71,7 +81,8 @@ public class SmartAssignmentController : ControllerBase
                 Score = r.Score,
                 Violations = r.Violations,
                 Warnings = r.Warnings,
-                Reasons = r.Reasons
+                Reasons = r.Reasons,
+                Factors = r.Factors.Select(MapFactor).ToList()
             }).ToList(),
             EmployeeLoad = serviceResponse.EmployeeLoad.Select(l => new SmartAssignmentEmployeeLoadDto
             {
@@ -84,5 +95,103 @@ public class SmartAssignmentController : ControllerBase
         };
 
         return Ok(response);
+    }
+
+    // POST: ranked recommendations for a NOT-YET-SAVED (draft) task, scored against the draft's own
+    // context (project/date/duration/site) rather than unrelated existing project tasks. Preview only —
+    // nothing is persisted because there is no task id yet.
+    [HttpPost("recommend-draft")]
+    public async Task<IActionResult> RecommendDraft([FromBody] DraftTaskRecommendationRequestDto request)
+    {
+        if (request == null || request.ProjectId <= 0)
+        {
+            return BadRequest(new { message = "ProjectId is required." });
+        }
+
+        if (request.PlannedEnd <= request.PlannedStart)
+        {
+            return BadRequest(new { message = "PlannedEnd must be after PlannedStart." });
+        }
+
+        var context = new DraftTaskRecommendationContextModel
+        {
+            ProjectId = request.ProjectId,
+            PlannedStart = request.PlannedStart,
+            PlannedEnd = request.PlannedEnd,
+            EstimatedHours = request.EstimatedHours,
+            Priority = request.Priority,
+            RequiredRole = request.RequiredRole,
+            SiteId = request.SiteId
+        };
+
+        var candidates = await _advancedSmartAssignmentService.GetRecommendationsForDraftAsync(context);
+
+        var response = new DraftTaskRecommendationResponseDto
+        {
+            GeneratedAt = DateTime.UtcNow,
+            Message = candidates.Count == 0
+                ? "לא נמצאו עובדים מתאימים עבור הקשר המשימה."
+                : "המלצות שיבוץ חכם חושבו עבור המשימה החדשה.",
+            Candidates = candidates.Select(MapCandidate).ToList()
+        };
+
+        return Ok(response);
+    }
+
+    private int? GetCurrentUserId()
+    {
+        var claim = User.FindFirst("userId")?.Value;
+        return int.TryParse(claim, out var userId) ? userId : null;
+    }
+
+    private static RecommendationFactorDto MapFactor(RecommendationFactorModel factor)
+    {
+        return new RecommendationFactorDto
+        {
+            Key = factor.Key,
+            Label = factor.Label,
+            Score = factor.Score,
+            WeightPercent = factor.WeightPercent,
+            Explanation = factor.Explanation,
+            DataSource = factor.DataSource,
+            HasData = factor.HasData
+        };
+    }
+
+    private static SmartAssignmentCandidateDto MapCandidate(EmployeeCandidateModel candidate)
+    {
+        return new SmartAssignmentCandidateDto
+        {
+            RankOrder = candidate.RankOrder,
+            EmployeeId = candidate.EmployeeId,
+            FullName = candidate.FullName,
+            PrimaryRole = candidate.PrimaryRole,
+            TotalScore = candidate.TotalScore,
+            IsEligible = candidate.IsEligible,
+            ExclusionReason = candidate.ExclusionReason,
+            Status = candidate.IsEligible
+                ? "כשיר"
+                : (string.IsNullOrWhiteSpace(candidate.ExclusionReason) ? "לא כשיר" : candidate.ExclusionReason!),
+            RecommendationSummary = candidate.RecommendationSummary,
+            Warnings = ParseWarnings(candidate.WarningsJson),
+            Factors = candidate.Factors.Select(MapFactor).ToList()
+        };
+    }
+
+    private static List<string> ParseWarnings(string? warningsJson)
+    {
+        if (string.IsNullOrWhiteSpace(warningsJson) || warningsJson == "[]")
+        {
+            return new List<string>();
+        }
+
+        try
+        {
+            return System.Text.Json.JsonSerializer.Deserialize<List<string>>(warningsJson) ?? new List<string>();
+        }
+        catch (System.Text.Json.JsonException)
+        {
+            return new List<string>();
+        }
     }
 }

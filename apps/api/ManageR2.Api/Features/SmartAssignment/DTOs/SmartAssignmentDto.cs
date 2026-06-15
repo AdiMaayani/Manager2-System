@@ -46,6 +46,55 @@ namespace ManageR2.Api.DTOs
         public List<string> Violations { get; set; } = new List<string>();
         public List<string> Warnings { get; set; } = new List<string>();
         public List<string> Reasons { get; set; } = new List<string>();
+        // Factor breakdown for the recommended employee (explainability).
+        public List<RecommendationFactorDto> Factors { get; set; } = new List<RecommendationFactorDto>();
+    }
+
+    // One explainability factor (professional/availability/workload/geographic/experience).
+    public class RecommendationFactorDto
+    {
+        public string Key { get; set; } = string.Empty;
+        public string Label { get; set; } = string.Empty;
+        public decimal? Score { get; set; }
+        public decimal WeightPercent { get; set; }
+        public string Explanation { get; set; } = string.Empty;
+        public string DataSource { get; set; } = string.Empty;
+        public bool HasData { get; set; }
+    }
+
+    // New Task draft recommendation request: scores candidates for a not-yet-saved task context.
+    public class DraftTaskRecommendationRequestDto
+    {
+        public int ProjectId { get; set; }
+        public DateTime PlannedStart { get; set; }
+        public DateTime PlannedEnd { get; set; }
+        public decimal? EstimatedHours { get; set; }
+        public string? Priority { get; set; }
+        public string? RequiredRole { get; set; }
+        public int? SiteId { get; set; }
+    }
+
+    // One ranked candidate for the draft recommendation, including the explainability breakdown.
+    public class SmartAssignmentCandidateDto
+    {
+        public int? RankOrder { get; set; }
+        public int EmployeeId { get; set; }
+        public string? FullName { get; set; }
+        public string? PrimaryRole { get; set; }
+        public decimal? TotalScore { get; set; }
+        public bool IsEligible { get; set; }
+        public string? ExclusionReason { get; set; }
+        public string Status { get; set; } = string.Empty;
+        public string? RecommendationSummary { get; set; }
+        public List<string> Warnings { get; set; } = new List<string>();
+        public List<RecommendationFactorDto> Factors { get; set; } = new List<RecommendationFactorDto>();
+    }
+
+    public class DraftTaskRecommendationResponseDto
+    {
+        public DateTime GeneratedAt { get; set; }
+        public string Message { get; set; } = string.Empty;
+        public List<SmartAssignmentCandidateDto> Candidates { get; set; } = new List<SmartAssignmentCandidateDto>();
     }
 
     // Capacity slice for fairness charts alongside task-level recommendations.

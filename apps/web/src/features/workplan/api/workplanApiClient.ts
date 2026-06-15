@@ -3,6 +3,8 @@ import { mapAllWorkPlansResponse, mapEmployeeResponse, mapWorkPlanResponse } fro
 import type {
   AssignEmployeeRequest,
   CreateTaskRequest,
+  DraftRecommendationRequest,
+  DraftRecommendationResponse,
   InternalWorkContext,
   MappedWorkPlan,
   SmartAssignmentRequest,
@@ -47,6 +49,16 @@ export async function getSmartAssignmentRecommendationsAsync(
   request: SmartAssignmentRequest,
 ): Promise<SmartAssignmentResponse> {
   return apiRequest<SmartAssignmentResponse>('/SmartAssignment/recommend', {
+    method: 'POST',
+    body: JSON.stringify(request),
+  });
+}
+
+// Ranked recommendations for a not-yet-saved (draft) task, scored against the draft's own context.
+export async function getDraftRecommendationsAsync(
+  request: DraftRecommendationRequest,
+): Promise<DraftRecommendationResponse> {
+  return apiRequest<DraftRecommendationResponse>('/SmartAssignment/recommend-draft', {
     method: 'POST',
     body: JSON.stringify(request),
   });
