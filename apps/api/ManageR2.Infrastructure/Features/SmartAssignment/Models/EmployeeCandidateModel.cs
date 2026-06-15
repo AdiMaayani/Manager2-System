@@ -101,5 +101,13 @@ namespace ManageR2.Infrastructure.Models.SmartAssignment
         // Travel detail used by the geographic factor, when route data exists.
         public int? TravelMinutes { get; set; }
         public decimal? DistanceKm { get; set; }
+
+        // Workload detail used by the workload factor and persisted for transparency.
+        public int? OpenAssignmentsCount { get; set; }
+        public decimal? CurrentWorkloadHours { get; set; }
+
+        // Continuity detail used by the continuity factor and persisted for transparency.
+        public bool? WorkedWithCustomerBefore { get; set; }
+        public bool? WorkedAtSiteBefore { get; set; }
     }
 }

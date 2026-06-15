@@ -70,5 +70,15 @@ namespace ManageR2.Infrastructure.Models.SmartAssignment
 
         // מרחקים וזמני נסיעה
         public List<RouteEstimateModel> RouteEstimates { get; set; } = new();
+
+        // =========================================
+        // עומס נוכחי ורציפות (נתונים קיימים מתוך שיבוצים)
+        // =========================================
+
+        // עומס נוכחי לכל עובד ביום המשימה (שיבוצים פתוחים ושעות מחויבות)
+        public List<EmployeeCurrentLoadModel> EmployeeCurrentLoads { get; set; } = new();
+
+        // היסטוריית רציפות לכל עובד מול הפרויקט / הלקוח / האתר של המשימה
+        public List<EmployeeContinuityModel> EmployeeContinuities { get; set; } = new();
     }
 }
