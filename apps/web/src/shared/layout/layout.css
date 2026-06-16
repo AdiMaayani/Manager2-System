@@ -183,3 +183,96 @@
   background: var(--color-neutral-800);
   color: #fff;
 }
+
+/* ── Off-canvas navigation (tablet & mobile) ─────────────────────────────────
+   On desktop the sidebar is a fixed rail and the toggle/backdrop are hidden.
+   Below 1024px (the whole tablet range and down) the rail collapses to an
+   off-canvas panel so field users get the full screen width for content. */
+.topBar__navToggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  margin-inline-end: var(--spacing-sm);
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-md);
+  background: #fff;
+  color: var(--color-neutral-700);
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.topBar__navToggle:hover {
+  background: var(--color-neutral-50);
+  border-color: var(--color-neutral-300);
+}
+
+.appLayout__navBackdrop {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  .appLayout__sidebar {
+    width: min(300px, 86vw);
+    transform: translateX(100%);
+    transition: transform var(--transition-base);
+  }
+
+  .appLayout__sidebar--open {
+    transform: translateX(0);
+    box-shadow: var(--shadow-xl);
+  }
+
+  .appLayout__main {
+    margin-right: 0;
+    width: 100%;
+  }
+
+  .appLayout__navBackdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    background: rgba(17, 24, 39, 0.45);
+  }
+
+  .topBar__navToggle {
+    display: inline-flex;
+  }
+
+  .topBar__brand {
+    width: auto;
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+/* ── Compact app bar & content padding (phones) ──────────────────────────── */
+@media (max-width: 640px) {
+  :root {
+    --topbar-height: 64px;
+  }
+
+  .topBar {
+    padding: 0 var(--spacing-md);
+  }
+
+  /* The decorative wordmark overlaps the title on narrow widths; the page
+     title and nav toggle are enough chrome for a phone-sized app bar. */
+  .topBar__logoWrap {
+    display: none;
+  }
+
+  .topBar__title {
+    font-size: var(--font-size-lg);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .appLayout__content,
+  .appLayout__contentWide {
+    padding: var(--spacing-md);
+  }
+}
