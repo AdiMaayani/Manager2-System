@@ -16,8 +16,8 @@ Validated against the production schema dump `igroup30_prod.sql` (current Ruppin
 
 | Object | Current DB (dump) | Repo baseline (`schema/` + `functions/` + `SP/`) | Gap closed by migrations |
 |---|---|---|---|
-| Tables | **41** | 38 (`schema/tables.sql`) | +3 Vault tables |
-| Stored procedures | **132** | 117 (`SP/*.sql`, excl. dated) | +15 (11 Vault, 3 login-lockout, 1 SA draft) |
+| Tables | **42** | 38 (`schema/tables.sql`) | +4 (3 Vault, 1 AuditLog) |
+| Stored procedures | **134** | 117 (`SP/*.sql`, excl. dated) | +17 (11 Vault, 3 login-lockout, 1 SA draft, 2 AuditLog) |
 | Scalar functions | **2** | 2 (`functions/`) | — |
 | Views / triggers | 0 | 0 | — |
 
@@ -26,7 +26,7 @@ programmability (`functions/`, `SP/`) + dated `migrations/` that add the newer o
 A fresh rebuild that matches the current database therefore needs **baseline + the required recent
 migrations + the required seeds** (full ordered list in [§4](#4-database-build-fresh-database)).
 
-The 3 tables and 15 procedures that exist **only in migrations** (not in `schema/`/`SP/`):
+The 4 tables and 17 procedures that exist **only in migrations** (not in `schema/`/`SP/`):
 
 - **Customer Systems Vault** (migration `2026-06-15_customer_systems_vault.sql`):
   tables `CustomerSystems`, `CustomerSystemSecrets`, `CustomerSystemSecretAccessLog`;
@@ -36,8 +36,11 @@ The 3 tables and 15 procedures that exist **only in migrations** (not in `schema
   `sp_Users_RegisterFailedLogin`, `sp_Users_ClearFailedLogin`.
 - **Smart Assignment draft** (migration `2026-06-15_smart_assignment_persistence_explainability.sql`):
   SP `Rec_GetDraftTaskRecommendationInput` (and an updated `Rec_GetLatestRecommendationsForTask`).
+- **Core audit log** (migration `2026-06-15_audit_log_core.sql`):
+  table `AuditLog` (append-only security/operational trail); SPs `sp_AuditLog_Create` (server-side
+  write path) and `sp_AuditLog_GetList` (read path for the Admin/SeniorManagement audit screen).
 
-117 + 15 = 132 SPs, 38 + 3 = 41 tables — the repo + required migrations reproduce the dump exactly.
+117 + 17 = 134 SPs, 38 + 4 = 42 tables — the repo + required migrations reproduce the dump exactly.
 
 ---
 
@@ -64,6 +67,7 @@ The 3 tables and 15 procedures that exist **only in migrations** (not in `schema
 | `migrations/2026-06-15_customer_systems_vault.sql` | **Required** migration | Yes | Fresh build + existing DBs |
 | `migrations/2026-06-15_smart_assignment_persistence_explainability.sql` | **Required** migration | Yes | Fresh build + existing DBs (run **before** factor activation) |
 | `migrations/2026-06-15_smart_assignment_factor_activation.sql` | **Required** migration | Yes | Fresh build + existing DBs (run **after** persistence) |
+| `migrations/2026-06-15_audit_log_core.sql` | **Required** migration | Yes (`IF NOT EXISTS` + `CREATE OR ALTER`) | Fresh build + existing DBs (independent; additive only) |
 | other `migrations/2026-06-0x_*.sql` | Historical (folded into baseline) | Yes | Only to upgrade an **older** DB; redundant for a fresh build |
 | `seed/2026-06-14_permission_roles.sql` | **Required** seed (role catalog) | Yes | Fresh build |
 | `seed/initial_admin/00_seed_initial_admin.sql` | **Required** seed (first login) | Yes | Fresh build |
@@ -99,16 +103,21 @@ Run every `database/SP/*.sql` **except** the two `2026-04-20_*` files. Order irr
 (`CREATE OR ALTER` does not require referenced objects to exist at create time). → 117 procs.
 
 ### Step 5 — Required recent migrations (idempotent, **order-sensitive**)
-Run these four, **in this order**:
+Run these five, **in this order**:
 
 1. `migrations/2026-06-14_users_login_lockout.sql` — adds 2 `Users` columns + 3 `sp_Users_*` SPs.
 2. `migrations/2026-06-15_customer_systems_vault.sql` — adds 3 Vault tables + 11 Vault SPs.
-3. `migrations/2026-06-15_smart_assignment_persistence_explainability.sql` — adds `Rec_GetDraftTaskRecommendationInput`, updates `Rec_GetLatestRecommendationsForTask`.
-4. `migrations/2026-06-15_smart_assignment_factor_activation.sql` — updates `Rec_GetTaskRecommendationInput` **and** `Rec_GetDraftTaskRecommendationInput` to emit result sets 13 (current load) + 14 (continuity).
+3. `migrations/2026-06-15_audit_log_core.sql` — adds the `AuditLog` table (+2 indexes) and SPs `sp_AuditLog_Create`, `sp_AuditLog_GetList`. Additive and independent of the Smart Assignment migrations.
+4. `migrations/2026-06-15_smart_assignment_persistence_explainability.sql` — adds `Rec_GetDraftTaskRecommendationInput`, updates `Rec_GetLatestRecommendationsForTask`.
+5. `migrations/2026-06-15_smart_assignment_factor_activation.sql` — updates `Rec_GetTaskRecommendationInput` **and** `Rec_GetDraftTaskRecommendationInput` to emit result sets 13 (current load) + 14 (continuity).
 
-> ⚠️ **Order matters between #3 and #4.** Both `CREATE OR ALTER` `Rec_GetDraftTaskRecommendationInput`.
-> #3 defines it with 12 result sets; #4 defines it with 14. The factor-activation version (14) must be
-> applied **last**, so **run #3 before #4**. A naive alphabetical filename sort runs `factor_activation`
+> ℹ️ **The audit-log migration (#3) is order-independent** — it only adds new objects and references
+> the existing baseline `Users` table for display joins. It is placed between the Vault and Smart
+> Assignment migrations here purely for readability; it can run any time after the baseline schema.
+
+> ⚠️ **Order matters between #4 and #5.** Both `CREATE OR ALTER` `Rec_GetDraftTaskRecommendationInput`.
+> #4 defines it with 12 result sets; #5 defines it with 14. The factor-activation version (14) must be
+> applied **last**, so **run #4 before #5**. A naive alphabetical filename sort runs `factor_activation`
 > **before** `persistence_explainability` (because "f" < "p") — which is **wrong** and silently downgrades
 > the draft procedure back to 12 result sets (workload/continuity factors then read as neutral on the
 > New-Task draft flow, with no error). Always use the explicit order above, not a glob sort.
@@ -161,6 +170,7 @@ Get-ChildItem "$root\SP\*.sql" -Exclude '2026-*' | ForEach-Object { sqlcmd -S $s
 $migrations = @(
   "$root\migrations\2026-06-14_users_login_lockout.sql",
   "$root\migrations\2026-06-15_customer_systems_vault.sql",
+  "$root\migrations\2026-06-15_audit_log_core.sql",
   "$root\migrations\2026-06-15_smart_assignment_persistence_explainability.sql",
   "$root\migrations\2026-06-15_smart_assignment_factor_activation.sql"
 )
@@ -249,13 +259,13 @@ npm run build      # production build of apps/web
 Run these against the target database after [§4](#4-database-build-fresh-database).
 
 ```sql
--- (a) Object counts — expect 41 / 132 / 2 / 0
+-- (a) Object counts — expect 42 / 134 / 2 / 0
 SELECT type_desc, COUNT(*) AS Cnt
 FROM sys.objects
 WHERE is_ms_shipped = 0 AND schema_id = SCHEMA_ID('dbo')
   AND type_desc IN ('USER_TABLE','SQL_STORED_PROCEDURE','SQL_SCALAR_FUNCTION','VIEW')
 GROUP BY type_desc ORDER BY type_desc;
--- USER_TABLE = 41, SQL_STORED_PROCEDURE = 132, SQL_SCALAR_FUNCTION = 2, VIEW = 0
+-- USER_TABLE = 42, SQL_STORED_PROCEDURE = 134, SQL_SCALAR_FUNCTION = 2, VIEW = 0
 
 -- (b) Customer Systems Vault tables exist (expect 3 rows)
 SELECT name FROM sys.tables
@@ -293,19 +303,45 @@ FROM dbo.Users u WHERE u.Email = 'admin@manager2.local';
 -- (h) Recommendation persistence tables exist & are queryable
 SELECT COUNT(*) AS RunRows FROM dbo.Rec_RecommendationRuns;
 SELECT COUNT(*) AS RecRows FROM dbo.Rec_TaskAssignmentRecommendations;
+
+-- (i) Audit log table exists (expect 1 row)
+SELECT name FROM sys.tables WHERE name = 'AuditLog';
+
+-- (j) Audit log stored procedures exist (expect 2 rows: sp_AuditLog_Create, sp_AuditLog_GetList)
+SELECT name FROM sys.procedures
+WHERE name IN ('sp_AuditLog_Create','sp_AuditLog_GetList')
+ORDER BY name;
+
+-- (k) Sample the latest audit rows (newest-first). Empty on a brand-new DB until the first audited action.
+SELECT TOP (20)
+       AuditLogId, OccurredAtUtc, UserId, Action, EntityType, EntityId, Severity, Summary
+FROM dbo.AuditLog
+ORDER BY OccurredAtUtc DESC, AuditLogId DESC;
 ```
 
 ### Final verification checklist
-- [ ] **Tables exist** — query (a) returns `USER_TABLE = 41`.
-- [ ] **Important SPs exist** — query (d) returns all 9; query (a) returns `SQL_STORED_PROCEDURE = 132`.
+- [ ] **Tables exist** — query (a) returns `USER_TABLE = 42`.
+- [ ] **Important SPs exist** — query (d) returns all 9; query (a) returns `SQL_STORED_PROCEDURE = 134`.
 - [ ] **Vault tables + lockout columns** — queries (b) = 3 rows, (c) = 2 rows.
 - [ ] **Smart Assignment SPs exist & factor activation applied** — query (e) = `PASS`.
+- [ ] **Audit log objects exist** — query (i) = 1 row (`AuditLog`); query (j) = 2 rows (`sp_AuditLog_Create`, `sp_AuditLog_GetList`).
 - [ ] **Roles exist** — query (f) shows `Admin`, `SeniorManagement`, `ProjectManager`, `Office`, `Technician`, `Inventory`.
 - [ ] **Admin can log in** — query (g) shows the admin user `IsActive = 1`, `HasActiveAdminRole = 1`; confirm by logging into the web app with `admin@manager2.local` / `Admin#2026!`.
 - [ ] **Vault encryption key configured** — `CustomerSystemsVault:EncryptionKey` is set (base64, decodes to 32 bytes); opening a customer's Vault section and revealing a secret works without the "encryption key is not configured" error.
 - [ ] **Recommendation run persistence works** — query (h) runs; then in the app, open New Task → run Smart Assignment → save the task → re-run (h): `Rec_TaskAssignmentRecommendations` row count increases.
+- [ ] **Audit log records security/operational events** — perform each action below, then re-run query (k) and confirm a new newest row with the expected `Action`:
+  - [ ] **Successful login** — log in with valid credentials → a `LoginSucceeded` row (`EntityType = User`).
+  - [ ] **Wrong password** — attempt login with a bad password → a `LoginFailed` row (`Severity = Warning`).
+  - [ ] **Vault secret reveal** — reveal a customer system secret → a `CustomerSystemSecretRevealed` row, and its `MetadataJson`/`Summary` contain **no plaintext secret** (only identifiers/metadata).
+  - [ ] **User role update** — change a user's role/details (Admin) → a `UserUpdated` row (`EntityType = User`).
 - [ ] **Backend build works** — `dotnet build ManageR2.Backend.sln` → `Build succeeded`.
 - [ ] **Frontend build works** — `npm run build` → succeeds.
+
+> 🔒 **`AuditLog` is append-only.** Rows are written server-side only (there is no public create/update/delete
+> endpoint), and the table is an immutable security/operational trail. **Do not manually delete or truncate
+> `AuditLog` in production** unless explicitly approved by a system owner (e.g. an approved retention policy).
+> The only sanctioned deletes are the self-test cleanup rows in a non-production DB (see the migration's
+> SSMS verification block).
 
 ---
 
@@ -313,9 +349,9 @@ SELECT COUNT(*) AS RecRows FROM dbo.Rec_TaskAssignmentRecommendations;
 
 Comparison of the repository scripts against the attached `igroup30_prod.sql` dump.
 
-**Matches (the repo + the four required migrations reproduce the dump exactly):**
-- 41 tables = 38 (`schema/tables.sql`) + 3 Vault (vault migration).
-- 132 SPs = 117 (`SP/`) + 11 Vault + 3 login-lockout + 1 SA draft (migrations).
+**Matches (the repo + the five required migrations reproduce the dump exactly):**
+- 42 tables = 38 (`schema/tables.sql`) + 3 Vault (vault migration) + 1 `AuditLog` (audit-log migration).
+- 134 SPs = 117 (`SP/`) + 11 Vault + 3 login-lockout + 1 SA draft + 2 AuditLog (migrations).
 - 2 scalar functions, 0 views, 0 triggers — match.
 
 **Mismatches / stale documentation found (no schema change made — documentation-first):**
@@ -323,9 +359,9 @@ Comparison of the repository scripts against the attached `igroup30_prod.sql` du
    folder is "historical / not part of a fresh rebuild." That is no longer true: the Vault, login-lockout,
    and SA-draft objects exist **only** in migrations and are **required**. This runbook is authoritative;
    a short pointer was added to the README header.
-2. **`schema/tables.sql` does not contain** the 3 Vault tables or the `Users` lockout columns — these
-   are intentionally delivered by migrations (the baseline snapshot predates them). Not a defect; just
-   means migrations are mandatory for a fresh build. **No schema edit made.**
+2. **`schema/tables.sql` does not contain** the 3 Vault tables, the `AuditLog` table, or the `Users`
+   lockout columns — these are intentionally delivered by migrations (the baseline snapshot predates them).
+   Not a defect; just means migrations are mandatory for a fresh build. **No schema edit made.**
 3. **Same-day SA migration ordering** (`persistence_explainability` before `factor_activation`) is
    **not** discoverable from filenames (alphabetical sort reverses them). Documented as an explicit
    ordered list in [§4 step 5](#step-5--required-recent-migrations-idempotent-order-sensitive). **No file renamed.**
@@ -370,8 +406,9 @@ migration-delivered objects above, which the ordered build applies.
 5. Run  migrations, in order:
      2026-06-14_users_login_lockout.sql
      2026-06-15_customer_systems_vault.sql
+     2026-06-15_audit_log_core.sql
      2026-06-15_smart_assignment_persistence_explainability.sql
-     2026-06-15_smart_assignment_factor_activation.sql      (must be last)
+     2026-06-15_smart_assignment_factor_activation.sql      (must be last of the SA pair)
 6. Run  seed/2026-06-14_permission_roles.sql
         seed/initial_admin/00_seed_initial_admin.sql
 7. Set secrets: ConnectionStrings:DefaultConnection, Jwt:Key (>=32), CustomerSystemsVault:EncryptionKey (base64 32B)
