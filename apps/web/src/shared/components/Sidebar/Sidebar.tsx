@@ -8,10 +8,17 @@ import {
 } from '@api/auth';
 import { hasPermission } from '@shared/auth/permissions';
 import { bottomNavItems, mainNavItems } from '@shared/layout/navItems';
+import { useMobileNav } from '@shared/layout/MobileNavContext';
 import '@shared/layout/layout.css';
 
-export function Sidebar() {
+interface SidebarProps {
+  /** When the layout has collapsed the sidebar to an off-canvas panel, controls whether it is slid in. */
+  isOpen?: boolean;
+}
+
+export function Sidebar({ isOpen = false }: SidebarProps) {
   const navigate = useNavigate();
+  const { close: closeMobileNav } = useMobileNav();
   const user = getCurrentUser();
   const userRoles = user?.roles ?? [];
   const visibleMainNavItems = mainNavItems.filter(
@@ -31,7 +38,9 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="appLayout__sidebar">
+    <aside
+      className={`appLayout__sidebar${isOpen ? ' appLayout__sidebar--open' : ''}`}
+    >
       <nav className="sidebar__nav">
         <div className="sidebar__user">
           <div className="sidebar__userName">{user?.username ?? 'משתמש'}</div>
@@ -53,6 +62,7 @@ export function Sidebar() {
               key={item.path}
               to={item.path}
               end={item.path === '/'}
+              onClick={closeMobileNav}
               className={({ isActive }) =>
                 `sidebar__link${isActive ? ' sidebar__link--active' : ''}`
               }
@@ -68,6 +78,7 @@ export function Sidebar() {
             <NavLink
               key={item.path}
               to={item.path}
+              onClick={closeMobileNav}
               className={({ isActive }) =>
                 `sidebar__link${isActive ? ' sidebar__link--active' : ''}`
               }

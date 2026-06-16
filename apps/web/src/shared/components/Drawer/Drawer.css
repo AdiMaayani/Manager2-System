@@ -103,3 +103,29 @@ body.drawerOpen {
   border-top: 1px solid var(--color-neutral-200);
   background: var(--color-neutral-50);
 }
+
+/* Phones: drawers (task detail, New Task wizard, service-call editor, project
+   drawer) fill the screen so multi-step forms and footer actions are usable
+   instead of squeezed into a small centered card. */
+@media (max-width: 640px) {
+  .drawer {
+    padding: 0;
+  }
+
+  .drawer__panel,
+  .drawer__panel--maximized {
+    width: 100%;
+    height: 100%;
+    max-height: 100%;
+    border-radius: 0;
+    border: none;
+  }
+
+  .drawer__header {
+    padding: var(--spacing-md);
+  }
+
+  .drawer__footer {
+    padding: var(--spacing-sm) var(--spacing-md);
+  }
+}

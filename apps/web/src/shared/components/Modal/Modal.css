@@ -93,3 +93,24 @@
   overflow: auto;
   padding: var(--spacing-lg);
 }
+
+/* Phones: go full-screen so dense forms get the whole viewport and the header
+   controls / sticky footers stay reachable instead of being clipped. */
+@media (max-width: 640px) {
+  .modal {
+    padding: 0;
+  }
+
+  .modal__panel,
+  .modal__panel--maximized {
+    width: 100%;
+    max-width: none;
+    height: 100%;
+    max-height: 100%;
+    border-radius: 0;
+  }
+
+  .modal__body {
+    padding: var(--spacing-md);
+  }
+}
