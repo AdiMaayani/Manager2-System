@@ -1,4 +1,3 @@
-using System.Net.Mail;
 using ManageR2.Api.Authorization;
 using ManageR2.Api.DTOs;
 using ManageR2.Domain.Entities;
@@ -59,12 +58,6 @@ public class EmployeesController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] UpsertEmployeeRequestDto dto)
     {
-        var validationError = ValidateEmployeeRequest(dto);
-        if (validationError != null)
-        {
-            return BadRequest(new { message = validationError });
-        }
-
         var employee = ToEntity(dto);
         var newEmployeeId = await _employeeRepository.CreateAsync(employee);
         var createdEmployee = await _employeeRepository.GetByIdAsync(newEmployeeId);
@@ -81,12 +74,6 @@ public class EmployeesController : ControllerBase
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, [FromBody] UpsertEmployeeRequestDto dto)
     {
-        var validationError = ValidateEmployeeRequest(dto);
-        if (validationError != null)
-        {
-            return BadRequest(new { message = validationError });
-        }
-
         var existingEmployee = await _employeeRepository.GetByIdAsync(id);
         if (existingEmployee == null)
         {
@@ -169,51 +156,8 @@ public class EmployeesController : ControllerBase
         };
     }
 
-    private static string? ValidateEmployeeRequest(UpsertEmployeeRequestDto? dto)
-    {
-        if (dto == null)
-        {
-            return "Employee data is required.";
-        }
-
-        if (string.IsNullOrWhiteSpace(dto.FullName))
-        {
-            return "FullName is required.";
-        }
-
-        if (string.IsNullOrWhiteSpace(dto.PrimaryRole))
-        {
-            return "PrimaryRole is required.";
-        }
-
-        if (!string.IsNullOrWhiteSpace(dto.Email) && !IsValidEmail(dto.Email))
-        {
-            return "Email is invalid.";
-        }
-
-        if (dto.DailyCapacityHours is <= 0 or > 24)
-        {
-            return "DailyCapacityHours must be greater than 0 and up to 24.";
-        }
-
-        return null;
-    }
-
     private static string? CleanOptionalValue(string? value)
     {
         return string.IsNullOrWhiteSpace(value) ? null : value.Trim();
-    }
-
-    private static bool IsValidEmail(string email)
-    {
-        try
-        {
-            var address = new MailAddress(email.Trim());
-            return string.Equals(address.Address, email.Trim(), StringComparison.OrdinalIgnoreCase);
-        }
-        catch
-        {
-            return false;
-        }
     }
 }

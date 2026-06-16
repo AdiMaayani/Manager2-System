@@ -66,17 +66,6 @@ public class CustomerSystemsController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateCustomerSystemRequestDto dto)
     {
-        if (dto.CustomerId <= 0)
-        {
-            return BadRequest(new { message = "CustomerId is required." });
-        }
-
-        var validationError = ValidateSystem(dto.SystemType, dto.SystemName);
-        if (validationError != null)
-        {
-            return BadRequest(new { message = validationError });
-        }
-
         var system = new CustomerSystem
         {
             CustomerId = dto.CustomerId,
@@ -115,12 +104,6 @@ public class CustomerSystemsController : ControllerBase
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, [FromBody] UpdateCustomerSystemRequestDto dto)
     {
-        var validationError = ValidateSystem(dto.SystemType, dto.SystemName);
-        if (validationError != null)
-        {
-            return BadRequest(new { message = validationError });
-        }
-
         var existing = await _repository.GetSystemByIdAsync(id);
         if (existing == null)
         {
@@ -206,16 +189,6 @@ public class CustomerSystemsController : ControllerBase
     [HttpPost("{id:int}/secrets")]
     public async Task<IActionResult> CreateSecret(int id, [FromBody] CreateCustomerSystemSecretRequestDto dto)
     {
-        if (string.IsNullOrWhiteSpace(dto.SecretType))
-        {
-            return BadRequest(new { message = "SecretType is required." });
-        }
-
-        if (string.IsNullOrEmpty(dto.SecretValue))
-        {
-            return BadRequest(new { message = "SecretValue is required." });
-        }
-
         var system = await _repository.GetSystemByIdAsync(id);
         if (system == null)
         {
@@ -255,11 +228,6 @@ public class CustomerSystemsController : ControllerBase
     [HttpPut("{id:int}/secrets/{secretId:int}")]
     public async Task<IActionResult> UpdateSecret(int id, int secretId, [FromBody] UpdateCustomerSystemSecretRequestDto dto)
     {
-        if (string.IsNullOrWhiteSpace(dto.SecretType))
-        {
-            return BadRequest(new { message = "SecretType is required." });
-        }
-
         var existing = await _repository.GetSecretForRevealAsync(id, secretId);
         if (existing == null)
         {
@@ -402,13 +370,6 @@ public class CustomerSystemsController : ControllerBase
         userId = 0;
         var claim = User.FindFirst("userId")?.Value;
         return !string.IsNullOrWhiteSpace(claim) && int.TryParse(claim, out userId);
-    }
-
-    private static string? ValidateSystem(string? systemType, string? systemName)
-    {
-        if (string.IsNullOrWhiteSpace(systemType)) return "SystemType is required.";
-        if (string.IsNullOrWhiteSpace(systemName)) return "SystemName is required.";
-        return null;
     }
 
     private static string? CleanOptional(string? value)

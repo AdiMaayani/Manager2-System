@@ -33,18 +33,6 @@ public class SmartAssignmentController : ControllerBase
     [HttpPost("recommend")]
     public async Task<IActionResult> Recommend([FromBody] SmartAssignmentRequestDto request)
     {
-        if (request == null)
-        {
-            return BadRequest(new { message = "Request body is required." });
-        }
-
-        var hasProjectId = request.ProjectId.HasValue;
-        var hasWorkItemIds = request.WorkItemIds != null && request.WorkItemIds.Count > 0;
-        if (!hasProjectId && !hasWorkItemIds)
-        {
-            return BadRequest(new { message = "Either ProjectId or WorkItemIds must be provided." });
-        }
-
         // Service layer owns planning date, locked-task inclusion, and optional save-run side effects.
         var serviceRequest = new SmartAssignmentRequestModel
         {
@@ -103,16 +91,6 @@ public class SmartAssignmentController : ControllerBase
     [HttpPost("recommend-draft")]
     public async Task<IActionResult> RecommendDraft([FromBody] DraftTaskRecommendationRequestDto request)
     {
-        if (request == null || request.ProjectId <= 0)
-        {
-            return BadRequest(new { message = "ProjectId is required." });
-        }
-
-        if (request.PlannedEnd <= request.PlannedStart)
-        {
-            return BadRequest(new { message = "PlannedEnd must be after PlannedStart." });
-        }
-
         var context = new DraftTaskRecommendationContextModel
         {
             ProjectId = request.ProjectId,

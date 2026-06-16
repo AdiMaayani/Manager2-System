@@ -3,7 +3,6 @@ using ManageR2.Api.Authorization;
 using ManageR2.Api.DTOs;
 using ManageR2.Api.Features.Audit;
 using ManageR2.Domain.Entities;
-using ManageR2.Domain.Exceptions;
 using ManageR2.Infrastructure.Repositories;
 using ManageR2.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -82,87 +81,6 @@ public class UsersController : ControllerBase
             .ToList();
     }
 
-    // Centralized create validation to keep action methods focused on orchestration and HTTP status mapping.
-    private static string? ValidateCreateUserDto(CreateUserDto? dto)
-    {
-        if (dto == null)
-        {
-            return "User data is required.";
-        }
-
-        if (dto.EmployeeId <= 0)
-        {
-            return "EmployeeId must be greater than 0.";
-        }
-
-        if (string.IsNullOrWhiteSpace(dto.Username))
-        {
-            return "Username is required.";
-        }
-
-        if (string.IsNullOrWhiteSpace(dto.Email))
-        {
-            return "Email is required.";
-        }
-
-        if (string.IsNullOrWhiteSpace(dto.Password))
-        {
-            return "Password is required.";
-        }
-
-        var roles = NormalizeNamesList(dto.Roles);
-        if (roles.Count == 0)
-        {
-            return "At least one role is required.";
-        }
-
-        var departments = NormalizeNamesList(dto.Departments);
-        if (departments.Count == 0)
-        {
-            return "At least one department is required.";
-        }
-
-        return null;
-    }
-
-    // Update validation mirrors create rules except password is optional on edit.
-    private static string? ValidateUpdateUserDto(UpdateUserDto? dto)
-    {
-        if (dto == null)
-        {
-            return "User data is required.";
-        }
-
-        if (dto.EmployeeId <= 0)
-        {
-            return "EmployeeId must be greater than 0.";
-        }
-
-        if (string.IsNullOrWhiteSpace(dto.Username))
-        {
-            return "Username is required.";
-        }
-
-        if (string.IsNullOrWhiteSpace(dto.Email))
-        {
-            return "Email is required.";
-        }
-
-        var roles = NormalizeNamesList(dto.Roles);
-        if (roles.Count == 0)
-        {
-            return "At least one role is required.";
-        }
-
-        var departments = NormalizeNamesList(dto.Departments);
-        if (departments.Count == 0)
-        {
-            return "At least one department is required.";
-        }
-
-        return null;
-    }
-
     // Admin directory: enumerate all users with roles/departments for back-office management.
     [Authorize(Policy = Policies.CanViewUsers)]
     [HttpGet]
@@ -228,57 +146,44 @@ public class UsersController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> CreateUser([FromBody] CreateUserDto dto)
     {
-        var validationError = ValidateCreateUserDto(dto);
-        if (validationError != null)
-        {
-            return BadRequest(new { message = validationError });
-        }
-
         var normalizedRoles = NormalizeNamesList(dto.Roles);
         var normalizedDepartments = NormalizeNamesList(dto.Departments);
 
-        try
-        {
-            _passwordService.CreatePasswordHash(dto.Password, out var hash, out var salt);
+        _passwordService.CreatePasswordHash(dto.Password, out var hash, out var salt);
 
-            var user = new User
+        var user = new User
+        {
+            EmployeeId = dto.EmployeeId,
+            Username = dto.Username.Trim(),
+            Email = dto.Email.Trim(),
+            PasswordHash = hash,
+            PasswordSalt = salt,
+            IsActive = dto.IsActive,
+            Phone = string.IsNullOrWhiteSpace(dto.Phone) ? null : dto.Phone.Trim(),
+            Notes = string.IsNullOrWhiteSpace(dto.Notes) ? null : dto.Notes.Trim()
+        };
+
+        var id = await _userRepository.CreateUserAsync(user);
+
+        await _userRepository.SetUserRolesAsync(id, normalizedRoles);
+        await _userRepository.SetUserDepartmentsAsync(id, normalizedDepartments);
+
+        var created = await _userRepository.GetUserByIdAsync(id);
+
+        await _auditLogService.LogAsync(this.BuildAuditEvent(
+            AuditActions.UserCreated,
+            AuditEntityTypes.User,
+            $"User '{user.Username}' (#{id}) created.",
+            entityId: id,
+            metadata: new Dictionary<string, object?>
             {
-                EmployeeId = dto.EmployeeId,
-                Username = dto.Username.Trim(),
-                Email = dto.Email.Trim(),
-                PasswordHash = hash,
-                PasswordSalt = salt,
-                IsActive = dto.IsActive,
-                Phone = string.IsNullOrWhiteSpace(dto.Phone) ? null : dto.Phone.Trim(),
-                Notes = string.IsNullOrWhiteSpace(dto.Notes) ? null : dto.Notes.Trim()
-            };
+                ["username"] = user.Username,
+                ["roles"] = normalizedRoles,
+                ["departments"] = normalizedDepartments,
+                ["isActive"] = user.IsActive
+            }));
 
-            var id = await _userRepository.CreateUserAsync(user);
-
-            await _userRepository.SetUserRolesAsync(id, normalizedRoles);
-            await _userRepository.SetUserDepartmentsAsync(id, normalizedDepartments);
-
-            var created = await _userRepository.GetUserByIdAsync(id);
-
-            await _auditLogService.LogAsync(this.BuildAuditEvent(
-                AuditActions.UserCreated,
-                AuditEntityTypes.User,
-                $"User '{user.Username}' (#{id}) created.",
-                entityId: id,
-                metadata: new Dictionary<string, object?>
-                {
-                    ["username"] = user.Username,
-                    ["roles"] = normalizedRoles,
-                    ["departments"] = normalizedDepartments,
-                    ["isActive"] = user.IsActive
-                }));
-
-            return CreatedAtAction(nameof(GetUserById), new { id }, await ToSafeUserAsync(created!));
-        }
-        catch (UserValidationException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+        return CreatedAtAction(nameof(GetUserById), new { id }, await ToSafeUserAsync(created!));
     }
 
     // Update profile fields; optional password rotation re-hashes via IPasswordService then updates role/department sets.
@@ -286,12 +191,6 @@ public class UsersController : ControllerBase
     [HttpPut("{id:int}")]
     public async Task<IActionResult> UpdateUser(int id, [FromBody] UpdateUserDto dto)
     {
-        var validationError = ValidateUpdateUserDto(dto);
-        if (validationError != null)
-        {
-            return BadRequest(new { message = validationError });
-        }
-
         var existing = await _userRepository.GetUserByIdAsync(id);
         if (existing == null)
             return NotFound(new { message = $"User with id {id} was not found." });
@@ -302,66 +201,59 @@ public class UsersController : ControllerBase
         var previousRoles = await _userRepository.GetUserRolesAsync(id);
         var wasActive = existing.IsActive;
 
-        try
+        string hash = existing.PasswordHash;
+        string salt = existing.PasswordSalt;
+
+        if (!string.IsNullOrWhiteSpace(dto.Password))
         {
-            string hash = existing.PasswordHash;
-            string salt = existing.PasswordSalt;
-
-            if (!string.IsNullOrWhiteSpace(dto.Password))
-            {
-                _passwordService.CreatePasswordHash(dto.Password, out hash, out salt);
-            }
-
-            var user = new User
-            {
-                UserId = id,
-                EmployeeId = dto.EmployeeId,
-                Username = dto.Username.Trim(),
-                Email = dto.Email.Trim(),
-                PasswordHash = hash,
-                PasswordSalt = salt,
-                IsActive = dto.IsActive,
-                Phone = string.IsNullOrWhiteSpace(dto.Phone) ? null : dto.Phone.Trim(),
-                Notes = string.IsNullOrWhiteSpace(dto.Notes) ? null : dto.Notes.Trim()
-            };
-
-            await _userRepository.UpdateUserAsync(user);
-
-            await _userRepository.SetUserRolesAsync(id, normalizedRoles);
-            await _userRepository.SetUserDepartmentsAsync(id, normalizedDepartments);
-
-            var rolesChanged = !previousRoles
-                .OrderBy(role => role, StringComparer.OrdinalIgnoreCase)
-                .SequenceEqual(
-                    normalizedRoles.OrderBy(role => role, StringComparer.OrdinalIgnoreCase),
-                    StringComparer.OrdinalIgnoreCase);
-            var deactivated = wasActive && !user.IsActive;
-            var passwordChanged = !string.IsNullOrWhiteSpace(dto.Password);
-
-            await _auditLogService.LogAsync(this.BuildAuditEvent(
-                AuditActions.UserUpdated,
-                AuditEntityTypes.User,
-                $"User '{user.Username}' (#{id}) updated.",
-                entityId: id,
-                severity: (rolesChanged || deactivated) ? AuditSeverity.Warning : AuditSeverity.Info,
-                metadata: new Dictionary<string, object?>
-                {
-                    ["username"] = user.Username,
-                    ["isActive"] = user.IsActive,
-                    ["deactivated"] = deactivated,
-                    ["rolesChanged"] = rolesChanged,
-                    ["previousRoles"] = previousRoles,
-                    ["newRoles"] = normalizedRoles,
-                    ["passwordChanged"] = passwordChanged
-                }));
-
-            var updated = await _userRepository.GetUserByIdAsync(id);
-            return Ok(await ToSafeUserAsync(updated!));
+            _passwordService.CreatePasswordHash(dto.Password, out hash, out salt);
         }
-        catch (UserValidationException ex)
+
+        var user = new User
         {
-            return BadRequest(new { message = ex.Message });
-        }
+            UserId = id,
+            EmployeeId = dto.EmployeeId,
+            Username = dto.Username.Trim(),
+            Email = dto.Email.Trim(),
+            PasswordHash = hash,
+            PasswordSalt = salt,
+            IsActive = dto.IsActive,
+            Phone = string.IsNullOrWhiteSpace(dto.Phone) ? null : dto.Phone.Trim(),
+            Notes = string.IsNullOrWhiteSpace(dto.Notes) ? null : dto.Notes.Trim()
+        };
+
+        await _userRepository.UpdateUserAsync(user);
+
+        await _userRepository.SetUserRolesAsync(id, normalizedRoles);
+        await _userRepository.SetUserDepartmentsAsync(id, normalizedDepartments);
+
+        var rolesChanged = !previousRoles
+            .OrderBy(role => role, StringComparer.OrdinalIgnoreCase)
+            .SequenceEqual(
+                normalizedRoles.OrderBy(role => role, StringComparer.OrdinalIgnoreCase),
+                StringComparer.OrdinalIgnoreCase);
+        var deactivated = wasActive && !user.IsActive;
+        var passwordChanged = !string.IsNullOrWhiteSpace(dto.Password);
+
+        await _auditLogService.LogAsync(this.BuildAuditEvent(
+            AuditActions.UserUpdated,
+            AuditEntityTypes.User,
+            $"User '{user.Username}' (#{id}) updated.",
+            entityId: id,
+            severity: (rolesChanged || deactivated) ? AuditSeverity.Warning : AuditSeverity.Info,
+            metadata: new Dictionary<string, object?>
+            {
+                ["username"] = user.Username,
+                ["isActive"] = user.IsActive,
+                ["deactivated"] = deactivated,
+                ["rolesChanged"] = rolesChanged,
+                ["previousRoles"] = previousRoles,
+                ["newRoles"] = normalizedRoles,
+                ["passwordChanged"] = passwordChanged
+            }));
+
+        var updated = await _userRepository.GetUserByIdAsync(id);
+        return Ok(await ToSafeUserAsync(updated!));
     }
 
     // Hard delete user row through repository (guarded by domain validation exceptions).
@@ -373,27 +265,20 @@ public class UsersController : ControllerBase
         if (existing == null)
             return NotFound(new { message = $"User with id {id} was not found." });
 
-        try
-        {
-            await _userRepository.DeleteUserAsync(id);
+        await _userRepository.DeleteUserAsync(id);
 
-            await _auditLogService.LogAsync(this.BuildAuditEvent(
-                AuditActions.UserDeleted,
-                AuditEntityTypes.User,
-                $"User '{existing.Username}' (#{id}) deleted.",
-                entityId: id,
-                severity: AuditSeverity.Warning,
-                metadata: new Dictionary<string, object?>
-                {
-                    ["username"] = existing.Username
-                }));
+        await _auditLogService.LogAsync(this.BuildAuditEvent(
+            AuditActions.UserDeleted,
+            AuditEntityTypes.User,
+            $"User '{existing.Username}' (#{id}) deleted.",
+            entityId: id,
+            severity: AuditSeverity.Warning,
+            metadata: new Dictionary<string, object?>
+            {
+                ["username"] = existing.Username
+            }));
 
-            return NoContent();
-        }
-        catch (UserValidationException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+        return NoContent();
     }
 
     // Public login: verify credentials, block inactive users, refresh last login, return JWT + role/department claims payload.
@@ -403,12 +288,6 @@ public class UsersController : ControllerBase
     [HttpPost("login")]
     public async Task<IActionResult> Login([FromBody] LoginRequestDto dto)
     {
-        if (string.IsNullOrWhiteSpace(dto.Email))
-            return BadRequest(new { message = "Email is required." });
-
-        if (string.IsNullOrWhiteSpace(dto.Password))
-            return BadRequest(new { message = "Password is required." });
-
         var email = dto.Email.Trim().ToLower();
 
         var user = await _userRepository.GetUserByEmailAsync(email);

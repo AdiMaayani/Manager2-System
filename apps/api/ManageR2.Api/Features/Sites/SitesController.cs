@@ -1,7 +1,6 @@
 using ManageR2.Api.Authorization;
 using ManageR2.Api.DTOs;
 using ManageR2.Domain.Entities;
-using ManageR2.Domain.Exceptions;
 using ManageR2.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -9,6 +8,7 @@ using Microsoft.AspNetCore.Mvc;
 namespace ManageR2.Api.Controllers;
 
 // Physical customer sites/locations; links to CustomerId; CRUD via ISiteRepository under JWT auth.
+// DTO validation runs via the global ValidationActionFilter; faults are shaped by GlobalExceptionHandler.
 [ApiController]
 [Route("api/[controller]")]
 [Authorize(Policy = Policies.CanViewCustomers)]
@@ -26,61 +26,47 @@ public class SitesController : ControllerBase
     [HttpGet]
     public async Task<IActionResult> GetAll()
     {
-        try
-        {
-            var sites = await _repository.GetAllAsync();
+        var sites = await _repository.GetAllAsync();
 
-            var result = sites.Select(site => new SiteDto
-            {
-                SiteId = site.SiteId,
-                CustomerId = site.CustomerId,
-                SiteName = site.SiteName,
-                AddressLine = site.AddressLine,
-                City = site.City,
-                IsPrimary = site.IsPrimary,
-                Notes = site.Notes,
-                CreatedAt = site.CreatedAt,
-                UpdatedAt = site.UpdatedAt
-            });
-
-            return Ok(result);
-        }
-        catch (UserValidationException ex)
+        var result = sites.Select(site => new SiteDto
         {
-            return BadRequest(new { message = ex.Message });
-        }
+            SiteId = site.SiteId,
+            CustomerId = site.CustomerId,
+            SiteName = site.SiteName,
+            AddressLine = site.AddressLine,
+            City = site.City,
+            IsPrimary = site.IsPrimary,
+            Notes = site.Notes,
+            CreatedAt = site.CreatedAt,
+            UpdatedAt = site.UpdatedAt
+        });
+
+        return Ok(result);
     }
 
     // Single site record for detail/edit views.
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int id)
     {
-        try
-        {
-            var site = await _repository.GetByIdAsync(id);
+        var site = await _repository.GetByIdAsync(id);
 
-            if (site == null)
-            {
-                return NotFound(new { message = $"Site with id {id} was not found." });
-            }
-
-            return Ok(new SiteDto
-            {
-                SiteId = site.SiteId,
-                CustomerId = site.CustomerId,
-                SiteName = site.SiteName,
-                AddressLine = site.AddressLine,
-                City = site.City,
-                IsPrimary = site.IsPrimary,
-                Notes = site.Notes,
-                CreatedAt = site.CreatedAt,
-                UpdatedAt = site.UpdatedAt
-            });
-        }
-        catch (UserValidationException ex)
+        if (site == null)
         {
-            return BadRequest(new { message = ex.Message });
+            return NotFound(new { message = $"Site with id {id} was not found." });
         }
+
+        return Ok(new SiteDto
+        {
+            SiteId = site.SiteId,
+            CustomerId = site.CustomerId,
+            SiteName = site.SiteName,
+            AddressLine = site.AddressLine,
+            City = site.City,
+            IsPrimary = site.IsPrimary,
+            Notes = site.Notes,
+            CreatedAt = site.CreatedAt,
+            UpdatedAt = site.UpdatedAt
+        });
     }
 
     // Create site under a valid customer; repository assigns timestamps and enforces referential rules.
@@ -88,53 +74,36 @@ public class SitesController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] SiteDto dto)
     {
-        if (dto.CustomerId <= 0)
+        var site = new Site
         {
-            return BadRequest(new { message = "CustomerId is required." });
+            CustomerId = dto.CustomerId,
+            SiteName = dto.SiteName,
+            AddressLine = dto.AddressLine,
+            City = dto.City,
+            IsPrimary = dto.IsPrimary,
+            Notes = dto.Notes
+        };
+
+        var id = await _repository.CreateAsync(site);
+
+        var created = await _repository.GetByIdAsync(id);
+        if (created == null)
+        {
+            return BadRequest(new { message = "Site was created but could not be reloaded." });
         }
 
-        if (string.IsNullOrWhiteSpace(dto.SiteName))
+        return CreatedAtAction(nameof(GetById), new { id }, new SiteDto
         {
-            return BadRequest(new { message = "SiteName is required." });
-        }
-
-        try
-        {
-            var site = new Site
-            {
-                CustomerId = dto.CustomerId,
-                SiteName = dto.SiteName,
-                AddressLine = dto.AddressLine,
-                City = dto.City,
-                IsPrimary = dto.IsPrimary,
-                Notes = dto.Notes
-            };
-
-            var id = await _repository.CreateAsync(site);
-
-            var created = await _repository.GetByIdAsync(id);
-            if (created == null)
-            {
-                return BadRequest(new { message = "Site was created but could not be reloaded." });
-            }
-
-            return CreatedAtAction(nameof(GetById), new { id }, new SiteDto
-            {
-                SiteId = created.SiteId,
-                CustomerId = created.CustomerId,
-                SiteName = created.SiteName,
-                AddressLine = created.AddressLine,
-                City = created.City,
-                IsPrimary = created.IsPrimary,
-                Notes = created.Notes,
-                CreatedAt = created.CreatedAt,
-                UpdatedAt = created.UpdatedAt
-            });
-        }
-        catch (UserValidationException ex)
-        {
-            return BadRequest(new { message = ex.Message });
-        }
+            SiteId = created.SiteId,
+            CustomerId = created.CustomerId,
+            SiteName = created.SiteName,
+            AddressLine = created.AddressLine,
+            City = created.City,
+            IsPrimary = created.IsPrimary,
+            Notes = created.Notes,
+            CreatedAt = created.CreatedAt,
+            UpdatedAt = created.UpdatedAt
+        });
     }
 
     // Update site fields; full replace pattern on entity loaded from repository before save.
@@ -142,81 +111,57 @@ public class SitesController : ControllerBase
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, [FromBody] SiteDto dto)
     {
-        if (dto.CustomerId <= 0)
+        var existing = await _repository.GetByIdAsync(id);
+        if (existing == null)
         {
-            return BadRequest(new { message = "CustomerId is required." });
+            return NotFound(new { message = $"Site with id {id} was not found." });
         }
 
-        if (string.IsNullOrWhiteSpace(dto.SiteName))
+        existing.CustomerId = dto.CustomerId;
+        existing.SiteName = dto.SiteName;
+        existing.AddressLine = dto.AddressLine;
+        existing.City = dto.City;
+        existing.IsPrimary = dto.IsPrimary;
+        existing.Notes = dto.Notes;
+
+        var success = await _repository.UpdateAsync(existing);
+
+        if (!success)
         {
-            return BadRequest(new { message = "SiteName is required." });
+            return BadRequest(new { message = "Failed to update site." });
         }
 
-        try
+        var updated = await _repository.GetByIdAsync(id);
+        if (updated == null)
         {
-            var existing = await _repository.GetByIdAsync(id);
-            if (existing == null)
-            {
-                return NotFound(new { message = $"Site with id {id} was not found." });
-            }
-
-            existing.CustomerId = dto.CustomerId;
-            existing.SiteName = dto.SiteName;
-            existing.AddressLine = dto.AddressLine;
-            existing.City = dto.City;
-            existing.IsPrimary = dto.IsPrimary;
-            existing.Notes = dto.Notes;
-
-            var success = await _repository.UpdateAsync(existing);
-
-            if (!success)
-            {
-                return BadRequest(new { message = "Failed to update site." });
-            }
-
-            var updated = await _repository.GetByIdAsync(id);
-            if (updated == null)
-            {
-                return NotFound(new { message = $"Site with id {id} was not found after update." });
-            }
-
-            return Ok(new SiteDto
-            {
-                SiteId = updated.SiteId,
-                CustomerId = updated.CustomerId,
-                SiteName = updated.SiteName,
-                AddressLine = updated.AddressLine,
-                City = updated.City,
-                IsPrimary = updated.IsPrimary,
-                Notes = updated.Notes,
-                CreatedAt = updated.CreatedAt,
-                UpdatedAt = updated.UpdatedAt
-            });
+            return NotFound(new { message = $"Site with id {id} was not found after update." });
         }
-        catch (UserValidationException ex)
+
+        return Ok(new SiteDto
         {
-            return BadRequest(new { message = ex.Message });
-        }
+            SiteId = updated.SiteId,
+            CustomerId = updated.CustomerId,
+            SiteName = updated.SiteName,
+            AddressLine = updated.AddressLine,
+            City = updated.City,
+            IsPrimary = updated.IsPrimary,
+            Notes = updated.Notes,
+            CreatedAt = updated.CreatedAt,
+            UpdatedAt = updated.UpdatedAt
+        });
     }
 
     [Authorize(Policy = Policies.CanManageProjects)]
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Deactivate(int id)
     {
-        try
-        {
-            var success = await _repository.DeactivateAsync(id);
+        var success = await _repository.DeactivateAsync(id);
 
-            if (!success)
-            {
-                return NotFound(new { message = $"Site with id {id} was not found." });
-            }
-
-            return NoContent();
-        }
-        catch (UserValidationException ex)
+        if (!success)
         {
-            return BadRequest(new { message = ex.Message });
+            return NotFound(new { message = $"Site with id {id} was not found." });
         }
+
+        return NoContent();
     }
 }
