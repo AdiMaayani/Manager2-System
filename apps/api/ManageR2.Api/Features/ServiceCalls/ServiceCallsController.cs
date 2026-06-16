@@ -48,12 +48,6 @@ public class ServiceCallsController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateServiceCallRequestDto request)
     {
-        var validationError = ValidateRequest(request);
-        if (validationError != null)
-        {
-            return BadRequest(validationError);
-        }
-
         var serviceCall = BuildServiceCall(request);
         var newWorkItemId = await _workItemRepository.CreateAsync(serviceCall);
 
@@ -90,12 +84,6 @@ public class ServiceCallsController : ControllerBase
         if (existingServiceCall == null)
         {
             return NotFound($"Service call with ID {id} was not found.");
-        }
-
-        var validationError = ValidateRequest(request);
-        if (validationError != null)
-        {
-            return BadRequest(validationError);
         }
 
         var serviceCall = BuildServiceCall(request);
@@ -155,11 +143,6 @@ public class ServiceCallsController : ControllerBase
             return NotFound($"Service call with ID {id} was not found.");
         }
 
-        if (request == null || request.EmployeeId <= 0 || string.IsNullOrWhiteSpace(request.AssignmentRole))
-        {
-            return BadRequest("Valid EmployeeId and AssignmentRole are required.");
-        }
-
         try
         {
             var assigned = await _workItemRepository.AssignEmployeeToWorkAsync(
@@ -201,41 +184,6 @@ public class ServiceCallsController : ControllerBase
         }
 
         return workItem;
-    }
-
-    private static string? ValidateRequest(CreateServiceCallRequestDto request)
-    {
-        if (request == null)
-        {
-            return "Service call data is required.";
-        }
-
-        if (string.IsNullOrWhiteSpace(request.Title))
-        {
-            return "Title is required.";
-        }
-
-        if (string.IsNullOrWhiteSpace(request.Status))
-        {
-            return "Status is required.";
-        }
-
-        if (string.IsNullOrWhiteSpace(request.BillingType))
-        {
-            return "BillingType is required.";
-        }
-
-        if (request.CustomerId <= 0)
-        {
-            return "CustomerId must be greater than 0.";
-        }
-
-        if (request.SiteId <= 0)
-        {
-            return "SiteId must be greater than 0.";
-        }
-
-        return null;
     }
 
     private static WorkItem BuildServiceCall(CreateServiceCallRequestDto request)

@@ -161,17 +161,6 @@ public class ProjectsController : ControllerBase
         int projectId,
         [FromBody] CreateProjectBoqItemRequestDto request)
     {
-        var validationError = ValidateProjectBoqRequest(
-            request.ItemDescription,
-            request.Quantity,
-            request.Unit,
-            request.UnitPrice);
-
-        if (validationError != null)
-        {
-            return BadRequest(new { message = validationError });
-        }
-
         try
         {
             var boqItem = new ProjectBoqItemModel
@@ -214,17 +203,6 @@ public class ProjectsController : ControllerBase
         int boqItemId,
         [FromBody] UpdateProjectBoqItemRequestDto request)
     {
-        var validationError = ValidateProjectBoqRequest(
-            request.ItemDescription,
-            request.Quantity,
-            request.Unit,
-            request.UnitPrice);
-
-        if (validationError != null)
-        {
-            return BadRequest(new { message = validationError });
-        }
-
         try
         {
             var boqItem = new ProjectBoqItemModel
@@ -339,16 +317,6 @@ public class ProjectsController : ControllerBase
         int projectId,
         [FromBody] CreateProjectDrawingRequestDto request)
     {
-        var validationError = ValidateProjectDrawingRequest(
-            request.Name,
-            request.Type,
-            request.DrawingDate);
-
-        if (validationError != null)
-        {
-            return BadRequest(new { message = validationError });
-        }
-
         try
         {
             var drawing = new ProjectDrawingModel
@@ -389,16 +357,6 @@ public class ProjectsController : ControllerBase
         int projectId,
         [FromForm] UploadProjectDrawingRequestDto request)
     {
-        var validationError = ValidateProjectDrawingRequest(
-            request.Name,
-            request.Type,
-            request.DrawingDate);
-
-        if (validationError != null)
-        {
-            return BadRequest(new { message = validationError });
-        }
-
         var fileValidationError = ValidateDrawingFile(request.File);
         if (fileValidationError != null)
         {
@@ -504,16 +462,6 @@ public class ProjectsController : ControllerBase
         int projectDrawingId,
         [FromBody] UpdateProjectDrawingRequestDto request)
     {
-        var validationError = ValidateProjectDrawingRequest(
-            request.Name,
-            request.Type,
-            request.DrawingDate);
-
-        if (validationError != null)
-        {
-            return BadRequest(new { message = validationError });
-        }
-
         try
         {
             var drawing = new ProjectDrawingModel
@@ -594,15 +542,6 @@ public class ProjectsController : ControllerBase
         int projectId,
         [FromBody] CreateProjectEquipmentItemRequestDto request)
     {
-        var validationError = ValidateProjectEquipmentRequest(
-            request.EquipmentName,
-            request.Status);
-
-        if (validationError != null)
-        {
-            return BadRequest(new { message = validationError });
-        }
-
         try
         {
             var equipmentItem = new ProjectEquipmentItemModel
@@ -643,15 +582,6 @@ public class ProjectsController : ControllerBase
         int equipmentItemId,
         [FromBody] UpdateProjectEquipmentItemRequestDto request)
     {
-        var validationError = ValidateProjectEquipmentRequest(
-            request.EquipmentName,
-            request.Status);
-
-        if (validationError != null)
-        {
-            return BadRequest(new { message = validationError });
-        }
-
         try
         {
             var equipmentItem = new ProjectEquipmentItemModel
@@ -766,79 +696,6 @@ public class ProjectsController : ControllerBase
     {
         var drawings = await _projectDrawingRepository.GetByProjectIdAsync(projectId);
         return drawings.FirstOrDefault(item => item.ProjectDrawingId == projectDrawingId);
-    }
-
-    private static string? ValidateProjectBoqRequest(
-        string itemDescription,
-        decimal quantity,
-        string unit,
-        decimal? unitPrice)
-    {
-        if (string.IsNullOrWhiteSpace(itemDescription))
-        {
-            return "ItemDescription is required.";
-        }
-
-        if (quantity <= 0)
-        {
-            return "Quantity must be greater than zero.";
-        }
-
-        if (string.IsNullOrWhiteSpace(unit))
-        {
-            return "Unit is required.";
-        }
-
-        if (unitPrice < 0)
-        {
-            return "UnitPrice must be non-negative.";
-        }
-
-        return null;
-    }
-
-    private static string? ValidateProjectEquipmentRequest(string equipmentName, string status)
-    {
-        if (string.IsNullOrWhiteSpace(equipmentName))
-        {
-            return "EquipmentName is required.";
-        }
-
-        if (string.IsNullOrWhiteSpace(status))
-        {
-            return "Status is required.";
-        }
-
-        return null;
-    }
-
-    private static string? ValidateProjectDrawingRequest(
-        string name,
-        string type,
-        DateOnly drawingDate)
-    {
-        if (string.IsNullOrWhiteSpace(name))
-        {
-            return "Name is required.";
-        }
-
-        if (string.IsNullOrWhiteSpace(type))
-        {
-            return "Type is required.";
-        }
-
-        var normalizedType = type.Trim().ToUpperInvariant();
-        if (normalizedType is not ("PDF" or "DWG"))
-        {
-            return "Type must be PDF or DWG.";
-        }
-
-        if (drawingDate == default)
-        {
-            return "DrawingDate is required.";
-        }
-
-        return null;
     }
 
     private static ProjectBoqItemDto MapProjectBoqItem(ProjectBoqItemModel boqItem)

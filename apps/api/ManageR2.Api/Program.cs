@@ -1,13 +1,17 @@
+using System.Diagnostics;
 using System.Text;
 using System.Threading.RateLimiting;
+using FluentValidation;
 using ManageR2.Api.Authorization;
 using ManageR2.Api.Middleware;
+using ManageR2.Api.Validation;
 using ManageR2.Infrastructure.DAL;
 using ManageR2.Infrastructure.Interfaces;
 using ManageR2.Infrastructure.Repositories;
 using ManageR2.Infrastructure.Security;
 using ManageR2.Infrastructure.Services;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
@@ -22,8 +26,38 @@ var builder = WebApplication.CreateBuilder(args);
 
 // API composition root: registers controllers, auth, CORS, Swagger, and Infrastructure services for the ManageR2 web API.
 // Add services to the container.
-builder.Services.AddControllers();
+// ValidationActionFilter runs registered FluentValidation validators on bound DTOs before each action executes.
+builder.Services.AddControllers(options => options.Filters.Add<ValidationActionFilter>());
 builder.Services.AddEndpointsApiExplorer();
+
+// Discovers and registers every AbstractValidator<T> defined in this API assembly for the action filter to resolve.
+builder.Services.AddValidatorsFromAssemblyContaining<Program>();
+
+// Model-binding failures (e.g. malformed JSON, wrong types) are shaped into the same ProblemDetails contract as
+// our validation/business errors, including the flattened "message" the SPA reads for error toasts.
+builder.Services.Configure<ApiBehaviorOptions>(options =>
+{
+    options.InvalidModelStateResponseFactory = context =>
+    {
+        var traceId = Activity.Current?.Id ?? context.HttpContext.TraceIdentifier;
+        var problemDetails = new ValidationProblemDetails(context.ModelState)
+        {
+            Status = StatusCodes.Status400BadRequest,
+            Title = "One or more validation errors occurred.",
+            Type = "https://datatracker.ietf.org/doc/html/rfc7231#section-6.5.1",
+            Instance = context.HttpContext.Request.Path
+        };
+        problemDetails.Extensions["traceId"] = traceId;
+        problemDetails.Extensions["message"] = string.Join(
+            " ",
+            problemDetails.Errors.SelectMany(error => error.Value));
+
+        return new BadRequestObjectResult(problemDetails)
+        {
+            ContentTypes = { "application/problem+json" }
+        };
+    };
+});
 
 // Global exception handling: unhandled exceptions are turned into RFC7807 ProblemDetails responses
 // (see GlobalExceptionHandler) instead of leaking stack traces or raw messages to clients.
