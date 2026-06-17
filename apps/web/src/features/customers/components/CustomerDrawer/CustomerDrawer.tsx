@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Drawer } from '@shared/components/Drawer';
@@ -6,7 +6,13 @@ import { Badge } from '@shared/components/Badge';
 import { Button } from '@shared/components/Button';
 import { DetailsField } from '@shared/components/DetailsField';
 import { DetailsSection } from '@shared/components/DetailsSection';
+import { RelatedSection } from '@shared/components/RelatedSection';
 import { Input } from '@shared/components/Input';
+import { Select } from '@shared/components/Select';
+import { Textarea } from '@shared/components/Textarea';
+import { Checkbox } from '@shared/components/Checkbox';
+import { InlineAlert } from '@shared/components/InlineAlert';
+import { ConfirmInline } from '@shared/components/ConfirmInline';
 import { usePermissions } from '@shared/auth/usePermissions';
 import { isLocalDataMode } from '@/config/appConfig';
 import { getProjectsListAsync, getSitesAsync } from '@features/projects/api/projectsApiClient';
@@ -124,7 +130,6 @@ function CustomerDrawerContent({ customer, onClose, onSaved }: CustomerDrawerCon
   const [isEditing, setIsEditing] = useState(!isExistingCustomer);
   const [form, setForm] = useState<CustomerFormState>(() => buildInitialState(customer));
   const [error, setError] = useState<string | null>(null);
-  const [confirmDeactivate, setConfirmDeactivate] = useState(false);
 
   function setField<K extends keyof CustomerFormState>(key: K, value: CustomerFormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -133,7 +138,6 @@ function CustomerDrawerContent({ customer, onClose, onSaved }: CustomerDrawerCon
   function handleStartEdit() {
     setForm(buildInitialState(customer));
     setError(null);
-    setConfirmDeactivate(false);
     setIsEditing(true);
   }
 
@@ -145,7 +149,6 @@ function CustomerDrawerContent({ customer, onClose, onSaved }: CustomerDrawerCon
 
     setForm(buildInitialState(customer));
     setError(null);
-    setConfirmDeactivate(false);
     setIsEditing(false);
   }
 
@@ -192,7 +195,6 @@ function CustomerDrawerContent({ customer, onClose, onSaved }: CustomerDrawerCon
       }
 
       setIsEditing(false);
-      setConfirmDeactivate(false);
       await onSaved?.(savedCustomer);
 
       // Without a parent to hand the saved record back to, fall back to the
@@ -241,10 +243,10 @@ function CustomerDrawerContent({ customer, onClose, onSaved }: CustomerDrawerCon
       footer={
         isEditing ? (
           <div className="customerDrawer__footerContent">
-            {error && <p className="customerDrawer__error">{error}</p>}
+            {error && <InlineAlert variant="danger">{error}</InlineAlert>}
             <div className="customerDrawer__actions">
-              <Button onClick={handleSave} disabled={isSaving}>
-                {isSaving ? 'שומר...' : 'שמור'}
+              <Button onClick={handleSave} isLoading={isSaving}>
+                שמור
               </Button>
               <Button variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
                 בטל שינויים
@@ -252,29 +254,13 @@ function CustomerDrawerContent({ customer, onClose, onSaved }: CustomerDrawerCon
 
               {isExistingCustomer && customer.isActive && (
                 <div className="customerDrawer__dangerActions">
-                  {confirmDeactivate ? (
-                    <>
-                      <span className="customerDrawer__confirmText">להשבית את הלקוח?</span>
-                      <Button variant="danger" onClick={handleDeactivate} disabled={isSaving}>
-                        אישור השבתה
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        onClick={() => setConfirmDeactivate(false)}
-                        disabled={isSaving}
-                      >
-                        חזור
-                      </Button>
-                    </>
-                  ) : (
-                    <Button
-                      variant="danger"
-                      onClick={() => setConfirmDeactivate(true)}
-                      disabled={isSaving}
-                    >
-                      השבת לקוח
-                    </Button>
-                  )}
+                  <ConfirmInline
+                    triggerLabel="השבת לקוח"
+                    message="להשבית את הלקוח?"
+                    confirmLabel="אישור השבתה"
+                    onConfirm={handleDeactivate}
+                    isPending={isSaving}
+                  />
                 </div>
               )}
             </div>
@@ -288,35 +274,30 @@ function CustomerDrawerContent({ customer, onClose, onSaved }: CustomerDrawerCon
         <div className="customerDrawer customerDrawer--edit">
           <DetailsSection title="פרטים כלליים">
             <Input
-              label="שם לקוח *"
+              label="שם לקוח"
               value={form.customerName}
               onChange={(e) => setField('customerName', e.target.value)}
               required
             />
             <div className="customerDrawer__grid">
-              <div className="customerDrawer__field">
-                <label className="customerDrawer__label">סוג לקוח *</label>
-                <select
-                  className="customerDrawer__select"
-                  value={form.customerType}
-                  onChange={(e) => setField('customerType', e.target.value)}
-                >
-                  {CUSTOMER_TYPE_OPTIONS.map((opt) => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
-                </select>
-              </div>
+              <Select
+                label="סוג לקוח"
+                required
+                value={form.customerType}
+                onChange={(e) => setField('customerType', e.target.value)}
+              >
+                {CUSTOMER_TYPE_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </Select>
             </div>
 
             {isExistingCustomer && (
-              <label className="customerDrawer__checkboxRow">
-                <input
-                  type="checkbox"
-                  checked={form.isActive}
-                  onChange={(e) => setField('isActive', e.target.checked)}
-                />
-                <span>לקוח פעיל</span>
-              </label>
+              <Checkbox
+                label="לקוח פעיל"
+                checked={form.isActive}
+                onChange={(e) => setField('isActive', e.target.checked)}
+              />
             )}
           </DetailsSection>
 
@@ -358,15 +339,12 @@ function CustomerDrawerContent({ customer, onClose, onSaved }: CustomerDrawerCon
           </DetailsSection>
 
           <DetailsSection title="מידע נוסף">
-            <div className="customerDrawer__field">
-              <label className="customerDrawer__label">הערות</label>
-              <textarea
-                className="customerDrawer__textarea"
-                rows={3}
-                value={form.notes}
-                onChange={(e) => setField('notes', e.target.value)}
-              />
-            </div>
+            <Textarea
+              label="הערות"
+              rows={3}
+              value={form.notes}
+              onChange={(e) => setField('notes', e.target.value)}
+            />
           </DetailsSection>
         </div>
       )}
@@ -615,57 +593,6 @@ function CustomerReviewDetails({ customer }: CustomerReviewDetailsProps) {
       </RelatedSection>
     </div>
   );
-}
-
-interface RelatedSectionProps {
-  title: string;
-  /** Number of related records, or null while the data has not loaded yet. */
-  count: number | null;
-  isLoading: boolean;
-  isError: boolean;
-  isUnavailable: boolean;
-  emptyText: string;
-  footer?: ReactNode;
-  children: ReactNode;
-}
-
-function RelatedSection({
-  title,
-  count,
-  isLoading,
-  isError,
-  isUnavailable,
-  emptyText,
-  footer,
-  children,
-}: RelatedSectionProps) {
-  const sectionTitle = count != null ? `${title} (${count})` : title;
-
-  let body: ReactNode;
-  if (isUnavailable) {
-    body = (
-      <p className="customerDrawer__relatedHint">נתונים מקושרים זמינים בחיבור לשרת בלבד.</p>
-    );
-  } else if (isLoading) {
-    body = <p className="customerDrawer__relatedHint">טוען נתונים מקושרים…</p>;
-  } else if (isError) {
-    body = (
-      <p className="customerDrawer__relatedHint customerDrawer__relatedHint--error">
-        טעינת הנתונים המקושרים נכשלה.
-      </p>
-    );
-  } else if (count === 0) {
-    body = <p className="customerDrawer__relatedHint">{emptyText}</p>;
-  } else {
-    body = (
-      <>
-        {children}
-        {footer}
-      </>
-    );
-  }
-
-  return <DetailsSection title={sectionTitle}>{body}</DetailsSection>;
 }
 
 function RelatedOverflowNote({ total }: { total: number }) {

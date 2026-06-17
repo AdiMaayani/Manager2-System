@@ -2,6 +2,8 @@ import { useEffect, useMemo, useState } from 'react';
 import { useInventory, type InventoryItem } from '@features/inventory';
 import { Button } from '@shared/components/Button';
 import { Input } from '@shared/components/Input';
+import { Select } from '@shared/components/Select';
+import { InlineAlert } from '@shared/components/InlineAlert';
 import type {
   CreateProjectBoqItemRequest,
   ProjectBoqItem,
@@ -253,7 +255,7 @@ export function ProjectBoqTab({
   if (isEditMode) {
     return (
       <div className="projectBoqTab">
-        {error && <div className="projectBoqTab__error">{error}</div>}
+        {error && <InlineAlert variant="danger">{error}</InlineAlert>}
         {sortedItems.length === 0 && (
           <p className="projectBoqTab__empty">אין עדיין פריטי כתב כמויות לפרויקט.</p>
         )}
@@ -285,8 +287,7 @@ export function ProjectBoqTab({
                     />
                   </td>
                   <td>
-                    <select
-                      className="projectBoqTab__select"
+                    <Select
                       value={draft.inventoryCategory}
                       onChange={(event) =>
                         updateDraft(item.projectBoqItemId, {
@@ -301,11 +302,10 @@ export function ProjectBoqTab({
                           {category}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </td>
                   <td>
-                    <select
-                      className="projectBoqTab__select"
+                    <Select
                       value={draft.inventoryItemId}
                       onChange={(event) =>
                         applyInventoryItemToDraft(event.target.value, (patch) =>
@@ -322,7 +322,7 @@ export function ProjectBoqTab({
                           {inventoryLabel(inventoryItem)}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </td>
                   <td>
                     <Input
@@ -343,8 +343,7 @@ export function ProjectBoqTab({
                     />
                   </td>
                   <td>
-                    <select
-                      className="projectBoqTab__select"
+                    <Select
                       value={draft.unit}
                       onChange={(event) =>
                         updateDraft(item.projectBoqItemId, { unit: event.target.value })
@@ -355,7 +354,7 @@ export function ProjectBoqTab({
                           {unit}
                         </option>
                       ))}
-                    </select>
+                    </Select>
                   </td>
                   <td>
                     <Input
@@ -417,8 +416,7 @@ export function ProjectBoqTab({
                 />
               </td>
               <td>
-                <select
-                  className="projectBoqTab__select"
+                <Select
                   value={newItemDraft.inventoryCategory}
                   onChange={(event) =>
                     setNewItemDraft((currentDraft) => ({
@@ -434,11 +432,10 @@ export function ProjectBoqTab({
                       {category}
                     </option>
                   ))}
-                </select>
+                </Select>
               </td>
               <td>
-                <select
-                  className="projectBoqTab__select"
+                <Select
                   value={newItemDraft.inventoryItemId}
                   onChange={(event) =>
                     applyInventoryItemToDraft(event.target.value, (patch) =>
@@ -455,7 +452,7 @@ export function ProjectBoqTab({
                       {inventoryLabel(inventoryItem)}
                     </option>
                   ))}
-                </select>
+                </Select>
               </td>
               <td>
                 <Input
@@ -480,8 +477,7 @@ export function ProjectBoqTab({
                 />
               </td>
               <td>
-                <select
-                  className="projectBoqTab__select"
+                <Select
                   value={newItemDraft.unit}
                   onChange={(event) =>
                     setNewItemDraft((currentDraft) => ({
@@ -495,7 +491,7 @@ export function ProjectBoqTab({
                       {unit}
                     </option>
                   ))}
-                </select>
+                </Select>
               </td>
               <td>
                 <Input

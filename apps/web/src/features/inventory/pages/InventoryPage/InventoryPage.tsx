@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from 'react';
+import { Plus } from 'lucide-react';
 import { Badge } from '@shared/components/Badge';
 import { Button } from '@shared/components/Button';
-import { EmptyState } from '@shared/components/EmptyState';
+import { Checkbox } from '@shared/components/Checkbox';
 import { ErrorState } from '@shared/components/ErrorState';
-import { FilterBar } from '@shared/components/FilterBar';
+import { FilterBar, FilterField } from '@shared/components/FilterBar';
 import { Input } from '@shared/components/Input';
+import { Select } from '@shared/components/Select';
+import { DataTable, type DataTableColumn } from '@shared/components/DataTable';
 import { PageShell } from '@shared/components/PageShell';
 import { PageSpinner } from '@shared/components/PageSpinner';
 import { InventoryDrawer } from '../../components/InventoryDrawer';
@@ -84,6 +87,55 @@ export function InventoryPage() {
     setDrawerInventoryItem(inventoryItem);
   };
 
+  const columns: DataTableColumn<InventoryItem>[] = [
+    {
+      id: 'sku',
+      header: 'מק״ט',
+      cell: (item) => <span className="inventoryPage__sku">{item.skuCode}</span>,
+    },
+    {
+      id: 'item',
+      header: 'פריט',
+      cell: (item) => (
+        <>
+          <div className="inventoryPage__itemName">{item.itemName}</div>
+          {item.notes && <div className="inventoryPage__notes">{item.notes}</div>}
+        </>
+      ),
+    },
+    { id: 'category', header: 'קטגוריה', cell: (item) => item.category ?? '—' },
+    {
+      id: 'quantity',
+      header: 'כמות',
+      cell: (item) => (
+        <span className={isLowStock(item) ? 'inventoryPage__lowStock' : ''}>
+          {formatQuantity(item.quantityOnHand, item.unit)}
+        </span>
+      ),
+    },
+    {
+      id: 'minimum',
+      header: 'מינימום',
+      cell: (item) =>
+        item.minimumQuantity == null
+          ? '—'
+          : formatQuantity(item.minimumQuantity, item.unit),
+    },
+    { id: 'location', header: 'מיקום', cell: (item) => item.locationName ?? '—' },
+    {
+      id: 'status',
+      header: 'סטטוס',
+      cell: (item) => (
+        <div className="inventoryPage__badges">
+          <Badge variant={item.isActive ? 'success' : 'neutral'}>
+            {item.isActive ? 'פעיל' : 'לא פעיל'}
+          </Badge>
+          {isLowStock(item) && <Badge variant="warning">מלאי נמוך</Badge>}
+        </div>
+      ),
+    },
+  ];
+
   if (isLoading) {
     return (
       <PageShell title="מלאי">
@@ -103,131 +155,64 @@ export function InventoryPage() {
   return (
     <PageShell title="מלאי">
       <FilterBar
-        actions={<Button onClick={() => setDrawerInventoryItem(null)}>+ פריט חדש</Button>}
+        actions={
+          <Button iconStart={<Plus size={18} />} onClick={() => setDrawerInventoryItem(null)}>
+            פריט חדש
+          </Button>
+        }
       >
-        <div className="inventoryPage__filter inventoryPage__filter--search">
+        <FilterField label="חיפוש" grow>
           <Input
-            label="חיפוש"
             placeholder="שם פריט, מק״ט, מיקום..."
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
-        </div>
+        </FilterField>
 
-        <div className="inventoryPage__filter">
-          <label className="inventoryPage__label">קטגוריה</label>
-          <select
-            className="inventoryPage__select"
-            value={category}
-            onChange={(event) => setCategory(event.target.value)}
-          >
+        <FilterField label="קטגוריה">
+          <Select value={category} onChange={(event) => setCategory(event.target.value)}>
             <option value="">כל הקטגוריות</option>
             {categoryOptions.map((categoryOption) => (
               <option key={categoryOption} value={categoryOption}>
                 {categoryOption}
               </option>
             ))}
-          </select>
-        </div>
+          </Select>
+        </FilterField>
 
-        <div className="inventoryPage__filter">
-          <label className="inventoryPage__label">סטטוס</label>
-          <select
-            className="inventoryPage__select"
+        <FilterField label="סטטוס">
+          <Select
             value={status}
             onChange={(event) => setStatus(event.target.value as InventoryStatusFilter)}
           >
             <option value="active">פעילים</option>
             <option value="inactive">לא פעילים</option>
             <option value="all">הכול</option>
-          </select>
-        </div>
+          </Select>
+        </FilterField>
 
-        <label className="inventoryPage__checkbox">
-          <input
-            type="checkbox"
+        <div className="inventoryPage__checkboxField">
+          <Checkbox
+            label="מתחת למינימום"
             checked={lowStockOnly}
             onChange={(event) => setLowStockOnly(event.target.checked)}
           />
-          <span>מתחת למינימום</span>
-        </label>
+        </div>
       </FilterBar>
 
-      {!inventoryItems || inventoryItems.length === 0 ? (
-        <EmptyState
-          title={hasFilters ? 'לא נמצאו פריטי מלאי' : 'אין פריטי מלאי עדיין'}
-          description={
-            hasFilters
-              ? 'נסו לשנות את החיפוש או הסינון.'
-              : 'הוסיפו פריט ראשון כדי להתחיל לנהל מלאי.'
-          }
-        />
-      ) : (
-        <div className="inventoryPage__tableWrap">
-          <table className="inventoryPage__table">
-            <thead>
-              <tr>
-                <th>מק״ט</th>
-                <th>פריט</th>
-                <th>קטגוריה</th>
-                <th>כמות</th>
-                <th>מינימום</th>
-                <th>מיקום</th>
-                <th>סטטוס</th>
-              </tr>
-            </thead>
-            <tbody>
-              {inventoryItems.map((inventoryItem) => (
-                <tr
-                  key={inventoryItem.inventoryItemId}
-                  role="button"
-                  tabIndex={0}
-                  className={`inventoryPage__row ${
-                    selectedInventoryItemId === inventoryItem.inventoryItemId
-                      ? 'inventoryPage__row--selected'
-                      : ''
-                  }`.trim()}
-                  onClick={() => openInventoryItem(inventoryItem)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault();
-                      openInventoryItem(inventoryItem);
-                    }
-                  }}
-                >
-                  <td className="inventoryPage__sku">{inventoryItem.skuCode}</td>
-                  <td>
-                    <div className="inventoryPage__itemName">{inventoryItem.itemName}</div>
-                    {inventoryItem.notes && (
-                      <div className="inventoryPage__notes">{inventoryItem.notes}</div>
-                    )}
-                  </td>
-                  <td>{inventoryItem.category ?? '—'}</td>
-                  <td>
-                    <span className={isLowStock(inventoryItem) ? 'inventoryPage__lowStock' : ''}>
-                      {formatQuantity(inventoryItem.quantityOnHand, inventoryItem.unit)}
-                    </span>
-                  </td>
-                  <td>
-                    {inventoryItem.minimumQuantity == null
-                      ? '—'
-                      : formatQuantity(inventoryItem.minimumQuantity, inventoryItem.unit)}
-                  </td>
-                  <td>{inventoryItem.locationName ?? '—'}</td>
-                  <td>
-                    <div className="inventoryPage__badges">
-                      <Badge variant={inventoryItem.isActive ? 'success' : 'neutral'}>
-                        {inventoryItem.isActive ? 'פעיל' : 'לא פעיל'}
-                      </Badge>
-                      {isLowStock(inventoryItem) && <Badge variant="warning">מלאי נמוך</Badge>}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable
+        columns={columns}
+        rows={inventoryItems ?? []}
+        getRowId={(item) => item.inventoryItemId}
+        onRowClick={openInventoryItem}
+        selectedRowId={selectedInventoryItemId}
+        emptyTitle={hasFilters ? 'לא נמצאו פריטי מלאי' : 'אין פריטי מלאי עדיין'}
+        emptyDescription={
+          hasFilters
+            ? 'נסו לשנות את החיפוש או הסינון.'
+            : 'הוסיפו פריט ראשון כדי להתחיל לנהל מלאי.'
+        }
+      />
 
       <InventoryDrawer
         isOpen={isDrawerOpen}

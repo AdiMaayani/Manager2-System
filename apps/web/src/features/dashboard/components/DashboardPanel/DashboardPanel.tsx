@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import { Spinner } from '@shared/components/Spinner';
+import { Button } from '@shared/components/Button';
 import './DashboardPanel.css';
 
 interface DashboardPanelProps {
@@ -55,9 +56,9 @@ export function DashboardPanel({
           <div className="dashboardPanel__state">
             <p className="dashboardPanel__stateText">{error}</p>
             {onRetry && (
-              <button type="button" className="dashboardPanel__retry" onClick={onRetry}>
+              <Button type="button" variant="secondary" size="sm" onClick={onRetry}>
                 נסה שוב
-              </button>
+              </Button>
             )}
           </div>
         ) : isEmpty ? (

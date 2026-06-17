@@ -1,6 +1,9 @@
 import { memo, useCallback, useMemo, useState } from 'react';
 import { Button } from '@shared/components/Button';
 import { Input } from '@shared/components/Input';
+import { Select } from '@shared/components/Select';
+import { Textarea } from '@shared/components/Textarea';
+import { InlineAlert } from '@shared/components/InlineAlert';
 import { CustomerDrawer, type Customer } from '@features/customers';
 import { ProjectReportsCard } from '../ProjectReportsCard';
 import type {
@@ -332,8 +335,7 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
             </span>
             {isEditMode ? (
               <div className="projectOverviewTab__fieldWithAction">
-                <select
-                  className="projectOverviewTab__select"
+                <Select
                   value={form.customerId || ''}
                   onChange={(event) => {
                     const customerId = Number(event.target.value);
@@ -349,7 +351,7 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
                       {customer.customerName}
                     </option>
                   ))}
-                </select>
+                </Select>
                 <Button
                   type="button"
                   variant="secondary"
@@ -370,8 +372,7 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
           <div className="projectOverviewTab__field">
             <span className="projectOverviewTab__label">סטטוס</span>
             {isEditMode ? (
-              <select
-                className="projectOverviewTab__select"
+              <Select
                 value={form.status}
                 onChange={(event) => updateField('status', event.target.value)}
               >
@@ -380,7 +381,7 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
                     {option.display}
                   </option>
                 ))}
-              </select>
+              </Select>
             ) : (
               <span>{statusMeta.display}</span>
             )}
@@ -388,8 +389,7 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
           <div className="projectOverviewTab__field">
             <span className="projectOverviewTab__label">סוג חיוב</span>
             {isEditMode ? (
-              <select
-                className="projectOverviewTab__select"
+              <Select
                 value={form.billingType}
                 onChange={(event) => updateField('billingType', event.target.value)}
               >
@@ -398,7 +398,7 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
                     {option.display}
                   </option>
                 ))}
-              </select>
+              </Select>
             ) : (
               <span>{getBillingTypeDisplay(project?.billingType)}</span>
             )}
@@ -496,8 +496,7 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
             <span className="projectOverviewTab__label">אתר</span>
             {isEditMode ? (
               <>
-                <select
-                  className="projectOverviewTab__select"
+                <Select
                   value={form.siteId || ''}
                   onChange={(event) => updateField('siteId', Number(event.target.value))}
                 >
@@ -507,7 +506,7 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
                       {[site.siteName, site.city, site.addressLine].filter(Boolean).join(' · ')}
                     </option>
                   ))}
-                </select>
+                </Select>
                 {filteredSites.length > 0 ? (
                   <span className="projectOverviewTab__fieldNote">
                     נמצאו {filteredSites.length} אתרים ללקוח זה. בחר אתר מהרשימה.
@@ -542,7 +541,7 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
             </div>
           )}
           {isEditMode && siteError && !showSiteForm && !showEditSiteForm && (
-            <p className="projectOverviewTab__siteError">{siteError}</p>
+            <InlineAlert variant="danger">{siteError}</InlineAlert>
           )}
           {isEditMode && showSiteForm && (
             <div className="projectOverviewTab__siteForm">
@@ -567,7 +566,7 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
                 onChange={(event) => setNewSiteNotes(event.target.value)}
               />
               {siteError && (
-                <p className="projectOverviewTab__siteError">{siteError}</p>
+                <InlineAlert variant="danger">{siteError}</InlineAlert>
               )}
               <Button type="button" variant="secondary" onClick={handleCreateSite}>
                 שמור אתר
@@ -597,7 +596,7 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
                 onChange={(event) => setEditSiteNotes(event.target.value)}
               />
               {siteError && (
-                <p className="projectOverviewTab__siteError">{siteError}</p>
+                <InlineAlert variant="danger">{siteError}</InlineAlert>
               )}
               <div className="projectOverviewTab__siteActions">
                 <Button type="button" variant="secondary" onClick={handleUpdateSite}>
@@ -619,8 +618,7 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
           <div className="projectOverviewTab__field">
             <span className="projectOverviewTab__label">תיאור</span>
             {isEditMode ? (
-              <textarea
-                className="projectOverviewTab__textarea"
+              <Textarea
                 value={form.description}
                 onChange={(event) => updateField('description', event.target.value)}
                 rows={4}
@@ -636,8 +634,7 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
           <div className="projectOverviewTab__field">
             <span className="projectOverviewTab__label">מנהל פרויקט</span>
             {isEditMode ? (
-              <select
-                className="projectOverviewTab__select"
+              <Select
                 value={teamForm.projectManagerEmployeeId != null ? String(teamForm.projectManagerEmployeeId) : ''}
                 onChange={(event) => handleProjectManagerChange(event.target.value)}
               >
@@ -647,7 +644,7 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
                     {employee.fullName}
                   </option>
                 ))}
-              </select>
+              </Select>
             ) : (
               <span>
                 {aggregatedTeam.managerNames.length > 0
@@ -661,8 +658,7 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
             {isEditMode ? (
               <div className="projectOverviewTab__teamEditor">
                 <div className="projectOverviewTab__teamAdd">
-                  <select
-                    className="projectOverviewTab__select"
+                  <Select
                     value={employeeToAddId}
                     onChange={(event) => setEmployeeToAddId(event.target.value)}
                     aria-label="בחר עובד להוספה לצוות"
@@ -674,7 +670,7 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
                         {employee.primaryRole ? ` · ${employee.primaryRole}` : ''}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                   <Button
                     type="button"
                     variant="secondary"

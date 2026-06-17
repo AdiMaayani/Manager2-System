@@ -1,8 +1,10 @@
 import type { ReactNode } from 'react';
 import './Badge.css';
 
+export type BadgeVariant = 'neutral' | 'primary' | 'success' | 'warning' | 'danger';
+
 interface BadgeProps {
-  variant?: 'neutral' | 'primary' | 'success' | 'warning' | 'danger';
+  variant?: BadgeVariant;
   children: ReactNode;
 }
 

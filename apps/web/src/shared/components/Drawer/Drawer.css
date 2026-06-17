@@ -26,7 +26,7 @@ body.drawerOpen {
   width: min(920px, 92vw);
   height: min(78vh, 760px);
   max-height: 78vh;
-  background: #fff;
+  background: var(--color-surface);
   border-radius: var(--radius-lg);
   border: 1px solid var(--color-neutral-200);
   box-shadow: var(--shadow-xl);
@@ -47,7 +47,7 @@ body.drawerOpen {
   gap: var(--spacing-md);
   padding: var(--spacing-lg);
   border-bottom: 1px solid var(--color-neutral-200);
-  background: #fff;
+  background: var(--color-surface);
 }
 
 .drawer__headerMain {
@@ -69,20 +69,8 @@ body.drawerOpen {
 .drawer__headerControls {
   display: flex;
   align-items: center;
-  gap: var(--spacing-sm);
+  gap: var(--spacing-xs);
   flex-shrink: 0;
-}
-
-.drawer__maximize,
-.drawer__close {
-  font-size: var(--font-size-lg);
-  line-height: 1;
-  color: var(--color-neutral-500);
-  padding: var(--spacing-xs) var(--spacing-sm);
-}
-
-.drawer__close {
-  font-size: 1.5rem;
 }
 
 .drawer__body {

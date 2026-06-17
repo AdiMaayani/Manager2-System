@@ -1,20 +1,38 @@
-import type { InputHTMLAttributes } from 'react';
+import { useId, type InputHTMLAttributes } from 'react';
+import { FormField } from '../FormField';
 import './Input.css';
 
 interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
   label?: string;
+  error?: string;
+  helpText?: string;
 }
 
-export function Input({ label, id, className = '', ...props }: InputProps) {
-  const inputId = id ?? props.name;
+export function Input({
+  label,
+  error,
+  helpText,
+  id,
+  className = '',
+  required,
+  ...props
+}: InputProps) {
+  const generatedId = useId();
+  const inputId = id ?? props.name ?? generatedId;
   return (
-    <div className="inputField">
-      {label && (
-        <label className="inputField__label" htmlFor={inputId}>
-          {label}
-        </label>
-      )}
-      <input id={inputId} className={`inputField__input ${className}`.trim()} {...props} />
-    </div>
+    <FormField
+      label={label}
+      htmlFor={inputId}
+      required={required}
+      error={error}
+      helpText={helpText}
+    >
+      <input
+        id={inputId}
+        required={required}
+        className={`formControl ${error ? 'formControl--error' : ''} ${className}`.trim()}
+        {...props}
+      />
+    </FormField>
   );
 }

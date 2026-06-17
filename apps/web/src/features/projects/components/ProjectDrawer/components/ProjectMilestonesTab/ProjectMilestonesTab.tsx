@@ -1,7 +1,11 @@
 import { useEffect, useState } from 'react';
 import { Badge } from '@shared/components/Badge';
+import { StatusBadge } from '@shared/components/StatusBadge';
 import { Button } from '@shared/components/Button';
 import { Input } from '@shared/components/Input';
+import { Select } from '@shared/components/Select';
+import { Textarea } from '@shared/components/Textarea';
+import { Checkbox } from '@shared/components/Checkbox';
 import { PageSpinner } from '@shared/components/PageSpinner';
 import { useProjectMilestones } from '../../../../hooks/useProjectLifecycle';
 import type {
@@ -250,48 +254,39 @@ export function ProjectMilestonesTab({
                     value={form.title}
                     onChange={(event) => updateField('title', event.target.value)}
                   />
-                  <label className="projectMilestonesTab__field">
-                    <span>סטטוס</span>
-                    <select
-                      className="projectMilestonesTab__select"
-                      value={form.status}
-                      onChange={(event) => updateField('status', event.target.value)}
-                    >
-                      {MILESTONE_STATUS_OPTIONS.map((option) => (
-                        <option key={option.code} value={option.code}>
-                          {option.display}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="projectMilestonesTab__field">
-                    <span>סוג חיוב</span>
-                    <select
-                      className="projectMilestonesTab__select"
-                      value={form.billingType}
-                      onChange={(event) => updateField('billingType', event.target.value)}
-                    >
-                      {BILLING_TYPE_OPTIONS.map((option) => (
-                        <option key={option.code} value={option.code}>
-                          {option.display}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="projectMilestonesTab__field">
-                    <span>עדיפות</span>
-                    <select
-                      className="projectMilestonesTab__select"
-                      value={form.priority}
-                      onChange={(event) => updateField('priority', event.target.value)}
-                    >
-                      {MILESTONE_PRIORITY_OPTIONS.map((option) => (
-                        <option key={option.code} value={option.code}>
-                          {option.display}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
+                  <Select
+                    label="סטטוס"
+                    value={form.status}
+                    onChange={(event) => updateField('status', event.target.value)}
+                  >
+                    {MILESTONE_STATUS_OPTIONS.map((option) => (
+                      <option key={option.code} value={option.code}>
+                        {option.display}
+                      </option>
+                    ))}
+                  </Select>
+                  <Select
+                    label="סוג חיוב"
+                    value={form.billingType}
+                    onChange={(event) => updateField('billingType', event.target.value)}
+                  >
+                    {BILLING_TYPE_OPTIONS.map((option) => (
+                      <option key={option.code} value={option.code}>
+                        {option.display}
+                      </option>
+                    ))}
+                  </Select>
+                  <Select
+                    label="עדיפות"
+                    value={form.priority}
+                    onChange={(event) => updateField('priority', event.target.value)}
+                  >
+                    {MILESTONE_PRIORITY_OPTIONS.map((option) => (
+                      <option key={option.code} value={option.code}>
+                        {option.display}
+                      </option>
+                    ))}
+                  </Select>
                   <Input
                     label="תפקיד נדרש"
                     value={form.requiredRole}
@@ -358,8 +353,7 @@ export function ProjectMilestonesTab({
                 ) : (
                   form.employees.map((employee, index) => (
                     <div key={`employee-${index}`} className="projectMilestonesTab__assignmentRow">
-                      <select
-                        className="projectMilestonesTab__select"
+                      <Select
                         value={employee.employeeId || ''}
                         onChange={(event) =>
                           updateEmployeeAssignment(index, {
@@ -373,9 +367,8 @@ export function ProjectMilestonesTab({
                             {option.fullName}
                           </option>
                         ))}
-                      </select>
-                      <select
-                        className="projectMilestonesTab__select"
+                      </Select>
+                      <Select
                         value={employee.assignmentRole}
                         onChange={(event) =>
                           updateEmployeeAssignment(index, {
@@ -388,7 +381,7 @@ export function ProjectMilestonesTab({
                             {role}
                           </option>
                         ))}
-                      </select>
+                      </Select>
                       <Button
                         type="button"
                         variant="ghost"
@@ -403,16 +396,13 @@ export function ProjectMilestonesTab({
 
               <section className="projectMilestonesTab__formSection">
                 <h4 className="projectMilestonesTab__sectionTitle">הערות ונעילה</h4>
-                <label className="projectMilestonesTab__checkbox">
-                  <input
-                    type="checkbox"
-                    checked={form.isLocked}
-                    onChange={(event) => updateField('isLocked', event.target.checked)}
-                  />
-                  <span>נעול לתכנון</span>
-                </label>
-                <textarea
-                  className="projectMilestonesTab__textarea"
+                <Checkbox
+                  label="נעול לתכנון"
+                  checked={form.isLocked}
+                  onChange={(event) => updateField('isLocked', event.target.checked)}
+                />
+                <Textarea
+                  label="תיאור"
                   value={form.description}
                   onChange={(event) => updateField('description', event.target.value)}
                   placeholder="תיאור"
@@ -456,7 +446,7 @@ export function ProjectMilestonesTab({
                 <div className="projectMilestonesTab__cardHeader">
                   <h4>{milestone.title}</h4>
                   <div className="projectMilestonesTab__badges">
-                    <Badge variant="primary">{milestone.status}</Badge>
+                    <StatusBadge domain="milestone" status={milestone.status} />
                     {milestone.isLocked && <Badge variant="warning">נעול</Badge>}
                   </div>
                 </div>

@@ -1,9 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useInventory, type InventoryItem } from '@features/inventory';
-import { Badge } from '@shared/components/Badge';
+import { StatusBadge } from '@shared/components/StatusBadge';
 import { Button } from '@shared/components/Button';
 import { EmptyState } from '@shared/components/EmptyState';
 import { Input } from '@shared/components/Input';
+import { Select } from '@shared/components/Select';
+import { InlineAlert } from '@shared/components/InlineAlert';
 import type {
   CreateProjectEquipmentItemRequest,
   ProjectEquipmentItem,
@@ -23,10 +25,6 @@ interface ProjectEquipmentTabProps {
   ) => Promise<void>;
   onDelete: (equipmentItemId: number) => Promise<void>;
   onReorder: (items: ProjectEquipmentItem[]) => Promise<void>;
-}
-
-function getEquipmentStatusLabel(status: string): string {
-  return EQUIPMENT_STATUS_OPTIONS.find((option) => option.code === status)?.display ?? status;
 }
 
 function inventoryLabel(item: InventoryItem): string {
@@ -117,53 +115,44 @@ function EquipmentEditCard({
         value={draftName}
         onChange={(event) => setDraftName(event.target.value)}
       />
-      <label className="projectEquipmentTab__field">
-        <span>קטגוריית מלאי</span>
-        <select
-          className="projectEquipmentTab__select"
-          value={draftInventoryCategory}
-          onChange={(event) => {
-            setDraftInventoryCategory(event.target.value);
-            setDraftInventoryItemId('');
-          }}
-        >
-          <option value="">כל הקטגוריות</option>
-          {inventoryCategories.map((category) => (
-            <option key={category} value={category}>
-              {category}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="projectEquipmentTab__field">
-        <span>פריט מלאי</span>
-        <select
-          className="projectEquipmentTab__select"
-          value={draftInventoryItemId}
-          onChange={(event) => handleSelectInventoryItem(event.target.value)}
-        >
-          <option value="">ללא קישור</option>
-          {filteredInventoryItems.map((inventoryItem) => (
-            <option key={inventoryItem.inventoryItemId} value={inventoryItem.inventoryItemId}>
-              {inventoryLabel(inventoryItem)}
-            </option>
-          ))}
-        </select>
-      </label>
-      <label className="projectEquipmentTab__field">
-        <span>סטטוס</span>
-        <select
-          className="projectEquipmentTab__select"
-          value={draftStatus}
-          onChange={(event) => setDraftStatus(event.target.value)}
-        >
-          {EQUIPMENT_STATUS_OPTIONS.map((option) => (
-            <option key={option.code} value={option.code}>
-              {option.display}
-            </option>
-          ))}
-        </select>
-      </label>
+      <Select
+        label="קטגוריית מלאי"
+        value={draftInventoryCategory}
+        onChange={(event) => {
+          setDraftInventoryCategory(event.target.value);
+          setDraftInventoryItemId('');
+        }}
+      >
+        <option value="">כל הקטגוריות</option>
+        {inventoryCategories.map((category) => (
+          <option key={category} value={category}>
+            {category}
+          </option>
+        ))}
+      </Select>
+      <Select
+        label="פריט מלאי"
+        value={draftInventoryItemId}
+        onChange={(event) => handleSelectInventoryItem(event.target.value)}
+      >
+        <option value="">ללא קישור</option>
+        {filteredInventoryItems.map((inventoryItem) => (
+          <option key={inventoryItem.inventoryItemId} value={inventoryItem.inventoryItemId}>
+            {inventoryLabel(inventoryItem)}
+          </option>
+        ))}
+      </Select>
+      <Select
+        label="סטטוס"
+        value={draftStatus}
+        onChange={(event) => setDraftStatus(event.target.value)}
+      >
+        {EQUIPMENT_STATUS_OPTIONS.map((option) => (
+          <option key={option.code} value={option.code}>
+            {option.display}
+          </option>
+        ))}
+      </Select>
       <Input
         label="מיקום"
         value={draftLocation}
@@ -299,7 +288,7 @@ export function ProjectEquipmentTab({
   if (isEditMode) {
     return (
       <div className="projectEquipmentTab">
-        {error && <div className="projectEquipmentTab__error">{error}</div>}
+        {error && <InlineAlert variant="danger">{error}</InlineAlert>}
         <div className="projectEquipmentTab__editList">
           {items.map((item, index) => (
             <EquipmentEditCard
@@ -322,53 +311,44 @@ export function ProjectEquipmentTab({
         </div>
         <div className="projectEquipmentTab__addForm">
           <Input label="שם" value={name} onChange={(event) => setName(event.target.value)} />
-          <label className="projectEquipmentTab__field">
-            <span>קטגוריית מלאי</span>
-            <select
-              className="projectEquipmentTab__select"
-              value={inventoryCategory}
-              onChange={(event) => {
-                setInventoryCategory(event.target.value);
-                setInventoryItemId('');
-              }}
-            >
-              <option value="">כל הקטגוריות</option>
-              {inventoryCategories.map((category) => (
-                <option key={category} value={category}>
-                  {category}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="projectEquipmentTab__field">
-            <span>פריט מלאי</span>
-            <select
-              className="projectEquipmentTab__select"
-              value={inventoryItemId}
-              onChange={(event) => handleSelectInventoryItem(event.target.value)}
-            >
-              <option value="">ללא קישור</option>
-              {filteredInventoryItems.map((inventoryItem) => (
-                <option key={inventoryItem.inventoryItemId} value={inventoryItem.inventoryItemId}>
-                  {inventoryLabel(inventoryItem)}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="projectEquipmentTab__field">
-            <span>סטטוס</span>
-            <select
-              className="projectEquipmentTab__select"
-              value={status}
-              onChange={(event) => setStatus(event.target.value)}
-            >
-              {EQUIPMENT_STATUS_OPTIONS.map((option) => (
-                <option key={option.code} value={option.code}>
-                  {option.display}
-                </option>
-              ))}
-            </select>
-          </label>
+          <Select
+            label="קטגוריית מלאי"
+            value={inventoryCategory}
+            onChange={(event) => {
+              setInventoryCategory(event.target.value);
+              setInventoryItemId('');
+            }}
+          >
+            <option value="">כל הקטגוריות</option>
+            {inventoryCategories.map((category) => (
+              <option key={category} value={category}>
+                {category}
+              </option>
+            ))}
+          </Select>
+          <Select
+            label="פריט מלאי"
+            value={inventoryItemId}
+            onChange={(event) => handleSelectInventoryItem(event.target.value)}
+          >
+            <option value="">ללא קישור</option>
+            {filteredInventoryItems.map((inventoryItem) => (
+              <option key={inventoryItem.inventoryItemId} value={inventoryItem.inventoryItemId}>
+                {inventoryLabel(inventoryItem)}
+              </option>
+            ))}
+          </Select>
+          <Select
+            label="סטטוס"
+            value={status}
+            onChange={(event) => setStatus(event.target.value)}
+          >
+            {EQUIPMENT_STATUS_OPTIONS.map((option) => (
+              <option key={option.code} value={option.code}>
+                {option.display}
+              </option>
+            ))}
+          </Select>
           <Input
             label="מיקום"
             value={location}
@@ -407,7 +387,7 @@ export function ProjectEquipmentTab({
                         {item.inventoryCategory ? ` · ${item.inventoryCategory}` : ''}
                       </span>
                     )}
-                    <Badge variant="primary">{getEquipmentStatusLabel(item.status)}</Badge>
+                    <StatusBadge domain="equipment" status={item.status} />
                   </li>
                 ))}
               </ul>

@@ -1,10 +1,10 @@
 .dashboardPanel {
   display: flex;
   flex-direction: column;
-  background: #fff;
+  background: var(--color-surface);
   border: 1px solid var(--color-neutral-200);
   border-radius: var(--radius-lg);
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+  box-shadow: var(--shadow-card);
   overflow: hidden;
 }
 
@@ -35,7 +35,7 @@
   width: 28px;
   height: 28px;
   color: var(--color-primary-700);
-  background: #fff;
+  background: var(--color-surface);
   border: 1px solid var(--color-neutral-200);
   border-radius: var(--radius-md);
 }
@@ -78,18 +78,4 @@
   margin: 0;
   font-size: var(--font-size-sm);
   color: var(--color-neutral-500);
-}
-
-.dashboardPanel__retry {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-primary-600);
-  background: none;
-  border: none;
-  cursor: pointer;
-  padding: 0;
-}
-
-.dashboardPanel__retry:hover {
-  text-decoration: underline;
 }

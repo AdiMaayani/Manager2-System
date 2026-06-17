@@ -49,6 +49,17 @@ const TASK_STATUS_LABELS: Record<string, string> = {
   Closed: 'סגור',
 };
 
+// Per-status colour so the task pill reflects the real state instead of always
+// rendering primary.
+const TASK_STATUS_VARIANT: Record<string, BadgeVariant> = {
+  Open: 'neutral',
+  Planned: 'primary',
+  Execution: 'warning',
+  Blocked: 'danger',
+  Done: 'success',
+  Closed: 'success',
+};
+
 const KPI_ICONS: Record<string, ReactNode> = {
   myTasksToday: <CalendarClock />,
   myOverdue: <TriangleAlert />,
@@ -209,7 +220,9 @@ export function DashboardPage() {
           {context && <span className="taskItem__context">{context}</span>}
         </div>
         {task.status && (
-          <Badge variant="primary">{getTaskStatusLabel(task.status)}</Badge>
+          <Badge variant={TASK_STATUS_VARIANT[task.status] ?? 'neutral'}>
+            {getTaskStatusLabel(task.status)}
+          </Badge>
         )}
       </li>
     );

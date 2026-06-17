@@ -1,14 +1,17 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import { Plus } from 'lucide-react';
 import { PageShell } from '@shared/components/PageShell';
 import { PageSpinner } from '@shared/components/PageSpinner';
 import { ErrorState } from '@shared/components/ErrorState';
-import { EmptyState } from '@shared/components/EmptyState';
 import { Badge } from '@shared/components/Badge';
 import { Button } from '@shared/components/Button';
-import { FilterBar } from '@shared/components/FilterBar';
+import { FilterBar, FilterField } from '@shared/components/FilterBar';
 import { Input } from '@shared/components/Input';
+import { InlineAlert } from '@shared/components/InlineAlert';
+import { SegmentedControl, type SegmentItem } from '@shared/components/SegmentedControl';
+import { DataTable, type DataTableColumn } from '@shared/components/DataTable';
 import { getRoleDisplayLabel } from '@api/auth';
 import { getEmployeesAsync, type Employee } from '@features/employees';
 import { UserDrawer } from '../../components/UserDrawer';
@@ -18,6 +21,11 @@ import './UsersPage.css';
 
 const ACTIVE_FILTERS = ['הכל', 'פעילים', 'לא פעילים'] as const;
 type ActiveFilter = (typeof ACTIVE_FILTERS)[number];
+
+const ACTIVE_FILTER_ITEMS: SegmentItem<ActiveFilter>[] = ACTIVE_FILTERS.map((f) => ({
+  id: f,
+  label: f,
+}));
 
 function formatDate(value?: string | null): string {
   if (!value) return '—';
@@ -100,6 +108,61 @@ export function UsersPage() {
     setDrawerUser(user);
   };
 
+  const columns: DataTableColumn<User>[] = [
+    {
+      id: 'username',
+      header: 'שם משתמש',
+      cell: (user) => (
+        <div className="usersPage__primaryCell">
+          <span>{user.username}</span>
+          <small>#{user.userId}</small>
+        </div>
+      ),
+    },
+    {
+      id: 'employee',
+      header: 'עובד מקושר',
+      cell: (user) => getEmployeeName(employeesById, user.employeeId),
+    },
+    { id: 'email', header: 'אימייל', cell: (user) => user.email },
+    {
+      id: 'roles',
+      header: 'תפקידים',
+      cell: (user) => (
+        <div className="usersPage__badges">
+          {user.roles.map((role) => (
+            <Badge key={role} variant={role === 'Admin' ? 'primary' : 'neutral'}>
+              {getRoleDisplayLabel(role)}
+            </Badge>
+          ))}
+        </div>
+      ),
+    },
+    {
+      id: 'departments',
+      header: 'מחלקות',
+      cell: (user) => (
+        <div className="usersPage__badges">
+          {user.departments.map((department) => (
+            <Badge key={department} variant="neutral">
+              {department}
+            </Badge>
+          ))}
+        </div>
+      ),
+    },
+    {
+      id: 'status',
+      header: 'סטטוס',
+      cell: (user) => (
+        <Badge variant={user.isActive ? 'success' : 'neutral'}>
+          {user.isActive ? 'פעיל' : 'לא פעיל'}
+        </Badge>
+      ),
+    },
+    { id: 'lastLogin', header: 'כניסה אחרונה', cell: (user) => formatDate(user.lastLoginAt) },
+  ];
+
   const isLookupLoading =
     employeesQuery.isLoading || rolesQuery.isLoading || departmentsQuery.isLoading;
   const lookupError = employeesQuery.error ?? rolesQuery.error ?? departmentsQuery.error;
@@ -140,117 +203,51 @@ export function UsersPage() {
       <FilterBar
         actions={
           <Button
+            iconStart={<Plus size={18} />}
             onClick={() => {
               setPageMessage(null);
               setDrawerUser(null);
             }}
           >
-            + משתמש חדש
+            משתמש חדש
           </Button>
         }
       >
-        <div className="usersPage__filter usersPage__filter--search">
-          <span className="usersPage__filterLabel">חיפוש</span>
+        <FilterField label="חיפוש" grow>
           <Input
             placeholder="חיפוש משתמש, עובד, תפקיד או מחלקה..."
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
-        </div>
+        </FilterField>
 
-        <div className="usersPage__filter">
-          <span className="usersPage__filterLabel">סטטוס</span>
-          <div className="usersPage__chips">
-            {ACTIVE_FILTERS.map((filter) => (
-              <button
-                key={filter}
-                type="button"
-                className={`usersPage__chip${activeFilter === filter ? ' usersPage__chip--active' : ''}`}
-                onClick={() => setActiveFilter(filter)}
-              >
-                {filter}
-              </button>
-            ))}
-          </div>
-        </div>
+        <FilterField label="סטטוס">
+          <SegmentedControl
+            items={ACTIVE_FILTER_ITEMS}
+            value={activeFilter}
+            onChange={setActiveFilter}
+            ariaLabel="סינון לפי סטטוס"
+            size="sm"
+          />
+        </FilterField>
       </FilterBar>
 
-      {pageMessage && <p className="usersPage__success">{pageMessage}</p>}
-
-      {filteredUsers.length === 0 ? (
-        <EmptyState
-          title="לא נמצאו משתמשים"
-          description="נסה לשנות סינון או להוסיף משתמש חדש"
-        />
-      ) : (
-        <div className="usersPage__tableWrap">
-          <table className="usersPage__table">
-            <thead>
-              <tr>
-                <th>שם משתמש</th>
-                <th>עובד מקושר</th>
-                <th>אימייל</th>
-                <th>תפקידים</th>
-                <th>מחלקות</th>
-                <th>סטטוס</th>
-                <th>כניסה אחרונה</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredUsers.map((user) => (
-                <tr
-                  key={user.userId}
-                  role="button"
-                  tabIndex={0}
-                  className={`usersPage__row ${
-                    selectedUserId === user.userId ? 'usersPage__row--selected' : ''
-                  }`.trim()}
-                  onClick={() => openUser(user)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault();
-                      openUser(user);
-                    }
-                  }}
-                >
-                  <td>
-                    <div className="usersPage__primaryCell">
-                      <span>{user.username}</span>
-                      <small>#{user.userId}</small>
-                    </div>
-                  </td>
-                  <td>{getEmployeeName(employeesById, user.employeeId)}</td>
-                  <td>{user.email}</td>
-                  <td>
-                    <div className="usersPage__badges">
-                      {user.roles.map((role) => (
-                        <Badge key={role} variant={role === 'Admin' ? 'primary' : 'neutral'}>
-                          {getRoleDisplayLabel(role)}
-                        </Badge>
-                      ))}
-                    </div>
-                  </td>
-                  <td>
-                    <div className="usersPage__badges">
-                      {user.departments.map((department) => (
-                        <Badge key={department} variant="neutral">
-                          {department}
-                        </Badge>
-                      ))}
-                    </div>
-                  </td>
-                  <td>
-                    <Badge variant={user.isActive ? 'success' : 'neutral'}>
-                      {user.isActive ? 'פעיל' : 'לא פעיל'}
-                    </Badge>
-                  </td>
-                  <td>{formatDate(user.lastLoginAt)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {pageMessage && (
+        <InlineAlert variant="success" onDismiss={() => setPageMessage(null)}>
+          {pageMessage}
+        </InlineAlert>
       )}
+
+      <DataTable
+        columns={columns}
+        rows={filteredUsers}
+        getRowId={(user) => user.userId}
+        onRowClick={openUser}
+        selectedRowId={selectedUserId}
+        minWidth={980}
+        emptyTitle="לא נמצאו משתמשים"
+        emptyDescription="נסה לשנות סינון או להוסיף משתמש חדש"
+      />
 
       <UserDrawer
         isOpen={isDrawerOpen}

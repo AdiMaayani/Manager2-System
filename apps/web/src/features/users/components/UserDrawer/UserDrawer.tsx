@@ -6,6 +6,11 @@ import { Button } from '@shared/components/Button';
 import { DetailsField } from '@shared/components/DetailsField';
 import { DetailsSection } from '@shared/components/DetailsSection';
 import { Input } from '@shared/components/Input';
+import { Select } from '@shared/components/Select';
+import { Textarea } from '@shared/components/Textarea';
+import { Checkbox } from '@shared/components/Checkbox';
+import { InlineAlert } from '@shared/components/InlineAlert';
+import { ConfirmInline } from '@shared/components/ConfirmInline';
 import { getCurrentUser, getRoleDisplayLabel } from '@api/auth';
 import type { Employee } from '@features/employees';
 import { useUserMutations } from '../../hooks/useUsers';
@@ -123,7 +128,6 @@ function UserDrawerContent({
   const [isEditing, setIsEditing] = useState(!isExistingUser);
   const [form, setForm] = useState<UserFormState>(() => buildInitialState(user));
   const [error, setError] = useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState(false);
 
   function setField<K extends keyof UserFormState>(key: K, value: UserFormState[K]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -132,7 +136,6 @@ function UserDrawerContent({
   function handleStartEdit() {
     setForm(buildInitialState(user));
     setError(null);
-    setConfirmDelete(false);
     setIsEditing(true);
   }
 
@@ -144,7 +147,6 @@ function UserDrawerContent({
 
     setForm(buildInitialState(user));
     setError(null);
-    setConfirmDelete(false);
     setIsEditing(false);
   }
 
@@ -217,7 +219,6 @@ function UserDrawerContent({
       }
 
       setIsEditing(false);
-      setConfirmDelete(false);
       onSaved(savedUser, message);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'שמירת המשתמש נכשלה');
@@ -268,10 +269,10 @@ function UserDrawerContent({
       footer={
         isEditing ? (
           <div className="userDrawer__footerContent">
-            {error && <p className="userDrawer__error">{error}</p>}
+            {error && <InlineAlert variant="danger">{error}</InlineAlert>}
             <div className="userDrawer__actions">
-              <Button onClick={handleSave} disabled={isSaving || isLookupLoading}>
-                {isSaving ? 'שומר...' : 'שמור'}
+              <Button onClick={handleSave} isLoading={isSaving} disabled={isLookupLoading}>
+                שמור
               </Button>
               <Button variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
                 בטל שינויים
@@ -279,32 +280,13 @@ function UserDrawerContent({
 
               {isExistingUser && !isSelf && (
                 <div className="userDrawer__dangerActions">
-                  {confirmDelete ? (
-                    <>
-                      <span className="userDrawer__confirmText">
-                        למחוק את המשתמש לצמיתות? אם הוא מקושר לרשומות אחרות, השרת
-                        יחזיר שגיאה.
-                      </span>
-                      <Button variant="danger" onClick={handleDelete} disabled={isSaving}>
-                        אישור מחיקה
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        onClick={() => setConfirmDelete(false)}
-                        disabled={isSaving}
-                      >
-                        חזור
-                      </Button>
-                    </>
-                  ) : (
-                    <Button
-                      variant="danger"
-                      onClick={() => setConfirmDelete(true)}
-                      disabled={isSaving}
-                    >
-                      מחק משתמש
-                    </Button>
-                  )}
+                  <ConfirmInline
+                    triggerLabel="מחק משתמש"
+                    message="למחוק את המשתמש לצמיתות? אם הוא מקושר לרשומות אחרות, השרת יחזיר שגיאה."
+                    confirmLabel="אישור מחיקה"
+                    onConfirm={handleDelete}
+                    isPending={isSaving}
+                  />
                 </div>
               )}
             </div>
@@ -321,33 +303,31 @@ function UserDrawerContent({
           )}
 
           <DetailsSection title="פרטים כלליים">
-            <div className="userDrawer__field">
-              <label className="userDrawer__label">עובד מקושר *</label>
-              <select
-                className="userDrawer__select"
-                value={form.employeeId}
-                onChange={(event) => setField('employeeId', event.target.value)}
-                disabled={isLookupLoading}
-              >
-                <option value="">-- בחר עובד --</option>
-                {employees.map((employee) => (
-                  <option key={employee.employeeId} value={employee.employeeId}>
-                    {employee.fullName} ({employee.employeeId})
-                  </option>
-                ))}
-              </select>
-            </div>
+            <Select
+              label="עובד מקושר"
+              required
+              value={form.employeeId}
+              onChange={(event) => setField('employeeId', event.target.value)}
+              disabled={isLookupLoading}
+            >
+              <option value="">-- בחר עובד --</option>
+              {employees.map((employee) => (
+                <option key={employee.employeeId} value={employee.employeeId}>
+                  {employee.fullName} ({employee.employeeId})
+                </option>
+              ))}
+            </Select>
 
             <div className="userDrawer__grid">
               <Input
-                label="שם משתמש *"
+                label="שם משתמש"
                 value={form.username}
                 onChange={(event) => setField('username', event.target.value)}
                 required
               />
 
               <Input
-                label="אימייל *"
+                label="אימייל"
                 type="email"
                 value={form.email}
                 onChange={(event) => setField('email', event.target.value)}
@@ -355,14 +335,11 @@ function UserDrawerContent({
               />
             </div>
 
-            <label className="userDrawer__checkboxRow">
-              <input
-                type="checkbox"
-                checked={form.isActive}
-                onChange={(event) => setField('isActive', event.target.checked)}
-              />
-              <span>משתמש פעיל</span>
-            </label>
+            <Checkbox
+              label="משתמש פעיל"
+              checked={form.isActive}
+              onChange={(event) => setField('isActive', event.target.checked)}
+            />
           </DetailsSection>
 
           <DetailsSection title="הרשאות">
@@ -373,17 +350,12 @@ function UserDrawerContent({
                   <p className="userDrawer__hint">לא נמצאו תפקידים זמינים.</p>
                 ) : (
                   roles.map((role) => (
-                    <label key={role} className="userDrawer__checkboxRow">
-                      <input
-                        type="checkbox"
-                        checked={form.roles.includes(role)}
-                        onChange={() => setField('roles', toggleSelection(form.roles, role))}
-                      />
-                      <span>
-                        {getRoleDisplayLabel(role)}
-                        {role === 'Admin' ? ' (Admin)' : ''}
-                      </span>
-                    </label>
+                    <Checkbox
+                      key={role}
+                      label={`${getRoleDisplayLabel(role)}${role === 'Admin' ? ' (Admin)' : ''}`}
+                      checked={form.roles.includes(role)}
+                      onChange={() => setField('roles', toggleSelection(form.roles, role))}
+                    />
                   ))
                 )}
               </fieldset>
@@ -394,16 +366,14 @@ function UserDrawerContent({
                   <p className="userDrawer__hint">לא נמצאו מחלקות זמינות.</p>
                 ) : (
                   departments.map((department) => (
-                    <label key={department} className="userDrawer__checkboxRow">
-                      <input
-                        type="checkbox"
-                        checked={form.departments.includes(department)}
-                        onChange={() =>
-                          setField('departments', toggleSelection(form.departments, department))
-                        }
-                      />
-                      <span>{department}</span>
-                    </label>
+                    <Checkbox
+                      key={department}
+                      label={department}
+                      checked={form.departments.includes(department)}
+                      onChange={() =>
+                        setField('departments', toggleSelection(form.departments, department))
+                      }
+                    />
                   ))
                 )}
               </fieldset>
@@ -413,7 +383,7 @@ function UserDrawerContent({
           <DetailsSection title="סיסמה">
             <div className="userDrawer__grid">
               <Input
-                label={isExistingUser ? 'סיסמה חדשה' : 'סיסמה *'}
+                label={isExistingUser ? 'סיסמה חדשה' : 'סיסמה'}
                 type="password"
                 value={form.password}
                 onChange={(event) => setField('password', event.target.value)}
@@ -435,15 +405,12 @@ function UserDrawerContent({
               />
             </div>
 
-            <div className="userDrawer__field">
-              <label className="userDrawer__label">הערות</label>
-              <textarea
-                className="userDrawer__textarea"
-                rows={3}
-                value={form.notes}
-                onChange={(event) => setField('notes', event.target.value)}
-              />
-            </div>
+            <Textarea
+              label="הערות"
+              rows={3}
+              value={form.notes}
+              onChange={(event) => setField('notes', event.target.value)}
+            />
           </DetailsSection>
         </div>
       )}

@@ -1,3 +1,4 @@
+import { Button } from '../Button';
 import './ErrorState.css';
 
 interface ErrorStateProps {
@@ -13,9 +14,9 @@ export function ErrorState({
     <div className="errorState" role="alert">
       <p className="errorState__message">{message}</p>
       {onRetry && (
-        <button className="errorState__retry" onClick={onRetry} type="button">
+        <Button variant="primary" onClick={onRetry} type="button">
           נסה שוב
-        </button>
+        </Button>
       )}
     </div>
   );

@@ -62,35 +62,6 @@
   gap: var(--spacing-md) var(--spacing-lg);
 }
 
-.projectMilestonesTab__field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
-  font-size: var(--font-size-base);
-}
-
-.projectMilestonesTab__select,
-.projectMilestonesTab__textarea {
-  width: 100%;
-  padding: var(--spacing-sm) var(--spacing-md);
-  border: 1px solid var(--color-neutral-300);
-  border-radius: var(--radius-md);
-  font-size: var(--font-size-base);
-  font-family: inherit;
-  background: #fff;
-}
-
-.projectMilestonesTab__checkbox {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  width: fit-content;
-  padding: var(--spacing-sm) var(--spacing-md);
-  border: 1px solid var(--color-neutral-200);
-  border-radius: var(--radius-md);
-  background: var(--color-neutral-50);
-}
-
 .projectMilestonesTab__formActions {
   display: flex;
   justify-content: flex-start;
