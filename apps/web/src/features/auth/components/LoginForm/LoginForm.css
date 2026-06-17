@@ -1,7 +1,7 @@
 .loginForm {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-lg);
+  gap: var(--spacing-md);
 }
 
 .loginForm__error {
@@ -37,8 +37,8 @@
 
 .loginForm__input:focus {
   outline: none;
-  border-color: var(--color-primary-500);
-  box-shadow: 0 0 0 3px var(--color-primary-100);
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.18);
 }
 
 .loginForm__input:disabled {
@@ -50,7 +50,7 @@
 .loginForm__submit {
   width: 100%;
   padding: var(--spacing-md);
-  background: linear-gradient(135deg, var(--color-primary-600), var(--color-primary-700));
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
   color: #fff;
   border-radius: var(--radius-lg);
   font-size: var(--font-size-base);
@@ -63,12 +63,17 @@
 }
 
 .loginForm__submit:hover:not(:disabled) {
-  background: var(--color-primary-700);
+  background: #1d4ed8;
   box-shadow: 0 16px 32px rgba(37, 99, 235, 0.3);
   transform: translateY(-1px);
 }
 
+.loginForm__submit:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.35);
+}
+
 .loginForm__submit:disabled {
-  background: var(--color-primary-300);
+  background: #93b4f5;
   cursor: not-allowed;
 }
