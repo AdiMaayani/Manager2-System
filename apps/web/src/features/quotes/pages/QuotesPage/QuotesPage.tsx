@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { Plus } from 'lucide-react';
 import { Button } from '@shared/components/Button';
 import { EmptyState } from '@shared/components/EmptyState';
 import { ErrorState } from '@shared/components/ErrorState';
-import { FilterBar } from '@shared/components/FilterBar';
+import { FilterBar, FilterField } from '@shared/components/FilterBar';
 import { Input } from '@shared/components/Input';
+import { Select } from '@shared/components/Select';
 import { PageShell } from '@shared/components/PageShell';
 import { PageSpinner } from '@shared/components/PageSpinner';
 import { QuoteDrawer } from '../../components/QuoteDrawer';
@@ -92,54 +94,43 @@ export function QuotesPage() {
     <PageShell title="הצעות מחיר">
       <FilterBar
         actions={
-          <Button onClick={() => setDrawer({ isOpen: true, quoteId: null })}>+ הצעה חדשה</Button>
+          <Button iconStart={<Plus size={18} />} onClick={() => setDrawer({ isOpen: true, quoteId: null })}>
+            הצעה חדשה
+          </Button>
         }
       >
-        <div className="quotesPage__filter quotesPage__filter--search">
+        <FilterField label="חיפוש" grow>
           <Input
-            label="חיפוש"
             placeholder="מספר הצעה, לקוח, פרויקט..."
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
-        </div>
+        </FilterField>
 
-        <div className="quotesPage__filter">
-          <label className="quotesPage__label">לקוח</label>
-          <select
-            className="quotesPage__select"
-            value={customerId}
-            onChange={(event) => setCustomerId(event.target.value)}
-          >
+        <FilterField label="לקוח">
+          <Select value={customerId} onChange={(event) => setCustomerId(event.target.value)}>
             <option value="">כל הלקוחות</option>
             {(customerOptions ?? []).map((customer) => (
               <option key={customer.customerId} value={customer.customerId}>
                 {customer.customerName}
               </option>
             ))}
-          </select>
-        </div>
+          </Select>
+        </FilterField>
 
-        <div className="quotesPage__filter">
-          <label className="quotesPage__label">פרויקט</label>
-          <select
-            className="quotesPage__select"
-            value={projectId}
-            onChange={(event) => setProjectId(event.target.value)}
-          >
+        <FilterField label="פרויקט">
+          <Select value={projectId} onChange={(event) => setProjectId(event.target.value)}>
             <option value="">כל הפרויקטים</option>
             {(projectOptions ?? []).map((project) => (
               <option key={project.workItemId} value={project.workItemId}>
                 {project.title}
               </option>
             ))}
-          </select>
-        </div>
+          </Select>
+        </FilterField>
 
-        <div className="quotesPage__filter">
-          <label className="quotesPage__label">סטטוס</label>
-          <select
-            className="quotesPage__select"
+        <FilterField label="סטטוס">
+          <Select
             value={status}
             onChange={(event) => setStatus(event.target.value as QuoteStatus | '')}
           >
@@ -149,26 +140,24 @@ export function QuotesPage() {
                 {getQuoteStatusLabel(statusOption)}
               </option>
             ))}
-          </select>
-        </div>
+          </Select>
+        </FilterField>
 
-        <div className="quotesPage__filter">
+        <FilterField label="מתאריך">
           <Input
-            label="מתאריך"
             type="date"
             value={fromDate}
             onChange={(event) => setFromDate(event.target.value)}
           />
-        </div>
+        </FilterField>
 
-        <div className="quotesPage__filter">
+        <FilterField label="עד תאריך">
           <Input
-            label="עד תאריך"
             type="date"
             value={toDate}
             onChange={(event) => setToDate(event.target.value)}
           />
-        </div>
+        </FilterField>
       </FilterBar>
 
       {isLoading ? (

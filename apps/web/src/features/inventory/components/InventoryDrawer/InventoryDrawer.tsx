@@ -5,6 +5,10 @@ import { DetailsField } from '@shared/components/DetailsField';
 import { DetailsSection } from '@shared/components/DetailsSection';
 import { Drawer } from '@shared/components/Drawer';
 import { Input } from '@shared/components/Input';
+import { Textarea } from '@shared/components/Textarea';
+import { Checkbox } from '@shared/components/Checkbox';
+import { InlineAlert } from '@shared/components/InlineAlert';
+import { ConfirmInline } from '@shared/components/ConfirmInline';
 import { useInventoryMutations } from '../../hooks/useInventory';
 import type { CreateInventoryItemRequest, InventoryItem } from '../../types';
 import './InventoryDrawer.css';
@@ -97,7 +101,6 @@ function InventoryDrawerContent({ inventoryItem, onClose, onSaved }: InventoryDr
   const [isEditing, setIsEditing] = useState(!isExistingItem);
   const [form, setForm] = useState<InventoryFormState>(() => buildInitialState(inventoryItem));
   const [error, setError] = useState<string | null>(null);
-  const [confirmDeactivate, setConfirmDeactivate] = useState(false);
 
   function setField<K extends keyof InventoryFormState>(key: K, value: InventoryFormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -106,7 +109,6 @@ function InventoryDrawerContent({ inventoryItem, onClose, onSaved }: InventoryDr
   function handleStartEdit() {
     setForm(buildInitialState(inventoryItem));
     setError(null);
-    setConfirmDeactivate(false);
     setIsEditing(true);
   }
 
@@ -118,7 +120,6 @@ function InventoryDrawerContent({ inventoryItem, onClose, onSaved }: InventoryDr
 
     setForm(buildInitialState(inventoryItem));
     setError(null);
-    setConfirmDeactivate(false);
     setIsEditing(false);
   }
 
@@ -183,7 +184,6 @@ function InventoryDrawerContent({ inventoryItem, onClose, onSaved }: InventoryDr
       }
 
       setIsEditing(false);
-      setConfirmDeactivate(false);
       await onSaved?.(savedInventoryItem);
 
       // Without a parent to hand the saved record back to, fall back to the
@@ -233,10 +233,10 @@ function InventoryDrawerContent({ inventoryItem, onClose, onSaved }: InventoryDr
       footer={
         isEditing ? (
           <div className="inventoryDrawer__footerContent">
-            {error && <p className="inventoryDrawer__error">{error}</p>}
+            {error && <InlineAlert variant="danger">{error}</InlineAlert>}
             <div className="inventoryDrawer__actions">
-              <Button onClick={handleSave} disabled={isSaving}>
-                {isSaving ? 'שומר...' : 'שמור'}
+              <Button onClick={handleSave} isLoading={isSaving}>
+                שמור
               </Button>
               <Button variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
                 בטל שינויים
@@ -244,29 +244,13 @@ function InventoryDrawerContent({ inventoryItem, onClose, onSaved }: InventoryDr
 
               {isExistingItem && inventoryItem.isActive && (
                 <div className="inventoryDrawer__dangerActions">
-                  {confirmDeactivate ? (
-                    <>
-                      <span className="inventoryDrawer__confirmText">להשבית את הפריט?</span>
-                      <Button variant="danger" onClick={handleDeactivate} disabled={isSaving}>
-                        אישור השבתה
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        onClick={() => setConfirmDeactivate(false)}
-                        disabled={isSaving}
-                      >
-                        חזור
-                      </Button>
-                    </>
-                  ) : (
-                    <Button
-                      variant="danger"
-                      onClick={() => setConfirmDeactivate(true)}
-                      disabled={isSaving}
-                    >
-                      השבת פריט
-                    </Button>
-                  )}
+                  <ConfirmInline
+                    triggerLabel="השבת פריט"
+                    message="להשבית את הפריט?"
+                    confirmLabel="אישור השבתה"
+                    onConfirm={handleDeactivate}
+                    isPending={isSaving}
+                  />
                 </div>
               )}
             </div>
@@ -280,51 +264,45 @@ function InventoryDrawerContent({ inventoryItem, onClose, onSaved }: InventoryDr
         <div className="inventoryDrawer inventoryDrawer--edit">
           <DetailsSection title="פרטים כלליים">
             <Input
-              label="שם פריט *"
+              label="שם פריט"
               value={form.itemName}
               onChange={(event) => setField('itemName', event.target.value)}
               required
             />
             <div className="inventoryDrawer__grid">
               <Input
-                label="מק״ט *"
+                label="מק״ט"
                 value={form.skuCode}
                 onChange={(event) => setField('skuCode', event.target.value)}
                 required
               />
 
-              <div className="inventoryDrawer__field">
-                <label className="inventoryDrawer__label">קטגוריה</label>
-                <input
-                  className="inventoryDrawer__input"
-                  list="inventoryCategoryOptions"
-                  value={form.category}
-                  onChange={(event) => setField('category', event.target.value)}
-                />
-                <datalist id="inventoryCategoryOptions">
-                  {CATEGORY_OPTIONS.map((option) => (
-                    <option key={option} value={option} />
-                  ))}
-                </datalist>
-              </div>
+              <Input
+                label="קטגוריה"
+                list="inventoryCategoryOptions"
+                value={form.category}
+                onChange={(event) => setField('category', event.target.value)}
+              />
+              <datalist id="inventoryCategoryOptions">
+                {CATEGORY_OPTIONS.map((option) => (
+                  <option key={option} value={option} />
+                ))}
+              </datalist>
             </div>
 
             {isExistingItem && (
-              <label className="inventoryDrawer__checkboxRow">
-                <input
-                  type="checkbox"
-                  checked={form.isActive}
-                  onChange={(event) => setField('isActive', event.target.checked)}
-                />
-                <span>פריט פעיל</span>
-              </label>
+              <Checkbox
+                label="פריט פעיל"
+                checked={form.isActive}
+                onChange={(event) => setField('isActive', event.target.checked)}
+              />
             )}
           </DetailsSection>
 
           <DetailsSection title="מלאי">
             <div className="inventoryDrawer__grid">
               <Input
-                label="כמות *"
+                label="כמות"
                 type="number"
                 min="0"
                 step="0.001"
@@ -333,21 +311,18 @@ function InventoryDrawerContent({ inventoryItem, onClose, onSaved }: InventoryDr
                 required
               />
 
-              <div className="inventoryDrawer__field">
-                <label className="inventoryDrawer__label">יחידה *</label>
-                <input
-                  className="inventoryDrawer__input"
-                  list="inventoryUnitOptions"
-                  value={form.unit}
-                  onChange={(event) => setField('unit', event.target.value)}
-                  required
-                />
-                <datalist id="inventoryUnitOptions">
-                  {UNIT_OPTIONS.map((option) => (
-                    <option key={option} value={option} />
-                  ))}
-                </datalist>
-              </div>
+              <Input
+                label="יחידה"
+                list="inventoryUnitOptions"
+                value={form.unit}
+                onChange={(event) => setField('unit', event.target.value)}
+                required
+              />
+              <datalist id="inventoryUnitOptions">
+                {UNIT_OPTIONS.map((option) => (
+                  <option key={option} value={option} />
+                ))}
+              </datalist>
 
               <Input
                 label="סף מינימום"
@@ -371,15 +346,12 @@ function InventoryDrawerContent({ inventoryItem, onClose, onSaved }: InventoryDr
           </DetailsSection>
 
           <DetailsSection title="הערות">
-            <div className="inventoryDrawer__field">
-              <label className="inventoryDrawer__label">הערות</label>
-              <textarea
-                className="inventoryDrawer__textarea"
-                rows={3}
-                value={form.notes}
-                onChange={(event) => setField('notes', event.target.value)}
-              />
-            </div>
+            <Textarea
+              label="הערות"
+              rows={3}
+              value={form.notes}
+              onChange={(event) => setField('notes', event.target.value)}
+            />
           </DetailsSection>
         </div>
       )}

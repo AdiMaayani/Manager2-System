@@ -2,8 +2,10 @@ import { useState } from 'react';
 import { useMutation } from '@tanstack/react-query';
 import { useQuery } from '@tanstack/react-query';
 import { Modal } from '@shared/components/Modal';
-import { Badge } from '@shared/components/Badge';
 import { Button } from '@shared/components/Button';
+import { StatusBadge } from '@shared/components/StatusBadge';
+import { InlineAlert } from '@shared/components/InlineAlert';
+import { ConfirmInline } from '@shared/components/ConfirmInline';
 import { PageSpinner } from '@shared/components/PageSpinner';
 import { ErrorState } from '@shared/components/ErrorState';
 import { deleteWorkReportAsync, getReportByIdAsync } from '../../api/reportsApiClient';
@@ -18,14 +20,6 @@ interface ReportDetailModalProps {
   onDeleted: () => void;
 }
 
-type StatusVariant = 'primary' | 'neutral' | 'success';
-
-function resolveStatusVariant(status?: string | null): StatusVariant {
-  if (status === 'הוגש') return 'primary';
-  if (status === 'הועבר להנה״ח') return 'success';
-  return 'neutral';
-}
-
 function formatReportDate(value?: string | null) {
   if (!value) return '—';
   return value.split('T')[0];
@@ -38,7 +32,6 @@ export function ReportDetailModal({
   onEdit,
   onDeleted,
 }: ReportDetailModalProps) {
-  const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
   const [isMaximized, setIsMaximized] = useState(false);
   const { data: report, isLoading, error, refetch } = useQuery({
@@ -50,7 +43,6 @@ export function ReportDetailModal({
   const deleteReport = useMutation({
     mutationFn: (id: number) => deleteWorkReportAsync(id),
     onSuccess: () => {
-      setConfirmDelete(false);
       setDeleteError(null);
       onDeleted();
     },
@@ -60,7 +52,6 @@ export function ReportDetailModal({
   });
 
   function handleClose() {
-    setConfirmDelete(false);
     setDeleteError(null);
     setIsMaximized(false);
     onClose();
@@ -94,9 +85,7 @@ export function ReportDetailModal({
               <div>
                 <dt>סטטוס</dt>
                 <dd>
-                  <Badge variant={resolveStatusVariant(report.status)}>
-                    {report.status ?? '—'}
-                  </Badge>
+                  <StatusBadge domain="report" status={report.status} />
                 </dd>
               </div>
               {report.reportType !== 'service_call' && (
@@ -188,43 +177,18 @@ export function ReportDetailModal({
           )}
 
           <div className="reportDetailModal__footer">
-            {deleteError && <p className="reportDetailModal__error">{deleteError}</p>}
+            {deleteError && <InlineAlert variant="danger">{deleteError}</InlineAlert>}
             <div className="reportDetailModal__actions">
               <Button type="button" onClick={() => onEdit(report)}>
                 עריכה
               </Button>
-              {confirmDelete ? (
-                <>
-                  <span className="reportDetailModal__confirmText">
-                    למחוק את הדיווח לצמיתות?
-                  </span>
-                  <Button
-                    type="button"
-                    variant="danger"
-                    disabled={deleteReport.isPending}
-                    onClick={() => deleteReport.mutate(report.reportId)}
-                  >
-                    {deleteReport.isPending ? 'מוחק...' : 'אישור מחיקה'}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    disabled={deleteReport.isPending}
-                    onClick={() => setConfirmDelete(false)}
-                  >
-                    חזור
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  type="button"
-                  variant="danger"
-                  disabled={deleteReport.isPending}
-                  onClick={() => setConfirmDelete(true)}
-                >
-                  מחיקה
-                </Button>
-              )}
+              <ConfirmInline
+                triggerLabel="מחיקה"
+                message="למחוק את הדיווח לצמיתות?"
+                confirmLabel="אישור מחיקה"
+                onConfirm={() => deleteReport.mutate(report.reportId)}
+                isPending={deleteReport.isPending}
+              />
               <Button type="button" variant="secondary" onClick={handleClose}>
                 סגור
               </Button>

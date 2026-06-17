@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Drawer } from '@shared/components/Drawer';
@@ -6,7 +6,11 @@ import { Badge } from '@shared/components/Badge';
 import { Button } from '@shared/components/Button';
 import { DetailsField } from '@shared/components/DetailsField';
 import { DetailsSection } from '@shared/components/DetailsSection';
+import { RelatedSection } from '@shared/components/RelatedSection';
 import { Input } from '@shared/components/Input';
+import { Checkbox } from '@shared/components/Checkbox';
+import { InlineAlert } from '@shared/components/InlineAlert';
+import { ConfirmInline } from '@shared/components/ConfirmInline';
 import { isLocalDataMode } from '@/config/appConfig';
 import { getUsersAsync } from '@features/users/api/usersApiClient';
 import { getAllWorkPlansAsync } from '@features/workplan/api/workplanApiClient';
@@ -95,7 +99,6 @@ function EmployeeDrawerContent({ employee, canEdit, onClose, onSaved }: Employee
   const [isEditing, setIsEditing] = useState(!isExistingEmployee && canEdit);
   const [form, setForm] = useState<EmployeeFormState>(() => buildInitialState(employee));
   const [error, setError] = useState<string | null>(null);
-  const [confirmStatusChange, setConfirmStatusChange] = useState(false);
 
   function setField<K extends keyof EmployeeFormState>(key: K, value: EmployeeFormState[K]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -105,7 +108,6 @@ function EmployeeDrawerContent({ employee, canEdit, onClose, onSaved }: Employee
     if (!canEdit) return;
     setForm(buildInitialState(employee));
     setError(null);
-    setConfirmStatusChange(false);
     setIsEditing(true);
   }
 
@@ -117,7 +119,6 @@ function EmployeeDrawerContent({ employee, canEdit, onClose, onSaved }: Employee
 
     setForm(buildInitialState(employee));
     setError(null);
-    setConfirmStatusChange(false);
     setIsEditing(false);
   }
 
@@ -175,7 +176,6 @@ function EmployeeDrawerContent({ employee, canEdit, onClose, onSaved }: Employee
       }
 
       setIsEditing(false);
-      setConfirmStatusChange(false);
       onSaved(savedEmployee, message);
     } catch (err) {
       setIsEditing(true);
@@ -226,10 +226,10 @@ function EmployeeDrawerContent({ employee, canEdit, onClose, onSaved }: Employee
       footer={
         isEditing ? (
           <div className="employeeDrawer__footerContent">
-            {error && <p className="employeeDrawer__error">{error}</p>}
+            {error && <InlineAlert variant="danger">{error}</InlineAlert>}
             <div className="employeeDrawer__actions">
-              <Button onClick={handleSave} disabled={isSaving}>
-                {isSaving ? 'שומר...' : 'שמור'}
+              <Button onClick={handleSave} isLoading={isSaving}>
+                שמור
               </Button>
               <Button variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
                 בטל שינויים
@@ -237,35 +237,14 @@ function EmployeeDrawerContent({ employee, canEdit, onClose, onSaved }: Employee
 
               {isExistingEmployee && (
                 <div className="employeeDrawer__dangerActions">
-                  {confirmStatusChange ? (
-                    <>
-                      <span className="employeeDrawer__confirmText">
-                        {employee.isActive ? 'להשבית את העובד?' : 'להפעיל את העובד מחדש?'}
-                      </span>
-                      <Button
-                        variant={employee.isActive ? 'danger' : 'primary'}
-                        onClick={handleStatusChange}
-                        disabled={isSaving}
-                      >
-                        אישור
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        onClick={() => setConfirmStatusChange(false)}
-                        disabled={isSaving}
-                      >
-                        חזור
-                      </Button>
-                    </>
-                  ) : (
-                    <Button
-                      variant={employee.isActive ? 'danger' : 'primary'}
-                      onClick={() => setConfirmStatusChange(true)}
-                      disabled={isSaving}
-                    >
-                      {employee.isActive ? 'השבת עובד' : 'הפעל עובד'}
-                    </Button>
-                  )}
+                  <ConfirmInline
+                    triggerLabel={employee.isActive ? 'השבת עובד' : 'הפעל עובד'}
+                    message={employee.isActive ? 'להשבית את העובד?' : 'להפעיל את העובד מחדש?'}
+                    confirmLabel="אישור"
+                    variant={employee.isActive ? 'danger' : 'primary'}
+                    onConfirm={handleStatusChange}
+                    isPending={isSaving}
+                  />
                 </div>
               )}
             </div>
@@ -279,28 +258,25 @@ function EmployeeDrawerContent({ employee, canEdit, onClose, onSaved }: Employee
         <div className="employeeDrawer employeeDrawer--edit">
           <DetailsSection title="פרטים כלליים">
             <Input
-              label="שם מלא *"
+              label="שם מלא"
               value={form.fullName}
               onChange={(event) => setField('fullName', event.target.value)}
               required
             />
             <div className="employeeDrawer__grid">
               <Input
-                label="תפקיד ראשי *"
+                label="תפקיד ראשי"
                 value={form.primaryRole}
                 onChange={(event) => setField('primaryRole', event.target.value)}
                 required
               />
             </div>
 
-            <label className="employeeDrawer__checkboxRow">
-              <input
-                type="checkbox"
-                checked={form.isActive}
-                onChange={(event) => setField('isActive', event.target.checked)}
-              />
-              <span>עובד פעיל</span>
-            </label>
+            <Checkbox
+              label="עובד פעיל"
+              checked={form.isActive}
+              onChange={(event) => setField('isActive', event.target.checked)}
+            />
           </DetailsSection>
 
           <DetailsSection title="פרטי התקשרות">
@@ -334,14 +310,11 @@ function EmployeeDrawerContent({ employee, canEdit, onClose, onSaved }: Employee
               />
             </div>
 
-            <label className="employeeDrawer__checkboxRow">
-              <input
-                type="checkbox"
-                checked={form.isAssignable}
-                onChange={(event) => setField('isAssignable', event.target.checked)}
-              />
-              <span>ניתן לשיבוץ</span>
-            </label>
+            <Checkbox
+              label="ניתן לשיבוץ"
+              checked={form.isAssignable}
+              onChange={(event) => setField('isAssignable', event.target.checked)}
+            />
           </DetailsSection>
         </div>
       )}
@@ -535,48 +508,4 @@ function EmployeeReviewDetails({ employee, canViewLinkedUser }: EmployeeReviewDe
       </RelatedSection>
     </div>
   );
-}
-
-interface RelatedSectionProps {
-  title: string;
-  /** Number of related records, or null when a count is not meaningful/loaded. */
-  count: number | null;
-  isLoading: boolean;
-  isError: boolean;
-  isUnavailable: boolean;
-  emptyText: string;
-  children: ReactNode;
-}
-
-function RelatedSection({
-  title,
-  count,
-  isLoading,
-  isError,
-  isUnavailable,
-  emptyText,
-  children,
-}: RelatedSectionProps) {
-  const sectionTitle = count != null ? `${title} (${count})` : title;
-
-  let body: ReactNode;
-  if (isUnavailable) {
-    body = (
-      <p className="employeeDrawer__relatedHint">נתונים מקושרים זמינים בחיבור לשרת בלבד.</p>
-    );
-  } else if (isLoading) {
-    body = <p className="employeeDrawer__relatedHint">טוען נתונים מקושרים…</p>;
-  } else if (isError) {
-    body = (
-      <p className="employeeDrawer__relatedHint employeeDrawer__relatedHint--error">
-        טעינת הנתונים המקושרים נכשלה.
-      </p>
-    );
-  } else if (count === 0) {
-    body = <p className="employeeDrawer__relatedHint">{emptyText}</p>;
-  } else {
-    body = children;
-  }
-
-  return <DetailsSection title={sectionTitle}>{body}</DetailsSection>;
 }

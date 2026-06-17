@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { Plus } from 'lucide-react';
 import { PageShell } from '@shared/components/PageShell';
 import { PageSpinner } from '@shared/components/PageSpinner';
 import { ErrorState } from '@shared/components/ErrorState';
-import { EmptyState } from '@shared/components/EmptyState';
 import { Badge } from '@shared/components/Badge';
 import { Button } from '@shared/components/Button';
-import { FilterBar } from '@shared/components/FilterBar';
+import { FilterBar, FilterField } from '@shared/components/FilterBar';
 import { Input } from '@shared/components/Input';
+import { DataTable, type DataTableColumn } from '@shared/components/DataTable';
 import { usePermissions } from '@shared/auth/usePermissions';
 import { useCustomers } from '../../hooks/useCustomers';
 import { CustomerDrawer } from '../../components/CustomerDrawer';
@@ -57,6 +58,22 @@ export function CustomersPage() {
     setDrawerCustomer(customer);
   };
 
+  const columns: DataTableColumn<Customer>[] = [
+    { id: 'name', header: 'שם לקוח', width: '30%', cell: (customer) => customer.customerName },
+    { id: 'type', header: 'סוג', cell: (customer) => customer.customerType || '—' },
+    { id: 'city', header: 'עיר', cell: (customer) => customer.city || '—' },
+    { id: 'phone', header: 'טלפון', cell: (customer) => customer.primaryPhone || '—' },
+    {
+      id: 'status',
+      header: 'סטטוס',
+      cell: (customer) => (
+        <Badge variant={customer.isActive ? 'success' : 'neutral'}>
+          {customer.status ?? (customer.isActive ? 'פעיל' : 'לא פעיל')}
+        </Badge>
+      ),
+    },
+  ];
+
   if (isLoading) return <PageShell title="לקוחות"><PageSpinner /></PageShell>;
   if (error) {
     return (
@@ -71,68 +88,30 @@ export function CustomersPage() {
       <FilterBar
         actions={
           can('manageCustomers') ? (
-            <Button onClick={() => setDrawerCustomer(null)}>+ לקוח חדש</Button>
+            <Button iconStart={<Plus size={18} />} onClick={() => setDrawerCustomer(null)}>
+              לקוח חדש
+            </Button>
           ) : undefined
         }
       >
-        <label className="customersPage__filter customersPage__filter--search">
-          <span>חיפוש</span>
+        <FilterField label="חיפוש" grow>
           <Input
             placeholder="חיפוש לקוח..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-        </label>
+        </FilterField>
       </FilterBar>
 
-      {filtered.length === 0 ? (
-        <EmptyState title="לא נמצאו לקוחות" />
-      ) : (
-        <div className="customersPage__tableWrap">
-          <table className="customersPage__table">
-            <thead>
-              <tr>
-                <th>שם לקוח</th>
-                <th>סוג</th>
-                <th>עיר</th>
-                <th>טלפון</th>
-                <th>סטטוס</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((customer) => (
-                <tr
-                  key={customer.customerId}
-                  role="button"
-                  tabIndex={0}
-                  className={`customersPage__row ${
-                    selectedCustomerId === customer.customerId
-                      ? 'customersPage__row--selected'
-                      : ''
-                  }`.trim()}
-                  onClick={() => openCustomer(customer)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault();
-                      openCustomer(customer);
-                    }
-                  }}
-                >
-                  <td>{customer.customerName}</td>
-                  <td>{customer.customerType || '—'}</td>
-                  <td>{customer.city || '—'}</td>
-                  <td>{customer.primaryPhone || '—'}</td>
-                  <td>
-                    <Badge variant={customer.isActive ? 'success' : 'neutral'}>
-                      {customer.status ?? (customer.isActive ? 'פעיל' : 'לא פעיל')}
-                    </Badge>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable
+        columns={columns}
+        rows={filtered}
+        getRowId={(customer) => customer.customerId}
+        onRowClick={openCustomer}
+        selectedRowId={selectedCustomerId}
+        emptyTitle="לא נמצאו לקוחות"
+        emptyDescription="התאימו את החיפוש או הוסיפו לקוח חדש."
+      />
 
       <CustomerDrawer
         isOpen={isDrawerOpen}

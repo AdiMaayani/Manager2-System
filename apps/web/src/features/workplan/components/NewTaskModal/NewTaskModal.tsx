@@ -3,6 +3,10 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Drawer } from '@shared/components/Drawer';
 import { Button } from '@shared/components/Button';
 import { Input } from '@shared/components/Input';
+import { Select } from '@shared/components/Select';
+import { Textarea } from '@shared/components/Textarea';
+import { InlineAlert } from '@shared/components/InlineAlert';
+import { SegmentedControl } from '@shared/components/SegmentedControl';
 import { PageSpinner } from '@shared/components/PageSpinner';
 import { isLocalDataMode } from '@/config/appConfig';
 import {
@@ -402,55 +406,39 @@ export function NewTaskModal({
 
               <div className="newTaskModal__field">
                 <span>סוג משימה</span>
-                <div className="newTaskModal__kindToggle" role="radiogroup" aria-label="סוג משימה">
-                  {TASK_KIND_OPTIONS.map((option) => {
-                    const isActive = taskKind === option.id;
-                    return (
-                      <button
-                        key={option.id}
-                        type="button"
-                        role="radio"
-                        aria-checked={isActive}
-                        className={`newTaskModal__kindOption ${
-                          isActive ? 'newTaskModal__kindOption--active' : ''
-                        }`}
-                        onClick={() => {
-                          setTaskKind(option.id);
-                          setDraftCandidates(null);
-                          setDraftMessage(null);
-                          setAcceptedRecommendation(null);
-                          setError(null);
-                        }}
-                      >
-                        {option.label}
-                      </button>
-                    );
-                  })}
-                </div>
+                <SegmentedControl
+                  ariaLabel="סוג משימה"
+                  items={TASK_KIND_OPTIONS}
+                  value={taskKind}
+                  onChange={(id) => {
+                    setTaskKind(id);
+                    setDraftCandidates(null);
+                    setDraftMessage(null);
+                    setAcceptedRecommendation(null);
+                    setError(null);
+                  }}
+                />
               </div>
 
               {!isInternalTask && (
-                <label className="newTaskModal__field">
-                  <span>פרויקט</span>
-                  <select
-                    className="newTaskModal__select"
-                    value={selectedProjectId}
-                    onChange={(event) => {
-                      setSelectedProjectId(event.target.value);
-                      setDraftCandidates(null);
-                      setDraftMessage(null);
-                      setAcceptedRecommendation(null);
-                    }}
-                    required
-                  >
-                    <option value="">בחר פרויקט</option>
-                    {selectableProjectOptions.map((project) => (
-                      <option key={project.id} value={project.id}>
-                        {project.title}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <Select
+                  label="פרויקט"
+                  required
+                  value={selectedProjectId}
+                  onChange={(event) => {
+                    setSelectedProjectId(event.target.value);
+                    setDraftCandidates(null);
+                    setDraftMessage(null);
+                    setAcceptedRecommendation(null);
+                  }}
+                >
+                  <option value="">בחר פרויקט</option>
+                  {selectableProjectOptions.map((project) => (
+                    <option key={project.id} value={project.id}>
+                      {project.title}
+                    </option>
+                  ))}
+                </Select>
               )}
 
               {isInternalTask && (
@@ -466,15 +454,12 @@ export function NewTaskModal({
                 required
               />
 
-              <label className="newTaskModal__field">
-                <span>תיאור</span>
-                <textarea
-                  className="newTaskModal__textarea"
-                  value={description}
-                  onChange={(event) => setDescription(event.target.value)}
-                  rows={3}
-                />
-              </label>
+              <Textarea
+                label="תיאור"
+                value={description}
+                onChange={(event) => setDescription(event.target.value)}
+                rows={3}
+              />
 
               <div className="newTaskModal__grid">
                 <Input
@@ -514,49 +499,40 @@ export function NewTaskModal({
               </p>
 
               <div className="newTaskModal__grid">
-                <label className="newTaskModal__field">
-                  <span>סטטוס</span>
-                  <select
-                    className="newTaskModal__select"
-                    value={status}
-                    onChange={(event) => setStatus(event.target.value)}
-                  >
-                    {WORKPLAN_STATUS_OPTIONS.map((option) => (
-                      <option key={option.code} value={option.code}>
-                        {option.display}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="newTaskModal__field">
-                  <span>דחיפות</span>
-                  <select
-                    className="newTaskModal__select"
-                    value={priority}
-                    onChange={(event) => setPriority(event.target.value)}
-                  >
-                    {WORKPLAN_PRIORITY_OPTIONS.map((option) => (
-                      <option key={option.code} value={option.code}>
-                        {option.display}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label className="newTaskModal__field">
-                  <span>תפקיד נדרש</span>
-                  <select
-                    className="newTaskModal__select"
-                    value={requiredRole}
-                    onChange={(event) => setRequiredRole(event.target.value)}
-                  >
-                    <option value="">בחר תפקיד</option>
-                    {ROLE_OPTIONS.map((option) => (
-                      <option key={option} value={option}>
-                        {option}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <Select
+                  label="סטטוס"
+                  value={status}
+                  onChange={(event) => setStatus(event.target.value)}
+                >
+                  {WORKPLAN_STATUS_OPTIONS.map((option) => (
+                    <option key={option.code} value={option.code}>
+                      {option.display}
+                    </option>
+                  ))}
+                </Select>
+                <Select
+                  label="דחיפות"
+                  value={priority}
+                  onChange={(event) => setPriority(event.target.value)}
+                >
+                  {WORKPLAN_PRIORITY_OPTIONS.map((option) => (
+                    <option key={option.code} value={option.code}>
+                      {option.display}
+                    </option>
+                  ))}
+                </Select>
+                <Select
+                  label="תפקיד נדרש"
+                  value={requiredRole}
+                  onChange={(event) => setRequiredRole(event.target.value)}
+                >
+                  <option value="">בחר תפקיד</option>
+                  {ROLE_OPTIONS.map((option) => (
+                    <option key={option} value={option}>
+                      {option}
+                    </option>
+                  ))}
+                </Select>
               </div>
             </section>
           )}
@@ -564,26 +540,23 @@ export function NewTaskModal({
           {step === 'assignment' && (
             <section className="newTaskModal__section">
               <h3 className="newTaskModal__sectionTitle">שיוך עובד</h3>
-              <label className="newTaskModal__field">
-                <span>עובד משויך</span>
-                <select
-                  className="newTaskModal__select"
-                  value={employeeId}
-                  onChange={(event) => {
-                    setEmployeeId(event.target.value);
-                    if (acceptedRecommendation?.employeeId !== Number(event.target.value)) {
-                      setAcceptedRecommendation(null);
-                    }
-                  }}
-                >
-                  <option value="">בחר עובד</option>
-                  {assignableEmployees.map((employee) => (
-                    <option key={employee.employeeId} value={employee.employeeId}>
-                      {employee.fullName} {employee.primaryRole ? `· ${employee.primaryRole}` : ''}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <Select
+                label="עובד משויך"
+                value={employeeId}
+                onChange={(event) => {
+                  setEmployeeId(event.target.value);
+                  if (acceptedRecommendation?.employeeId !== Number(event.target.value)) {
+                    setAcceptedRecommendation(null);
+                  }
+                }}
+              >
+                <option value="">בחר עובד</option>
+                {assignableEmployees.map((employee) => (
+                  <option key={employee.employeeId} value={employee.employeeId}>
+                    {employee.fullName} {employee.primaryRole ? `· ${employee.primaryRole}` : ''}
+                  </option>
+                ))}
+              </Select>
               <p className="newTaskModal__hint">
                 ניתן לבחור עובד ידנית, או להמשיך לשלב הבא לקבלת המלצת שיבוץ חכם אוטומטית.
               </p>
@@ -695,7 +668,7 @@ export function NewTaskModal({
         </div>
 
         <div className="newTaskModal__footer">
-          {error && <p className="newTaskModal__error">{error}</p>}
+          {error && <InlineAlert variant="danger">{error}</InlineAlert>}
           {!isTaskPersistenceAvailable && (
             <p className="newTaskModal__hint">{taskPersistenceMessage}</p>
           )}
@@ -716,21 +689,18 @@ export function NewTaskModal({
               </Button>
             )}
             {step === 'assignment' && (
-              <Button type="button" onClick={handleContinueFromAssignment} disabled={isSmartLoading}>
-                {isSmartLoading ? 'מריץ שיבוץ...' : 'המשך לשיבוץ חכם'}
+              <Button type="button" onClick={handleContinueFromAssignment} isLoading={isSmartLoading}>
+                המשך לשיבוץ חכם
               </Button>
             )}
             {step === 'recommendation' && (
               <Button
                 type="submit"
-                disabled={mutation.isPending || !isTaskPersistenceAvailable}
+                isLoading={mutation.isPending}
+                disabled={!isTaskPersistenceAvailable}
                 title={!isTaskPersistenceAvailable ? taskPersistenceMessage : undefined}
               >
-                {mutation.isPending
-                  ? 'שומר...'
-                  : isManualSelection
-                    ? 'שמור עם העובד שנבחר'
-                    : 'שמור משימה'}
+                {isManualSelection ? 'שמור עם העובד שנבחר' : 'שמור משימה'}
               </Button>
             )}
             <Button type="button" variant="secondary" onClick={handleClose}>

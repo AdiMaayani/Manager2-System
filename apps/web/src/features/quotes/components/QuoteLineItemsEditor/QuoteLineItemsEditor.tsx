@@ -1,4 +1,6 @@
+import { Plus, Trash2 } from 'lucide-react';
 import { Button } from '@shared/components/Button';
+import { IconButton } from '@shared/components/IconButton';
 import { formatCurrency } from '../../utils/format';
 import './QuoteLineItemsEditor.css';
 
@@ -35,8 +37,8 @@ export function QuoteLineItemsEditor({
     <div className="quoteLineItemsEditor">
       {/* The section title is provided by the wrapping DetailsSection card. */}
       <div className="quoteLineItemsEditor__header">
-        <Button variant="secondary" onClick={onAddLine}>
-          + הוסף שורה
+        <Button variant="secondary" onClick={onAddLine} iconStart={<Plus size={16} />}>
+          הוסף שורה
         </Button>
       </div>
 
@@ -60,7 +62,7 @@ export function QuoteLineItemsEditor({
                 <tr key={index}>
                   <td>
                     <input
-                      className="quoteLineItemsEditor__input"
+                      className="formControl quoteLineItemsEditor__input"
                       value={line.description}
                       placeholder="תיאור הפריט"
                       onChange={(event) => onChangeLine(index, 'description', event.target.value)}
@@ -68,7 +70,7 @@ export function QuoteLineItemsEditor({
                   </td>
                   <td>
                     <input
-                      className="quoteLineItemsEditor__input quoteLineItemsEditor__input--num"
+                      className="formControl quoteLineItemsEditor__input quoteLineItemsEditor__input--num"
                       type="number"
                       min="0"
                       step="0.01"
@@ -78,7 +80,7 @@ export function QuoteLineItemsEditor({
                   </td>
                   <td>
                     <input
-                      className="quoteLineItemsEditor__input quoteLineItemsEditor__input--unit"
+                      className="formControl quoteLineItemsEditor__input quoteLineItemsEditor__input--unit"
                       list="quoteLineUnitOptions"
                       value={line.unit}
                       onChange={(event) => onChangeLine(index, 'unit', event.target.value)}
@@ -86,7 +88,7 @@ export function QuoteLineItemsEditor({
                   </td>
                   <td>
                     <input
-                      className="quoteLineItemsEditor__input quoteLineItemsEditor__input--num"
+                      className="formControl quoteLineItemsEditor__input quoteLineItemsEditor__input--num"
                       type="number"
                       min="0"
                       step="0.01"
@@ -98,14 +100,13 @@ export function QuoteLineItemsEditor({
                     {formatCurrency(computeLineTotal(line))}
                   </td>
                   <td>
-                    <button
-                      type="button"
-                      className="quoteLineItemsEditor__remove"
+                    <IconButton
+                      label="מחק שורה"
+                      variant="danger"
+                      size="sm"
+                      icon={<Trash2 size={16} />}
                       onClick={() => onRemoveLine(index)}
-                      aria-label="מחק שורה"
-                    >
-                      ×
-                    </button>
+                    />
                   </td>
                 </tr>
               ))}

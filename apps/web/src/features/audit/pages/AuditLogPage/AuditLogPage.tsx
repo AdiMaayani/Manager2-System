@@ -2,11 +2,13 @@ import { useMemo, useState } from 'react';
 import { PageShell } from '@shared/components/PageShell';
 import { PageSpinner } from '@shared/components/PageSpinner';
 import { ErrorState } from '@shared/components/ErrorState';
-import { EmptyState } from '@shared/components/EmptyState';
-import { Badge } from '@shared/components/Badge';
-import { FilterBar } from '@shared/components/FilterBar';
+import { StatusBadge } from '@shared/components/StatusBadge';
+import { FilterBar, FilterField } from '@shared/components/FilterBar';
+import { Input } from '@shared/components/Input';
+import { Select } from '@shared/components/Select';
+import { DataTable, type DataTableColumn } from '@shared/components/DataTable';
 import { useAuditLog } from '../../hooks/useAuditLog';
-import type { AuditLogFilters } from '../../types';
+import type { AuditLogEntry, AuditLogFilters } from '../../types';
 import './AuditLogPage.css';
 
 const ENTITY_TYPE_OPTIONS = [
@@ -18,12 +20,6 @@ const ENTITY_TYPE_OPTIONS = [
 ];
 
 const SEVERITY_OPTIONS = ['Info', 'Warning', 'Critical'];
-
-const SEVERITY_VARIANTS: Record<string, 'neutral' | 'warning' | 'danger'> = {
-  Info: 'neutral',
-  Warning: 'warning',
-  Critical: 'danger',
-};
 
 function formatDateTime(value: string): string {
   if (!value) return '-';
@@ -82,108 +78,77 @@ export function AuditLogPage() {
 
   const rows = entries ?? [];
 
+  const columns: DataTableColumn<AuditLogEntry>[] = [
+    { id: 'time', header: 'זמן', cell: (entry) => formatDateTime(entry.occurredAtUtc) },
+    {
+      id: 'user',
+      header: 'משתמש',
+      cell: (entry) => entry.userName ?? (entry.userId != null ? `#${entry.userId}` : '-'),
+    },
+    { id: 'action', header: 'פעולה', cell: (entry) => entry.action },
+    { id: 'entityType', header: 'סוג ישות', cell: (entry) => entry.entityType },
+    { id: 'entityId', header: 'מזהה ישות', cell: (entry) => entry.entityId ?? '-' },
+    {
+      id: 'severity',
+      header: 'חומרה',
+      cell: (entry) => <StatusBadge domain="severity" status={entry.severity} />,
+    },
+    { id: 'summary', header: 'תיאור', cell: (entry) => entry.summary },
+  ];
+
   return (
     <PageShell title="יומן ביקורת" wide>
       <FilterBar>
-        <div className="auditLogPage__filter">
-          <span className="auditLogPage__filterLabel">פעולה</span>
-          <input
-            className="auditLogPage__input"
+        <FilterField label="פעולה" grow>
+          <Input
             placeholder="לדוגמה: LoginSucceeded"
             value={actionInput}
             onChange={(event) => setActionInput(event.target.value)}
           />
-        </div>
+        </FilterField>
 
-        <div className="auditLogPage__filter">
-          <span className="auditLogPage__filterLabel">סוג ישות</span>
-          <select
-            className="auditLogPage__select"
-            value={entityType}
-            onChange={(event) => setEntityType(event.target.value)}
-          >
+        <FilterField label="סוג ישות">
+          <Select value={entityType} onChange={(event) => setEntityType(event.target.value)}>
             <option value="">הכול</option>
             {ENTITY_TYPE_OPTIONS.map((option) => (
               <option key={option} value={option}>
                 {option}
               </option>
             ))}
-          </select>
-        </div>
+          </Select>
+        </FilterField>
 
-        <div className="auditLogPage__filter">
-          <span className="auditLogPage__filterLabel">חומרה</span>
-          <select
-            className="auditLogPage__select"
-            value={severity}
-            onChange={(event) => setSeverity(event.target.value)}
-          >
+        <FilterField label="חומרה">
+          <Select value={severity} onChange={(event) => setSeverity(event.target.value)}>
             <option value="">הכול</option>
             {SEVERITY_OPTIONS.map((option) => (
               <option key={option} value={option}>
                 {option}
               </option>
             ))}
-          </select>
-        </div>
+          </Select>
+        </FilterField>
 
-        <div className="auditLogPage__filter">
-          <span className="auditLogPage__filterLabel">מתאריך</span>
-          <input
-            className="auditLogPage__input"
+        <FilterField label="מתאריך">
+          <Input
             type="date"
             value={fromDate}
             onChange={(event) => setFromDate(event.target.value)}
           />
-        </div>
+        </FilterField>
 
-        <div className="auditLogPage__filter">
-          <span className="auditLogPage__filterLabel">עד תאריך</span>
-          <input
-            className="auditLogPage__input"
-            type="date"
-            value={toDate}
-            onChange={(event) => setToDate(event.target.value)}
-          />
-        </div>
+        <FilterField label="עד תאריך">
+          <Input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
+        </FilterField>
       </FilterBar>
 
-      {rows.length === 0 ? (
-        <EmptyState title="לא נמצאו רשומות ביומן הביקורת" />
-      ) : (
-        <div className="auditLogPage__tableWrap">
-          <table className="auditLogPage__table">
-            <thead>
-              <tr>
-                <th>זמן</th>
-                <th>משתמש</th>
-                <th>פעולה</th>
-                <th>סוג ישות</th>
-                <th>מזהה ישות</th>
-                <th>חומרה</th>
-                <th>תיאור</th>
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map((entry) => (
-                <tr key={entry.auditLogId} className="auditLogPage__row">
-                  <td>{formatDateTime(entry.occurredAtUtc)}</td>
-                  <td>{entry.userName ?? (entry.userId != null ? `#${entry.userId}` : '-')}</td>
-                  <td>{entry.action}</td>
-                  <td>{entry.entityType}</td>
-                  <td>{entry.entityId ?? '-'}</td>
-                  <td>
-                    <Badge variant={SEVERITY_VARIANTS[entry.severity] ?? 'neutral'}>
-                      {entry.severity}
-                    </Badge>
-                  </td>
-                  <td>{entry.summary}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable
+        columns={columns}
+        rows={rows}
+        getRowId={(entry) => entry.auditLogId}
+        minWidth={980}
+        emptyTitle="לא נמצאו רשומות ביומן הביקורת"
+      />
     </PageShell>
   );
 }

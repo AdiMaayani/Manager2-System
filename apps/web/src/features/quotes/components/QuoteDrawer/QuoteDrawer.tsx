@@ -6,6 +6,10 @@ import { DetailsField } from '@shared/components/DetailsField';
 import { DetailsSection } from '@shared/components/DetailsSection';
 import { Drawer } from '@shared/components/Drawer';
 import { Input } from '@shared/components/Input';
+import { Select } from '@shared/components/Select';
+import { Textarea } from '@shared/components/Textarea';
+import { InlineAlert } from '@shared/components/InlineAlert';
+import { ConfirmInline } from '@shared/components/ConfirmInline';
 import { PageSpinner } from '@shared/components/PageSpinner';
 import { QUOTE_STATUS_OPTIONS, getQuoteStatusLabel } from '../../constants/quoteStatus';
 import {
@@ -115,7 +119,6 @@ function QuoteDrawerContent({ quoteId, onClose, onSaved, initialProjectId }: Quo
   const [isEditing, setIsEditing] = useState(!isExistingQuote);
   const [form, setForm] = useState<QuoteFormState>(() => buildCreateState(initialProjectId));
   const [error, setError] = useState<string | null>(null);
-  const [confirmDeactivate, setConfirmDeactivate] = useState(false);
 
   function setField<K extends keyof QuoteFormState>(key: K, value: QuoteFormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -125,7 +128,6 @@ function QuoteDrawerContent({ quoteId, onClose, onSaved, initialProjectId }: Quo
     if (!quote) return;
     setForm(buildFormFromQuote(quote));
     setError(null);
-    setConfirmDeactivate(false);
     setIsEditing(true);
   }
 
@@ -137,7 +139,6 @@ function QuoteDrawerContent({ quoteId, onClose, onSaved, initialProjectId }: Quo
 
     setForm(buildFormFromQuote(quote));
     setError(null);
-    setConfirmDeactivate(false);
     setIsEditing(false);
   }
 
@@ -252,7 +253,6 @@ function QuoteDrawerContent({ quoteId, onClose, onSaved, initialProjectId }: Quo
       if (isExistingQuote) {
         await updateMutation.mutateAsync({ id: quoteId, request });
         setIsEditing(false);
-        setConfirmDeactivate(false);
         // Notify the parent (e.g. project quote tab) without closing — the
         // drawer returns to review mode after a successful update.
         onSaved?.(quoteId);
@@ -314,10 +314,10 @@ function QuoteDrawerContent({ quoteId, onClose, onSaved, initialProjectId }: Quo
       footer={
         isEditing && isQuoteReady ? (
           <div className="quoteDrawer__footerContent">
-            {error && <p className="quoteDrawer__error">{error}</p>}
+            {error && <InlineAlert variant="danger">{error}</InlineAlert>}
             <div className="quoteDrawer__actions">
-              <Button onClick={handleSave} disabled={isSaving}>
-                {isSaving ? 'שומר...' : 'שמור'}
+              <Button onClick={handleSave} isLoading={isSaving}>
+                שמור
               </Button>
               <Button variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
                 בטל שינויים
@@ -325,29 +325,13 @@ function QuoteDrawerContent({ quoteId, onClose, onSaved, initialProjectId }: Quo
 
               {isExistingQuote && quote?.isActive && (
                 <div className="quoteDrawer__dangerActions">
-                  {confirmDeactivate ? (
-                    <>
-                      <span className="quoteDrawer__confirmText">לבטל את הצעת המחיר?</span>
-                      <Button variant="danger" onClick={handleDeactivate} disabled={isSaving}>
-                        אישור ביטול
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        onClick={() => setConfirmDeactivate(false)}
-                        disabled={isSaving}
-                      >
-                        חזור
-                      </Button>
-                    </>
-                  ) : (
-                    <Button
-                      variant="danger"
-                      onClick={() => setConfirmDeactivate(true)}
-                      disabled={isSaving}
-                    >
-                      בטל הצעה
-                    </Button>
-                  )}
+                  <ConfirmInline
+                    triggerLabel="בטל הצעה"
+                    message="לבטל את הצעת המחיר?"
+                    confirmLabel="אישור ביטול"
+                    onConfirm={handleDeactivate}
+                    isPending={isSaving}
+                  />
                 </div>
               )}
             </div>
@@ -359,7 +343,7 @@ function QuoteDrawerContent({ quoteId, onClose, onSaved, initialProjectId }: Quo
         isLoadingQuote ? (
           <PageSpinner />
         ) : (
-          <p className="quoteDrawer__loadError">טעינת הצעת המחיר נכשלה.</p>
+          <InlineAlert variant="danger">טעינת הצעת המחיר נכשלה.</InlineAlert>
         )
       ) : !isEditing && quote ? (
         <QuoteReviewDetails quote={quote} />
@@ -374,60 +358,52 @@ function QuoteDrawerContent({ quoteId, onClose, onSaved, initialProjectId }: Quo
                 </div>
               </div>
 
-              <div className="quoteDrawer__field">
-                <label className="quoteDrawer__label">סטטוס</label>
-                <select
-                  className="quoteDrawer__select"
-                  value={form.status}
-                  onChange={(event) => setField('status', event.target.value as QuoteStatus)}
-                >
-                  {QUOTE_STATUS_OPTIONS.map((status) => (
-                    <option key={status} value={status}>
-                      {getQuoteStatusLabel(status)}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <Select
+                label="סטטוס"
+                value={form.status}
+                onChange={(event) => setField('status', event.target.value as QuoteStatus)}
+              >
+                {QUOTE_STATUS_OPTIONS.map((status) => (
+                  <option key={status} value={status}>
+                    {getQuoteStatusLabel(status)}
+                  </option>
+                ))}
+              </Select>
 
-              <div className="quoteDrawer__field">
-                <label className="quoteDrawer__label">לקוח *</label>
-                <select
-                  className="quoteDrawer__select"
-                  value={form.customerId}
-                  onChange={(event) => setField('customerId', event.target.value)}
-                >
-                  <option value="">בחרו לקוח</option>
-                  {activeCustomers.map((customer) => (
-                    <option key={customer.customerId} value={customer.customerId}>
-                      {customer.customerName}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <Select
+                label="לקוח"
+                required
+                value={form.customerId}
+                onChange={(event) => setField('customerId', event.target.value)}
+              >
+                <option value="">בחרו לקוח</option>
+                {activeCustomers.map((customer) => (
+                  <option key={customer.customerId} value={customer.customerId}>
+                    {customer.customerName}
+                  </option>
+                ))}
+              </Select>
 
-              <div className="quoteDrawer__field">
-                <label className="quoteDrawer__label">פרויקט (אופציונלי)</label>
-                <select
-                  className="quoteDrawer__select"
-                  value={form.projectId}
-                  onChange={(event) => setField('projectId', event.target.value)}
-                >
-                  <option value="">ללא פרויקט</option>
-                  {(projectOptions ?? []).map((project) => (
-                    <option key={project.workItemId} value={project.workItemId}>
-                      {project.title}
-                      {project.customerName ? ` — ${project.customerName}` : ''}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <Select
+                label="פרויקט (אופציונלי)"
+                value={form.projectId}
+                onChange={(event) => setField('projectId', event.target.value)}
+              >
+                <option value="">ללא פרויקט</option>
+                {(projectOptions ?? []).map((project) => (
+                  <option key={project.workItemId} value={project.workItemId}>
+                    {project.title}
+                    {project.customerName ? ` — ${project.customerName}` : ''}
+                  </option>
+                ))}
+              </Select>
             </div>
           </DetailsSection>
 
           <DetailsSection title="תאריכים">
             <div className="quoteDrawer__grid">
               <Input
-                label="תאריך הצעה *"
+                label="תאריך הצעה"
                 type="date"
                 value={form.quoteDate}
                 onChange={(event) => setField('quoteDate', event.target.value)}
@@ -481,15 +457,12 @@ function QuoteDrawerContent({ quoteId, onClose, onSaved, initialProjectId }: Quo
           </DetailsSection>
 
           <DetailsSection title="הערות">
-            <div className="quoteDrawer__field">
-              <label className="quoteDrawer__label">הערות</label>
-              <textarea
-                className="quoteDrawer__textarea"
-                rows={3}
-                value={form.notes}
-                onChange={(event) => setField('notes', event.target.value)}
-              />
-            </div>
+            <Textarea
+              label="הערות"
+              rows={3}
+              value={form.notes}
+              onChange={(event) => setField('notes', event.target.value)}
+            />
           </DetailsSection>
         </div>
       )}

@@ -1,0 +1,77 @@
+.dataTable__wrap {
+  background: var(--color-surface);
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden;
+}
+
+.dataTable__scroll {
+  overflow-x: auto;
+}
+
+.dataTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.dataTable__th {
+  padding: var(--spacing-sm) var(--spacing-lg);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-500);
+  text-align: start;
+  background: var(--color-neutral-50);
+  border-bottom: 1px solid var(--color-neutral-200);
+  white-space: nowrap;
+}
+
+.dataTable__td {
+  padding: var(--spacing-md) var(--spacing-lg);
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-800);
+  border-bottom: 1px solid var(--color-neutral-100);
+  text-align: start;
+  vertical-align: middle;
+}
+
+.dataTable__row:last-child .dataTable__td {
+  border-bottom: none;
+}
+
+.dataTable__cell--start {
+  text-align: start;
+}
+
+.dataTable__cell--center {
+  text-align: center;
+}
+
+.dataTable__cell--end {
+  text-align: end;
+}
+
+.dataTable__row--clickable {
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.dataTable__row--clickable:hover,
+.dataTable__row--clickable:focus-visible {
+  background: var(--color-neutral-50);
+  outline: none;
+}
+
+.dataTable__row--selected,
+.dataTable__row--selected:hover {
+  background: var(--color-primary-50);
+}
+
+.dataTable__row--selected .dataTable__td:first-child {
+  box-shadow: inset 3px 0 0 0 var(--color-primary-600);
+}
+
+/* In RTL the visual inline-start is the right edge; mirror the accent bar. */
+[dir='rtl'] .dataTable__row--selected .dataTable__td:first-child {
+  box-shadow: inset -3px 0 0 0 var(--color-primary-600);
+}

@@ -1,0 +1,1 @@
+export { ConfirmInline } from './ConfirmInline';

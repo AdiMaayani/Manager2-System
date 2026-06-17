@@ -1,14 +1,20 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Plus } from 'lucide-react';
 import { PageShell } from '@shared/components/PageShell';
 import { PageSpinner } from '@shared/components/PageSpinner';
 import { ErrorState } from '@shared/components/ErrorState';
-import { EmptyState } from '@shared/components/EmptyState';
-import { Badge } from '@shared/components/Badge';
+import { StatusBadge } from '@shared/components/StatusBadge';
 import { Button } from '@shared/components/Button';
 import { Modal } from '@shared/components/Modal';
 import { Input } from '@shared/components/Input';
+import { Select } from '@shared/components/Select';
+import { Textarea } from '@shared/components/Textarea';
+import { Checkbox } from '@shared/components/Checkbox';
+import { InlineAlert } from '@shared/components/InlineAlert';
+import { FilterBar, FilterField } from '@shared/components/FilterBar';
+import { DataTable, type DataTableColumn } from '@shared/components/DataTable';
 import {
   createWorkReportAsync,
   getReportEmployeesAsync,
@@ -22,6 +28,7 @@ import type {
   CreateWorkReportRequest,
   ReportProjectOption,
   WorkReportDetails,
+  WorkReportListItem,
 } from '../../types';
 import './ReportsPage.css';
 
@@ -456,138 +463,96 @@ export function ReportsPage() {
     );
   }
 
+  const reportColumns: DataTableColumn<WorkReportListItem>[] = [
+    { id: 'date', header: 'תאריך', cell: (r) => formatReportDate(r.reportDate) || '—' },
+    { id: 'number', header: 'מס׳ דיווח', cell: (r) => `#${r.reportId}` },
+    { id: 'project', header: 'פרויקט', cell: (r) => r.projectTitle ?? '—' },
+    { id: 'customer', header: 'לקוח', cell: (r) => r.customerName ?? '—' },
+    { id: 'reporter', header: 'מדווח', cell: (r) => r.reportedByName ?? '—' },
+    {
+      id: 'status',
+      header: 'סטטוס',
+      cell: (r) => <StatusBadge domain="report" status={r.status} />,
+    },
+  ];
+
   return (
     <PageShell title="דיווחים">
-      {pageMessage && <p className="reportsPage__success">{pageMessage}</p>}
+      {pageMessage && (
+        <InlineAlert variant="success" onDismiss={() => setPageMessage(null)}>
+          {pageMessage}
+        </InlineAlert>
+      )}
 
-      <div className="reportsPage__filterBar">
-        <div className="reportsPage__filters">
-          <label className="reportsPage__filterField reportsPage__filterField--search">
-            <span>חיפוש</span>
-            <input
-              type="search"
-              className="reportsPage__select"
-              placeholder="פרויקט, לקוח, מדווח או מס׳ דיווח"
-              value={filterSearch}
-              onChange={(e) => setFilterSearch(e.target.value)}
-            />
-          </label>
-          <label className="reportsPage__filterField">
-            <span>פרויקט</span>
-            <select
-              className="reportsPage__select"
-              value={filterProjectId}
-              onChange={(e) => setFilterProjectId(e.target.value)}
-            >
-              <option value="">הכל</option>
-              {projects.map((p) => (
-                <option key={p.workItemId} value={String(p.workItemId)}>
-                  {p.title}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="reportsPage__filterField">
-            <span>לקוח</span>
-            <select
-              className="reportsPage__select"
-              value={filterCustomer}
-              onChange={(e) => setFilterCustomer(e.target.value)}
-            >
-              <option value="">הכל</option>
-              {customerOptions.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="reportsPage__filterField">
-            <span>סטטוס</span>
-            <select
-              className="reportsPage__select"
-              value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value)}
-            >
-              <option value="">הכל</option>
-              {LIST_STATUS_OPTIONS.map((s) => (
-                <option key={s} value={s}>
-                  {s}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="reportsPage__filterField">
-            <span>מתאריך</span>
-            <input
-              type="date"
-              className="reportsPage__select"
-              value={filterDateFrom}
-              onChange={(e) => setFilterDateFrom(e.target.value)}
-            />
-          </label>
-          <label className="reportsPage__filterField">
-            <span>עד תאריך</span>
-            <input
-              type="date"
-              className="reportsPage__select"
-              value={filterDateTo}
-              onChange={(e) => setFilterDateTo(e.target.value)}
-            />
-          </label>
-        </div>
-
-        <div className="reportsPage__filterActions">
-          <Button type="button" onClick={openCreateModal}>
+      <FilterBar
+        actions={
+          <Button type="button" iconStart={<Plus size={18} />} onClick={openCreateModal}>
             דיווח חדש
           </Button>
-        </div>
-      </div>
+        }
+      >
+        <FilterField label="חיפוש" grow>
+          <Input
+            type="search"
+            placeholder="פרויקט, לקוח, מדווח או מס׳ דיווח"
+            value={filterSearch}
+            onChange={(e) => setFilterSearch(e.target.value)}
+          />
+        </FilterField>
+        <FilterField label="פרויקט">
+          <Select value={filterProjectId} onChange={(e) => setFilterProjectId(e.target.value)}>
+            <option value="">הכל</option>
+            {projects.map((p) => (
+              <option key={p.workItemId} value={String(p.workItemId)}>
+                {p.title}
+              </option>
+            ))}
+          </Select>
+        </FilterField>
+        <FilterField label="לקוח">
+          <Select value={filterCustomer} onChange={(e) => setFilterCustomer(e.target.value)}>
+            <option value="">הכל</option>
+            {customerOptions.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </Select>
+        </FilterField>
+        <FilterField label="סטטוס">
+          <Select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
+            <option value="">הכל</option>
+            {LIST_STATUS_OPTIONS.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </Select>
+        </FilterField>
+        <FilterField label="מתאריך">
+          <Input
+            type="date"
+            value={filterDateFrom}
+            onChange={(e) => setFilterDateFrom(e.target.value)}
+          />
+        </FilterField>
+        <FilterField label="עד תאריך">
+          <Input
+            type="date"
+            value={filterDateTo}
+            onChange={(e) => setFilterDateTo(e.target.value)}
+          />
+        </FilterField>
+      </FilterBar>
 
-      {filteredReports.length === 0 ? (
-        <EmptyState
-          title={
-            reports?.length
-              ? 'לא נמצאו דיווחים לפי הסינון הנוכחי'
-              : 'אין דיווחים'
-          }
-        />
-      ) : (
-        <div className="reportsPage__tableWrap">
-          <table className="reportsPage__table">
-            <thead>
-              <tr>
-                <th>תאריך</th>
-                <th>מס׳ דיווח</th>
-                <th>פרויקט</th>
-                <th>לקוח</th>
-                <th>מדווח</th>
-                <th>סטטוס</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredReports.map((r) => (
-                <tr
-                  key={r.reportId}
-                  className="reportsPage__row"
-                  onClick={() => setSelectedReportId(r.reportId)}
-                >
-                  <td>{formatReportDate(r.reportDate) || '—'}</td>
-                  <td>#{r.reportId}</td>
-                  <td>{r.projectTitle ?? '—'}</td>
-                  <td>{r.customerName ?? '—'}</td>
-                  <td>{r.reportedByName ?? '—'}</td>
-                  <td>
-                    <Badge variant={r.status === 'הוגש' ? 'primary' : 'neutral'}>
-                      {r.status ?? '—'}
-                    </Badge>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable
+        columns={reportColumns}
+        rows={filteredReports}
+        getRowId={(r) => r.reportId}
+        onRowClick={(r) => setSelectedReportId(r.reportId)}
+        selectedRowId={selectedReportId}
+        emptyTitle={reports?.length ? 'לא נמצאו דיווחים לפי הסינון הנוכחי' : 'אין דיווחים'}
+      />
 
       <Modal
         isOpen={isCreateOpen}
@@ -651,39 +616,33 @@ export function ReportsPage() {
               />
 
               {form.reportType === 'project' ? (
-                <label className="reportsPage__field">
-                  <span>פרויקט</span>
-                  <select
-                    className="reportsPage__select"
-                    value={form.projectId}
-                    onChange={(event) => handleProjectChange(event.target.value)}
-                    required
-                  >
-                    <option value="">בחר פרויקט</option>
-                    {projects.map((project) => (
-                      <option key={project.workItemId} value={project.workItemId}>
-                        {project.title}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <Select
+                  label="פרויקט"
+                  value={form.projectId}
+                  onChange={(event) => handleProjectChange(event.target.value)}
+                  required
+                >
+                  <option value="">בחר פרויקט</option>
+                  {projects.map((project) => (
+                    <option key={project.workItemId} value={project.workItemId}>
+                      {project.title}
+                    </option>
+                  ))}
+                </Select>
               ) : (
-                <label className="reportsPage__field">
-                  <span>קריאת שירות</span>
-                  <select
-                    className="reportsPage__select"
-                    value={form.serviceCallId}
-                    onChange={(event) => handleServiceCallChange(event.target.value)}
-                    required
-                  >
-                    <option value="">בחר קריאת שירות</option>
-                    {serviceCalls.map((serviceCall) => (
-                      <option key={serviceCall.workItemId} value={serviceCall.workItemId}>
-                        {serviceCall.title}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <Select
+                  label="קריאת שירות"
+                  value={form.serviceCallId}
+                  onChange={(event) => handleServiceCallChange(event.target.value)}
+                  required
+                >
+                  <option value="">בחר קריאת שירות</option>
+                  {serviceCalls.map((serviceCall) => (
+                    <option key={serviceCall.workItemId} value={serviceCall.workItemId}>
+                      {serviceCall.title}
+                    </option>
+                  ))}
+                </Select>
               )}
 
               <Input
@@ -710,62 +669,53 @@ export function ReportsPage() {
                 onChange={(event) => updateForm({ end: event.target.value })}
                 required
               />
-              <label className="reportsPage__field">
-                <span>מדווח</span>
-                <select
-                  className="reportsPage__select"
-                  value={form.reporterId}
-                  onChange={(event) => {
-                    const employee = employees.find(
-                      (row) => String(row.employeeId) === event.target.value,
-                    );
-                    updateForm({
-                      reporterId: event.target.value,
-                      role: employee?.primaryRole || form.role,
-                    });
-                  }}
-                  required
-                >
-                  <option value="">בחר מדווח</option>
-                  {employees
-                    .filter((employee) => employee.isActive !== false)
-                    .map((employee) => (
-                      <option key={employee.employeeId} value={employee.employeeId}>
-                        {employee.fullName}
-                      </option>
-                    ))}
-                </select>
-              </label>
-              <label className="reportsPage__field">
-                <span>תפקיד</span>
-                <select
-                  className="reportsPage__select"
-                  value={form.role}
-                  onChange={(event) => updateForm({ role: event.target.value })}
-                >
-                  <option value="">בחר תפקיד</option>
-                  {ROLE_OPTIONS.map((opt) => (
-                    <option key={opt} value={opt}>
-                      {opt}
+              <Select
+                label="מדווח"
+                value={form.reporterId}
+                onChange={(event) => {
+                  const employee = employees.find(
+                    (row) => String(row.employeeId) === event.target.value,
+                  );
+                  updateForm({
+                    reporterId: event.target.value,
+                    role: employee?.primaryRole || form.role,
+                  });
+                }}
+                required
+              >
+                <option value="">בחר מדווח</option>
+                {employees
+                  .filter((employee) => employee.isActive !== false)
+                  .map((employee) => (
+                    <option key={employee.employeeId} value={employee.employeeId}>
+                      {employee.fullName}
                     </option>
                   ))}
-                </select>
-              </label>
+              </Select>
+              <Select
+                label="תפקיד"
+                value={form.role}
+                onChange={(event) => updateForm({ role: event.target.value })}
+              >
+                <option value="">בחר תפקיד</option>
+                {ROLE_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))}
+              </Select>
             </div>
           </section>
 
           <section className="reportsPage__formSection">
             <h3>סיכום עבודה</h3>
-            <label className="reportsPage__field">
-              <span>סיכום</span>
-              <textarea
-                className="reportsPage__textarea"
-                rows={4}
-                value={form.summary}
-                onChange={(event) => updateForm({ summary: event.target.value })}
-                required
-              />
-            </label>
+            <Textarea
+              label="סיכום"
+              rows={4}
+              value={form.summary}
+              onChange={(event) => updateForm({ summary: event.target.value })}
+              required
+            />
           </section>
 
           <section className="reportsPage__formSection">
@@ -789,8 +739,8 @@ export function ReportsPage() {
           <section className="reportsPage__formSection">
             <h3>עובדים קשורים</h3>
             <div className="reportsPage__workerAdd">
-              <select
-                className="reportsPage__select reportsPage__workerSelect"
+              <Select
+                className="reportsPage__workerSelect"
                 value={workerToAddId}
                 onChange={(e) => setWorkerToAddId(e.target.value)}
                 aria-label="בחר עובד להוספה"
@@ -803,7 +753,7 @@ export function ReportsPage() {
                       {e.fullName}
                     </option>
                   ))}
-              </select>
+              </Select>
               <Button
                 type="button"
                 variant="secondary"
@@ -834,23 +784,17 @@ export function ReportsPage() {
 
           <section className="reportsPage__formSection">
             <h3>הערות</h3>
-            <label className="reportsPage__field">
-              <span>הערות נוספות</span>
-              <textarea
-                className="reportsPage__textarea"
-                rows={3}
-                value={form.notes}
-                onChange={(event) => updateForm({ notes: event.target.value })}
-              />
-            </label>
-            <label className="reportsPage__checkbox">
-              <input
-                type="checkbox"
-                checked={form.followup}
-                onChange={(event) => updateForm({ followup: event.target.checked })}
-              />
-              <span>דורש ביקור חוזר</span>
-            </label>
+            <Textarea
+              label="הערות נוספות"
+              rows={3}
+              value={form.notes}
+              onChange={(event) => updateForm({ notes: event.target.value })}
+            />
+            <Checkbox
+              label="דורש ביקור חוזר"
+              checked={form.followup}
+              onChange={(event) => updateForm({ followup: event.target.checked })}
+            />
             {form.followup && (
               <Input
                 label="סיבת ביקור חוזר"
@@ -861,14 +805,10 @@ export function ReportsPage() {
           </section>
 
           <div className="reportsPage__formFooter">
-            {formError && <p className="reportsPage__error">{formError}</p>}
+            {formError && <InlineAlert variant="danger">{formError}</InlineAlert>}
             <div className="reportsPage__actions">
-              <Button type="submit" disabled={saveReport.isPending}>
-                {saveReport.isPending
-                  ? 'שומר...'
-                  : formMode === 'edit'
-                    ? 'שמור שינויים'
-                    : 'שלח דיווח'}
+              <Button type="submit" isLoading={saveReport.isPending}>
+                {formMode === 'edit' ? 'שמור שינויים' : 'שלח דיווח'}
               </Button>
               <Button
                 type="button"

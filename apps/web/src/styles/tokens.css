@@ -46,6 +46,24 @@
   --color-neutral-800: #1f2937;
   --color-neutral-900: #111827;
 
+  --color-success-800: #166534;
+  --color-warning-700: #b45309;
+  --color-danger-700: #b91c1c;
+
+  /* Surfaces: use these instead of bare #fff / neutral-50 so every card,
+     control, and panel shares one background vocabulary. */
+  --color-surface: #fff;
+  --color-surface-muted: var(--color-neutral-50);
+
+  /* Form controls: one height + border + focus ring across every input,
+     select, and textarea so comparable fields line up. */
+  --control-height-sm: 36px;
+  --control-height-md: 40px;
+  --control-padding-x: var(--spacing-md);
+  --border-control: 1px solid var(--color-neutral-300);
+  --focus-ring-width: 3px;
+  --focus-ring: 0 0 0 var(--focus-ring-width) var(--color-primary-100);
+
   /* Spacing */
   --spacing-xs: 0.25rem;   /* 4px */
   --spacing-sm: 0.5rem;    /* 8px */
@@ -88,6 +106,8 @@
   --shadow-md: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
   --shadow-lg: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
   --shadow-xl: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+  /* Elevated content cards (KPIs, dashboard/work-plan surfaces). */
+  --shadow-card: 0 6px 18px rgba(15, 23, 42, 0.04);
 
   /* Transitions */
   --transition-fast: 150ms ease-in-out;
@@ -98,4 +118,13 @@
   --sidebar-width: 280px;
   --topbar-height: 96px;
   --content-max-width: 1400px;
+
+  /* Standard breakpoints (reference values for @media queries; CSS custom
+     properties cannot be used inside media conditions, so these document the
+     canonical set every component should target):
+       phone   max-width: 640px
+       tablet  max-width: 768px
+       laptop  max-width: 1024px
+       desktop min-width: 1440px
+     Avoid stray values like 720 / 760 / 1100 — snap to the nearest above. */
 }

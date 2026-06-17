@@ -4,6 +4,7 @@ import { Tabs } from '@shared/components/Tabs';
 import type { TabItem } from '@shared/components/Tabs';
 import { Button } from '@shared/components/Button';
 import { ErrorState } from '@shared/components/ErrorState';
+import { InlineAlert } from '@shared/components/InlineAlert';
 import { PageSpinner } from '@shared/components/PageSpinner';
 import {
   useAssignProjectTeam,
@@ -541,7 +542,7 @@ export function ProjectDrawer({
             {!isCreateMode && lifecycle?.summary && (
               <ProjectSummaryCard summary={lifecycle.summary} />
             )}
-            {saveError && <div className="projectDrawer__error">{saveError}</div>}
+            {saveError && <InlineAlert variant="danger">{saveError}</InlineAlert>}
             <ProjectOverviewTab
               lifecycle={lifecycle}
               form={overviewForm}

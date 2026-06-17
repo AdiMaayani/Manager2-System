@@ -1,6 +1,8 @@
 import { useState, type FormEvent } from 'react';
 import { Button } from '@shared/components/Button';
 import { Input } from '@shared/components/Input';
+import { Textarea } from '@shared/components/Textarea';
+import { InlineAlert } from '@shared/components/InlineAlert';
 import type { CompanySettings, UpdateCompanySettingsRequest } from '../../types';
 import './CompanySettingsForm.css';
 
@@ -125,7 +127,7 @@ export function CompanySettingsForm({
     <form className="companySettingsForm" onSubmit={handleSubmit}>
       <div className="companySettingsForm__grid">
         <Input
-          label="שם חברה *"
+          label="שם חברה"
           value={form.companyName}
           onChange={(event) => setField('companyName', event.target.value)}
           disabled={!isAdmin || isSaving}
@@ -167,16 +169,13 @@ export function CompanySettingsForm({
         />
       </div>
 
-      <div className="companySettingsForm__field">
-        <label className="companySettingsForm__label">כתובת</label>
-        <textarea
-          className="companySettingsForm__textarea"
-          rows={3}
-          value={form.address}
-          onChange={(event) => setField('address', event.target.value)}
-          disabled={!isAdmin || isSaving}
-        />
-      </div>
+      <Textarea
+        label="כתובת"
+        rows={3}
+        value={form.address}
+        onChange={(event) => setField('address', event.target.value)}
+        disabled={!isAdmin || isSaving}
+      />
 
       <div className="companySettingsForm__meta">
         עודכן לאחרונה: {formatUpdatedAt(companySettings.updatedAt)}
@@ -188,13 +187,13 @@ export function CompanySettingsForm({
         </p>
       )}
 
-      {error && <p className="companySettingsForm__error">{error}</p>}
-      {successMessage && <p className="companySettingsForm__success">{successMessage}</p>}
+      {error && <InlineAlert variant="danger">{error}</InlineAlert>}
+      {successMessage && <InlineAlert variant="success">{successMessage}</InlineAlert>}
 
       {isAdmin && (
         <div className="companySettingsForm__actions">
-          <Button type="submit" disabled={isSaving}>
-            {isSaving ? 'שומר...' : 'שמור פרטי חברה'}
+          <Button type="submit" isLoading={isSaving}>
+            שמור פרטי חברה
           </Button>
         </div>
       )}

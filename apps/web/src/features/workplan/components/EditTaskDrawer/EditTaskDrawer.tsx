@@ -4,6 +4,10 @@ import { Drawer } from '@shared/components/Drawer';
 import { Button } from '@shared/components/Button';
 import { ErrorState } from '@shared/components/ErrorState';
 import { Input } from '@shared/components/Input';
+import { Select } from '@shared/components/Select';
+import { Textarea } from '@shared/components/Textarea';
+import { InlineAlert } from '@shared/components/InlineAlert';
+import { ConfirmInline } from '@shared/components/ConfirmInline';
 import { isLocalDataMode } from '@/config/appConfig';
 import {
   cancelWorkPlanTaskAsync,
@@ -184,7 +188,6 @@ function EditTaskForm({ taskId, initialValues, workItem, onClose, onSaved }: Edi
   );
   const [requiredRole, setRequiredRole] = useState(initialValues.requiredRole || '');
   const [error, setError] = useState<string | null>(null);
-  const [confirmCancelTask, setConfirmCancelTask] = useState(false);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -269,15 +272,12 @@ function EditTaskForm({ taskId, initialValues, workItem, onClose, onSaved }: Edi
             required
           />
 
-          <label className="editTaskDrawer__field">
-            <span>תיאור</span>
-            <textarea
-              className="editTaskDrawer__textarea"
-              value={description}
-              onChange={(event) => setDescription(event.target.value)}
-              rows={3}
-            />
-          </label>
+          <Textarea
+            label="תיאור"
+            value={description}
+            onChange={(event) => setDescription(event.target.value)}
+            rows={3}
+          />
         </section>
 
         <section className="editTaskDrawer__section">
@@ -315,58 +315,49 @@ function EditTaskForm({ taskId, initialValues, workItem, onClose, onSaved }: Edi
         <section className="editTaskDrawer__section">
           <h3 className="editTaskDrawer__sectionTitle">סיווג</h3>
           <div className="editTaskDrawer__grid">
-            <label className="editTaskDrawer__field">
-              <span>סטטוס</span>
-              <select
-                className="editTaskDrawer__select"
-                value={status}
-                onChange={(event) => setStatus(event.target.value)}
-              >
-                {WORKPLAN_STATUS_OPTIONS.map((option) => (
-                  <option key={option.code} value={option.code}>
-                    {option.display}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="editTaskDrawer__field">
-              <span>דחיפות</span>
-              <select
-                className="editTaskDrawer__select"
-                value={priority}
-                onChange={(event) => setPriority(event.target.value)}
-              >
-                {WORKPLAN_PRIORITY_OPTIONS.map((option) => (
-                  <option key={option.code} value={option.code}>
-                    {option.display}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label className="editTaskDrawer__field">
-              <span>תפקיד נדרש</span>
-              <select
-                className="editTaskDrawer__select"
-                value={requiredRole}
-                onChange={(event) => setRequiredRole(event.target.value)}
-              >
-                <option value="">בחר תפקיד</option>
-                {ROLE_OPTIONS.map((option) => (
-                  <option key={option} value={option}>
-                    {option}
-                  </option>
-                ))}
-              </select>
-            </label>
+            <Select
+              label="סטטוס"
+              value={status}
+              onChange={(event) => setStatus(event.target.value)}
+            >
+              {WORKPLAN_STATUS_OPTIONS.map((option) => (
+                <option key={option.code} value={option.code}>
+                  {option.display}
+                </option>
+              ))}
+            </Select>
+            <Select
+              label="דחיפות"
+              value={priority}
+              onChange={(event) => setPriority(event.target.value)}
+            >
+              {WORKPLAN_PRIORITY_OPTIONS.map((option) => (
+                <option key={option.code} value={option.code}>
+                  {option.display}
+                </option>
+              ))}
+            </Select>
+            <Select
+              label="תפקיד נדרש"
+              value={requiredRole}
+              onChange={(event) => setRequiredRole(event.target.value)}
+            >
+              <option value="">בחר תפקיד</option>
+              {ROLE_OPTIONS.map((option) => (
+                <option key={option} value={option}>
+                  {option}
+                </option>
+              ))}
+            </Select>
           </div>
         </section>
       </div>
 
       <div className="editTaskDrawer__footer">
-        {error && <p className="editTaskDrawer__error">{error}</p>}
+        {error && <InlineAlert variant="danger">{error}</InlineAlert>}
         <div className="editTaskDrawer__actions">
-          <Button type="submit" disabled={isBusy || !workItem}>
-            {saveMutation.isPending ? 'שומר...' : 'שמור'}
+          <Button type="submit" isLoading={saveMutation.isPending} disabled={isBusy || !workItem}>
+            שמור
           </Button>
           <Button type="button" variant="secondary" onClick={onClose} disabled={isBusy}>
             בטל שינויים
@@ -375,36 +366,13 @@ function EditTaskForm({ taskId, initialValues, workItem, onClose, onSaved }: Edi
           {/* Locked tasks keep the existing lock rule: no destructive action. */}
           {workItem && !workItem.isLocked && (
             <div className="editTaskDrawer__dangerActions">
-              {confirmCancelTask ? (
-                <>
-                  <span className="editTaskDrawer__confirmText">לבטל את המשימה?</span>
-                  <Button
-                    type="button"
-                    variant="danger"
-                    onClick={() => cancelTaskMutation.mutate()}
-                    disabled={isBusy}
-                  >
-                    {cancelTaskMutation.isPending ? 'מבטל...' : 'אישור ביטול'}
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => setConfirmCancelTask(false)}
-                    disabled={isBusy}
-                  >
-                    חזור
-                  </Button>
-                </>
-              ) : (
-                <Button
-                  type="button"
-                  variant="danger"
-                  onClick={() => setConfirmCancelTask(true)}
-                  disabled={isBusy}
-                >
-                  בטל משימה
-                </Button>
-              )}
+              <ConfirmInline
+                triggerLabel="בטל משימה"
+                message="לבטל את המשימה?"
+                confirmLabel="אישור ביטול"
+                onConfirm={() => cancelTaskMutation.mutate()}
+                isPending={isBusy}
+              />
             </div>
           )}
         </div>

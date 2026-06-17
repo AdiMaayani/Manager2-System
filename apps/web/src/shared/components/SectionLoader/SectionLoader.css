@@ -1,0 +1,9 @@
+.sectionLoader {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-lg);
+  color: var(--color-neutral-500);
+  font-size: var(--font-size-sm);
+}

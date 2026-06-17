@@ -1,4 +1,7 @@
 import { useState, type FormEvent } from 'react';
+import { Button } from '@shared/components/Button';
+import { Input } from '@shared/components/Input';
+import { InlineAlert } from '@shared/components/InlineAlert';
 import type { LoginFormValues } from '../../types';
 import './LoginForm.css';
 
@@ -19,49 +22,37 @@ export function LoginForm({ isSubmitting, error, onSubmit }: LoginFormProps) {
 
   return (
     <form className="loginForm" onSubmit={handleSubmit} noValidate>
-      {error && (
-        <div className="loginForm__error" role="alert">
-          {error}
-        </div>
-      )}
+      {error && <InlineAlert variant="danger">{error}</InlineAlert>}
 
-      <div className="loginForm__field">
-        <input
-          className="loginForm__input"
-          type="email"
-          id="email"
-          name="email"
-          placeholder="אימייל"
-          autoComplete="username"
-          required
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          disabled={isSubmitting}
-        />
-      </div>
-
-      <div className="loginForm__field">
-        <input
-          className="loginForm__input"
-          type="password"
-          id="password"
-          name="password"
-          placeholder="סיסמה"
-          autoComplete="current-password"
-          required
-          value={password}
-          onChange={(e) => setPassword(e.target.value)}
-          disabled={isSubmitting}
-        />
-      </div>
-
-      <button
-        className="loginForm__submit"
-        type="submit"
+      <Input
+        type="email"
+        id="email"
+        name="email"
+        label="אימייל"
+        placeholder="אימייל"
+        autoComplete="username"
+        required
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
         disabled={isSubmitting}
-      >
-        {isSubmitting ? 'מתחבר...' : 'התחבר'}
-      </button>
+      />
+
+      <Input
+        type="password"
+        id="password"
+        name="password"
+        label="סיסמה"
+        placeholder="סיסמה"
+        autoComplete="current-password"
+        required
+        value={password}
+        onChange={(e) => setPassword(e.target.value)}
+        disabled={isSubmitting}
+      />
+
+      <Button type="submit" className="loginForm__submit" isLoading={isSubmitting}>
+        התחבר
+      </Button>
     </form>
   );
 }

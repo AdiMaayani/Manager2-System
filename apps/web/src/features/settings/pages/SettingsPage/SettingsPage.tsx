@@ -4,6 +4,7 @@ import { ErrorState } from '@shared/components/ErrorState';
 import { EmptyState } from '@shared/components/EmptyState';
 import { ComingSoonPanel } from '@shared/components/ComingSoonPanel';
 import { Badge } from '@shared/components/Badge';
+import { InlineAlert } from '@shared/components/InlineAlert';
 import { getCurrentUser, getRoleDisplayLabel } from '@api/auth';
 import { apiBaseUrl, appDataMode, appEnvironment, isMockDataMode } from '@/config/appConfig';
 import {
@@ -15,7 +16,8 @@ import {
   MILESTONE_STATUS_OPTIONS,
   PROJECT_STATUS_OPTIONS,
 } from '@features/projects/utils/projectDisplayUtils';
-import { Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { Button } from '@shared/components/Button';
 import { CompanySettingsForm } from '../../components/CompanySettingsForm';
 import { SettingsSection } from '../../components/SettingsSection';
 import { useCompanySettings, useUpdateCompanySettings } from '../../hooks/useCompanySettings';
@@ -37,6 +39,7 @@ function renderValue(value?: string | number | null) {
 }
 
 export function SettingsPage() {
+  const navigate = useNavigate();
   const currentUser = getCurrentUser();
   const isAdmin = currentUser?.roles.includes('Admin') ?? false;
   const companySettingsQuery = useCompanySettings();
@@ -133,9 +136,9 @@ export function SettingsPage() {
                   <strong>יש לך הרשאת Admin.</strong>
                   <p>ניתן לנהל משתמשים, שיוך תפקידים ושיוך מחלקות במסך הייעודי.</p>
                 </div>
-                <Link className="settingsPage__linkButton" to="/users">
+                <Button variant="primary" onClick={() => navigate('/users')}>
                   פתח ניהול משתמשים
-                </Link>
+                </Button>
               </>
             ) : (
               <p className="settingsPage__note">
@@ -280,17 +283,17 @@ export function SettingsPage() {
         >
           <div className="settingsPage__warningList">
             {isMockDataMode && (
-              <div className="settingsPage__warning settingsPage__warning--danger">
+              <InlineAlert variant="danger">
                 מצב mock פעיל. זה מתאים לעבודת UI מקומית בלבד ואינו מוכן לפרודקשן.
-              </div>
+              </InlineAlert>
             )}
-            <div className="settingsPage__warning">
+            <InlineAlert variant="info">
               חיבור API, מחרוזת חיבור למסד נתונים ומפתח JWT מוגדרים לפי סביבת הרצה ולא מתוך מסך זה.
-            </div>
+            </InlineAlert>
             {!companySettingsQuery.data && (
-              <div className="settingsPage__warning">
+              <InlineAlert variant="warning">
                 פרטי חברה דורשים הרצת migration במסד הנתונים לפני טעינה ושמירה.
-              </div>
+              </InlineAlert>
             )}
           </div>
         </SettingsSection>

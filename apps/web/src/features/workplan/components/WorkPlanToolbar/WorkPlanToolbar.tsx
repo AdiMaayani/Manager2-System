@@ -2,13 +2,16 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
-  PlusCircle,
+  Plus,
   Printer,
   Search,
   Upload,
   X,
 } from 'lucide-react';
 import { Button } from '@shared/components/Button';
+import { IconButton } from '@shared/components/IconButton';
+import { Select } from '@shared/components/Select';
+import { SegmentedControl, type SegmentItem } from '@shared/components/SegmentedControl';
 import { RANGE_LABELS, SCOPE_LABELS, STATUS_FILTER_OPTIONS } from '../../constants';
 import type { WorkPlanProjectFilter, WorkPlanRange, WorkPlanScope } from '../../types';
 import './WorkPlanToolbar.css';
@@ -42,8 +45,13 @@ interface WorkPlanToolbarProps {
   canCreateTask: boolean;
 }
 
-const SCOPES: WorkPlanScope[] = ['company', 'personal', 'employee', 'project'];
-const RANGES: WorkPlanRange[] = ['daily', 'weekly', 'monthly', 'yearly'];
+const SCOPE_ITEMS: SegmentItem<WorkPlanScope>[] = (
+  ['company', 'personal', 'employee', 'project'] as WorkPlanScope[]
+).map((id) => ({ id, label: SCOPE_LABELS[id] }));
+
+const RANGE_ITEMS: SegmentItem<WorkPlanRange>[] = (
+  ['daily', 'weekly', 'monthly', 'yearly'] as WorkPlanRange[]
+).map((id) => ({ id, label: RANGE_LABELS[id] }));
 
 const LEGEND_ITEMS: Array<{ modifier: string; label: string }> = [
   { modifier: 'normal', label: 'משימת פרויקט' },
@@ -85,24 +93,15 @@ export function WorkPlanToolbar({
           <div className="workPlanToolbar__group">
             <span className="workPlanToolbar__groupLabel">חתך</span>
             <div className="workPlanToolbar__scopeRow">
-              <div className="workPlanToolbar__segment" role="tablist" aria-label="היקף תצוגה">
-                {SCOPES.map((item) => (
-                  <button
-                    key={item}
-                    type="button"
-                    role="tab"
-                    aria-selected={scope === item}
-                    className={`workPlanToolbar__segBtn ${scope === item ? 'workPlanToolbar__segBtn--active' : ''}`}
-                    onClick={() => onScopeChange(item)}
-                  >
-                    {SCOPE_LABELS[item]}
-                  </button>
-                ))}
-              </div>
+              <SegmentedControl
+                items={SCOPE_ITEMS}
+                value={scope}
+                onChange={onScopeChange}
+                ariaLabel="היקף תצוגה"
+              />
 
               {scope === 'employee' && (
-                <select
-                  className="workPlanToolbar__select"
+                <Select
                   value={employeeFilterId}
                   onChange={(e) => onEmployeeFilterChange(e.target.value)}
                   aria-label="בחירת עובד"
@@ -113,12 +112,11 @@ export function WorkPlanToolbar({
                       {employee.fullName}
                     </option>
                   ))}
-                </select>
+                </Select>
               )}
 
               {isProjectScope && (
-                <select
-                  className="workPlanToolbar__select"
+                <Select
                   value={projectFilter === 'all' ? 'all' : String(projectFilter)}
                   onChange={(e) => {
                     const value = e.target.value;
@@ -132,34 +130,25 @@ export function WorkPlanToolbar({
                       {project.title}
                     </option>
                   ))}
-                </select>
+                </Select>
               )}
             </div>
           </div>
 
           <div className="workPlanToolbar__group">
             <span className="workPlanToolbar__groupLabel">תצוגה</span>
-            <div className="workPlanToolbar__segment" role="tablist" aria-label="טווח תצוגה">
-              {RANGES.map((item) => (
-                <button
-                  key={item}
-                  type="button"
-                  role="tab"
-                  aria-selected={range === item}
-                  className={`workPlanToolbar__segBtn ${range === item ? 'workPlanToolbar__segBtn--active' : ''}`}
-                  onClick={() => onRangeChange(item)}
-                >
-                  {RANGE_LABELS[item]}
-                </button>
-              ))}
-            </div>
+            <SegmentedControl
+              items={RANGE_ITEMS}
+              value={range}
+              onChange={onRangeChange}
+              ariaLabel="טווח תצוגה"
+            />
           </div>
 
           {isProjectScope && (
             <div className="workPlanToolbar__group">
               <span className="workPlanToolbar__groupLabel">סטטוס</span>
-              <select
-                className="workPlanToolbar__select"
+              <Select
                 value={statusFilter}
                 onChange={(e) => onStatusFilterChange(e.target.value)}
                 aria-label="סינון לפי סטטוס"
@@ -169,73 +158,62 @@ export function WorkPlanToolbar({
                     {option.label}
                   </option>
                 ))}
-              </select>
+              </Select>
             </div>
           )}
         </div>
 
         <div className="workPlanToolbar__actions">
           {canCreateTask && (
-            <Button type="button" onClick={onNewTask}>
-              <PlusCircle size={18} aria-hidden />
+            <Button type="button" iconStart={<Plus size={18} />} onClick={onNewTask}>
               משימה חדשה
             </Button>
           )}
           <div className="workPlanToolbar__iconActions">
-            <button
-              type="button"
-              className="workPlanToolbar__iconBtn"
+            <IconButton
+              variant="subtle"
               onClick={onPrint}
+              label="הדפסה"
               title="הדפסת התצוגה הנוכחית"
-              aria-label="הדפסה"
-            >
-              <Printer size={18} aria-hidden />
-            </button>
-            <button
-              type="button"
-              className="workPlanToolbar__iconBtn"
+              icon={<Printer size={18} />}
+            />
+            <IconButton
+              variant="subtle"
               disabled
+              label="ייצוא (בקרוב)"
               title="ייצוא נתונים — בקרוב"
-              aria-label="ייצוא (בקרוב)"
-            >
-              <Download size={18} aria-hidden />
-            </button>
-            <button
-              type="button"
-              className="workPlanToolbar__iconBtn"
+              icon={<Download size={18} />}
+            />
+            <IconButton
+              variant="subtle"
               disabled
+              label="ייבוא (בקרוב)"
               title="ייבוא נתונים — בקרוב"
-              aria-label="ייבוא (בקרוב)"
-            >
-              <Upload size={18} aria-hidden />
-            </button>
+              icon={<Upload size={18} />}
+            />
           </div>
         </div>
       </div>
 
       <div className="workPlanToolbar__tools">
         <div className="workPlanToolbar__nav" role="group" aria-label="ניווט בין תקופות">
-          <button
-            type="button"
-            className="workPlanToolbar__navBtn"
+          <IconButton
+            variant="subtle"
             onClick={onPreviousPeriod}
-            aria-label="התקופה הקודמת"
+            label="התקופה הקודמת"
             title="הקודם"
-          >
-            <ChevronRight size={18} aria-hidden />
-          </button>
-          <button type="button" className="workPlanToolbar__todayBtn" onClick={onToday}>
+            icon={<ChevronRight size={18} />}
+          />
+          <Button type="button" variant="secondary" size="sm" onClick={onToday}>
             היום
-          </button>
-          <button
-            type="button"
-            className="workPlanToolbar__navBtn"
+          </Button>
+          <IconButton
+            variant="subtle"
             onClick={onNextPeriod}
-            aria-label="התקופה הבאה"
+            label="התקופה הבאה"
             title="הבא"
-          >
-            <ChevronLeft size={18} aria-hidden />
-          </button>
+            icon={<ChevronLeft size={18} />}
+          />
           <span className="workPlanToolbar__periodLabel" aria-live="polite">
             {periodLabel}
           </span>

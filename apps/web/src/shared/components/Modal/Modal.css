@@ -18,7 +18,7 @@
   position: relative;
   display: flex;
   flex-direction: column;
-  background: #fff;
+  background: var(--color-surface);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-xl);
   max-width: 720px;
@@ -54,37 +54,6 @@
   display: flex;
   align-items: center;
   gap: var(--spacing-xs);
-}
-
-.modal__maximize {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 32px;
-  height: 32px;
-  font-size: 1.1rem;
-  line-height: 1;
-  color: var(--color-neutral-500);
-  background: transparent;
-  border: 1px solid transparent;
-  border-radius: var(--radius-md);
-  cursor: pointer;
-  transition: background var(--transition-fast), color var(--transition-fast);
-}
-
-.modal__maximize:hover {
-  background: var(--color-neutral-100);
-  color: var(--color-neutral-900);
-}
-
-.modal__close {
-  font-size: 1.5rem;
-  line-height: 1;
-  color: var(--color-neutral-500);
-}
-
-.modal__close:hover {
-  color: var(--color-neutral-900);
 }
 
 .modal__body {

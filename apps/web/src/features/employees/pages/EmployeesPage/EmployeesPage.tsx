@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { Plus } from 'lucide-react';
 import { PageShell } from '@shared/components/PageShell';
 import { PageSpinner } from '@shared/components/PageSpinner';
 import { ErrorState } from '@shared/components/ErrorState';
-import { EmptyState } from '@shared/components/EmptyState';
 import { Badge } from '@shared/components/Badge';
-import { FilterBar } from '@shared/components/FilterBar';
+import { FilterBar, FilterField } from '@shared/components/FilterBar';
 import { Input } from '@shared/components/Input';
 import { Button } from '@shared/components/Button';
+import { InlineAlert } from '@shared/components/InlineAlert';
+import { DataTable, type DataTableColumn } from '@shared/components/DataTable';
 import { getCurrentUser } from '@api/auth';
 import { EmployeeDrawer } from '../../components/EmployeeDrawer';
 import { useEmployees } from '../../hooks/useEmployees';
@@ -62,6 +64,36 @@ export function EmployeesPage() {
     setDrawerEmployee(employee);
   };
 
+  const columns: DataTableColumn<Employee>[] = [
+    { id: 'name', header: 'שם', cell: (employee) => employee.fullName },
+    { id: 'role', header: 'תפקיד', cell: (employee) => employee.primaryRole || '—' },
+    { id: 'phone', header: 'טלפון', cell: (employee) => employee.phone ?? '—' },
+    { id: 'email', header: 'אימייל', cell: (employee) => employee.email ?? '—' },
+    {
+      id: 'capacity',
+      header: 'קיבולת יומית',
+      cell: (employee) => employee.dailyCapacityHours ?? '—',
+    },
+    {
+      id: 'assignable',
+      header: 'ניתן לשיבוץ',
+      cell: (employee) => (
+        <Badge variant={employee.isAssignable ? 'success' : 'neutral'}>
+          {employee.isAssignable ? 'כן' : 'לא'}
+        </Badge>
+      ),
+    },
+    {
+      id: 'status',
+      header: 'סטטוס',
+      cell: (employee) => (
+        <Badge variant={employee.isActive ? 'success' : 'neutral'}>
+          {employee.isActive ? 'פעיל' : 'לא פעיל'}
+        </Badge>
+      ),
+    },
+  ];
+
   if (isLoading) return <PageShell title="עובדים"><PageSpinner /></PageShell>;
   if (error) {
     return (
@@ -76,84 +108,42 @@ export function EmployeesPage() {
       <FilterBar
         actions={
           canManageEmployees ? (
-            <Button onClick={() => setDrawerEmployee(null)}>+ עובד חדש</Button>
+            <Button iconStart={<Plus size={18} />} onClick={() => setDrawerEmployee(null)}>
+              עובד חדש
+            </Button>
           ) : undefined
         }
       >
-        <div className="employeesPage__filter employeesPage__filter--search">
-          <span className="employeesPage__filterLabel">חיפוש</span>
+        <FilterField label="חיפוש" grow>
           <Input
             placeholder="חיפוש עובד..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-        </div>
+        </FilterField>
       </FilterBar>
 
       {!canManageEmployees && (
-        <p className="employeesPage__readonlyNote">
+        <InlineAlert variant="info">
           ניהול עובדים זמין למנהלים בלבד. הרשימה מוצגת לקריאה בלבד.
-        </p>
+        </InlineAlert>
       )}
 
-      {pageMessage && <p className="employeesPage__success">{pageMessage}</p>}
-
-      {filtered.length === 0 ? (
-        <EmptyState title="לא נמצאו עובדים" />
-      ) : (
-        <div className="employeesPage__tableWrap">
-          <table className="employeesPage__table">
-            <thead>
-              <tr>
-                <th>שם</th>
-                <th>תפקיד</th>
-                <th>טלפון</th>
-                <th>אימייל</th>
-                <th>קיבולת יומית</th>
-                <th>ניתן לשיבוץ</th>
-                <th>סטטוס</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((employee) => (
-                <tr
-                  key={employee.employeeId}
-                  role="button"
-                  tabIndex={0}
-                  className={`employeesPage__row ${
-                    selectedEmployeeId === employee.employeeId
-                      ? 'employeesPage__row--selected'
-                      : ''
-                  }`.trim()}
-                  onClick={() => openEmployee(employee)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault();
-                      openEmployee(employee);
-                    }
-                  }}
-                >
-                  <td>{employee.fullName}</td>
-                  <td>{employee.primaryRole || '—'}</td>
-                  <td>{employee.phone ?? '—'}</td>
-                  <td>{employee.email ?? '—'}</td>
-                  <td>{employee.dailyCapacityHours ?? '—'}</td>
-                  <td>
-                    <Badge variant={employee.isAssignable ? 'success' : 'neutral'}>
-                      {employee.isAssignable ? 'כן' : 'לא'}
-                    </Badge>
-                  </td>
-                  <td>
-                    <Badge variant={employee.isActive ? 'success' : 'neutral'}>
-                      {employee.isActive ? 'פעיל' : 'לא פעיל'}
-                    </Badge>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
+      {pageMessage && (
+        <InlineAlert variant="success" onDismiss={() => setPageMessage(null)}>
+          {pageMessage}
+        </InlineAlert>
       )}
+
+      <DataTable
+        columns={columns}
+        rows={filtered}
+        getRowId={(employee) => employee.employeeId}
+        onRowClick={openEmployee}
+        selectedRowId={selectedEmployeeId}
+        emptyTitle="לא נמצאו עובדים"
+        emptyDescription="התאימו את החיפוש או הוסיפו עובד חדש."
+      />
 
       <EmployeeDrawer
         isOpen={isDrawerOpen}

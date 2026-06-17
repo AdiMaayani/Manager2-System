@@ -1,4 +1,5 @@
 import { Badge } from '@shared/components/Badge';
+import { DataTable, type DataTableColumn } from '@shared/components/DataTable';
 import { QuoteStatusBadge } from '../QuoteStatusBadge';
 import type { QuoteListItem } from '../../types';
 import { formatCurrency, formatDate } from '../../utils/format';
@@ -11,53 +12,42 @@ interface QuotesTableProps {
 }
 
 export function QuotesTable({ quotes, selectedQuoteId, onSelectQuote }: QuotesTableProps) {
+  const columns: DataTableColumn<QuoteListItem>[] = [
+    {
+      id: 'number',
+      header: 'מספר',
+      cell: (quote) => <span className="quotesTable__number">{quote.quoteNumber}</span>,
+    },
+    { id: 'customer', header: 'לקוח', cell: (quote) => quote.customerName ?? '—' },
+    { id: 'project', header: 'פרויקט', cell: (quote) => quote.projectTitle ?? '—' },
+    { id: 'date', header: 'תאריך', cell: (quote) => formatDate(quote.quoteDate) },
+    { id: 'validUntil', header: 'בתוקף עד', cell: (quote) => formatDate(quote.validUntil) },
+    {
+      id: 'status',
+      header: 'סטטוס',
+      cell: (quote) => (
+        <div className="quotesTable__badges">
+          <QuoteStatusBadge status={quote.status} />
+          {!quote.isActive && <Badge variant="neutral">בוטל</Badge>}
+        </div>
+      ),
+    },
+    {
+      id: 'total',
+      header: 'סה״כ',
+      align: 'end',
+      cell: (quote) => <span className="quotesTable__total">{formatCurrency(quote.total)}</span>,
+    },
+  ];
+
   return (
-    <div className="quotesTable__wrap">
-      <table className="quotesTable">
-        <thead>
-          <tr>
-            <th>מספר</th>
-            <th>לקוח</th>
-            <th>פרויקט</th>
-            <th>תאריך</th>
-            <th>בתוקף עד</th>
-            <th>סטטוס</th>
-            <th>סה״כ</th>
-          </tr>
-        </thead>
-        <tbody>
-          {quotes.map((quote) => (
-            <tr
-              key={quote.quoteId}
-              role="button"
-              tabIndex={0}
-              className={`quotesTable__row ${
-                selectedQuoteId === quote.quoteId ? 'quotesTable__row--selected' : ''
-              }`.trim()}
-              onClick={() => onSelectQuote(quote.quoteId)}
-              onKeyDown={(event) => {
-                if (event.key === 'Enter' || event.key === ' ') {
-                  event.preventDefault();
-                  onSelectQuote(quote.quoteId);
-                }
-              }}
-            >
-              <td className="quotesTable__number">{quote.quoteNumber}</td>
-              <td>{quote.customerName ?? '—'}</td>
-              <td>{quote.projectTitle ?? '—'}</td>
-              <td>{formatDate(quote.quoteDate)}</td>
-              <td>{formatDate(quote.validUntil)}</td>
-              <td>
-                <div className="quotesTable__badges">
-                  <QuoteStatusBadge status={quote.status} />
-                  {!quote.isActive && <Badge variant="neutral">בוטל</Badge>}
-                </div>
-              </td>
-              <td className="quotesTable__total">{formatCurrency(quote.total)}</td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+    <DataTable
+      columns={columns}
+      rows={quotes}
+      getRowId={(quote) => quote.quoteId}
+      onRowClick={(quote) => onSelectQuote(quote.quoteId)}
+      selectedRowId={selectedQuoteId ?? null}
+      emptyTitle="לא נמצאו הצעות מחיר"
+    />
   );
 }

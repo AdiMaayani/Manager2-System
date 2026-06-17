@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { Plus } from 'lucide-react';
 import { PageShell } from '@shared/components/PageShell';
 import { PageSpinner } from '@shared/components/PageSpinner';
 import { ErrorState } from '@shared/components/ErrorState';
-import { EmptyState } from '@shared/components/EmptyState';
 import { Button } from '@shared/components/Button';
-import { FilterBar } from '@shared/components/FilterBar';
+import { FilterBar, FilterField } from '@shared/components/FilterBar';
 import { Input } from '@shared/components/Input';
 import { Badge } from '@shared/components/Badge';
+import { SegmentedControl, type SegmentItem } from '@shared/components/SegmentedControl';
+import { DataTable, type DataTableColumn } from '@shared/components/DataTable';
 import { usePermissions } from '@shared/auth/usePermissions';
 import { useContacts } from '../../hooks/useContacts';
 import { ContactDrawer } from '../../components/ContactDrawer';
@@ -17,6 +19,12 @@ import './ContactsPage.css';
 const SEGMENTS = ['הכל', 'לקוחות', 'נציגי לקוחות', 'ספקים', 'קבלנים', 'שותפים עסקיים'];
 const ACTIVE_FILTERS = ['הכל', 'פעילים', 'לא פעילים'] as const;
 type ActiveFilter = (typeof ACTIVE_FILTERS)[number];
+
+const SEGMENT_ITEMS: SegmentItem<string>[] = SEGMENTS.map((s) => ({ id: s, label: s }));
+const ACTIVE_FILTER_ITEMS: SegmentItem<ActiveFilter>[] = ACTIVE_FILTERS.map((f) => ({
+  id: f,
+  label: f,
+}));
 
 function formatContactDate(value?: string | null) {
   if (!value) return '—';
@@ -77,6 +85,24 @@ export function ContactsPage() {
     setDrawerContact(contact);
   };
 
+  const columns: DataTableColumn<Contact>[] = [
+    { id: 'name', header: 'שם', cell: (c) => c.fullName },
+    { id: 'company', header: 'חברה', cell: (c) => c.companyName || '—' },
+    { id: 'category', header: 'קטגוריה', cell: (c) => c.contactCategory },
+    { id: 'phone', header: 'טלפון', cell: (c) => c.phone || '—' },
+    { id: 'email', header: 'מייל', cell: (c) => c.email || '—' },
+    {
+      id: 'status',
+      header: 'סטטוס',
+      cell: (c) => (
+        <Badge variant={c.isActive ? 'success' : 'neutral'}>
+          {c.status ?? (c.isActive ? 'פעיל' : 'לא פעיל')}
+        </Badge>
+      ),
+    },
+    { id: 'updated', header: 'עודכן', cell: (c) => formatContactDate(c.updatedAt) },
+  ];
+
   if (isLoading) return <PageShell title="אנשי קשר"><PageSpinner /></PageShell>;
   if (error) {
     return (
@@ -91,105 +117,50 @@ export function ContactsPage() {
       <FilterBar
         actions={
           can('manageContacts') ? (
-            <Button onClick={() => setDrawerContact(null)}>+ איש קשר חדש</Button>
+            <Button iconStart={<Plus size={18} />} onClick={() => setDrawerContact(null)}>
+              איש קשר חדש
+            </Button>
           ) : undefined
         }
       >
-        <div className="contactsPage__filter contactsPage__filter--search">
-          <span className="contactsPage__filterLabel">חיפוש</span>
+        <FilterField label="חיפוש" grow>
           <Input
             placeholder="חיפוש איש קשר..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
-        </div>
+        </FilterField>
 
-        <div className="contactsPage__filter">
-          <span className="contactsPage__filterLabel">קטגוריה</span>
-          <div className="contactsPage__segments">
-            {SEGMENTS.map((s) => (
-              <button
-                key={s}
-                type="button"
-                className={`contactsPage__chip${segment === s ? ' contactsPage__chip--active' : ''}`}
-                onClick={() => setSegment(s)}
-              >
-                {s}
-              </button>
-            ))}
-          </div>
-        </div>
+        <FilterField label="קטגוריה">
+          <SegmentedControl
+            items={SEGMENT_ITEMS}
+            value={segment}
+            onChange={setSegment}
+            ariaLabel="סינון לפי קטגוריה"
+            size="sm"
+          />
+        </FilterField>
 
-        <div className="contactsPage__filter">
-          <span className="contactsPage__filterLabel">סטטוס</span>
-          <div className="contactsPage__segments">
-            {ACTIVE_FILTERS.map((f) => (
-              <button
-                key={f}
-                type="button"
-                className={`contactsPage__chip${activeFilter === f ? ' contactsPage__chip--active' : ''}`}
-                onClick={() => setActiveFilter(f)}
-              >
-                {f}
-              </button>
-            ))}
-          </div>
-        </div>
+        <FilterField label="סטטוס">
+          <SegmentedControl
+            items={ACTIVE_FILTER_ITEMS}
+            value={activeFilter}
+            onChange={setActiveFilter}
+            ariaLabel="סינון לפי סטטוס"
+            size="sm"
+          />
+        </FilterField>
       </FilterBar>
 
-      {filtered.length === 0 ? (
-        <EmptyState
-          title="לא נמצאו אנשי קשר"
-          description="נסה לשנות סינון או להוסיף איש קשר חדש"
-        />
-      ) : (
-        <div className="contactsPage__tableWrap">
-          <table className="contactsPage__table">
-            <thead>
-              <tr>
-                <th>שם</th>
-                <th>חברה</th>
-                <th>קטגוריה</th>
-                <th>טלפון</th>
-                <th>מייל</th>
-                <th>סטטוס</th>
-                <th>עודכן</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((c) => (
-                <tr
-                  key={c.contactId}
-                  role="button"
-                  tabIndex={0}
-                  className={`contactsPage__row ${
-                    selectedContactId === c.contactId ? 'contactsPage__row--selected' : ''
-                  }`.trim()}
-                  onClick={() => openContact(c)}
-                  onKeyDown={(event) => {
-                    if (event.key === 'Enter' || event.key === ' ') {
-                      event.preventDefault();
-                      openContact(c);
-                    }
-                  }}
-                >
-                  <td>{c.fullName}</td>
-                  <td>{c.companyName || '—'}</td>
-                  <td>{c.contactCategory}</td>
-                  <td>{c.phone || '—'}</td>
-                  <td>{c.email || '—'}</td>
-                  <td>
-                    <Badge variant={c.isActive ? 'success' : 'neutral'}>
-                      {c.status ?? (c.isActive ? 'פעיל' : 'לא פעיל')}
-                    </Badge>
-                  </td>
-                  <td>{formatContactDate(c.updatedAt)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable
+        columns={columns}
+        rows={filtered}
+        getRowId={(c) => c.contactId}
+        onRowClick={openContact}
+        selectedRowId={selectedContactId}
+        emptyTitle="לא נמצאו אנשי קשר"
+        emptyDescription="נסה לשנות סינון או להוסיף איש קשר חדש"
+      />
 
       <ContactDrawer
         isOpen={isDrawerOpen}

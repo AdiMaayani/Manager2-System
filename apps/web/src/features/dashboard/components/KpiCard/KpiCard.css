@@ -4,10 +4,10 @@
   flex-direction: column;
   gap: var(--spacing-sm);
   padding: var(--spacing-lg);
-  background: #fff;
+  background: var(--color-surface);
   border: 1px solid var(--color-neutral-200);
   border-radius: var(--radius-lg);
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+  box-shadow: var(--shadow-card);
   overflow: hidden;
 }
 

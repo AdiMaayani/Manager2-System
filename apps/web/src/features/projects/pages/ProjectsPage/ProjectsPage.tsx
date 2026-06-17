@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { Plus } from 'lucide-react';
 import { PageShell } from '@shared/components/PageShell';
 import { PageSpinner } from '@shared/components/PageSpinner';
 import { ErrorState } from '@shared/components/ErrorState';
-import { EmptyState } from '@shared/components/EmptyState';
 import { Input } from '@shared/components/Input';
+import { Select } from '@shared/components/Select';
 import { Button } from '@shared/components/Button';
-import { Badge } from '@shared/components/Badge';
+import { FilterBar, FilterField } from '@shared/components/FilterBar';
+import { StatusBadge } from '@shared/components/StatusBadge';
+import { DataTable, type DataTableColumn } from '@shared/components/DataTable';
 import { ProjectDrawer } from '../../components/ProjectDrawer';
 import { useProjects } from '../../hooks/useProjects';
 import type { ProjectDrawerMode, ProjectDrawerTabId, ProjectListItem } from '../../types';
@@ -142,6 +145,36 @@ export function ProjectsPage() {
     );
   };
 
+  const hasActiveFilters = Boolean(
+    search || stageFilter || customerFilter || pmFilter || siteFilter,
+  );
+
+  const resetFilters = () => {
+    setSearch('');
+    setStageFilter('');
+    setCustomerFilter('');
+    setPmFilter('');
+    setSiteFilter('');
+    updateSearchParams({ search: null, stage: null, customer: null, pm: null, site: null });
+  };
+
+  const columns: DataTableColumn<ProjectListItem>[] = [
+    { id: 'number', header: 'מספר', width: '110px', cell: (project) => project.projectNumber },
+    { id: 'title', header: 'שם הפרויקט', cell: (project) => project.title },
+    { id: 'customer', header: 'לקוח', cell: (project) => project.customerName },
+    { id: 'pm', header: 'מנהל פרויקט', cell: (project) => project.projectManagerName },
+    {
+      id: 'status',
+      header: 'סטטוס',
+      cell: (project) => <StatusBadge domain="project" status={project.status} />,
+    },
+    {
+      id: 'created',
+      header: 'תאריך פתיחה',
+      cell: (project) => formatProjectDate(project.createdAt),
+    },
+  ];
+
   if (isLoading) {
     return (
       <PageShell title="פרויקטים" wide>
@@ -160,150 +193,104 @@ export function ProjectsPage() {
 
   return (
     <PageShell title="פרויקטים" wide>
-      <div className="projectsPage__toolbar">
-        <div className="projectsPage__filters">
-          <label className="projectsPage__filter projectsPage__filter--search">
-            <span>חיפוש</span>
-            <Input
-              placeholder="חיפוש לפי שם, לקוח או מספר..."
-              value={search}
-              onChange={(event) => {
-                setSearch(event.target.value);
-                updateSearchParams({ search: event.target.value.trim() || null });
-              }}
-            />
-          </label>
-          <label className="projectsPage__filter">
-            <span>שלב</span>
-            <select
-              className="projectsPage__select"
-              value={stageFilter}
-              onChange={(event) => {
-                setStageFilter(event.target.value);
-                updateSearchParams({ stage: event.target.value || null });
-              }}
-            >
-              {STAGE_FILTER_OPTIONS.map((option) => (
-                <option key={option.code || 'all'} value={option.code}>
-                  {option.display}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="projectsPage__filter">
-            <span>לקוח</span>
-            <select
-              className="projectsPage__select"
-              value={customerFilter}
-              onChange={(event) => {
-                setCustomerFilter(event.target.value);
-                updateSearchParams({ customer: event.target.value || null });
-              }}
-            >
-              <option value="">הכל</option>
-              {customerOptions.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="projectsPage__filter">
-            <span>מנהל פרויקט</span>
-            <select
-              className="projectsPage__select"
-              value={pmFilter}
-              onChange={(event) => {
-                setPmFilter(event.target.value);
-                updateSearchParams({ pm: event.target.value || null });
-              }}
-            >
-              <option value="">הכל</option>
-              {pmOptions.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="projectsPage__filter">
-            <span>אתר</span>
-            <select
-              className="projectsPage__select"
-              value={siteFilter}
-              onChange={(event) => {
-                setSiteFilter(event.target.value);
-                updateSearchParams({ site: event.target.value || null });
-              }}
-            >
-              <option value="">הכל</option>
-              {siteOptions.map((name) => (
-                <option key={name} value={name}>
-                  {name}
-                </option>
-              ))}
-            </select>
-          </label>
-        </div>
-        <div className="projectsPage__toolbarActions">
-          <Button type="button" onClick={openCreateProject}>
-            פרויקט חדש
-          </Button>
-        </div>
-      </div>
+      <FilterBar
+        actions={
+          <>
+            {hasActiveFilters && (
+              <Button type="button" variant="ghost" onClick={resetFilters}>
+                נקה סינון
+              </Button>
+            )}
+            <Button type="button" iconStart={<Plus size={18} />} onClick={openCreateProject}>
+              פרויקט חדש
+            </Button>
+          </>
+        }
+      >
+        <FilterField label="חיפוש" grow>
+          <Input
+            placeholder="חיפוש לפי שם, לקוח או מספר..."
+            value={search}
+            onChange={(event) => {
+              setSearch(event.target.value);
+              updateSearchParams({ search: event.target.value.trim() || null });
+            }}
+          />
+        </FilterField>
+        <FilterField label="שלב">
+          <Select
+            value={stageFilter}
+            onChange={(event) => {
+              setStageFilter(event.target.value);
+              updateSearchParams({ stage: event.target.value || null });
+            }}
+          >
+            {STAGE_FILTER_OPTIONS.map((option) => (
+              <option key={option.code || 'all'} value={option.code}>
+                {option.display}
+              </option>
+            ))}
+          </Select>
+        </FilterField>
+        <FilterField label="לקוח">
+          <Select
+            value={customerFilter}
+            onChange={(event) => {
+              setCustomerFilter(event.target.value);
+              updateSearchParams({ customer: event.target.value || null });
+            }}
+          >
+            <option value="">הכל</option>
+            {customerOptions.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </Select>
+        </FilterField>
+        <FilterField label="מנהל פרויקט">
+          <Select
+            value={pmFilter}
+            onChange={(event) => {
+              setPmFilter(event.target.value);
+              updateSearchParams({ pm: event.target.value || null });
+            }}
+          >
+            <option value="">הכל</option>
+            {pmOptions.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </Select>
+        </FilterField>
+        <FilterField label="אתר">
+          <Select
+            value={siteFilter}
+            onChange={(event) => {
+              setSiteFilter(event.target.value);
+              updateSearchParams({ site: event.target.value || null });
+            }}
+          >
+            <option value="">הכל</option>
+            {siteOptions.map((name) => (
+              <option key={name} value={name}>
+                {name}
+              </option>
+            ))}
+          </Select>
+        </FilterField>
+      </FilterBar>
 
-      {filtered.length === 0 ? (
-        <EmptyState title="לא נמצאו פרויקטים" />
-      ) : (
-        <div className="projectsPage__tableWrap">
-          <table className="projectsPage__table">
-            <thead>
-              <tr>
-                <th>מספר</th>
-                <th>שם הפרויקט</th>
-                <th>לקוח</th>
-                <th>מנהל פרויקט</th>
-                <th>סטטוס</th>
-                <th>תאריך פתיחה</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map((project) => {
-                const statusMeta = getProjectStatusMeta(project.status);
-
-                return (
-                  <tr
-                    key={project.workItemId}
-                    role="button"
-                    tabIndex={0}
-                    className={`projectsPage__row ${
-                      drawerState?.projectId === project.workItemId
-                        ? 'projectsPage__row--selected'
-                        : ''
-                    }`.trim()}
-                    onClick={() => openProject(project)}
-                    onKeyDown={(event) => {
-                      if (event.key === 'Enter' || event.key === ' ') {
-                        event.preventDefault();
-                        openProject(project);
-                      }
-                    }}
-                  >
-                    <td>{project.projectNumber}</td>
-                    <td>{project.title}</td>
-                    <td>{project.customerName}</td>
-                    <td>{project.projectManagerName}</td>
-                    <td>
-                      <Badge variant={statusMeta.badgeVariant}>{statusMeta.display}</Badge>
-                    </td>
-                    <td>{formatProjectDate(project.createdAt)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-      )}
+      <DataTable
+        columns={columns}
+        rows={filtered}
+        getRowId={(project) => project.workItemId}
+        onRowClick={openProject}
+        selectedRowId={drawerState?.projectId ?? null}
+        emptyTitle="לא נמצאו פרויקטים"
+        emptyDescription="התאימו את הסינון או צרו פרויקט חדש."
+      />
 
       <ProjectDrawer
         isOpen={drawerState !== null}

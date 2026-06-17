@@ -1,4 +1,6 @@
 import { useEffect, type ReactNode } from 'react';
+import { Maximize2, Minimize2, X } from 'lucide-react';
+import { IconButton } from '../IconButton';
 import './Drawer.css';
 
 interface DrawerProps {
@@ -7,6 +9,8 @@ interface DrawerProps {
   title?: string;
   headerActions?: ReactNode;
   footer?: ReactNode;
+  /** Size mode. `wide` is the maximized footprint; mobile is always full-screen. */
+  size?: 'default' | 'wide';
   isMaximized?: boolean;
   onToggleMaximize?: () => void;
   children: ReactNode;
@@ -18,6 +22,7 @@ export function Drawer({
   title,
   headerActions,
   footer,
+  size = 'default',
   isMaximized = false,
   onToggleMaximize,
   children,
@@ -40,12 +45,12 @@ export function Drawer({
 
   if (!isOpen) return null;
 
+  const isWide = isMaximized || size === 'wide';
+
   return (
     <div className="drawer" role="dialog" aria-modal="true">
       <div className="drawer__backdrop" onClick={onClose} aria-hidden="true" />
-      <div
-        className={`drawer__panel ${isMaximized ? 'drawer__panel--maximized' : ''}`.trim()}
-      >
+      <div className={`drawer__panel ${isWide ? 'drawer__panel--maximized' : ''}`.trim()}>
         <div className="drawer__header">
           <div className="drawer__headerMain">
             {title && <h2 className="drawer__title">{title}</h2>}
@@ -53,23 +58,13 @@ export function Drawer({
           </div>
           <div className="drawer__headerControls">
             {onToggleMaximize && (
-              <button
-                type="button"
-                className="drawer__maximize"
+              <IconButton
+                label={isMaximized ? 'הקטן' : 'הגדל'}
+                icon={isMaximized ? <Minimize2 size={18} /> : <Maximize2 size={18} />}
                 onClick={onToggleMaximize}
-                aria-label={isMaximized ? 'הקטן' : 'הגדל'}
-              >
-                {isMaximized ? '⤡' : '⤢'}
-              </button>
+              />
             )}
-            <button
-              type="button"
-              className="drawer__close"
-              onClick={onClose}
-              aria-label="סגור"
-            >
-              ×
-            </button>
+            <IconButton label="סגור" icon={<X size={20} />} onClick={onClose} />
           </div>
         </div>
         <div className="drawer__body">{children}</div>

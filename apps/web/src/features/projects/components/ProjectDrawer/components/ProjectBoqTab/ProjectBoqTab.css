@@ -11,13 +11,6 @@
   text-align: start;
 }
 
-.projectBoqTab__select {
-  width: 100%;
-  padding: var(--spacing-sm);
-  border: 1px solid var(--color-neutral-300);
-  border-radius: var(--radius-md);
-}
-
 .projectBoqTab__actions {
   display: flex;
   flex-wrap: wrap;
@@ -27,13 +20,4 @@
 .projectBoqTab__empty {
   margin: 0 0 var(--spacing-md);
   color: var(--color-neutral-600);
-}
-
-.projectBoqTab__error {
-  margin-bottom: var(--spacing-md);
-  padding: var(--spacing-sm);
-  border: 1px solid var(--color-danger-200);
-  border-radius: var(--radius-md);
-  color: var(--color-danger-700);
-  background: var(--color-danger-50);
 }

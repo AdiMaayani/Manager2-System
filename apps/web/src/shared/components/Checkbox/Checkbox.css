@@ -1,0 +1,30 @@
+.checkbox {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-700);
+}
+
+.checkbox__input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--color-primary-600);
+  cursor: pointer;
+}
+
+.checkbox__input:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
+}
+
+.checkbox__input:disabled {
+  cursor: not-allowed;
+}
+
+.checkbox:has(.checkbox__input:disabled) {
+  color: var(--color-neutral-400);
+  cursor: not-allowed;
+}

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Drawer } from '@shared/components/Drawer';
@@ -6,7 +6,13 @@ import { Badge } from '@shared/components/Badge';
 import { Button } from '@shared/components/Button';
 import { DetailsField } from '@shared/components/DetailsField';
 import { DetailsSection } from '@shared/components/DetailsSection';
+import { RelatedSection } from '@shared/components/RelatedSection';
 import { Input } from '@shared/components/Input';
+import { Select } from '@shared/components/Select';
+import { Textarea } from '@shared/components/Textarea';
+import { Checkbox } from '@shared/components/Checkbox';
+import { InlineAlert } from '@shared/components/InlineAlert';
+import { ConfirmInline } from '@shared/components/ConfirmInline';
 import { usePermissions } from '@shared/auth/usePermissions';
 import { isLocalDataMode } from '@/config/appConfig';
 import { getCustomersAsync } from '@features/customers';
@@ -96,7 +102,6 @@ function ContactDrawerContent({ contact, onClose, onSaved }: ContactDrawerConten
   const [isEditing, setIsEditing] = useState(!isExistingContact);
   const [form, setForm] = useState<ContactFormState>(() => buildInitialState(contact));
   const [error, setError] = useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState(false);
 
   const requiresCustomer = CUSTOMER_LINK_CATEGORIES.includes(form.contactCategory);
 
@@ -123,7 +128,6 @@ function ContactDrawerContent({ contact, onClose, onSaved }: ContactDrawerConten
   function handleStartEdit() {
     setForm(buildInitialState(contact));
     setError(null);
-    setConfirmDelete(false);
     setIsEditing(true);
   }
 
@@ -135,7 +139,6 @@ function ContactDrawerContent({ contact, onClose, onSaved }: ContactDrawerConten
 
     setForm(buildInitialState(contact));
     setError(null);
-    setConfirmDelete(false);
     setIsEditing(false);
   }
 
@@ -188,7 +191,6 @@ function ContactDrawerContent({ contact, onClose, onSaved }: ContactDrawerConten
       }
 
       setIsEditing(false);
-      setConfirmDelete(false);
       await onSaved?.(savedContact);
 
       // Without a parent to hand the saved record back to, fall back to the
@@ -237,10 +239,10 @@ function ContactDrawerContent({ contact, onClose, onSaved }: ContactDrawerConten
       footer={
         isEditing ? (
           <div className="contactDrawer__footerContent">
-            {error && <p className="contactDrawer__error">{error}</p>}
+            {error && <InlineAlert variant="danger">{error}</InlineAlert>}
             <div className="contactDrawer__actions">
-              <Button onClick={handleSave} disabled={isSaving}>
-                {isSaving ? 'שומר...' : 'שמור'}
+              <Button onClick={handleSave} isLoading={isSaving}>
+                שמור
               </Button>
               <Button variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
                 בטל שינויים
@@ -248,29 +250,13 @@ function ContactDrawerContent({ contact, onClose, onSaved }: ContactDrawerConten
 
               {isExistingContact && (
                 <div className="contactDrawer__dangerActions">
-                  {confirmDelete ? (
-                    <>
-                      <span className="contactDrawer__confirmText">למחוק את איש הקשר?</span>
-                      <Button variant="danger" onClick={handleDelete} disabled={isSaving}>
-                        אישור מחיקה
-                      </Button>
-                      <Button
-                        variant="secondary"
-                        onClick={() => setConfirmDelete(false)}
-                        disabled={isSaving}
-                      >
-                        חזור
-                      </Button>
-                    </>
-                  ) : (
-                    <Button
-                      variant="danger"
-                      onClick={() => setConfirmDelete(true)}
-                      disabled={isSaving}
-                    >
-                      מחק איש קשר
-                    </Button>
-                  )}
+                  <ConfirmInline
+                    triggerLabel="מחק איש קשר"
+                    message="למחוק את איש הקשר?"
+                    confirmLabel="אישור מחיקה"
+                    onConfirm={handleDelete}
+                    isPending={isSaving}
+                  />
                 </div>
               )}
             </div>
@@ -284,7 +270,7 @@ function ContactDrawerContent({ contact, onClose, onSaved }: ContactDrawerConten
         <div className="contactDrawer contactDrawer--edit">
           <DetailsSection title="פרטים כלליים">
             <Input
-              label="שם מלא *"
+              label="שם מלא"
               value={form.fullName}
               onChange={(e) => setField('fullName', e.target.value)}
               required
@@ -296,53 +282,45 @@ function ContactDrawerContent({ contact, onClose, onSaved }: ContactDrawerConten
                 onChange={(e) => setField('jobTitle', e.target.value)}
               />
 
-              <div className="contactDrawer__field">
-                <label className="contactDrawer__label">קטגוריה *</label>
-                <select
-                  className="contactDrawer__select"
-                  value={form.contactCategory}
-                  onChange={(e) => handleCategoryChange(e.target.value)}
-                >
-                  {CATEGORY_OPTIONS.map((opt) => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
-                </select>
-              </div>
-
+              <Select
+                label="קטגוריה"
+                required
+                value={form.contactCategory}
+                onChange={(e) => handleCategoryChange(e.target.value)}
+              >
+                {CATEGORY_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </Select>
             </div>
 
             {isExistingContact && (
-              <label className="contactDrawer__checkboxRow">
-                <input
-                  type="checkbox"
-                  checked={form.isActive}
-                  onChange={(e) => setField('isActive', e.target.checked)}
-                />
-                <span>איש קשר פעיל</span>
-              </label>
+              <Checkbox
+                label="איש קשר פעיל"
+                checked={form.isActive}
+                onChange={(e) => setField('isActive', e.target.checked)}
+              />
             )}
           </DetailsSection>
 
           <DetailsSection title="הקשר עסקי">
             <div className="contactDrawer__grid">
               {requiresCustomer && (
-                <div className="contactDrawer__field">
-                  <label className="contactDrawer__label">לקוח *</label>
-                  <select
-                    className="contactDrawer__select"
-                    value={form.customerId ?? ''}
-                    onChange={(e) =>
-                      setField('customerId', e.target.value ? Number(e.target.value) : null)
-                    }
-                  >
-                    <option value="">-- בחר לקוח --</option>
-                    {customers.map((c) => (
-                      <option key={c.customerId} value={c.customerId}>
-                        {c.customerName}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+                <Select
+                  label="לקוח"
+                  required
+                  value={form.customerId ?? ''}
+                  onChange={(e) =>
+                    setField('customerId', e.target.value ? Number(e.target.value) : null)
+                  }
+                >
+                  <option value="">-- בחר לקוח --</option>
+                  {customers.map((c) => (
+                    <option key={c.customerId} value={c.customerId}>
+                      {c.customerName}
+                    </option>
+                  ))}
+                </Select>
               )}
 
               <Input
@@ -374,19 +352,16 @@ function ContactDrawerContent({ contact, onClose, onSaved }: ContactDrawerConten
                 onChange={(e) => setField('email', e.target.value)}
               />
 
-              <div className="contactDrawer__field">
-                <label className="contactDrawer__label">ערוץ מועדף</label>
-                <select
-                  className="contactDrawer__select"
-                  value={form.preferredChannel}
-                  onChange={(e) => setField('preferredChannel', e.target.value)}
-                >
-                  <option value="">בחר ערוץ</option>
-                  {PREFERRED_CHANNEL_OPTIONS.map((opt) => (
-                    <option key={opt} value={opt}>{opt}</option>
-                  ))}
-                </select>
-              </div>
+              <Select
+                label="ערוץ מועדף"
+                value={form.preferredChannel}
+                onChange={(e) => setField('preferredChannel', e.target.value)}
+              >
+                <option value="">בחר ערוץ</option>
+                {PREFERRED_CHANNEL_OPTIONS.map((opt) => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </Select>
             </div>
           </DetailsSection>
 
@@ -404,15 +379,12 @@ function ContactDrawerContent({ contact, onClose, onSaved }: ContactDrawerConten
               onChange={(e) => setField('address', e.target.value)}
             />
 
-            <div className="contactDrawer__field">
-              <label className="contactDrawer__label">הערות</label>
-              <textarea
-                className="contactDrawer__textarea"
-                rows={3}
-                value={form.notes}
-                onChange={(e) => setField('notes', e.target.value)}
-              />
-            </div>
+            <Textarea
+              label="הערות"
+              rows={3}
+              value={form.notes}
+              onChange={(e) => setField('notes', e.target.value)}
+            />
           </DetailsSection>
         </div>
       )}
@@ -582,50 +554,6 @@ function ContactReviewDetails({ contact }: ContactReviewDetailsProps) {
       )}
     </div>
   );
-}
-
-interface RelatedSectionProps {
-  title: string;
-  /** Number of related records, or null while the data has not loaded yet. */
-  count: number | null;
-  isLoading: boolean;
-  isError: boolean;
-  isUnavailable: boolean;
-  emptyText: string;
-  children: ReactNode;
-}
-
-function RelatedSection({
-  title,
-  count,
-  isLoading,
-  isError,
-  isUnavailable,
-  emptyText,
-  children,
-}: RelatedSectionProps) {
-  const sectionTitle = count != null ? `${title} (${count})` : title;
-
-  let body: ReactNode;
-  if (isUnavailable) {
-    body = (
-      <p className="contactDrawer__relatedHint">נתונים מקושרים זמינים בחיבור לשרת בלבד.</p>
-    );
-  } else if (isLoading) {
-    body = <p className="contactDrawer__relatedHint">טוען נתונים מקושרים…</p>;
-  } else if (isError) {
-    body = (
-      <p className="contactDrawer__relatedHint contactDrawer__relatedHint--error">
-        טעינת הנתונים המקושרים נכשלה.
-      </p>
-    );
-  } else if (count === 0) {
-    body = <p className="contactDrawer__relatedHint">{emptyText}</p>;
-  } else {
-    body = children;
-  }
-
-  return <DetailsSection title={sectionTitle}>{body}</DetailsSection>;
 }
 
 function RelatedOverflowNote({ total }: { total: number }) {

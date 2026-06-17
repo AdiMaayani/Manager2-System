@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { Button } from '@shared/components/Button';
 import { EmptyState } from '@shared/components/EmptyState';
 import { Input } from '@shared/components/Input';
+import { Select } from '@shared/components/Select';
+import { InlineAlert } from '@shared/components/InlineAlert';
 import { downloadProjectDrawingFileAsync } from '../../../../api/projectsApiClient';
 import type {
   CreateProjectDrawingRequest,
@@ -127,22 +129,19 @@ function DrawingEditCard({
         value={draft.name}
         onChange={(event) => setDraft((current) => ({ ...current, name: event.target.value }))}
       />
-      <label className="projectDrawingsTab__field">
-        <span>סוג</span>
-        <select
-          className="projectDrawingsTab__select"
-          value={draft.type}
-          onChange={(event) =>
-            setDraft((current) => ({
-              ...current,
-              type: event.target.value as 'PDF' | 'DWG',
-            }))
-          }
-        >
-          <option value="PDF">PDF</option>
-          <option value="DWG">DWG</option>
-        </select>
-      </label>
+      <Select
+        label="סוג"
+        value={draft.type}
+        onChange={(event) =>
+          setDraft((current) => ({
+            ...current,
+            type: event.target.value as 'PDF' | 'DWG',
+          }))
+        }
+      >
+        <option value="PDF">PDF</option>
+        <option value="DWG">DWG</option>
+      </Select>
       <Input
         label="תאריך"
         type="date"
@@ -237,7 +236,7 @@ export function ProjectDrawingsTab({
   if (isEditMode) {
     return (
       <div className="projectDrawingsTab">
-        {error && <div className="projectDrawingsTab__error">{error}</div>}
+        {error && <InlineAlert variant="danger">{error}</InlineAlert>}
         <div className="projectDrawingsTab__editList">
           {drawings.map((drawing) => (
             <DrawingEditCard
@@ -265,22 +264,19 @@ export function ProjectDrawingsTab({
               setNewDrawingDraft((current) => ({ ...current, name: event.target.value }))
             }
           />
-          <label className="projectDrawingsTab__field">
-            <span>סוג</span>
-            <select
-              className="projectDrawingsTab__select"
-              value={newDrawingDraft.type}
-              onChange={(event) =>
-                setNewDrawingDraft((current) => ({
-                  ...current,
-                  type: event.target.value as 'PDF' | 'DWG',
-                }))
-              }
-            >
-              <option value="PDF">PDF</option>
-              <option value="DWG">DWG</option>
-            </select>
-          </label>
+          <Select
+            label="סוג"
+            value={newDrawingDraft.type}
+            onChange={(event) =>
+              setNewDrawingDraft((current) => ({
+                ...current,
+                type: event.target.value as 'PDF' | 'DWG',
+              }))
+            }
+          >
+            <option value="PDF">PDF</option>
+            <option value="DWG">DWG</option>
+          </Select>
           <Input
             label="תאריך"
             type="date"

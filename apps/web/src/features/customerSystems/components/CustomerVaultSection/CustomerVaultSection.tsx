@@ -3,6 +3,10 @@ import { Badge } from '@shared/components/Badge';
 import { Button } from '@shared/components/Button';
 import { DetailsSection } from '@shared/components/DetailsSection';
 import { Input } from '@shared/components/Input';
+import { Select } from '@shared/components/Select';
+import { Checkbox } from '@shared/components/Checkbox';
+import { InlineAlert } from '@shared/components/InlineAlert';
+import { ConfirmInline } from '@shared/components/ConfirmInline';
 import { ApiError } from '@api/client';
 import { usePermissions } from '@shared/auth/usePermissions';
 import { isLocalDataMode } from '@/config/appConfig';
@@ -181,10 +185,10 @@ export function CustomerVaultSection({ customerId }: CustomerVaultSectionProps) 
             {showAddSystem ? (
               <form className="vault__form" onSubmit={handleAddSystem}>
                 <SystemFormFields values={addForm} onChange={setAddForm} showActive={false} />
-                {addError && <p className="vault__error">{addError}</p>}
+                {addError && <InlineAlert variant="danger">{addError}</InlineAlert>}
                 <div className="vault__formActions">
-                  <Button type="submit" disabled={createMutation.isPending}>
-                    {createMutation.isPending ? 'שומר…' : 'הוסף מערכת'}
+                  <Button type="submit" isLoading={createMutation.isPending}>
+                    הוסף מערכת
                   </Button>
                   <Button
                     type="button"
@@ -225,19 +229,17 @@ function SystemFormFields({ values, onChange, showActive }: SystemFormFieldsProp
 
   return (
     <div className="vault__formGrid">
-      <label className="vault__field">
-        <span>סוג מערכת *</span>
-        <select
-          className="vault__select"
-          value={values.systemType}
-          onChange={(e) => set('systemType', e.target.value)}
-        >
-          {SYSTEM_TYPE_OPTIONS.map((option) => (
-            <option key={option} value={option}>{option}</option>
-          ))}
-        </select>
-      </label>
-      <Input label="שם מערכת *" value={values.systemName} onChange={(e) => set('systemName', e.target.value)} />
+      <Select
+        label="סוג מערכת"
+        required
+        value={values.systemType}
+        onChange={(e) => set('systemType', e.target.value)}
+      >
+        {SYSTEM_TYPE_OPTIONS.map((option) => (
+          <option key={option} value={option}>{option}</option>
+        ))}
+      </Select>
+      <Input label="שם מערכת" required value={values.systemName} onChange={(e) => set('systemName', e.target.value)} />
       <Input label="יצרן" value={values.vendor} onChange={(e) => set('vendor', e.target.value)} />
       <Input label="דגם" value={values.model} onChange={(e) => set('model', e.target.value)} />
       <Input label="כתובת IP / Host" value={values.host} onChange={(e) => set('host', e.target.value)} />
@@ -250,14 +252,11 @@ function SystemFormFields({ values, onChange, showActive }: SystemFormFieldsProp
       />
       <Input label="הערות" value={values.notes} onChange={(e) => set('notes', e.target.value)} />
       {showActive && (
-        <label className="vault__checkboxRow">
-          <input
-            type="checkbox"
-            checked={values.isActive}
-            onChange={(e) => set('isActive', e.target.checked)}
-          />
-          <span>מערכת פעילה</span>
-        </label>
+        <Checkbox
+          label="מערכת פעילה"
+          checked={values.isActive}
+          onChange={(e) => set('isActive', e.target.checked)}
+        />
       )}
     </div>
   );
@@ -275,7 +274,6 @@ function SystemCard({ customerId, system, canManage, canReveal }: SystemCardProp
   const [isEditing, setIsEditing] = useState(false);
   const [editForm, setEditForm] = useState<SystemFormValues>(() => systemToForm(system));
   const [error, setError] = useState<string | null>(null);
-  const [confirmDeactivate, setConfirmDeactivate] = useState(false);
 
   const { updateMutation, deactivateMutation } = useCustomerSystemMutations(customerId);
 
@@ -340,36 +338,28 @@ function SystemCard({ customerId, system, canManage, canReveal }: SystemCardProp
       {isEditing && (
         <form className="vault__form" onSubmit={handleSaveEdit}>
           <SystemFormFields values={editForm} onChange={setEditForm} showActive />
-          {error && <p className="vault__error">{error}</p>}
+          {error && <InlineAlert variant="danger">{error}</InlineAlert>}
           <div className="vault__formActions">
-            <Button type="submit" disabled={updateMutation.isPending}>
-              {updateMutation.isPending ? 'שומר…' : 'שמור'}
+            <Button type="submit" isLoading={updateMutation.isPending}>
+              שמור
             </Button>
             <Button type="button" variant="secondary" onClick={() => setIsEditing(false)}>
               בטל
             </Button>
             {system.isActive && (
-              confirmDeactivate ? (
-                <>
-                  <span className="vault__confirmText">להשבית מערכת זו?</span>
-                  <Button type="button" variant="danger" onClick={handleDeactivate} disabled={deactivateMutation.isPending}>
-                    אישור
-                  </Button>
-                  <Button type="button" variant="secondary" onClick={() => setConfirmDeactivate(false)}>
-                    חזור
-                  </Button>
-                </>
-              ) : (
-                <Button type="button" variant="danger" onClick={() => setConfirmDeactivate(true)}>
-                  השבת מערכת
-                </Button>
-              )
+              <ConfirmInline
+                triggerLabel="השבת מערכת"
+                message="להשבית מערכת זו?"
+                confirmLabel="אישור"
+                onConfirm={handleDeactivate}
+                isPending={deactivateMutation.isPending}
+              />
             )}
           </div>
         </form>
       )}
 
-      {!isEditing && error && <p className="vault__error">{error}</p>}
+      {!isEditing && error && <InlineAlert variant="danger">{error}</InlineAlert>}
 
       {isExpanded && !isEditing && (
         <SecretsPanel
@@ -464,21 +454,20 @@ function SecretsPanel({ customerSystemId, canManage, canReveal }: SecretsPanelPr
           {showAdd ? (
             <form className="vault__form" onSubmit={handleAddSecret}>
               <div className="vault__formGrid">
-                <label className="vault__field">
-                  <span>סוג סוד *</span>
-                  <select
-                    className="vault__select"
-                    value={secretType}
-                    onChange={(e) => setSecretType(e.target.value)}
-                  >
-                    {SECRET_TYPE_OPTIONS.map((option) => (
-                      <option key={option} value={option}>{option}</option>
-                    ))}
-                  </select>
-                </label>
+                <Select
+                  label="סוג סוד"
+                  required
+                  value={secretType}
+                  onChange={(e) => setSecretType(e.target.value)}
+                >
+                  {SECRET_TYPE_OPTIONS.map((option) => (
+                    <option key={option} value={option}>{option}</option>
+                  ))}
+                </Select>
                 <Input label="שם משתמש" value={username} onChange={(e) => setUsername(e.target.value)} />
                 <Input
-                  label="ערך הסוד *"
+                  label="ערך הסוד"
+                  required
                   type="password"
                   autoComplete="new-password"
                   value={secretValue}
@@ -486,10 +475,10 @@ function SecretsPanel({ customerSystemId, canManage, canReveal }: SecretsPanelPr
                 />
                 <Input label="הערות" value={notes} onChange={(e) => setNotes(e.target.value)} />
               </div>
-              {error && <p className="vault__error">{error}</p>}
+              {error && <InlineAlert variant="danger">{error}</InlineAlert>}
               <div className="vault__formActions">
-                <Button type="submit" disabled={createMutation.isPending}>
-                  {createMutation.isPending ? 'שומר…' : 'הוסף סוד'}
+                <Button type="submit" isLoading={createMutation.isPending}>
+                  הוסף סוד
                 </Button>
                 <Button
                   type="button"
@@ -644,7 +633,7 @@ function SecretRow({ customerSystemId, secret, canManage, canReveal }: SecretRow
         </div>
       )}
 
-      {error && <p className="vault__error">{error}</p>}
+      {error && <InlineAlert variant="danger">{error}</InlineAlert>}
     </li>
   );
 }
