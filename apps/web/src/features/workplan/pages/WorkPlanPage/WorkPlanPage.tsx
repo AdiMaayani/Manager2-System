@@ -12,6 +12,7 @@ import { NewTaskModal } from '../../components/NewTaskModal';
 import { usePermissions } from '@shared/auth/usePermissions';
 import { useWorkPlanPageState } from '../../hooks/useWorkPlanPageState';
 import { useWorkPlanScheduling } from '../../hooks/useWorkPlanData';
+import { buildWorkPlanTaskSelection } from '../../lib/workPlanScheduling';
 import type { ScheduledTaskBar, WorkPlanTaskSelection } from '../../types';
 import './WorkPlanPage.css';
 
@@ -51,6 +52,42 @@ export function WorkPlanPage() {
 
   const [selectedTask, setSelectedTask] = useState<WorkPlanTaskSelection | null>(null);
   const [isNewTaskModalOpen, setIsNewTaskModalOpen] = useState(false);
+  // Once the user closes (or saves) a deep-linked task we stop auto-reopening it, so the drawer never
+  // springs back on the next render while the workItemId query parameter is still in the URL.
+  const [dismissedWorkItemId, setDismissedWorkItemId] = useState<number | null>(null);
+
+  const requestedWorkItemId = pageState.requestedWorkItemId;
+
+  // Deep-link target resolved from the already-loaded work plans (no extra fetch). Looking it up in the
+  // full set means we can open the task even when the current scope/date filters it out of the grid.
+  const requestedTaskSelection = useMemo<WorkPlanTaskSelection | null>(() => {
+    if (requestedWorkItemId == null) return null;
+    for (const workPlan of scheduling.allWorkPlans) {
+      const match = workPlan.tasks.find((task) => task.workItemId === requestedWorkItemId);
+      if (match) return buildWorkPlanTaskSelection(workPlan, match);
+    }
+    return null;
+  }, [requestedWorkItemId, scheduling.allWorkPlans]);
+
+  // Auto-open the deep-linked task unless the user has explicitly dismissed it. A manual selection
+  // always wins so normal clicking is unaffected.
+  const autoOpenTask =
+    requestedWorkItemId != null && dismissedWorkItemId !== requestedWorkItemId
+      ? requestedTaskSelection
+      : null;
+  const effectiveSelectedTask = selectedTask ?? autoOpenTask;
+
+  const requestedTaskMissing =
+    requestedWorkItemId != null &&
+    dismissedWorkItemId !== requestedWorkItemId &&
+    requestedTaskSelection == null;
+
+  const closeTaskPanel = () => {
+    setSelectedTask(null);
+    if (requestedWorkItemId != null) {
+      setDismissedWorkItemId(requestedWorkItemId);
+    }
+  };
 
   const personalScopeInfo = useMemo(() => {
     if (pageState.scope !== 'personal') return null;
@@ -109,9 +146,9 @@ export function WorkPlanPage() {
   // In personal scope, users may edit only their own tasks; locked tasks are
   // blocked separately inside the task panel.
   const isSelectedTaskOwnedByCurrentUser =
-    selectedTask != null &&
+    effectiveSelectedTask != null &&
     scheduling.currentUserEmployeeId != null &&
-    selectedTask.assigneeEmployeeId === String(scheduling.currentUserEmployeeId);
+    effectiveSelectedTask.assigneeEmployeeId === String(scheduling.currentUserEmployeeId);
 
   const canEditTask = pageState.scope !== 'personal' || isSelectedTaskOwnedByCurrentUser;
 
@@ -178,12 +215,18 @@ export function WorkPlanPage() {
           </div>
         )}
 
+        {requestedTaskMissing && (
+          <div className="workPlanPage__scopeBanner workPlanPage__scopeBanner--warning" role="status">
+            המשימה המבוקשת אינה זמינה בתצוגה זו.
+          </div>
+        )}
+
         {pageState.range === 'daily' && pageState.scope === 'project' && (
           <WorkPlanDailyGrid
             mode="projects"
             projectRows={scheduling.projectRows}
             onTaskSelect={(task) => setSelectedTask(scheduledToSelection(task))}
-            selectedTaskId={selectedTask?.taskId ?? null}
+            selectedTaskId={effectiveSelectedTask?.taskId ?? null}
           />
         )}
 
@@ -192,7 +235,7 @@ export function WorkPlanPage() {
             mode="employees"
             employeeRows={scheduling.employeeRows}
             onTaskSelect={(task) => setSelectedTask(scheduledToSelection(task))}
-            selectedTaskId={selectedTask?.taskId ?? null}
+            selectedTaskId={effectiveSelectedTask?.taskId ?? null}
           />
         )}
 
@@ -224,10 +267,10 @@ export function WorkPlanPage() {
         )}
 
         <WorkPlanTaskPanel
-          task={selectedTask}
-          onClose={() => setSelectedTask(null)}
+          task={effectiveSelectedTask}
+          onClose={closeTaskPanel}
           canEdit={canEditTask}
-          onTaskUpdated={() => setSelectedTask(null)}
+          onTaskUpdated={closeTaskPanel}
         />
 
         <NewTaskModal

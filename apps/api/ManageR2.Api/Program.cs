@@ -198,6 +198,9 @@ builder.Services.AddScoped<IAuditLogService, AuditLogService>();
 // Customer Systems Vault encryption. Singleton holds the validated AES-256 key; constructed lazily on
 // first vault request, so a missing/invalid key fails only vault operations (with a clear message), not startup.
 builder.Services.AddSingleton<ISecretProtector, AesGcmSecretProtector>();
+// Dashboard command center: focused read-only repository + orchestration service for GET /api/dashboard.
+builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
+builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<ISmartAssignmentService, SmartAssignmentBatchService>();
 // Advanced ranked recommendations: concrete repository + service from SmartAssignment module (aliased at top of file).
 builder.Services.AddScoped<AdvancedSmartAssignmentRepository>();

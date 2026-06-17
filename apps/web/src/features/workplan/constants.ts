@@ -4,6 +4,7 @@ export const WORKPLAN_QUERY = {
   PROJECT_ID: 'projectId',
   SEARCH: 'q',
   DATE: 'date',
+  WORK_ITEM_ID: 'workItemId',
 } as const;
 
 export const WORKPLAN_SCOPES: Record<string, WorkPlanScope> = {

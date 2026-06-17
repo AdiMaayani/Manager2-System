@@ -68,6 +68,7 @@ The 4 tables and 17 procedures that exist **only in migrations** (not in `schema
 | `migrations/2026-06-15_smart_assignment_persistence_explainability.sql` | **Required** migration | Yes | Fresh build + existing DBs (run **before** factor activation) |
 | `migrations/2026-06-15_smart_assignment_factor_activation.sql` | **Required** migration | Yes | Fresh build + existing DBs (run **after** persistence) |
 | `migrations/2026-06-15_audit_log_core.sql` | **Required** migration | Yes (`IF NOT EXISTS` + `CREATE OR ALTER`) | Fresh build + existing DBs (independent; additive only) |
+| `migrations/2026-06-17_dashboard_command_center.sql` | **Required** migration | Yes (`CREATE OR ALTER`) | Fresh build + existing DBs (independent; read-only SPs only) |
 | other `migrations/2026-06-0x_*.sql` | Historical (folded into baseline) | Yes | Only to upgrade an **older** DB; redundant for a fresh build |
 | `seed/2026-06-14_permission_roles.sql` | **Required** seed (role catalog) | Yes | Fresh build |
 | `seed/initial_admin/00_seed_initial_admin.sql` | **Required** seed (first login) | Yes | Fresh build |
@@ -103,13 +104,14 @@ Run every `database/SP/*.sql` **except** the two `2026-04-20_*` files. Order irr
 (`CREATE OR ALTER` does not require referenced objects to exist at create time). → 117 procs.
 
 ### Step 5 — Required recent migrations (idempotent, **order-sensitive**)
-Run these five, **in this order**:
+Run these six, **in this order**:
 
 1. `migrations/2026-06-14_users_login_lockout.sql` — adds 2 `Users` columns + 3 `sp_Users_*` SPs.
 2. `migrations/2026-06-15_customer_systems_vault.sql` — adds 3 Vault tables + 11 Vault SPs.
 3. `migrations/2026-06-15_audit_log_core.sql` — adds the `AuditLog` table (+2 indexes) and SPs `sp_AuditLog_Create`, `sp_AuditLog_GetList`. Additive and independent of the Smart Assignment migrations.
 4. `migrations/2026-06-15_smart_assignment_persistence_explainability.sql` — adds `Rec_GetDraftTaskRecommendationInput`, updates `Rec_GetLatestRecommendationsForTask`.
 5. `migrations/2026-06-15_smart_assignment_factor_activation.sql` — updates `Rec_GetTaskRecommendationInput` **and** `Rec_GetDraftTaskRecommendationInput` to emit result sets 13 (current load) + 14 (continuity).
+6. `migrations/2026-06-17_dashboard_command_center.sql` — adds six read-only `sp_Dashboard_*` procedures that back `GET /api/dashboard`. Additive and order-independent (only references baseline tables for reads).
 
 > ℹ️ **The audit-log migration (#3) is order-independent** — it only adds new objects and references
 > the existing baseline `Users` table for display joins. It is placed between the Vault and Smart
@@ -172,7 +174,8 @@ $migrations = @(
   "$root\migrations\2026-06-15_customer_systems_vault.sql",
   "$root\migrations\2026-06-15_audit_log_core.sql",
   "$root\migrations\2026-06-15_smart_assignment_persistence_explainability.sql",
-  "$root\migrations\2026-06-15_smart_assignment_factor_activation.sql"
+  "$root\migrations\2026-06-15_smart_assignment_factor_activation.sql",
+  "$root\migrations\2026-06-17_dashboard_command_center.sql"
 )
 $migrations | ForEach-Object { sqlcmd -S $server -d $db -b -i $_ }
 

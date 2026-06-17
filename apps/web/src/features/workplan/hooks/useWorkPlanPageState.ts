@@ -28,6 +28,15 @@ export function useWorkPlanPageState() {
     [periodAnchor, range],
   );
 
+  // Optional deep-link target (e.g. from the dashboard): the WorkItem whose task drawer should open
+  // automatically once the work-plan data has loaded. Absent for normal navigation.
+  const requestedWorkItemId = useMemo(() => {
+    const raw = searchParams.get(WORKPLAN_QUERY.WORK_ITEM_ID);
+    if (!raw) return null;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  }, [searchParams]);
+
   const projectFilter = useMemo((): WorkPlanProjectFilter => {
     const raw = searchParams.get(WORKPLAN_QUERY.PROJECT_ID);
     if (!raw || raw.toLowerCase() === 'all') return 'all';
@@ -150,6 +159,7 @@ export function useWorkPlanPageState() {
     projectFilter,
     isAllProjectsMode,
     searchQuery,
+    requestedWorkItemId,
     periodAnchor,
     periodLabel,
     setScope,
