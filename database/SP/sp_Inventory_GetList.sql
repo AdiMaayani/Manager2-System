@@ -34,7 +34,10 @@ BEGIN
         IsActive,
         CreatedAt,
         UpdatedAt,
-        DeletedAt
+        DeletedAt,
+        ImagePath,
+        ImageContentType,
+        ImageFileSizeBytes
     FROM dbo.InventoryItems
     WHERE (
             @NormalizedStatus = N'all'

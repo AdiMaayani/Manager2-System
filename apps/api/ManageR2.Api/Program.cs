@@ -224,6 +224,10 @@ app.UseCors("AllowFrontend");
 
 app.UseHttpsRedirection();
 
+// Serves publicly readable static assets from wwwroot (e.g. uploaded product images under /uploads/inventory).
+// Registered before authentication so image URLs returned in DTOs load directly in <img> without a bearer token.
+app.UseStaticFiles();
+
 // Populates HttpContext.User from JWT; UseAuthorization enforces policies/roles on endpoints.
 app.UseAuthentication();
 app.UseAuthorization();

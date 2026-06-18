@@ -22,4 +22,8 @@ public class InventoryItemDto
     public string? Notes { get; set; }
 
     public bool IsActive { get; set; }
+
+    // Absolute, browser-usable URL for the product image. Null when no image is set.
+    // Server-only filesystem paths are never exposed; only this public URL is returned.
+    public string? ImageUrl { get; set; }
 }

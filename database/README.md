@@ -39,6 +39,8 @@ database/
     2026-06-04_project_drawings.sql        # Historical migration for project drawings metadata
     2026-06-04_sites_deactivate.sql        # Historical migration for site soft-deactivation
     2026-06-04_inventory_mvp.sql           # Historical migration for Inventory MVP persistence
+    2026-06-18_inventory_product_image.sql # Adds product image metadata columns to InventoryItems
+    2026-06-18_inventory_category_cleanup.sql # Deletes obsolete categories and normalizes legacy aliases
   SP/
     <ProcedureName>.sql        # One stored procedure per file (108 canonical files)
     2026-04-20_workplan_algorithm_data_model_extension.sql   # historical migration (see notes)
@@ -100,7 +102,7 @@ sp_GetProjectLifecycle, sp_GetProjectMilestones, sp_GetProjectsList, sp_GetProje
 sp_GetSiteById, sp_GetSites, sp_GetTasksByParentWorkItemId, sp_GetUserByEmail, sp_GetUserById,
 sp_GetUserDepartments, sp_GetUserRoles, sp_GetUsers, sp_GetWorkEmployees, sp_GetWorkItemDetails, sp_GetWorkItems,
 sp_GetWorkItemsByType, sp_GetWorkPlanAssignments, sp_GetWorkPlanProject, sp_GetWorkPlanTasks,
-sp_Inventory_Create, sp_Inventory_Deactivate, sp_Inventory_GetById, sp_Inventory_GetList, sp_Inventory_Update,
+sp_Inventory_ClearImage, sp_Inventory_Create, sp_Inventory_Deactivate, sp_Inventory_GetById, sp_Inventory_GetList, sp_Inventory_SetImage, sp_Inventory_Update,
 sp_ProjectBoq_Create, sp_ProjectBoq_Delete, sp_ProjectBoq_GetByProject, sp_ProjectBoq_Reorder, sp_ProjectBoq_Update,
 sp_ProjectDrawings_Create, sp_ProjectDrawings_Delete, sp_ProjectDrawings_GetByProject, sp_ProjectDrawings_Update,
 sp_ProjectEquipment_Create, sp_ProjectEquipment_Delete, sp_ProjectEquipment_GetByProject, sp_ProjectEquipment_Reorder,
@@ -269,6 +271,18 @@ A fresh rebuild already gets their final table/procedure state from `schema/tabl
   Its columns are now captured in `schema/tables.sql`; `sp_DeactivateSite` is canonical under `SP/`.
 - `migrations/2026-06-04_inventory_mvp.sql` — idempotent migration for Inventory MVP persistence.
   Its table is now captured in `schema/tables.sql`; its five procedures are canonical under `SP/`.
+- `migrations/2026-06-18_inventory_product_image.sql` — idempotent migration adding product image metadata
+  columns (`ImagePath`, `ImageContentType`, `ImageFileSizeBytes`) to `InventoryItems`. Columns are now captured
+  in `schema/tables.sql`; `sp_Inventory_SetImage` and `sp_Inventory_ClearImage` are canonical under `SP/`.
+- `migrations/2026-06-18_inventory_category_cleanup.sql` — idempotent, intentional business-data cleanup that
+  deletes obsolete-category items (`בטיחות אש`, `בקרת כניסה`) and normalizes legacy aliases
+  (`כריזה ומולטימדיה` → `מולטימדיה`, `מצלמות ואבטחה` → `מצלמות אבטחה`). Runs in a single transaction
+  (`SET XACT_ABORT ON` + `TRY/CATCH`). Because `FK_ProjectBoqItems_InventoryItems` and
+  `FK_ProjectEquipmentItems_InventoryItems` reference `InventoryItems` with `NO ACTION`, it first deletes the
+  dependent `ProjectBoqItems` / `ProjectEquipmentItems` rows that reference exactly the obsolete
+  `InventoryItemId`s (parents and unrelated rows untouched; no FK is dropped and no cascade is added), then the
+  items. Reports the `ImagePath` values of rows it deletes so their on-disk files can be removed manually (SQL
+  does not delete physical files) and returns a summary result set of all counts.
 - `SP/2026-04-20_workplan_algorithm_data_model_extension.sql` — conditional `ALTER TABLE ADD COLUMN` migration for
   the work-plan algorithm. Its columns are already present in `schema/tables.sql`, so a fresh build does **not**
   need it. Retained as migration history.

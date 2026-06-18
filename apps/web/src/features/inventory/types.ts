@@ -11,6 +11,8 @@ export interface InventoryItem {
   locationName?: string;
   notes?: string;
   isActive: boolean;
+  // Absolute, browser-usable product image URL returned by the API. Absent when no image is set.
+  imageUrl?: string;
 }
 
 export interface InventoryFilters {
@@ -18,6 +20,14 @@ export interface InventoryFilters {
   category?: string;
   status: InventoryStatusFilter;
   lowStockOnly: boolean;
+}
+
+export type InventoryViewMode = 'card' | 'table';
+
+export interface InventoryCategorySummary {
+  name: string;
+  activeCount: number;
+  totalCount: number;
 }
 
 export interface CreateInventoryItemRequest {

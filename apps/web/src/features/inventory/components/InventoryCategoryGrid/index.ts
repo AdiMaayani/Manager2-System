@@ -1,0 +1,1 @@
+export { InventoryCategoryGrid } from './InventoryCategoryGrid';

@@ -43,3 +43,17 @@ export function updateInventoryItemAsync(
 export function deactivateInventoryItemAsync(id: number): Promise<void> {
   return apiRequest<void>(`/Inventory/${id}`, { method: 'DELETE' });
 }
+
+export function uploadInventoryItemImageAsync(id: number, file: File): Promise<InventoryItem> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  return apiRequest<InventoryItem>(`/Inventory/${id}/image`, {
+    method: 'POST',
+    body: formData,
+  });
+}
+
+export function removeInventoryItemImageAsync(id: number): Promise<InventoryItem> {
+  return apiRequest<InventoryItem>(`/Inventory/${id}/image`, { method: 'DELETE' });
+}

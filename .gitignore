@@ -40,5 +40,9 @@ Thumbs.db
 apps/web/dist/
 apps/web/.vite/
 
+# ── Uploaded runtime assets (keep folders, ignore uploaded files) ──
+apps/api/ManageR2.Api/wwwroot/uploads/inventory/*
+!apps/api/ManageR2.Api/wwwroot/uploads/inventory/.gitkeep
+
 # ── Legacy reference clone (read-only, not part of monorepo) ──
 _temp/

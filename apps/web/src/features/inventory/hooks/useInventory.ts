@@ -3,7 +3,9 @@ import {
   createInventoryItemAsync,
   deactivateInventoryItemAsync,
   getInventoryItemsAsync,
+  removeInventoryItemImageAsync,
   updateInventoryItemAsync,
+  uploadInventoryItemImageAsync,
 } from '../api/inventoryApiClient';
 import type { CreateInventoryItemRequest, InventoryFilters } from '../types';
 
@@ -37,5 +39,22 @@ export function useInventoryMutations() {
     onSuccess: invalidate,
   });
 
-  return { createMutation, updateMutation, deactivateMutation };
+  const uploadImageMutation = useMutation({
+    mutationFn: ({ id, file }: { id: number; file: File }) =>
+      uploadInventoryItemImageAsync(id, file),
+    onSuccess: invalidate,
+  });
+
+  const removeImageMutation = useMutation({
+    mutationFn: (id: number) => removeInventoryItemImageAsync(id),
+    onSuccess: invalidate,
+  });
+
+  return {
+    createMutation,
+    updateMutation,
+    deactivateMutation,
+    uploadImageMutation,
+    removeImageMutation,
+  };
 }

@@ -1,0 +1,2 @@
+# Storage location for uploaded inventory product images (served as static files at /uploads/inventory).
+# This file keeps the directory present in version control; uploaded image files are git-ignored.
