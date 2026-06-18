@@ -16,5 +16,8 @@ public class AuditLogQuery
 
     public int? UserId { get; set; }
 
+    // Single free-text search across Action/Summary/EntityType/UserName/EntityId (raw stored values).
+    public string? Search { get; set; }
+
     public int MaxRows { get; set; } = 200;
 }

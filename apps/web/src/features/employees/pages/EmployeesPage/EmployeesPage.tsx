@@ -8,6 +8,7 @@ import { Badge } from '@shared/components/Badge';
 import { FilterBar, FilterField } from '@shared/components/FilterBar';
 import { Input } from '@shared/components/Input';
 import { Button } from '@shared/components/Button';
+import { SegmentedControl, type SegmentItem } from '@shared/components/SegmentedControl';
 import { InlineAlert } from '@shared/components/InlineAlert';
 import { DataTable, type DataTableColumn } from '@shared/components/DataTable';
 import { getCurrentUser } from '@api/auth';
@@ -16,10 +17,18 @@ import { useEmployees } from '../../hooks/useEmployees';
 import type { Employee } from '../../types';
 import './EmployeesPage.css';
 
+const STATUS_FILTERS = ['פעילים', 'בארכיון', 'הכול'] as const;
+type StatusFilter = (typeof STATUS_FILTERS)[number];
+const STATUS_FILTER_ITEMS: SegmentItem<StatusFilter>[] = STATUS_FILTERS.map((f) => ({
+  id: f,
+  label: f,
+}));
+
 export function EmployeesPage() {
   const { data: employees, isLoading, error, refetch } = useEmployees();
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('הכול');
   // undefined = drawer closed, null = create mode, Employee = review existing.
   const [drawerEmployee, setDrawerEmployee] = useState<Employee | null | undefined>(undefined);
   const [pageMessage, setPageMessage] = useState<string | null>(null);
@@ -50,15 +59,28 @@ export function EmployeesPage() {
   const filtered = useMemo(() => {
     if (!employees) return [];
     const q = search.trim().toLowerCase();
-    if (!q) return employees;
-    return employees.filter(
-      (e) =>
+    return employees.filter((e) => {
+      const matchesStatus =
+        statusFilter === 'הכול' ||
+        (statusFilter === 'פעילים' && e.isActive) ||
+        (statusFilter === 'בארכיון' && !e.isActive);
+      if (!matchesStatus) return false;
+      if (!q) return true;
+      return (
         e.fullName.toLowerCase().includes(q) ||
         e.primaryRole.toLowerCase().includes(q) ||
         (e.email ?? '').toLowerCase().includes(q) ||
-        (e.phone ?? '').includes(q),
-    );
-  }, [employees, search]);
+        (e.phone ?? '').includes(q)
+      );
+    });
+  }, [employees, search, statusFilter]);
+
+  const hasActiveFilters = Boolean(search.trim()) || statusFilter !== 'הכול';
+
+  const resetFilters = () => {
+    setSearch('');
+    setStatusFilter('הכול');
+  };
 
   const openEmployee = (employee: Employee) => {
     setDrawerEmployee(employee);
@@ -107,11 +129,18 @@ export function EmployeesPage() {
     <PageShell title="עובדים">
       <FilterBar
         actions={
-          canManageEmployees ? (
-            <Button iconStart={<Plus size={18} />} onClick={() => setDrawerEmployee(null)}>
-              עובד חדש
-            </Button>
-          ) : undefined
+          <>
+            {hasActiveFilters && (
+              <Button type="button" variant="ghost" onClick={resetFilters}>
+                נקה סינון
+              </Button>
+            )}
+            {canManageEmployees && (
+              <Button iconStart={<Plus size={18} />} onClick={() => setDrawerEmployee(null)}>
+                עובד חדש
+              </Button>
+            )}
+          </>
         }
       >
         <FilterField label="חיפוש" grow>
@@ -119,6 +148,16 @@ export function EmployeesPage() {
             placeholder="חיפוש עובד..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+          />
+        </FilterField>
+
+        <FilterField label="סטטוס">
+          <SegmentedControl
+            items={STATUS_FILTER_ITEMS}
+            value={statusFilter}
+            onChange={setStatusFilter}
+            ariaLabel="סינון לפי סטטוס"
+            size="sm"
           />
         </FilterField>
       </FilterBar>

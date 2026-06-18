@@ -4,7 +4,7 @@ import { Badge } from '@shared/components/Badge';
 import { Button } from '@shared/components/Button';
 import { DetailsField } from '@shared/components/DetailsField';
 import { DetailsSection } from '@shared/components/DetailsSection';
-import { Drawer } from '@shared/components/Drawer';
+import { Drawer, useDrawerMaximize } from '@shared/components/Drawer';
 import { Input } from '@shared/components/Input';
 import { Select } from '@shared/components/Select';
 import { Textarea } from '@shared/components/Textarea';
@@ -128,6 +128,7 @@ function InventoryDrawerContent({
     buildInitialState(inventoryItem, defaultCategory),
   );
   const [error, setError] = useState<string | null>(null);
+  const { isMaximized, toggleMaximize } = useDrawerMaximize(true);
 
   // Create persists the record and its image atomically (single request), so there is never a
   // half-created record to remember and a retry can never duplicate.
@@ -336,7 +337,36 @@ function InventoryDrawerContent({
       await deactivateMutation.mutateAsync(inventoryItem.inventoryItemId);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'ביטול פעילות פריט נכשל');
+      setError(err instanceof Error ? err.message : 'מחיקת הפריט נכשלה');
+    }
+  }
+
+  // Restore re-uses the standard update path with IsActive=1 (sp_Inventory_Update clears DeletedAt).
+  async function handleRestore() {
+    if (!isExistingItem) return;
+    setError(null);
+
+    const request: CreateInventoryItemRequest = {
+      skuCode: inventoryItem.skuCode,
+      itemName: inventoryItem.itemName,
+      category: inventoryItem.category || undefined,
+      quantityOnHand: inventoryItem.quantityOnHand,
+      unit: inventoryItem.unit,
+      minimumQuantity: inventoryItem.minimumQuantity ?? undefined,
+      locationName: inventoryItem.locationName || undefined,
+      notes: inventoryItem.notes || undefined,
+      isActive: true,
+    };
+
+    try {
+      const restoredItem = await updateMutation.mutateAsync({
+        id: inventoryItem.inventoryItemId,
+        request,
+      });
+      await onSaved?.(restoredItem ?? { ...inventoryItem, ...request });
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'שחזור הפריט נכשל');
     }
   }
 
@@ -370,11 +400,54 @@ function InventoryDrawerContent({
   // stages an actual image, so an unselected image is not mistaken for the product's photo.
   const showEmptyImagePlaceholder = !persistedItem && !previewUrl;
 
+  // Edit mode keeps only save/cancel; destructive + restore live in the read-only footer.
+  const editFooter = (
+    <div className="inventoryDrawer__footerContent">
+      {error && <InlineAlert variant="danger">{error}</InlineAlert>}
+      <div className="inventoryDrawer__actions">
+        <Button onClick={handleSave} isLoading={isSaving}>
+          שמור
+        </Button>
+        <Button variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
+          בטל שינויים
+        </Button>
+      </div>
+    </div>
+  );
+
+  const reviewFooter = isExistingItem ? (
+    <div className="inventoryDrawer__footerContent">
+      {error && <InlineAlert variant="danger">{error}</InlineAlert>}
+      <div className="inventoryDrawer__dangerActions">
+        {inventoryItem.isActive ? (
+          <ConfirmInline
+            triggerLabel="מחיקה"
+            message="למחוק את הפריט מהמלאי?"
+            confirmLabel="אישור מחיקה"
+            onConfirm={handleDeactivate}
+            isPending={isSaving}
+          />
+        ) : (
+          <ConfirmInline
+            triggerLabel="שחזור"
+            message="לשחזר את הפריט?"
+            confirmLabel="אישור שחזור"
+            variant="primary"
+            onConfirm={handleRestore}
+            isPending={isSaving}
+          />
+        )}
+      </div>
+    </div>
+  ) : undefined;
+
   return (
     <Drawer
       isOpen
       onClose={onClose}
       title={title}
+      isMaximized={isMaximized}
+      onToggleMaximize={toggleMaximize}
       headerActions={
         isExistingItem && !isEditing ? (
           <Button type="button" variant="secondary" onClick={handleStartEdit}>
@@ -382,33 +455,7 @@ function InventoryDrawerContent({
           </Button>
         ) : undefined
       }
-      footer={
-        isEditing ? (
-          <div className="inventoryDrawer__footerContent">
-            {error && <InlineAlert variant="danger">{error}</InlineAlert>}
-            <div className="inventoryDrawer__actions">
-              <Button onClick={handleSave} isLoading={isSaving}>
-                שמור
-              </Button>
-              <Button variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
-                בטל שינויים
-              </Button>
-
-              {isExistingItem && inventoryItem.isActive && (
-                <div className="inventoryDrawer__dangerActions">
-                  <ConfirmInline
-                    triggerLabel="השבת פריט"
-                    message="להשבית את הפריט?"
-                    confirmLabel="אישור השבתה"
-                    onConfirm={handleDeactivate}
-                    isPending={isSaving}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-        ) : undefined
-      }
+      footer={isEditing ? editFooter : reviewFooter}
     >
       {!isEditing && isExistingItem ? (
         <InventoryReviewDetails inventoryItem={inventoryItem} />

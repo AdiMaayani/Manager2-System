@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Drawer } from '@shared/components/Drawer';
+import { Drawer, useDrawerMaximize } from '@shared/components/Drawer';
 import { Badge } from '@shared/components/Badge';
 import { Button } from '@shared/components/Button';
 import { DetailsField } from '@shared/components/DetailsField';
@@ -193,6 +193,7 @@ function ServiceCallDrawerContent({
   const [isEditing, setIsEditing] = useState(!isExistingServiceCall);
   const [form, setForm] = useState<ServiceCallFormState>(() => buildInitialState(currentServiceCall));
   const [error, setError] = useState<string | null>(null);
+  const { isMaximized, toggleMaximize } = useDrawerMaximize(true);
   const [employeeIdToAssign, setEmployeeIdToAssign] = useState('');
   const [assignmentRole, setAssignmentRole] = useState(currentServiceCall?.requiredRole ?? '');
 
@@ -380,11 +381,44 @@ function ServiceCallDrawerContent({
       ? `עריכת קריאת שירות — ${currentServiceCall?.title ?? ''}`
       : `פרטי קריאת שירות — ${currentServiceCall?.title ?? ''}`;
 
+  // Edit mode keeps only save/cancel; closing the call lives in the read-only footer.
+  const editFooter = (
+    <div className="serviceCallDrawer__footerContent">
+      {error && <InlineAlert variant="danger">{error}</InlineAlert>}
+      <div className="serviceCallDrawer__actions">
+        <Button type="button" onClick={handleSave} isLoading={isSaving}>
+          שמור
+        </Button>
+        <Button type="button" variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
+          בטל שינויים
+        </Button>
+      </div>
+    </div>
+  );
+
+  const reviewFooter =
+    isExistingServiceCall && canManage && !currentServiceCall?.closedAt ? (
+      <div className="serviceCallDrawer__footerContent">
+        {error && <InlineAlert variant="danger">{error}</InlineAlert>}
+        <div className="serviceCallDrawer__dangerActions">
+          <ConfirmInline
+            triggerLabel="סגירת קריאה"
+            message="לסגור את הקריאה?"
+            confirmLabel="אישור סגירה"
+            onConfirm={handleCloseServiceCall}
+            isPending={isSaving}
+          />
+        </div>
+      </div>
+    ) : undefined;
+
   return (
     <Drawer
       isOpen
       onClose={onClose}
       title={title}
+      isMaximized={isMaximized}
+      onToggleMaximize={toggleMaximize}
       headerActions={
         isExistingServiceCall && !isEditing && canManage ? (
           <Button type="button" variant="secondary" onClick={handleStartEdit}>
@@ -392,33 +426,7 @@ function ServiceCallDrawerContent({
           </Button>
         ) : undefined
       }
-      footer={
-        isEditing ? (
-          <div className="serviceCallDrawer__footerContent">
-            {error && <InlineAlert variant="danger">{error}</InlineAlert>}
-            <div className="serviceCallDrawer__actions">
-              <Button type="button" onClick={handleSave} isLoading={isSaving}>
-                שמור
-              </Button>
-              <Button type="button" variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
-                בטל שינויים
-              </Button>
-
-              {isExistingServiceCall && !currentServiceCall?.closedAt && (
-                <div className="serviceCallDrawer__dangerActions">
-                  <ConfirmInline
-                    triggerLabel="סגור קריאה"
-                    message="לסגור את קריאת השירות?"
-                    confirmLabel="אישור סגירה"
-                    onConfirm={handleCloseServiceCall}
-                    isPending={isSaving}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-        ) : undefined
-      }
+      footer={isEditing ? editFooter : reviewFooter}
     >
       {serviceCallDetailsQuery.isLoading && <PageSpinner />}
       {serviceCallDetailsQuery.error != null && (

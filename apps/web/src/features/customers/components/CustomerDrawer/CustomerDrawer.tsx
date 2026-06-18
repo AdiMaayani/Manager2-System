@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Drawer } from '@shared/components/Drawer';
+import { Drawer, useDrawerMaximize } from '@shared/components/Drawer';
 import { Badge } from '@shared/components/Badge';
 import { Button } from '@shared/components/Button';
 import { DetailsField } from '@shared/components/DetailsField';
@@ -130,6 +130,7 @@ function CustomerDrawerContent({ customer, onClose, onSaved }: CustomerDrawerCon
   const [isEditing, setIsEditing] = useState(!isExistingCustomer);
   const [form, setForm] = useState<CustomerFormState>(() => buildInitialState(customer));
   const [error, setError] = useState<string | null>(null);
+  const { isMaximized, toggleMaximize } = useDrawerMaximize(true);
 
   function setField<K extends keyof CustomerFormState>(key: K, value: CustomerFormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -215,7 +216,37 @@ function CustomerDrawerContent({ customer, onClose, onSaved }: CustomerDrawerCon
       await deactivateMutation.mutateAsync(customer.customerId);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'ביטול פעילות נכשל');
+      setError(err instanceof Error ? err.message : 'מחיקה נכשלה');
+    }
+  }
+
+  // Restore re-uses the standard update path with IsActive=1 (no related-entity gap).
+  async function handleRestore() {
+    if (!isExistingCustomer) return;
+    setError(null);
+
+    const request: CreateCustomerRequest = {
+      customerName: customer.customerName,
+      customerType: customer.customerType,
+      primaryPhone: customer.primaryPhone || undefined,
+      primaryEmail: customer.primaryEmail || undefined,
+      city: customer.city || undefined,
+      region: customer.region || undefined,
+      address: customer.address || undefined,
+      status: 'פעיל',
+      notes: customer.notes || undefined,
+      isActive: true,
+    };
+
+    try {
+      const restoredCustomer = await updateMutation.mutateAsync({
+        id: customer.customerId,
+        request,
+      });
+      await onSaved?.(restoredCustomer ?? { ...customer, ...request });
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'שחזור נכשל');
     }
   }
 
@@ -228,11 +259,55 @@ function CustomerDrawerContent({ customer, onClose, onSaved }: CustomerDrawerCon
       ? `עריכת לקוח — ${customer.customerName}`
       : `פרטי לקוח — ${customer.customerName}`;
 
+  // Edit mode keeps only save/cancel; destructive + restore live in the read-only footer.
+  const editFooter = (
+    <div className="customerDrawer__footerContent">
+      {error && <InlineAlert variant="danger">{error}</InlineAlert>}
+      <div className="customerDrawer__actions">
+        <Button onClick={handleSave} isLoading={isSaving}>
+          שמור
+        </Button>
+        <Button variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
+          בטל שינויים
+        </Button>
+      </div>
+    </div>
+  );
+
+  const reviewFooter =
+    isExistingCustomer && canManage ? (
+      <div className="customerDrawer__footerContent">
+        {error && <InlineAlert variant="danger">{error}</InlineAlert>}
+        <div className="customerDrawer__dangerActions">
+          {customer.isActive ? (
+            <ConfirmInline
+              triggerLabel="מחיקה"
+              message="למחוק את הלקוח? הלקוח יוסר מהרשימות הפעילות."
+              confirmLabel="אישור מחיקה"
+              onConfirm={handleDeactivate}
+              isPending={isSaving}
+            />
+          ) : (
+            <ConfirmInline
+              triggerLabel="שחזור"
+              message="לשחזר את הלקוח?"
+              confirmLabel="אישור שחזור"
+              variant="primary"
+              onConfirm={handleRestore}
+              isPending={isSaving}
+            />
+          )}
+        </div>
+      </div>
+    ) : undefined;
+
   return (
     <Drawer
       isOpen
       onClose={onClose}
       title={title}
+      isMaximized={isMaximized}
+      onToggleMaximize={toggleMaximize}
       headerActions={
         isExistingCustomer && !isEditing && canManage ? (
           <Button type="button" variant="secondary" onClick={handleStartEdit}>
@@ -240,33 +315,7 @@ function CustomerDrawerContent({ customer, onClose, onSaved }: CustomerDrawerCon
           </Button>
         ) : undefined
       }
-      footer={
-        isEditing ? (
-          <div className="customerDrawer__footerContent">
-            {error && <InlineAlert variant="danger">{error}</InlineAlert>}
-            <div className="customerDrawer__actions">
-              <Button onClick={handleSave} isLoading={isSaving}>
-                שמור
-              </Button>
-              <Button variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
-                בטל שינויים
-              </Button>
-
-              {isExistingCustomer && customer.isActive && (
-                <div className="customerDrawer__dangerActions">
-                  <ConfirmInline
-                    triggerLabel="השבת לקוח"
-                    message="להשבית את הלקוח?"
-                    confirmLabel="אישור השבתה"
-                    onConfirm={handleDeactivate}
-                    isPending={isSaving}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-        ) : undefined
-      }
+      footer={isEditing ? editFooter : reviewFooter}
     >
       {!isEditing && isExistingCustomer ? (
         <CustomerReviewDetails customer={customer} />

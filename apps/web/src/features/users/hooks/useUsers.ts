@@ -5,9 +5,10 @@ import {
   getUserDepartmentsAsync,
   getUserRolesAsync,
   getUsersAsync,
+  restoreUserAsync,
   updateUserAsync,
 } from '../api/usersApiClient';
-import type { CreateUserRequest, UpdateUserRequest } from '../types';
+import type { CreateUserRequest, RestoreUserRequest, UpdateUserRequest } from '../types';
 
 export function useUsers() {
   return useQuery({
@@ -52,5 +53,11 @@ export function useUserMutations() {
     onSuccess: invalidateUsers,
   });
 
-  return { createMutation, updateMutation, deleteMutation };
+  const restoreMutation = useMutation({
+    mutationFn: ({ id, request }: { id: number; request: RestoreUserRequest }) =>
+      restoreUserAsync(id, request),
+    onSuccess: invalidateUsers,
+  });
+
+  return { createMutation, updateMutation, deleteMutation, restoreMutation };
 }

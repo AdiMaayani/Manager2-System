@@ -9,6 +9,7 @@ import { ErrorState } from '@shared/components/ErrorState';
 import { FilterBar, FilterField } from '@shared/components/FilterBar';
 import { Input } from '@shared/components/Input';
 import { Select } from '@shared/components/Select';
+import { SegmentedControl, type SegmentItem } from '@shared/components/SegmentedControl';
 import { DataTable, type DataTableColumn } from '@shared/components/DataTable';
 import { PageShell } from '@shared/components/PageShell';
 import { PageSpinner } from '@shared/components/PageSpinner';
@@ -38,6 +39,12 @@ import type {
 import './InventoryPage.css';
 
 const VIEW_MODE_STORAGE_KEY = 'manager2_inventory_view_mode';
+
+const STATUS_FILTER_ITEMS: SegmentItem<InventoryStatusFilter>[] = [
+  { id: 'active', label: 'פעילים' },
+  { id: 'inactive', label: 'מחוקים' },
+  { id: 'all', label: 'הכול' },
+];
 
 export function InventoryPage() {
   // The selected category lives in the URL (?category=...) so it survives refresh and
@@ -163,6 +170,25 @@ export function InventoryPage() {
     setSearchParams(nextParams);
   };
 
+  // Switching category from the filter Select keeps the current product filters (acts as a filter,
+  // not a fresh drill-down). An empty value returns to the category overview.
+  const handleCategoryChange = (value: string) => {
+    const nextParams = new URLSearchParams(searchParams);
+    if (value) {
+      nextParams.set('category', value);
+    } else {
+      nextParams.delete('category');
+    }
+    setSearchParams(nextParams);
+  };
+
+  const resetProductFilters = () => {
+    setSearch('');
+    setDebouncedSearch('');
+    setStatus('active');
+    setLowStockOnly(false);
+  };
+
   const openInventoryItem = (item: InventoryItem) => {
     setDrawerInventoryItem(item);
   };
@@ -264,6 +290,11 @@ export function InventoryPage() {
           <FilterBar
             actions={
               <div className="inventoryPage__toolbarActions">
+                {hasProductFilters && (
+                  <Button type="button" variant="ghost" onClick={resetProductFilters}>
+                    נקה סינון
+                  </Button>
+                )}
                 <InventoryViewSwitcher value={viewMode} onChange={setViewMode} />
                 <Button iconStart={<Plus size={18} />} onClick={() => setDrawerInventoryItem(null)}>
                   פריט חדש
@@ -280,23 +311,35 @@ export function InventoryPage() {
             </FilterField>
 
             <FilterField label="סטטוס">
-              <Select
+              <SegmentedControl
+                items={STATUS_FILTER_ITEMS}
                 value={status}
-                onChange={(event) => setStatus(event.target.value as InventoryStatusFilter)}
+                onChange={setStatus}
+                ariaLabel="סינון לפי סטטוס"
+                size="sm"
+              />
+            </FilterField>
+
+            <FilterField label="קטגוריה">
+              <Select
+                value={selectedCategory ?? ''}
+                onChange={(event) => handleCategoryChange(event.target.value)}
               >
-                <option value="active">פעילים</option>
-                <option value="inactive">לא פעילים</option>
-                <option value="all">הכול</option>
+                {CANONICAL_CATEGORIES.map((name) => (
+                  <option key={name} value={name}>
+                    {categoryDisplayName(name)}
+                  </option>
+                ))}
               </Select>
             </FilterField>
 
-            <div className="inventoryPage__checkboxField">
+            <FilterField label="מלאי">
               <Checkbox
                 label="מתחת למינימום"
                 checked={lowStockOnly}
                 onChange={(event) => setLowStockOnly(event.target.checked)}
               />
-            </div>
+            </FilterField>
           </FilterBar>
 
           {productsError ? (

@@ -1,13 +1,21 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { PageShell } from '@shared/components/PageShell';
 import { PageSpinner } from '@shared/components/PageSpinner';
 import { ErrorState } from '@shared/components/ErrorState';
 import { StatusBadge } from '@shared/components/StatusBadge';
+import { Button } from '@shared/components/Button';
 import { FilterBar, FilterField } from '@shared/components/FilterBar';
 import { Input } from '@shared/components/Input';
 import { Select } from '@shared/components/Select';
+import { SegmentedControl, type SegmentItem } from '@shared/components/SegmentedControl';
 import { DataTable, type DataTableColumn } from '@shared/components/DataTable';
 import { useAuditLog } from '../../hooks/useAuditLog';
+import { AuditLogDrawer } from '../../components/AuditLogDrawer';
+import {
+  buildAuditDisplaySummary,
+  localizeAuditAction,
+  localizeAuditEntityType,
+} from '../../auditLabels';
 import type { AuditLogEntry, AuditLogFilters } from '../../types';
 import './AuditLogPage.css';
 
@@ -19,7 +27,12 @@ const ENTITY_TYPE_OPTIONS = [
   'WorkItem',
 ];
 
-const SEVERITY_OPTIONS = ['Info', 'Warning', 'Critical'];
+const SEVERITY_FILTER_ITEMS: SegmentItem<string>[] = [
+  { id: '', label: 'הכול' },
+  { id: 'Info', label: 'מידע' },
+  { id: 'Warning', label: 'אזהרה' },
+  { id: 'Critical', label: 'קריטי' },
+];
 
 function formatDateTime(value: string): string {
   if (!value) return '-';
@@ -28,37 +41,39 @@ function formatDateTime(value: string): string {
   return parsed.toLocaleString('he-IL');
 }
 
-// Local date input (yyyy-mm-dd) → ISO bounds covering the full day in the user's timezone.
-function toDayStart(value: string): string | undefined {
-  if (!value) return undefined;
-  return new Date(`${value}T00:00:00`).toISOString();
-}
-
-function toDayEnd(value: string): string | undefined {
-  if (!value) return undefined;
-  return new Date(`${value}T23:59:59`).toISOString();
-}
-
 export function AuditLogPage() {
-  const [actionInput, setActionInput] = useState('');
+  // Single free-text search drives the backend `search` param (server-filtered + capped endpoint).
+  const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
   const [entityType, setEntityType] = useState('');
   const [severity, setSeverity] = useState('');
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
+  const [selectedEntry, setSelectedEntry] = useState<AuditLogEntry | null>(null);
+
+  useEffect(() => {
+    const timeoutId = window.setTimeout(() => setDebouncedSearch(search), 300);
+    return () => window.clearTimeout(timeoutId);
+  }, [search]);
 
   const filters = useMemo<AuditLogFilters>(
     () => ({
-      action: actionInput.trim() || undefined,
+      search: debouncedSearch.trim() || undefined,
       entityType: entityType || undefined,
       severity: severity || undefined,
-      fromUtc: toDayStart(fromDate),
-      toUtc: toDayEnd(toDate),
       maxRows: 200,
     }),
-    [actionInput, entityType, severity, fromDate, toDate],
+    [debouncedSearch, entityType, severity],
   );
 
   const { data: entries, isLoading, error, refetch } = useAuditLog(filters);
+
+  const hasActiveFilters =
+    Boolean(search.trim()) || Boolean(entityType) || Boolean(severity);
+
+  const resetFilters = () => {
+    setSearch('');
+    setEntityType('');
+    setSeverity('');
+  };
 
   if (isLoading) {
     return (
@@ -85,25 +100,38 @@ export function AuditLogPage() {
       header: 'משתמש',
       cell: (entry) => entry.userName ?? (entry.userId != null ? `#${entry.userId}` : '-'),
     },
-    { id: 'action', header: 'פעולה', cell: (entry) => entry.action },
-    { id: 'entityType', header: 'סוג ישות', cell: (entry) => entry.entityType },
+    { id: 'action', header: 'פעולה', cell: (entry) => localizeAuditAction(entry.action) },
+    {
+      id: 'entityType',
+      header: 'סוג ישות',
+      cell: (entry) => localizeAuditEntityType(entry.entityType),
+    },
     { id: 'entityId', header: 'מזהה ישות', cell: (entry) => entry.entityId ?? '-' },
     {
       id: 'severity',
       header: 'חומרה',
       cell: (entry) => <StatusBadge domain="severity" status={entry.severity} />,
     },
-    { id: 'summary', header: 'תיאור', cell: (entry) => entry.summary },
+    { id: 'summary', header: 'תיאור', cell: (entry) => buildAuditDisplaySummary(entry) },
   ];
 
   return (
     <PageShell title="יומן ביקורת" wide>
-      <FilterBar>
-        <FilterField label="פעולה" grow>
+      <FilterBar
+        actions={
+          hasActiveFilters ? (
+            <Button type="button" variant="ghost" onClick={resetFilters}>
+              נקה סינון
+            </Button>
+          ) : undefined
+        }
+      >
+        <FilterField label="חיפוש" grow>
           <Input
-            placeholder="לדוגמה: LoginSucceeded"
-            value={actionInput}
-            onChange={(event) => setActionInput(event.target.value)}
+            type="search"
+            placeholder="פעולה, תיאור, משתמש, סוג ישות או מזהה..."
+            value={search}
+            onChange={(event) => setSearch(event.target.value)}
           />
         </FilterField>
 
@@ -112,33 +140,20 @@ export function AuditLogPage() {
             <option value="">הכול</option>
             {ENTITY_TYPE_OPTIONS.map((option) => (
               <option key={option} value={option}>
-                {option}
+                {localizeAuditEntityType(option)}
               </option>
             ))}
           </Select>
         </FilterField>
 
         <FilterField label="חומרה">
-          <Select value={severity} onChange={(event) => setSeverity(event.target.value)}>
-            <option value="">הכול</option>
-            {SEVERITY_OPTIONS.map((option) => (
-              <option key={option} value={option}>
-                {option}
-              </option>
-            ))}
-          </Select>
-        </FilterField>
-
-        <FilterField label="מתאריך">
-          <Input
-            type="date"
-            value={fromDate}
-            onChange={(event) => setFromDate(event.target.value)}
+          <SegmentedControl
+            items={SEVERITY_FILTER_ITEMS}
+            value={severity}
+            onChange={setSeverity}
+            ariaLabel="סינון לפי חומרה"
+            size="sm"
           />
-        </FilterField>
-
-        <FilterField label="עד תאריך">
-          <Input type="date" value={toDate} onChange={(event) => setToDate(event.target.value)} />
         </FilterField>
       </FilterBar>
 
@@ -146,8 +161,16 @@ export function AuditLogPage() {
         columns={columns}
         rows={rows}
         getRowId={(entry) => entry.auditLogId}
+        onRowClick={(entry) => setSelectedEntry(entry)}
+        selectedRowId={selectedEntry?.auditLogId ?? null}
         minWidth={980}
         emptyTitle="לא נמצאו רשומות ביומן הביקורת"
+      />
+
+      <AuditLogDrawer
+        entry={selectedEntry}
+        isOpen={selectedEntry != null}
+        onClose={() => setSelectedEntry(null)}
       />
     </PageShell>
   );

@@ -5,7 +5,7 @@ import type { AuditLogEntry, AuditLogFilters } from '../types';
 export function getAuditLogAsync(filters: AuditLogFilters = {}): Promise<AuditLogEntry[]> {
   const params = new URLSearchParams();
 
-  if (filters.action) params.set('action', filters.action);
+  if (filters.search) params.set('search', filters.search);
   if (filters.entityType) params.set('entityType', filters.entityType);
   if (filters.severity) params.set('severity', filters.severity);
   if (filters.fromUtc) params.set('fromUtc', filters.fromUtc);

@@ -1,5 +1,10 @@
 import { apiRequest } from '@api/client';
-import type { CreateUserRequest, UpdateUserRequest, User } from '../types';
+import type {
+  CreateUserRequest,
+  RestoreUserRequest,
+  UpdateUserRequest,
+  User,
+} from '../types';
 
 export function getUsersAsync(): Promise<User[]> {
   return apiRequest<User[]>('/Users');
@@ -29,4 +34,11 @@ export function updateUserAsync(id: number, request: UpdateUserRequest): Promise
 
 export function deleteUserAsync(id: number): Promise<void> {
   return apiRequest<void>(`/Users/${id}`, { method: 'DELETE' });
+}
+
+export function restoreUserAsync(id: number, request: RestoreUserRequest): Promise<User> {
+  return apiRequest<User>(`/Users/${id}/restore`, {
+    method: 'POST',
+    body: JSON.stringify(request),
+  });
 }

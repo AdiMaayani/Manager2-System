@@ -30,6 +30,7 @@ public static class AuditActions
     public const string UserCreated = "UserCreated";
     public const string UserUpdated = "UserUpdated";
     public const string UserDeleted = "UserDeleted";
+    public const string UserRestored = "UserRestored";
 
     // Customer Systems Vault
     public const string CustomerSystemCreated = "CustomerSystemCreated";

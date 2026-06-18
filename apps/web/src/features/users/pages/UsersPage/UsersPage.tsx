@@ -9,6 +9,7 @@ import { Badge } from '@shared/components/Badge';
 import { Button } from '@shared/components/Button';
 import { FilterBar, FilterField } from '@shared/components/FilterBar';
 import { Input } from '@shared/components/Input';
+import { Select } from '@shared/components/Select';
 import { InlineAlert } from '@shared/components/InlineAlert';
 import { SegmentedControl, type SegmentItem } from '@shared/components/SegmentedControl';
 import { DataTable, type DataTableColumn } from '@shared/components/DataTable';
@@ -19,7 +20,7 @@ import { useUserLookups, useUsers } from '../../hooks/useUsers';
 import type { User } from '../../types';
 import './UsersPage.css';
 
-const ACTIVE_FILTERS = ['הכל', 'פעילים', 'לא פעילים'] as const;
+const ACTIVE_FILTERS = ['פעילים', 'מחוקים', 'הכול'] as const;
 type ActiveFilter = (typeof ACTIVE_FILTERS)[number];
 
 const ACTIVE_FILTER_ITEMS: SegmentItem<ActiveFilter>[] = ACTIVE_FILTERS.map((f) => ({
@@ -50,7 +51,8 @@ export function UsersPage() {
 
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
-  const [activeFilter, setActiveFilter] = useState<ActiveFilter>('הכל');
+  const [activeFilter, setActiveFilter] = useState<ActiveFilter>('הכול');
+  const [roleFilter, setRoleFilter] = useState('');
   // undefined = drawer closed, null = create mode, User = review existing.
   const [drawerUser, setDrawerUser] = useState<User | null | undefined>(undefined);
   const [pageMessage, setPageMessage] = useState<string | null>(null);
@@ -80,6 +82,14 @@ export function UsersPage() {
     [employees],
   );
 
+  const roleOptions = useMemo(() => {
+    const roles = new Set<string>();
+    (users ?? []).forEach((user) => user.roles.forEach((role) => roles.add(role)));
+    return Array.from(roles).sort((a, b) =>
+      getRoleDisplayLabel(a).localeCompare(getRoleDisplayLabel(b), 'he'),
+    );
+  }, [users]);
+
   const filteredUsers = useMemo(() => {
     if (!users) return [];
 
@@ -95,13 +105,24 @@ export function UsersPage() {
         user.departments.some((department) => department.toLowerCase().includes(query));
 
       const matchesActive =
-        activeFilter === 'הכל' ||
+        activeFilter === 'הכול' ||
         (activeFilter === 'פעילים' && user.isActive) ||
-        (activeFilter === 'לא פעילים' && !user.isActive);
+        (activeFilter === 'מחוקים' && !user.isActive);
 
-      return matchesSearch && matchesActive;
+      const matchesRole = !roleFilter || user.roles.includes(roleFilter);
+
+      return matchesSearch && matchesActive && matchesRole;
     });
-  }, [users, employeesById, search, activeFilter]);
+  }, [users, employeesById, search, activeFilter, roleFilter]);
+
+  const hasActiveFilters =
+    Boolean(search.trim()) || activeFilter !== 'הכול' || Boolean(roleFilter);
+
+  const resetFilters = () => {
+    setSearch('');
+    setActiveFilter('הכול');
+    setRoleFilter('');
+  };
 
   const openUser = (user: User) => {
     setPageMessage(null);
@@ -202,15 +223,22 @@ export function UsersPage() {
     <PageShell title="ניהול משתמשים" wide>
       <FilterBar
         actions={
-          <Button
-            iconStart={<Plus size={18} />}
-            onClick={() => {
-              setPageMessage(null);
-              setDrawerUser(null);
-            }}
-          >
-            משתמש חדש
-          </Button>
+          <>
+            {hasActiveFilters && (
+              <Button type="button" variant="ghost" onClick={resetFilters}>
+                נקה סינון
+              </Button>
+            )}
+            <Button
+              iconStart={<Plus size={18} />}
+              onClick={() => {
+                setPageMessage(null);
+                setDrawerUser(null);
+              }}
+            >
+              משתמש חדש
+            </Button>
+          </>
         }
       >
         <FilterField label="חיפוש" grow>
@@ -229,6 +257,17 @@ export function UsersPage() {
             ariaLabel="סינון לפי סטטוס"
             size="sm"
           />
+        </FilterField>
+
+        <FilterField label="תפקיד">
+          <Select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)}>
+            <option value="">כל התפקידים</option>
+            {roleOptions.map((role) => (
+              <option key={role} value={role}>
+                {getRoleDisplayLabel(role)}
+              </option>
+            ))}
+          </Select>
         </FilterField>
       </FilterBar>
 

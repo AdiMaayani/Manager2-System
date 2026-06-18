@@ -184,7 +184,7 @@ export function ReportDetailModal({
               </Button>
               <ConfirmInline
                 triggerLabel="מחיקה"
-                message="למחוק את הדיווח לצמיתות?"
+                message="למחוק את הדיווח? פעולה זו אינה הפיכה."
                 confirmLabel="אישור מחיקה"
                 onConfirm={() => deleteReport.mutate(report.reportId)}
                 isPending={deleteReport.isPending}

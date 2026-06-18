@@ -17,7 +17,7 @@ import type { Contact } from '../../types';
 import './ContactsPage.css';
 
 const SEGMENTS = ['הכל', 'לקוחות', 'נציגי לקוחות', 'ספקים', 'קבלנים', 'שותפים עסקיים'];
-const ACTIVE_FILTERS = ['הכל', 'פעילים', 'לא פעילים'] as const;
+const ACTIVE_FILTERS = ['פעילים', 'מחוקים', 'הכול'] as const;
 type ActiveFilter = (typeof ACTIVE_FILTERS)[number];
 
 const SEGMENT_ITEMS: SegmentItem<string>[] = SEGMENTS.map((s) => ({ id: s, label: s }));
@@ -36,7 +36,7 @@ export function ContactsPage() {
   const { data: contacts, isLoading, error, refetch } = useContacts();
   const [searchParams, setSearchParams] = useSearchParams();
   const [segment, setSegment] = useState('הכל');
-  const [activeFilter, setActiveFilter] = useState<ActiveFilter>('הכל');
+  const [activeFilter, setActiveFilter] = useState<ActiveFilter>('הכול');
   const [search, setSearch] = useState('');
   // undefined = drawer closed, null = create mode, Contact = review existing.
   const [drawerContact, setDrawerContact] = useState<Contact | null | undefined>(undefined);
@@ -74,12 +74,21 @@ export function ContactsPage() {
         (c.phone ?? '').includes(q) ||
         (c.email ?? '').toLowerCase().includes(q);
       const matchActive =
-        activeFilter === 'הכל' ||
+        activeFilter === 'הכול' ||
         (activeFilter === 'פעילים' && c.isActive) ||
-        (activeFilter === 'לא פעילים' && !c.isActive);
+        (activeFilter === 'מחוקים' && !c.isActive);
       return matchSegment && matchSearch && matchActive;
     });
   }, [contacts, segment, search, activeFilter]);
+
+  const hasActiveFilters =
+    Boolean(search.trim()) || segment !== 'הכל' || activeFilter !== 'הכול';
+
+  const resetFilters = () => {
+    setSearch('');
+    setSegment('הכל');
+    setActiveFilter('הכול');
+  };
 
   const openContact = (contact: Contact) => {
     setDrawerContact(contact);
@@ -116,11 +125,18 @@ export function ContactsPage() {
     <PageShell title="אנשי קשר">
       <FilterBar
         actions={
-          can('manageContacts') ? (
-            <Button iconStart={<Plus size={18} />} onClick={() => setDrawerContact(null)}>
-              איש קשר חדש
-            </Button>
-          ) : undefined
+          <>
+            {hasActiveFilters && (
+              <Button type="button" variant="ghost" onClick={resetFilters}>
+                נקה סינון
+              </Button>
+            )}
+            {can('manageContacts') && (
+              <Button iconStart={<Plus size={18} />} onClick={() => setDrawerContact(null)}>
+                איש קשר חדש
+              </Button>
+            )}
+          </>
         }
       >
         <FilterField label="חיפוש" grow>

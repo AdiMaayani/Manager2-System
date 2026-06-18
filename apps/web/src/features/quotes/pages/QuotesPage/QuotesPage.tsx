@@ -7,14 +7,21 @@ import { ErrorState } from '@shared/components/ErrorState';
 import { FilterBar, FilterField } from '@shared/components/FilterBar';
 import { Input } from '@shared/components/Input';
 import { Select } from '@shared/components/Select';
+import { SegmentedControl, type SegmentItem } from '@shared/components/SegmentedControl';
 import { PageShell } from '@shared/components/PageShell';
 import { PageSpinner } from '@shared/components/PageSpinner';
 import { QuoteDrawer } from '../../components/QuoteDrawer';
 import { QuotesTable } from '../../components/QuotesTable';
 import { QUOTE_STATUS_OPTIONS, getQuoteStatusLabel } from '../../constants/quoteStatus';
-import { useQuoteCustomerOptions, useQuoteProjectOptions, useQuotes } from '../../hooks/useQuotes';
+import { useQuoteCustomerOptions, useQuotes } from '../../hooks/useQuotes';
 import type { QuoteFilters, QuoteStatus } from '../../types';
 import './QuotesPage.css';
+
+// Status filter ids: '' means "all", otherwise a canonical QuoteStatus.
+const STATUS_FILTER_ITEMS: SegmentItem<QuoteStatus | ''>[] = [
+  { id: '', label: 'הכול' },
+  ...QUOTE_STATUS_OPTIONS.map((status) => ({ id: status, label: getQuoteStatusLabel(status) })),
+];
 
 interface DrawerState {
   isOpen: boolean;
@@ -29,14 +36,13 @@ export function QuotesPage() {
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [customerId, setCustomerId] = useState('');
+  // projectId has no visible control; it is set only via the project→quotes deep link and is still
+  // sent to the server filter (API support preserved). "נקה סינון" clears it.
   const [projectId, setProjectId] = useState(searchParams.get('projectId') ?? '');
   const [status, setStatus] = useState<QuoteStatus | ''>('');
-  const [fromDate, setFromDate] = useState('');
-  const [toDate, setToDate] = useState('');
   const [drawer, setDrawer] = useState<DrawerState>(CLOSED_DRAWER);
 
   const { data: customerOptions } = useQuoteCustomerOptions();
-  const { data: projectOptions } = useQuoteProjectOptions();
 
   useEffect(() => {
     const timeoutId = window.setTimeout(() => setDebouncedSearch(search), 300);
@@ -74,17 +80,20 @@ export function QuotesPage() {
       customerId: customerId ? Number(customerId) : undefined,
       projectId: projectId ? Number(projectId) : undefined,
       status: status || undefined,
-      fromDate: fromDate || undefined,
-      toDate: toDate || undefined,
     }),
-    [debouncedSearch, customerId, projectId, status, fromDate, toDate],
+    [debouncedSearch, customerId, projectId, status],
   );
 
   const { data: quotes, isLoading, error, refetch } = useQuotes(filters);
 
-  const hasFilters = Boolean(
-    search.trim() || customerId || projectId || status || fromDate || toDate,
-  );
+  const hasFilters = Boolean(search.trim() || customerId || projectId || status);
+
+  function resetFilters() {
+    setSearch('');
+    setCustomerId('');
+    setProjectId('');
+    setStatus('');
+  }
 
   function closeDrawer() {
     setDrawer(CLOSED_DRAWER);
@@ -94,9 +103,19 @@ export function QuotesPage() {
     <PageShell title="הצעות מחיר">
       <FilterBar
         actions={
-          <Button iconStart={<Plus size={18} />} onClick={() => setDrawer({ isOpen: true, quoteId: null })}>
-            הצעה חדשה
-          </Button>
+          <>
+            {hasFilters && (
+              <Button type="button" variant="ghost" onClick={resetFilters}>
+                נקה סינון
+              </Button>
+            )}
+            <Button
+              iconStart={<Plus size={18} />}
+              onClick={() => setDrawer({ isOpen: true, quoteId: null })}
+            >
+              הצעה חדשה
+            </Button>
+          </>
         }
       >
         <FilterField label="חיפוש" grow>
@@ -104,6 +123,16 @@ export function QuotesPage() {
             placeholder="מספר הצעה, לקוח, פרויקט..."
             value={search}
             onChange={(event) => setSearch(event.target.value)}
+          />
+        </FilterField>
+
+        <FilterField label="סטטוס">
+          <SegmentedControl
+            items={STATUS_FILTER_ITEMS}
+            value={status}
+            onChange={setStatus}
+            ariaLabel="סינון לפי סטטוס"
+            size="sm"
           />
         </FilterField>
 
@@ -116,47 +145,6 @@ export function QuotesPage() {
               </option>
             ))}
           </Select>
-        </FilterField>
-
-        <FilterField label="פרויקט">
-          <Select value={projectId} onChange={(event) => setProjectId(event.target.value)}>
-            <option value="">כל הפרויקטים</option>
-            {(projectOptions ?? []).map((project) => (
-              <option key={project.workItemId} value={project.workItemId}>
-                {project.title}
-              </option>
-            ))}
-          </Select>
-        </FilterField>
-
-        <FilterField label="סטטוס">
-          <Select
-            value={status}
-            onChange={(event) => setStatus(event.target.value as QuoteStatus | '')}
-          >
-            <option value="">כל הסטטוסים</option>
-            {QUOTE_STATUS_OPTIONS.map((statusOption) => (
-              <option key={statusOption} value={statusOption}>
-                {getQuoteStatusLabel(statusOption)}
-              </option>
-            ))}
-          </Select>
-        </FilterField>
-
-        <FilterField label="מתאריך">
-          <Input
-            type="date"
-            value={fromDate}
-            onChange={(event) => setFromDate(event.target.value)}
-          />
-        </FilterField>
-
-        <FilterField label="עד תאריך">
-          <Input
-            type="date"
-            value={toDate}
-            onChange={(event) => setToDate(event.target.value)}
-          />
         </FilterField>
       </FilterBar>
 

@@ -300,7 +300,7 @@ function SystemCard({ customerId, system, canManage, canReveal }: SystemCardProp
     try {
       await deactivateMutation.mutateAsync(system.customerSystemId);
     } catch (err) {
-      setError(describeError(err, 'השבתת מערכת נכשלה.'));
+      setError(describeError(err, 'מחיקת מערכת נכשלה.'));
     }
   }
 
@@ -348,9 +348,9 @@ function SystemCard({ customerId, system, canManage, canReveal }: SystemCardProp
             </Button>
             {system.isActive && (
               <ConfirmInline
-                triggerLabel="השבת מערכת"
-                message="להשבית מערכת זו?"
-                confirmLabel="אישור"
+                triggerLabel="מחיקה"
+                message="למחוק מערכת זו?"
+                confirmLabel="אישור מחיקה"
                 onConfirm={handleDeactivate}
                 isPending={deactivateMutation.isPending}
               />
@@ -567,12 +567,12 @@ function SecretRow({ customerSystemId, secret, canManage, canReveal }: SecretRow
             variant="secondary"
             onClick={() =>
               deactivateMutation.mutate(secret.secretId, {
-                onError: (err) => setError(describeError(err, 'השבתת הסוד נכשלה.')),
+                onError: (err) => setError(describeError(err, 'מחיקת הסוד נכשלה.')),
               })
             }
             disabled={deactivateMutation.isPending}
           >
-            השבת
+            מחיקה
           </Button>
         )}
 

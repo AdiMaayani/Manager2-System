@@ -9,6 +9,7 @@ import { Button } from '@shared/components/Button';
 import { FilterBar, FilterField } from '@shared/components/FilterBar';
 import { Input } from '@shared/components/Input';
 import { Select } from '@shared/components/Select';
+import { SegmentedControl, type SegmentItem } from '@shared/components/SegmentedControl';
 import { InlineAlert } from '@shared/components/InlineAlert';
 import { DataTable, type DataTableColumn } from '@shared/components/DataTable';
 import { usePermissions } from '@shared/auth/usePermissions';
@@ -23,6 +24,16 @@ const PRIORITY_LABELS: Record<string, string> = {
   High: 'גבוהה',
   Urgent: 'דחופה',
 };
+
+const STATUS_FILTER_ITEMS: SegmentItem<string>[] = [
+  { id: 'all', label: 'הכול' },
+  { id: 'Open', label: 'פתוחה' },
+  { id: 'InProgress', label: 'בטיפול' },
+  { id: 'Done', label: 'בוצעה' },
+  { id: 'Cancelled', label: 'בוטלה' },
+];
+
+const PRIORITY_OPTIONS = ['Low', 'Medium', 'High', 'Urgent'];
 
 function getPriorityLabel(priority?: string | null): string {
   if (!priority) return '-';
@@ -58,6 +69,7 @@ export function ServiceCallsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [priorityFilter, setPriorityFilter] = useState('all');
   // undefined = drawer closed, null = create mode, ServiceCallDetails = review existing.
   const [drawerServiceCall, setDrawerServiceCall] = useState<ServiceCallDetails | null | undefined>(
     undefined,
@@ -91,12 +103,22 @@ export function ServiceCallsPage() {
 
     return calls.filter((serviceCall) => {
       const matchesStatus = statusFilter === 'all' || serviceCall.status === statusFilter;
+      const matchesPriority = priorityFilter === 'all' || serviceCall.priority === priorityFilter;
       const matchesSearch =
         !normalizedSearch || buildSearchText(serviceCall).includes(normalizedSearch);
 
-      return matchesStatus && matchesSearch;
+      return matchesStatus && matchesPriority && matchesSearch;
     });
-  }, [search, serviceCalls, statusFilter]);
+  }, [search, serviceCalls, statusFilter, priorityFilter]);
+
+  const hasActiveFilters =
+    Boolean(search.trim()) || statusFilter !== 'all' || priorityFilter !== 'all';
+
+  const resetFilters = () => {
+    setSearch('');
+    setStatusFilter('all');
+    setPriorityFilter('all');
+  };
 
   const openServiceCall = (serviceCall: ServiceCallListItem) => {
     setPageMessage(null);
@@ -131,18 +153,25 @@ export function ServiceCallsPage() {
     <PageShell title="קריאות שירות">
       <FilterBar
         actions={
-          canManageServiceCalls ? (
-            <Button
-              type="button"
-              iconStart={<Plus size={18} />}
-              onClick={() => {
-                setPageMessage(null);
-                setDrawerServiceCall(null);
-              }}
-            >
-              קריאה חדשה
-            </Button>
-          ) : undefined
+          <>
+            {hasActiveFilters && (
+              <Button type="button" variant="ghost" onClick={resetFilters}>
+                נקה סינון
+              </Button>
+            )}
+            {canManageServiceCalls && (
+              <Button
+                type="button"
+                iconStart={<Plus size={18} />}
+                onClick={() => {
+                  setPageMessage(null);
+                  setDrawerServiceCall(null);
+                }}
+              >
+                קריאה חדשה
+              </Button>
+            )}
+          </>
         }
       >
         <FilterField label="חיפוש" grow>
@@ -154,12 +183,26 @@ export function ServiceCallsPage() {
         </FilterField>
 
         <FilterField label="סטטוס">
-          <Select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
-            <option value="all">כל הסטטוסים</option>
-            <option value="Open">פתוחה</option>
-            <option value="InProgress">בטיפול</option>
-            <option value="Done">בוצעה</option>
-            <option value="Cancelled">בוטלה</option>
+          <SegmentedControl
+            items={STATUS_FILTER_ITEMS}
+            value={statusFilter}
+            onChange={setStatusFilter}
+            ariaLabel="סינון לפי סטטוס"
+            size="sm"
+          />
+        </FilterField>
+
+        <FilterField label="עדיפות">
+          <Select
+            value={priorityFilter}
+            onChange={(event) => setPriorityFilter(event.target.value)}
+          >
+            <option value="all">כל העדיפויות</option>
+            {PRIORITY_OPTIONS.map((priority) => (
+              <option key={priority} value={priority}>
+                {PRIORITY_LABELS[priority]}
+              </option>
+            ))}
           </Select>
         </FilterField>
       </FilterBar>

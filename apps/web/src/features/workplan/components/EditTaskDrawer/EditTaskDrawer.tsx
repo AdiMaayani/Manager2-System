@@ -1,19 +1,14 @@
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Drawer } from '@shared/components/Drawer';
+import { Drawer, useDrawerMaximize } from '@shared/components/Drawer';
 import { Button } from '@shared/components/Button';
 import { ErrorState } from '@shared/components/ErrorState';
 import { Input } from '@shared/components/Input';
 import { Select } from '@shared/components/Select';
 import { Textarea } from '@shared/components/Textarea';
 import { InlineAlert } from '@shared/components/InlineAlert';
-import { ConfirmInline } from '@shared/components/ConfirmInline';
 import { isLocalDataMode } from '@/config/appConfig';
-import {
-  cancelWorkPlanTaskAsync,
-  getWorkItemByIdAsync,
-  updateWorkItemAsync,
-} from '../../api/workplanApiClient';
+import { getWorkItemByIdAsync, updateWorkItemAsync } from '../../api/workplanApiClient';
 import {
   normalizeWorkPlanPriorityCode,
   normalizeWorkPlanStatusCode,
@@ -89,29 +84,38 @@ export function EditTaskDrawer({
   onClose,
   onSaved,
 }: EditTaskDrawerProps) {
+  // Maximize state lives here (stable) so it survives the EditTaskForm remount on hydration.
+  const { isMaximized, toggleMaximize } = useDrawerMaximize(isOpen);
+
   const workItemQuery = useQuery({
     queryKey: ['workplan', 'workItem', task?.taskId],
     queryFn: () => getWorkItemByIdAsync(task!.taskId),
     enabled: isOpen && isLocalDataMode && !!task?.taskId,
   });
 
+  const closeFooter = (
+    <div className="editTaskDrawer__actions">
+      <Button type="button" variant="secondary" onClick={onClose}>
+        סגור
+      </Button>
+    </div>
+  );
+
   if (!isLocalDataMode) {
     return (
-      <Drawer isOpen={isOpen} onClose={onClose} title="עריכת משימה">
-        <div className="editTaskDrawer">
-          <div className="editTaskDrawer__body">
-            <p className="editTaskDrawer__notice">
-              עריכת משימות אינה זמינה במצב נתוני דמו. יש להפעיל את האפליקציה במצב חיבור לשרת
-              (VITE_APP_DATA_MODE=local) כדי לערוך ולשמור משימות.
-            </p>
-          </div>
-          <div className="editTaskDrawer__footer">
-            <div className="editTaskDrawer__actions">
-              <Button type="button" variant="secondary" onClick={onClose}>
-                סגור
-              </Button>
-            </div>
-          </div>
+      <Drawer
+        isOpen={isOpen}
+        onClose={onClose}
+        title="עריכת משימה"
+        isMaximized={isMaximized}
+        onToggleMaximize={toggleMaximize}
+        footer={closeFooter}
+      >
+        <div className="editTaskDrawer__body">
+          <p className="editTaskDrawer__notice">
+            עריכת משימות אינה זמינה במצב נתוני דמו. יש להפעיל את האפליקציה במצב חיבור לשרת
+            (VITE_APP_DATA_MODE=local) כדי לערוך ולשמור משימות.
+          </p>
         </div>
       </Drawer>
     );
@@ -119,45 +123,60 @@ export function EditTaskDrawer({
 
   if (workItemQuery.isError) {
     return (
-      <Drawer isOpen={isOpen} onClose={onClose} title="עריכת משימה">
-        <div className="editTaskDrawer">
-          <div className="editTaskDrawer__body">
-            <ErrorState
-              message="טעינת פרטי המשימה נכשלה — לא ניתן לערוך ללא הנתונים המלאים."
-              onRetry={() => workItemQuery.refetch()}
-            />
-          </div>
-          <div className="editTaskDrawer__footer">
-            <div className="editTaskDrawer__actions">
-              <Button type="button" variant="secondary" onClick={onClose}>
-                סגור
-              </Button>
-            </div>
-          </div>
+      <Drawer
+        isOpen={isOpen}
+        onClose={onClose}
+        title="עריכת משימה"
+        isMaximized={isMaximized}
+        onToggleMaximize={toggleMaximize}
+        footer={closeFooter}
+      >
+        <div className="editTaskDrawer__body">
+          <ErrorState
+            message="טעינת פרטי המשימה נכשלה — לא ניתן לערוך ללא הנתונים המלאים."
+            onRetry={() => workItemQuery.refetch()}
+          />
         </div>
       </Drawer>
     );
   }
 
+  if (!task) {
+    return (
+      <Drawer
+        isOpen={isOpen}
+        onClose={onClose}
+        title="עריכת משימה"
+        isMaximized={isMaximized}
+        onToggleMaximize={toggleMaximize}
+        footer={closeFooter}
+      >
+        <div className="editTaskDrawer__body" />
+      </Drawer>
+    );
+  }
+
   return (
-    <Drawer isOpen={isOpen} onClose={onClose} title="עריכת משימה">
-      {task && (
-        <EditTaskForm
-          // Seed from the selection right away, then remount with the
-          // authoritative work item once it loads so fields are never empty.
-          key={`${task.taskId}-${workItemQuery.data ? 'hydrated' : 'seed'}`}
-          taskId={task.taskId}
-          initialValues={workItemQuery.data ?? task}
-          workItem={workItemQuery.data ?? null}
-          onClose={onClose}
-          onSaved={onSaved}
-        />
-      )}
-    </Drawer>
+    <EditTaskForm
+      // Seed from the selection right away, then remount with the
+      // authoritative work item once it loads so fields are never empty.
+      key={`${task.taskId}-${workItemQuery.data ? 'hydrated' : 'seed'}`}
+      isOpen={isOpen}
+      isMaximized={isMaximized}
+      onToggleMaximize={toggleMaximize}
+      taskId={task.taskId}
+      initialValues={workItemQuery.data ?? task}
+      workItem={workItemQuery.data ?? null}
+      onClose={onClose}
+      onSaved={onSaved}
+    />
   );
 }
 
 interface EditTaskFormProps {
+  isOpen: boolean;
+  isMaximized: boolean;
+  onToggleMaximize: () => void;
   taskId: number;
   initialValues: EditableTaskFieldsSource;
   // Full work item is required for saving: the backend PUT replaces every
@@ -167,7 +186,16 @@ interface EditTaskFormProps {
   onSaved?: () => void;
 }
 
-function EditTaskForm({ taskId, initialValues, workItem, onClose, onSaved }: EditTaskFormProps) {
+function EditTaskForm({
+  isOpen,
+  isMaximized,
+  onToggleMaximize,
+  taskId,
+  initialValues,
+  workItem,
+  onClose,
+  onSaved,
+}: EditTaskFormProps) {
   const queryClient = useQueryClient();
   const initialStartParts = splitDateTime(initialValues.plannedStart);
   const initialEndParts = splitDateTime(initialValues.plannedEnd);
@@ -232,29 +260,35 @@ function EditTaskForm({ taskId, initialValues, workItem, onClose, onSaved }: Edi
     },
   });
 
-  // Soft-cancels the task through the existing WorkItems cancel endpoint; the
-  // cancelled task drops out of the work plan once the queries refetch.
-  const cancelTaskMutation = useMutation({
-    mutationFn: () => cancelWorkPlanTaskAsync(taskId),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['workplan'] });
-      onSaved?.();
-      onClose();
-    },
-    onError: (err) => {
-      setError(err instanceof Error ? err.message : 'ביטול המשימה נכשל');
-    },
-  });
+  const isBusy = saveMutation.isPending;
 
-  const isBusy = saveMutation.isPending || cancelTaskMutation.isPending;
+  const footer = (
+    <div className="editTaskDrawer__footerContent">
+      {error && <InlineAlert variant="danger">{error}</InlineAlert>}
+      <div className="editTaskDrawer__actions">
+        <Button
+          type="button"
+          onClick={() => saveMutation.mutate()}
+          isLoading={saveMutation.isPending}
+          disabled={isBusy || !workItem}
+        >
+          שמור
+        </Button>
+        <Button type="button" variant="secondary" onClick={onClose} disabled={isBusy}>
+          בטל שינויים
+        </Button>
+      </div>
+    </div>
+  );
 
   return (
-    <form
-      className="editTaskDrawer"
-      onSubmit={(event) => {
-        event.preventDefault();
-        saveMutation.mutate();
-      }}
+    <Drawer
+      isOpen={isOpen}
+      onClose={onClose}
+      title="עריכת משימה"
+      isMaximized={isMaximized}
+      onToggleMaximize={onToggleMaximize}
+      footer={footer}
     >
       <div className="editTaskDrawer__body">
         {!workItem && (
@@ -352,31 +386,6 @@ function EditTaskForm({ taskId, initialValues, workItem, onClose, onSaved }: Edi
           </div>
         </section>
       </div>
-
-      <div className="editTaskDrawer__footer">
-        {error && <InlineAlert variant="danger">{error}</InlineAlert>}
-        <div className="editTaskDrawer__actions">
-          <Button type="submit" isLoading={saveMutation.isPending} disabled={isBusy || !workItem}>
-            שמור
-          </Button>
-          <Button type="button" variant="secondary" onClick={onClose} disabled={isBusy}>
-            בטל שינויים
-          </Button>
-
-          {/* Locked tasks keep the existing lock rule: no destructive action. */}
-          {workItem && !workItem.isLocked && (
-            <div className="editTaskDrawer__dangerActions">
-              <ConfirmInline
-                triggerLabel="בטל משימה"
-                message="לבטל את המשימה?"
-                confirmLabel="אישור ביטול"
-                onConfirm={() => cancelTaskMutation.mutate()}
-                isPending={isBusy}
-              />
-            </div>
-          )}
-        </div>
-      </div>
-    </form>
+    </Drawer>
   );
 }

@@ -16,7 +16,8 @@ export interface AuditLogEntry {
 
 // Optional filters accepted by the audit list endpoint.
 export interface AuditLogFilters {
-  action?: string;
+  // Single free-text search over action/summary/user/entityType/entityId (server-side).
+  search?: string;
   entityType?: string;
   severity?: string;
   fromUtc?: string;
