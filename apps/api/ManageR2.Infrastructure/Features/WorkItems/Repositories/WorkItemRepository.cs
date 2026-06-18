@@ -248,6 +248,44 @@ public class WorkItemRepository : IWorkItemRepository
         return await CloseAsync(milestoneId);
     }
 
+    public async Task<DeleteWorkPlanTaskResult> DeleteWorkPlanTaskAsync(int workItemId)
+    {
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand("dbo.sp_WorkItems_DeleteTask", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+
+        command.Parameters.AddWithValue("@WorkItemId", workItemId);
+
+        await connection.OpenAsync();
+        await using var reader = await command.ExecuteReaderAsync();
+
+        if (await reader.ReadAsync())
+        {
+            return new DeleteWorkPlanTaskResult
+            {
+                ResultCode = MapDeleteWorkPlanTaskResultCode(GetIntValue(reader, "ResultCode")),
+                Message = GetStringValue(reader, "Message") ?? "מחיקת המשימה נכשלה. נסה שוב.",
+                RowsAffected = GetIntValue(reader, "RowsAffected")
+            };
+        }
+
+        return new DeleteWorkPlanTaskResult
+        {
+            ResultCode = DeleteWorkPlanTaskResultCode.Failed,
+            Message = "מחיקת המשימה נכשלה. נסה שוב.",
+            RowsAffected = 0
+        };
+    }
+
+    private static DeleteWorkPlanTaskResultCode MapDeleteWorkPlanTaskResultCode(int resultCode)
+    {
+        return Enum.IsDefined(typeof(DeleteWorkPlanTaskResultCode), resultCode)
+            ? (DeleteWorkPlanTaskResultCode)resultCode
+            : DeleteWorkPlanTaskResultCode.Failed;
+    }
+
     public async Task<bool> AssignEmployeeToWorkAsync(int workItemId, int employeeId, string assignmentRole)
     {
         // Creates employee assignment link for a specific work item.

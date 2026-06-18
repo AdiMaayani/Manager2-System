@@ -11,6 +11,7 @@ interface RawWorkPlanResponse {
     workItemId?: number;
     title?: string;
     status?: string;
+    workType?: string | null;
     estimatedHours?: number | null;
     priority?: string | null;
     plannedStart?: string | null;
@@ -59,6 +60,7 @@ export function mapWorkPlanResponse(response: RawWorkPlanResponse | null): Mappe
       title: task.title ?? '',
       description: task.description ?? null,
       status: task.status ?? '',
+      workType: task.workType ?? null,
       estimatedHours: task.estimatedHours ?? null,
       priority: task.priority ?? null,
       plannedStart: task.plannedStart ?? null,
