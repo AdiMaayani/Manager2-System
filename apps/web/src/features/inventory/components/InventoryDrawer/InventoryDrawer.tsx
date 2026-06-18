@@ -13,11 +13,9 @@ import { InlineAlert } from '@shared/components/InlineAlert';
 import { ConfirmInline } from '@shared/components/ConfirmInline';
 import { InventoryImage } from '../InventoryImage';
 import { useInventoryMutations } from '../../hooks/useInventory';
-import {
-  CANONICAL_CATEGORIES,
-  isCanonicalCategory,
-  resolveCategoryImage,
-} from '../../utils/categoryImages';
+import { CANONICAL_CATEGORIES, isCanonicalCategory } from '../../utils/categoryImages';
+import { getSeededProductImage } from '../../data/productImageCatalog';
+import { resolveInventoryItemImage } from '../../utils/productImages';
 import { formatQuantity, isLowStock } from '../../utils/stock';
 import type { CreateInventoryItemRequest, InventoryItem } from '../../types';
 import './InventoryDrawer.css';
@@ -26,6 +24,10 @@ const UNIT_OPTIONS = ['יח׳', 'מ׳', 'ק״ג', 'סט', 'גליל'];
 
 const MAX_IMAGE_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
+
+// A newly created item must carry a real user-uploaded image; a seeded catalog image never
+// satisfies this. Enforced on the frontend (here) and atomically on the backend create endpoint.
+const IMAGE_REQUIRED_MESSAGE = 'יש להעלות תמונת מוצר לפני שמירת הפריט';
 
 interface InventoryDrawerProps {
   isOpen: boolean;
@@ -112,8 +114,13 @@ function InventoryDrawerContent({
   defaultCategory,
 }: InventoryDrawerContentProps) {
   const isExistingItem = inventoryItem != null;
-  const { createMutation, updateMutation, deactivateMutation, uploadImageMutation, removeImageMutation } =
-    useInventoryMutations();
+  const {
+    createWithImageMutation,
+    updateMutation,
+    deactivateMutation,
+    uploadImageMutation,
+    removeImageMutation,
+  } = useInventoryMutations();
 
   // Existing items open in read-only review mode; create opens editable.
   const [isEditing, setIsEditing] = useState(!isExistingItem);
@@ -122,11 +129,9 @@ function InventoryDrawerContent({
   );
   const [error, setError] = useState<string | null>(null);
 
-  // When creating, the record may be persisted before its image upload succeeds. We keep the
-  // created record here so a retry updates it (never re-creates a duplicate) and the drawer
-  // reflects the already-created product even if the image step failed.
-  const [createdItem, setCreatedItem] = useState<InventoryItem | null>(null);
-  const persistedItem = inventoryItem ?? createdItem;
+  // Create persists the record and its image atomically (single request), so there is never a
+  // half-created record to remember and a retry can never duplicate.
+  const persistedItem = inventoryItem;
 
   // Image edits are staged and applied on save (after the record exists), so the
   // selected image can be previewed before committing.
@@ -162,19 +167,7 @@ function InventoryDrawerContent({
   }
 
   function handleCancelEdit() {
-    // A record was created during this create session (its image step may have failed):
-    // hand the created product back to the parent instead of discarding it.
-    if (!isExistingItem && createdItem) {
-      resetImageEdits();
-      setError(null);
-      if (onSaved) {
-        void onSaved(createdItem);
-      } else {
-        onClose();
-      }
-      return;
-    }
-
+    // Create is atomic: nothing is persisted until save succeeds, so cancelling just closes.
     if (!isExistingItem) {
       onClose();
       return;
@@ -266,30 +259,51 @@ function InventoryDrawerContent({
 
     setError(null);
 
-    // Phase 1: persist the record. Update when it already exists (existing item or one created
-    // earlier in this session); otherwise create exactly once.
+    // CREATE: a new item requires a real user-uploaded image, and the record + image are created
+    // atomically in a single request. This guarantees no active item is ever persisted without an
+    // image, and a retry after failure can never create a duplicate (nothing was created on failure).
+    if (!persistedItem) {
+      if (!imageFile) {
+        setError(IMAGE_REQUIRED_MESSAGE);
+        return;
+      }
+
+      let createdInventoryItem: InventoryItem;
+      try {
+        createdInventoryItem = await createWithImageMutation.mutateAsync({
+          request,
+          file: imageFile,
+        });
+      } catch (err) {
+        // Nothing was persisted; keep edit mode and the staged file so the user can retry.
+        setIsEditing(true);
+        setError(err instanceof Error ? err.message : 'שמירת פריט נכשלה');
+        return;
+      }
+
+      resetImageEdits();
+      setIsEditing(false);
+      await onSaved?.(createdInventoryItem);
+      if (!onSaved) onClose();
+      return;
+    }
+
+    // EDIT: persist field changes, then apply staged image changes. An image failure here is a
+    // partial failure — the field update already succeeded — so we keep edit mode and the staged
+    // image and surface a clear message instead of pretending the whole save failed.
     let savedInventoryItem: InventoryItem;
     try {
-      if (persistedItem) {
-        const updatedInventoryItem = await updateMutation.mutateAsync({
-          id: persistedItem.inventoryItemId,
-          request,
-        });
-        savedInventoryItem = updatedInventoryItem ?? { ...persistedItem, ...request };
-      } else {
-        savedInventoryItem = await createMutation.mutateAsync(request);
-        // Remember the new record immediately so any retry updates it instead of duplicating it.
-        setCreatedItem(savedInventoryItem);
-      }
+      const updatedInventoryItem = await updateMutation.mutateAsync({
+        id: persistedItem.inventoryItemId,
+        request,
+      });
+      savedInventoryItem = updatedInventoryItem ?? { ...persistedItem, ...request };
     } catch (err) {
       setIsEditing(true);
       setError(err instanceof Error ? err.message : 'שמירת פריט נכשלה');
       return;
     }
 
-    // Phase 2: apply staged image changes once the record (and its id) exists. A failure here is
-    // a partial failure — the product itself is saved — so we keep edit mode and the staged image
-    // and surface a clear message instead of pretending the whole save failed.
     try {
       if (imageFile) {
         savedInventoryItem = await uploadImageMutation.mutateAsync({
@@ -300,26 +314,18 @@ function InventoryDrawerContent({
         savedInventoryItem = await removeImageMutation.mutateAsync(savedInventoryItem.inventoryItemId);
       }
     } catch (err) {
-      // Keep the created/updated record (already invalidated in cache) so a retry never re-creates it.
-      setCreatedItem(savedInventoryItem);
       setIsEditing(true);
       const reason = err instanceof Error ? err.message : 'פעולה נכשלה';
       setError(
-        `הפריט נשמר, אך עדכון התמונה נכשל: ${reason} ניתן לנסות שוב את העלאת התמונה בלחיצה על "שמור".`,
+        `הפריט עודכן, אך עדכון התמונה נכשל: ${reason} ניתן לנסות שוב את העלאת התמונה בלחיצה על "שמור".`,
       );
       return;
     }
 
     resetImageEdits();
-    setCreatedItem(null);
     setIsEditing(false);
     await onSaved?.(savedInventoryItem);
-
-    // Without a parent to hand the saved record back to, fall back to the
-    // previous behavior of closing after a successful save.
-    if (!onSaved) {
-      onClose();
-    }
+    if (!onSaved) onClose();
   }
 
   async function handleDeactivate() {
@@ -335,7 +341,7 @@ function InventoryDrawerContent({
   }
 
   const isSaving =
-    createMutation.isPending ||
+    createWithImageMutation.isPending ||
     updateMutation.isPending ||
     deactivateMutation.isPending ||
     uploadImageMutation.isPending ||
@@ -347,12 +353,21 @@ function InventoryDrawerContent({
       ? `עריכת פריט — ${persistedItem.itemName}`
       : `פרטי פריט — ${persistedItem.itemName}`;
 
-  // Edit-mode preview: staged file, else current image (unless removal is staged).
-  const editImageSrc = previewUrl ?? (removeImageRequested ? null : persistedItem?.imageUrl ?? null);
+  // Edit-mode preview candidates (highest priority first): staged file → current uploaded image
+  // (unless removal is staged) → seeded SKU image. Never a category image.
+  const seededImageUrl = getSeededProductImage(form.skuCode)?.url;
+  const editImageSources: (string | null | undefined)[] = [];
+  if (previewUrl) {
+    editImageSources.push(previewUrl);
+  } else if (!removeImageRequested && persistedItem?.imageUrl) {
+    editImageSources.push(persistedItem.imageUrl);
+  }
+  editImageSources.push(seededImageUrl);
+
   const hasImageToRemove =
     Boolean(previewUrl) || (!removeImageRequested && Boolean(persistedItem?.imageUrl));
-  // Create mode shows a neutral empty placeholder (never a category/fallback photo) until the
-  // user stages an actual image, so an unselected image is not mistaken for the product's photo.
+  // Create mode shows a neutral empty placeholder (never a category/seeded photo) until the user
+  // stages an actual image, so an unselected image is not mistaken for the product's photo.
   const showEmptyImagePlaceholder = !persistedItem && !previewUrl;
 
   return (
@@ -405,14 +420,14 @@ function InventoryDrawerContent({
                 {showEmptyImagePlaceholder ? (
                   <div className="inventoryDrawer__imagePlaceholder">
                     <ImageOff size={32} aria-hidden="true" />
-                    <span>לא נבחרה תמונה</span>
+                    <span>לא נבחרה תמונת מוצר</span>
                   </div>
                 ) : (
                   <InventoryImage
-                    src={editImageSrc}
-                    fallbackSrc={resolveCategoryImage(form.category)}
+                    sources={editImageSources}
                     alt={form.itemName || 'תמונת מוצר'}
                     variant="drawer"
+                    showMissingState
                     eager
                   />
                 )}
@@ -447,7 +462,9 @@ function InventoryDrawerContent({
                 )}
               </div>
               <p className="inventoryDrawer__imageHint">
-                ניתן להעלות תמונה בפורמט JPEG, PNG או WebP בגודל עד 5MB.
+                {isExistingItem
+                  ? 'ניתן להעלות תמונה בפורמט JPEG, PNG או WebP בגודל עד 5MB.'
+                  : 'חובה להעלות תמונת מוצר בפורמט JPEG, PNG או WebP בגודל עד 5MB לפני שמירת הפריט.'}
               </p>
             </div>
           </DetailsSection>
@@ -564,16 +581,18 @@ interface InventoryReviewDetailsProps {
 
 function InventoryReviewDetails({ inventoryItem }: InventoryReviewDetailsProps) {
   const isItemLowOnStock = isLowStock(inventoryItem);
+  // Product image only: uploaded → seeded SKU image → explicit missing state. Never a category image.
+  const reviewImage = resolveInventoryItemImage(inventoryItem);
 
   return (
     <div className="inventoryDrawer inventoryDrawer--review">
       <DetailsSection title="תמונה וזיהוי">
         <div className="inventoryDrawer__imageFrame">
           <InventoryImage
-            src={inventoryItem.imageUrl}
-            fallbackSrc={resolveCategoryImage(inventoryItem.category)}
+            sources={reviewImage.sources}
             alt={inventoryItem.itemName}
             variant="drawer"
+            showMissingState
             eager
           />
         </div>

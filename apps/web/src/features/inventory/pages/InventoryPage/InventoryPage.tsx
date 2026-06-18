@@ -246,7 +246,7 @@ export function InventoryPage() {
             <div className="inventoryPage__categoryHeading">
               <div className="inventoryPage__categoryThumb">
                 <InventoryImage
-                  src={resolveCategoryImage(selectedCategory ?? '')}
+                  sources={[resolveCategoryImage(selectedCategory ?? '')]}
                   alt={categoryDisplayName(selectedCategory)}
                   variant="category"
                   eager

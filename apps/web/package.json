@@ -7,7 +7,9 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "validate:inventory-images": "node scripts/validate-product-image-catalog.mjs",
+    "validate:inventory-images:strict": "node scripts/validate-product-image-catalog.mjs --strict"
   },
   "dependencies": {
     "@tanstack/react-query": "^5.100.14",

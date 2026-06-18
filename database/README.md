@@ -102,7 +102,7 @@ sp_GetProjectLifecycle, sp_GetProjectMilestones, sp_GetProjectsList, sp_GetProje
 sp_GetSiteById, sp_GetSites, sp_GetTasksByParentWorkItemId, sp_GetUserByEmail, sp_GetUserById,
 sp_GetUserDepartments, sp_GetUserRoles, sp_GetUsers, sp_GetWorkEmployees, sp_GetWorkItemDetails, sp_GetWorkItems,
 sp_GetWorkItemsByType, sp_GetWorkPlanAssignments, sp_GetWorkPlanProject, sp_GetWorkPlanTasks,
-sp_Inventory_ClearImage, sp_Inventory_Create, sp_Inventory_Deactivate, sp_Inventory_GetById, sp_Inventory_GetList, sp_Inventory_SetImage, sp_Inventory_Update,
+sp_Inventory_ClearImage, sp_Inventory_Create, sp_Inventory_CreateWithImage, sp_Inventory_Deactivate, sp_Inventory_GetById, sp_Inventory_GetList, sp_Inventory_SetImage, sp_Inventory_Update,
 sp_ProjectBoq_Create, sp_ProjectBoq_Delete, sp_ProjectBoq_GetByProject, sp_ProjectBoq_Reorder, sp_ProjectBoq_Update,
 sp_ProjectDrawings_Create, sp_ProjectDrawings_Delete, sp_ProjectDrawings_GetByProject, sp_ProjectDrawings_Update,
 sp_ProjectEquipment_Create, sp_ProjectEquipment_Delete, sp_ProjectEquipment_GetByProject, sp_ProjectEquipment_Reorder,
@@ -274,6 +274,16 @@ A fresh rebuild already gets their final table/procedure state from `schema/tabl
 - `migrations/2026-06-18_inventory_product_image.sql` — idempotent migration adding product image metadata
   columns (`ImagePath`, `ImageContentType`, `ImageFileSizeBytes`) to `InventoryItems`. Columns are now captured
   in `schema/tables.sql`; `sp_Inventory_SetImage` and `sp_Inventory_ClearImage` are canonical under `SP/`.
+- `SP/sp_Inventory_CreateWithImage.sql` — **required** atomic create-with-image procedure. It inserts a
+  new `InventoryItems` row **together with** its image metadata (`ImagePath`, `ImageContentType`,
+  `ImageFileSizeBytes`) inside a single `SET XACT_ABORT ON` transaction (`TRY/CATCH`, full rollback on
+  failure) and returns the new `InventoryItemId`. It is a normal `CREATE OR ALTER` SP file (no `2026-`
+  prefix), so the standard `SP/` deploy step (`Get-ChildItem .\database\SP\*.sql -Exclude '2026-*'`)
+  picks it up automatically; **no separate migration is needed**. **Deployment order:** deploy it with
+  the other Inventory procedures — `sp_Inventory_GetList`, `sp_Inventory_GetById`, `sp_Inventory_SetImage`,
+  `sp_Inventory_ClearImage` — and it **must exist before** the multipart `POST /api/Inventory/with-image`
+  endpoint is used (that endpoint calls this procedure). The image-less `POST /api/Inventory` JSON path is
+  closed and never creates a row, so `sp_Inventory_Create` is no longer reached through the API.
 - `migrations/2026-06-18_inventory_category_cleanup.sql` — idempotent, intentional business-data cleanup that
   deletes obsolete-category items (`בטיחות אש`, `בקרת כניסה`) and normalizes legacy aliases
   (`כריזה ומולטימדיה` → `מולטימדיה`, `מצלמות ואבטחה` → `מצלמות אבטחה`). Runs in a single transaction

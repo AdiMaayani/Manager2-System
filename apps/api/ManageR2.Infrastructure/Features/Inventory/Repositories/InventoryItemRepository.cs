@@ -149,6 +149,56 @@ public class InventoryItemRepository : IInventoryItemRepository
         }
     }
 
+    public async Task<int> CreateWithImageAsync(InventoryItem inventoryItem)
+    {
+        _logger.LogInformation(
+            "CreateWithImageAsync started for Inventory SkuCode={SkuCode}, ItemName={ItemName}.",
+            inventoryItem.SkuCode,
+            inventoryItem.ItemName);
+
+        try
+        {
+            await using var connection = _dbServices.CreateConnection();
+            await using var command = new SqlCommand("dbo.sp_Inventory_CreateWithImage", connection)
+            {
+                CommandType = CommandType.StoredProcedure
+            };
+
+            AddUpsertParameters(command, inventoryItem, includeId: false);
+            command.Parameters.AddWithValue("@ImagePath", (object?)inventoryItem.ImagePath ?? DBNull.Value);
+            command.Parameters.AddWithValue("@ImageContentType", (object?)inventoryItem.ImageContentType ?? DBNull.Value);
+            command.Parameters.AddWithValue("@ImageFileSizeBytes", (object?)inventoryItem.ImageFileSizeBytes ?? DBNull.Value);
+
+            await connection.OpenAsync();
+
+            var result = await command.ExecuteScalarAsync();
+            var newInventoryItemId = result != null && result != DBNull.Value
+                ? Convert.ToInt32(result)
+                : 0;
+
+            _logger.LogInformation("CreateWithImageAsync succeeded. Created InventoryItemId={InventoryItemId}.", newInventoryItemId);
+
+            return newInventoryItemId;
+        }
+        catch (SqlException ex) when (ex.Number == 51206 || ex.Number == 2601 || ex.Number == 2627)
+        {
+            // 51206 = the procedure's explicit active-SKU guard; 2601/2627 = the filtered unique index
+            // (UX_InventoryItems_SkuCode_Active) firing on a concurrent insert. Both mean an active dup.
+            _logger.LogWarning(ex, "CreateWithImageAsync failed for SkuCode={SkuCode} because it already exists.", inventoryItem.SkuCode);
+            throw new UserValidationException("An active inventory item with this SKU already exists.", ex);
+        }
+        catch (SqlException ex) when (ex.Number == 547)
+        {
+            _logger.LogWarning(ex, "CreateWithImageAsync failed for SkuCode={SkuCode} because of a CHECK constraint.", inventoryItem.SkuCode);
+            throw new UserValidationException("Failed to create inventory item because one or more values are invalid.", ex);
+        }
+        catch (SqlException ex)
+        {
+            _logger.LogError(ex, "CreateWithImageAsync failed with SQL error for SkuCode={SkuCode}.", inventoryItem.SkuCode);
+            throw new UserValidationException("Failed to create inventory item.", ex);
+        }
+    }
+
     public async Task<bool> UpdateAsync(InventoryItem inventoryItem)
     {
         _logger.LogInformation(

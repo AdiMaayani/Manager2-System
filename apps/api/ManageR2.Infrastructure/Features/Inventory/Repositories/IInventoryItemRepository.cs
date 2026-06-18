@@ -15,6 +15,11 @@ public interface IInventoryItemRepository
 
     Task<int> CreateAsync(InventoryItem inventoryItem);
 
+    // Atomically creates an item together with its image metadata (ImagePath/ImageContentType/
+    // ImageFileSizeBytes on the entity) in a single transactional stored procedure. Either a complete
+    // row is committed or nothing is — there is no create-then-cleanup row left behind on failure.
+    Task<int> CreateWithImageAsync(InventoryItem inventoryItem);
+
     Task<bool> UpdateAsync(InventoryItem inventoryItem);
 
     Task<bool> DeactivateAsync(int inventoryItemId);
