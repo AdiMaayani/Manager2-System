@@ -248,6 +248,91 @@ public class InventoryItemRepository : IInventoryItemRepository
         }
     }
 
+    public async Task<InventoryImageMutationResult> SetImageAsync(
+        int inventoryItemId,
+        string imagePath,
+        string? imageContentType,
+        long? imageFileSizeBytes)
+    {
+        _logger.LogInformation("SetImageAsync started for InventoryItemId={InventoryItemId}.", inventoryItemId);
+
+        try
+        {
+            await using var connection = _dbServices.CreateConnection();
+            await using var command = new SqlCommand("dbo.sp_Inventory_SetImage", connection)
+            {
+                CommandType = CommandType.StoredProcedure
+            };
+
+            command.Parameters.AddWithValue("@InventoryItemId", inventoryItemId);
+            command.Parameters.AddWithValue("@ImagePath", imagePath);
+            command.Parameters.AddWithValue("@ImageContentType", (object?)imageContentType ?? DBNull.Value);
+            command.Parameters.AddWithValue("@ImageFileSizeBytes", (object?)imageFileSizeBytes ?? DBNull.Value);
+
+            await connection.OpenAsync();
+
+            var result = await ReadImageMutationResultAsync(command);
+
+            _logger.LogInformation(
+                "SetImageAsync completed for InventoryItemId={InventoryItemId}. ItemFound={ItemFound}.",
+                inventoryItemId,
+                result.ItemFound);
+
+            return result;
+        }
+        catch (SqlException ex)
+        {
+            _logger.LogError(ex, "SetImageAsync failed with SQL error for InventoryItemId={InventoryItemId}.", inventoryItemId);
+            throw new UserValidationException("Failed to save the inventory item image.", ex);
+        }
+    }
+
+    public async Task<InventoryImageMutationResult> ClearImageAsync(int inventoryItemId)
+    {
+        _logger.LogInformation("ClearImageAsync started for InventoryItemId={InventoryItemId}.", inventoryItemId);
+
+        try
+        {
+            await using var connection = _dbServices.CreateConnection();
+            await using var command = new SqlCommand("dbo.sp_Inventory_ClearImage", connection)
+            {
+                CommandType = CommandType.StoredProcedure
+            };
+
+            command.Parameters.AddWithValue("@InventoryItemId", inventoryItemId);
+
+            await connection.OpenAsync();
+
+            var result = await ReadImageMutationResultAsync(command);
+
+            _logger.LogInformation(
+                "ClearImageAsync completed for InventoryItemId={InventoryItemId}. RowsCleared={RowsCleared}.",
+                inventoryItemId,
+                result.ItemFound);
+
+            return result;
+        }
+        catch (SqlException ex)
+        {
+            _logger.LogError(ex, "ClearImageAsync failed with SQL error for InventoryItemId={InventoryItemId}.", inventoryItemId);
+            throw new UserValidationException("Failed to remove the inventory item image.", ex);
+        }
+    }
+
+    private static async Task<InventoryImageMutationResult> ReadImageMutationResultAsync(SqlCommand command)
+    {
+        await using var reader = await command.ExecuteReaderAsync();
+
+        if (await reader.ReadAsync())
+        {
+            var rowsAffected = GetIntValue(reader, "RowsAffected");
+            var previousImagePath = GetStringValue(reader, "PreviousImagePath");
+            return new InventoryImageMutationResult(rowsAffected > 0, previousImagePath);
+        }
+
+        return new InventoryImageMutationResult(false, null);
+    }
+
     private static void AddUpsertParameters(SqlCommand command, InventoryItem inventoryItem, bool includeId)
     {
         if (includeId)
@@ -282,7 +367,10 @@ public class InventoryItemRepository : IInventoryItemRepository
             IsActive = GetBoolValue(reader, "IsActive"),
             CreatedAt = GetDateTimeValue(reader, "CreatedAt") ?? DateTime.MinValue,
             UpdatedAt = GetDateTimeValue(reader, "UpdatedAt"),
-            DeletedAt = GetDateTimeValue(reader, "DeletedAt")
+            DeletedAt = GetDateTimeValue(reader, "DeletedAt"),
+            ImagePath = GetStringValue(reader, "ImagePath"),
+            ImageContentType = GetStringValue(reader, "ImageContentType"),
+            ImageFileSizeBytes = GetNullableLongValue(reader, "ImageFileSizeBytes")
         };
     }
 
@@ -337,6 +425,16 @@ public class InventoryItemRepository : IInventoryItemRepository
         }
 
         return Convert.ToDecimal(reader[columnName]);
+    }
+
+    private static long? GetNullableLongValue(SqlDataReader reader, string columnName)
+    {
+        if (!HasColumn(reader, columnName) || reader[columnName] == DBNull.Value)
+        {
+            return null;
+        }
+
+        return Convert.ToInt64(reader[columnName]);
     }
 
     private static bool GetBoolValue(SqlDataReader reader, string columnName)

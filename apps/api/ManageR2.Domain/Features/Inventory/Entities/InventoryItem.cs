@@ -28,4 +28,15 @@ public class InventoryItem
     public DateTime? UpdatedAt { get; set; }
 
     public DateTime? DeletedAt { get; set; }
+
+    // Server-relative stored path of the product image (e.g. uploads/inventory/<guid>.webp). Null when no image.
+    public string? ImagePath { get; set; }
+
+    public string? ImageContentType { get; set; }
+
+    public long? ImageFileSizeBytes { get; set; }
 }
+
+// Outcome of an image set/clear stored-procedure call. Distinguishes "item not found" (no row updated)
+// from a successful update whose previously stored image path was NULL.
+public sealed record InventoryImageMutationResult(bool ItemFound, string? PreviousImagePath);

@@ -22,7 +22,10 @@ BEGIN
         IsActive,
         CreatedAt,
         UpdatedAt,
-        DeletedAt
+        DeletedAt,
+        ImagePath,
+        ImageContentType,
+        ImageFileSizeBytes
     FROM dbo.InventoryItems
     WHERE InventoryItemId = @InventoryItemId;
 END

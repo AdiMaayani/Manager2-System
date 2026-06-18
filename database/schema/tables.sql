@@ -165,6 +165,9 @@ CREATE TABLE [dbo].[InventoryItems](
 	[CreatedAt] [datetime2](7) NOT NULL CONSTRAINT [DF_InventoryItems_CreatedAt] DEFAULT (sysutcdatetime()),
 	[UpdatedAt] [datetime2](7) NULL,
 	[DeletedAt] [datetime2](7) NULL,
+	[ImagePath] [nvarchar](260) NULL,
+	[ImageContentType] [nvarchar](100) NULL,
+	[ImageFileSizeBytes] [bigint] NULL,
  CONSTRAINT [PK_InventoryItems] PRIMARY KEY CLUSTERED
 (
 	[InventoryItemId] ASC
@@ -173,7 +176,8 @@ CREATE TABLE [dbo].[InventoryItems](
  CONSTRAINT [CK_InventoryItems_ItemName_NotBlank] CHECK ((len(ltrim(rtrim([ItemName])))>(0))),
  CONSTRAINT [CK_InventoryItems_QuantityOnHand_NonNegative] CHECK (([QuantityOnHand]>=(0))),
  CONSTRAINT [CK_InventoryItems_Unit_NotBlank] CHECK ((len(ltrim(rtrim([Unit])))>(0))),
- CONSTRAINT [CK_InventoryItems_MinimumQuantity_NonNegative] CHECK (([MinimumQuantity] IS NULL OR [MinimumQuantity]>=(0)))
+ CONSTRAINT [CK_InventoryItems_MinimumQuantity_NonNegative] CHECK (([MinimumQuantity] IS NULL OR [MinimumQuantity]>=(0))),
+ CONSTRAINT [CK_InventoryItems_ImageFileSizeBytes_NonNegative] CHECK (([ImageFileSizeBytes] IS NULL OR [ImageFileSizeBytes]>=(0)))
 ) ON [PRIMARY]
 GO
 /****** Object:  Table [dbo].[ProjectEquipmentItems]    Script Date: 02/06/2026 ******/

@@ -1,26 +1,39 @@
-import { useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ImagePlus, ImageOff, Trash2 } from 'lucide-react';
 import { Badge } from '@shared/components/Badge';
 import { Button } from '@shared/components/Button';
 import { DetailsField } from '@shared/components/DetailsField';
 import { DetailsSection } from '@shared/components/DetailsSection';
 import { Drawer } from '@shared/components/Drawer';
 import { Input } from '@shared/components/Input';
+import { Select } from '@shared/components/Select';
 import { Textarea } from '@shared/components/Textarea';
 import { Checkbox } from '@shared/components/Checkbox';
 import { InlineAlert } from '@shared/components/InlineAlert';
 import { ConfirmInline } from '@shared/components/ConfirmInline';
+import { InventoryImage } from '../InventoryImage';
 import { useInventoryMutations } from '../../hooks/useInventory';
+import {
+  CANONICAL_CATEGORIES,
+  isCanonicalCategory,
+  resolveCategoryImage,
+} from '../../utils/categoryImages';
+import { formatQuantity, isLowStock } from '../../utils/stock';
 import type { CreateInventoryItemRequest, InventoryItem } from '../../types';
 import './InventoryDrawer.css';
 
 const UNIT_OPTIONS = ['יח׳', 'מ׳', 'ק״ג', 'סט', 'גליל'];
-const CATEGORY_OPTIONS = ['בקרי חשמל', 'מצלמות', 'רמקולים', 'מתגים', 'כבלים', 'ארונות תקשורת'];
+
+const MAX_IMAGE_FILE_SIZE_BYTES = 5 * 1024 * 1024;
+const ALLOWED_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
 interface InventoryDrawerProps {
   isOpen: boolean;
   onClose: () => void;
   onSaved?: (inventoryItem: InventoryItem) => void | Promise<void>;
   inventoryItem?: InventoryItem | null;
+  // Pre-selects the category when creating a new item from within a category context.
+  defaultCategory?: string;
 }
 
 interface InventoryFormState {
@@ -35,11 +48,14 @@ interface InventoryFormState {
   isActive: boolean;
 }
 
-function buildInitialState(inventoryItem: InventoryItem | null): InventoryFormState {
+function buildInitialState(
+  inventoryItem: InventoryItem | null,
+  defaultCategory?: string,
+): InventoryFormState {
   return {
     skuCode: inventoryItem?.skuCode ?? '',
     itemName: inventoryItem?.itemName ?? '',
-    category: inventoryItem?.category ?? '',
+    category: inventoryItem?.category ?? defaultCategory ?? '',
     quantityOnHand: inventoryItem?.quantityOnHand?.toString() ?? '0',
     unit: inventoryItem?.unit ?? UNIT_OPTIONS[0],
     minimumQuantity: inventoryItem?.minimumQuantity?.toString() ?? '',
@@ -60,19 +76,13 @@ function parseOptionalQuantity(value: string): number | undefined | null {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
-function formatQuantity(value: number, unit: string): string {
-  return `${value.toLocaleString('he-IL', { maximumFractionDigits: 3 })} ${unit}`;
-}
-
-function isLowStock(inventoryItem: InventoryItem): boolean {
-  return (
-    inventoryItem.minimumQuantity !== undefined &&
-    inventoryItem.minimumQuantity !== null &&
-    inventoryItem.quantityOnHand <= inventoryItem.minimumQuantity
-  );
-}
-
-export function InventoryDrawer({ isOpen, onClose, onSaved, inventoryItem }: InventoryDrawerProps) {
+export function InventoryDrawer({
+  isOpen,
+  onClose,
+  onSaved,
+  inventoryItem,
+  defaultCategory,
+}: InventoryDrawerProps) {
   if (!isOpen) return null;
 
   // Remount per item so form/edit state always resets when the drawer
@@ -83,6 +93,7 @@ export function InventoryDrawer({ isOpen, onClose, onSaved, inventoryItem }: Inv
       inventoryItem={inventoryItem ?? null}
       onClose={onClose}
       onSaved={onSaved}
+      defaultCategory={defaultCategory}
     />
   );
 }
@@ -91,36 +102,115 @@ interface InventoryDrawerContentProps {
   inventoryItem: InventoryItem | null;
   onClose: () => void;
   onSaved?: (inventoryItem: InventoryItem) => void | Promise<void>;
+  defaultCategory?: string;
 }
 
-function InventoryDrawerContent({ inventoryItem, onClose, onSaved }: InventoryDrawerContentProps) {
+function InventoryDrawerContent({
+  inventoryItem,
+  onClose,
+  onSaved,
+  defaultCategory,
+}: InventoryDrawerContentProps) {
   const isExistingItem = inventoryItem != null;
-  const { createMutation, updateMutation, deactivateMutation } = useInventoryMutations();
+  const { createMutation, updateMutation, deactivateMutation, uploadImageMutation, removeImageMutation } =
+    useInventoryMutations();
 
   // Existing items open in read-only review mode; create opens editable.
   const [isEditing, setIsEditing] = useState(!isExistingItem);
-  const [form, setForm] = useState<InventoryFormState>(() => buildInitialState(inventoryItem));
+  const [form, setForm] = useState<InventoryFormState>(() =>
+    buildInitialState(inventoryItem, defaultCategory),
+  );
   const [error, setError] = useState<string | null>(null);
+
+  // When creating, the record may be persisted before its image upload succeeds. We keep the
+  // created record here so a retry updates it (never re-creates a duplicate) and the drawer
+  // reflects the already-created product even if the image step failed.
+  const [createdItem, setCreatedItem] = useState<InventoryItem | null>(null);
+  const persistedItem = inventoryItem ?? createdItem;
+
+  // Image edits are staged and applied on save (after the record exists), so the
+  // selected image can be previewed before committing.
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [removeImageRequested, setRemoveImageRequested] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const previewUrl = useMemo(
+    () => (imageFile ? URL.createObjectURL(imageFile) : null),
+    [imageFile],
+  );
+
+  useEffect(() => {
+    return () => {
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+    };
+  }, [previewUrl]);
 
   function setField<K extends keyof InventoryFormState>(key: K, value: InventoryFormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
+  function resetImageEdits() {
+    setImageFile(null);
+    setRemoveImageRequested(false);
+  }
+
   function handleStartEdit() {
-    setForm(buildInitialState(inventoryItem));
+    setForm(buildInitialState(inventoryItem, defaultCategory));
+    resetImageEdits();
     setError(null);
     setIsEditing(true);
   }
 
   function handleCancelEdit() {
+    // A record was created during this create session (its image step may have failed):
+    // hand the created product back to the parent instead of discarding it.
+    if (!isExistingItem && createdItem) {
+      resetImageEdits();
+      setError(null);
+      if (onSaved) {
+        void onSaved(createdItem);
+      } else {
+        onClose();
+      }
+      return;
+    }
+
     if (!isExistingItem) {
       onClose();
       return;
     }
 
-    setForm(buildInitialState(inventoryItem));
+    setForm(buildInitialState(inventoryItem, defaultCategory));
+    resetImageEdits();
     setError(null);
     setIsEditing(false);
+  }
+
+  function handleSelectImageFile(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    // Allow re-selecting the same file later.
+    event.target.value = '';
+    if (!file) return;
+
+    if (!ALLOWED_IMAGE_TYPES.includes(file.type)) {
+      setError('יש לבחור קובץ תמונה מסוג JPEG, PNG או WebP.');
+      return;
+    }
+
+    if (file.size > MAX_IMAGE_FILE_SIZE_BYTES) {
+      setError('הקובץ גדול מדי. הגודל המרבי הוא 5MB.');
+      return;
+    }
+
+    setError(null);
+    setRemoveImageRequested(false);
+    setImageFile(file);
+  }
+
+  function handleRemoveImage() {
+    setImageFile(null);
+    setRemoveImageRequested(true);
+    setError(null);
   }
 
   function buildRequest(): CreateInventoryItemRequest | null {
@@ -139,6 +229,11 @@ function InventoryDrawerContent({ inventoryItem, onClose, onSaved }: InventoryDr
 
     if (!form.unit.trim()) {
       setError('יחידת מידה היא שדה חובה.');
+      return null;
+    }
+
+    if (!isCanonicalCategory(form.category)) {
+      setError('יש לבחור קטגוריה מהרשימה.');
       return null;
     }
 
@@ -171,29 +266,59 @@ function InventoryDrawerContent({ inventoryItem, onClose, onSaved }: InventoryDr
 
     setError(null);
 
+    // Phase 1: persist the record. Update when it already exists (existing item or one created
+    // earlier in this session); otherwise create exactly once.
+    let savedInventoryItem: InventoryItem;
     try {
-      let savedInventoryItem: InventoryItem;
-      if (isExistingItem) {
+      if (persistedItem) {
         const updatedInventoryItem = await updateMutation.mutateAsync({
-          id: inventoryItem.inventoryItemId,
+          id: persistedItem.inventoryItemId,
           request,
         });
-        savedInventoryItem = updatedInventoryItem ?? { ...inventoryItem, ...request };
+        savedInventoryItem = updatedInventoryItem ?? { ...persistedItem, ...request };
       } else {
         savedInventoryItem = await createMutation.mutateAsync(request);
-      }
-
-      setIsEditing(false);
-      await onSaved?.(savedInventoryItem);
-
-      // Without a parent to hand the saved record back to, fall back to the
-      // previous behavior of closing after a successful save.
-      if (!onSaved) {
-        onClose();
+        // Remember the new record immediately so any retry updates it instead of duplicating it.
+        setCreatedItem(savedInventoryItem);
       }
     } catch (err) {
       setIsEditing(true);
       setError(err instanceof Error ? err.message : 'שמירת פריט נכשלה');
+      return;
+    }
+
+    // Phase 2: apply staged image changes once the record (and its id) exists. A failure here is
+    // a partial failure — the product itself is saved — so we keep edit mode and the staged image
+    // and surface a clear message instead of pretending the whole save failed.
+    try {
+      if (imageFile) {
+        savedInventoryItem = await uploadImageMutation.mutateAsync({
+          id: savedInventoryItem.inventoryItemId,
+          file: imageFile,
+        });
+      } else if (removeImageRequested && savedInventoryItem.imageUrl) {
+        savedInventoryItem = await removeImageMutation.mutateAsync(savedInventoryItem.inventoryItemId);
+      }
+    } catch (err) {
+      // Keep the created/updated record (already invalidated in cache) so a retry never re-creates it.
+      setCreatedItem(savedInventoryItem);
+      setIsEditing(true);
+      const reason = err instanceof Error ? err.message : 'פעולה נכשלה';
+      setError(
+        `הפריט נשמר, אך עדכון התמונה נכשל: ${reason} ניתן לנסות שוב את העלאת התמונה בלחיצה על "שמור".`,
+      );
+      return;
+    }
+
+    resetImageEdits();
+    setCreatedItem(null);
+    setIsEditing(false);
+    await onSaved?.(savedInventoryItem);
+
+    // Without a parent to hand the saved record back to, fall back to the
+    // previous behavior of closing after a successful save.
+    if (!onSaved) {
+      onClose();
     }
   }
 
@@ -210,13 +335,25 @@ function InventoryDrawerContent({ inventoryItem, onClose, onSaved }: InventoryDr
   }
 
   const isSaving =
-    createMutation.isPending || updateMutation.isPending || deactivateMutation.isPending;
+    createMutation.isPending ||
+    updateMutation.isPending ||
+    deactivateMutation.isPending ||
+    uploadImageMutation.isPending ||
+    removeImageMutation.isPending;
 
-  const title = !isExistingItem
+  const title = !persistedItem
     ? 'פריט מלאי חדש'
     : isEditing
-      ? `עריכת פריט — ${inventoryItem.itemName}`
-      : `פרטי פריט — ${inventoryItem.itemName}`;
+      ? `עריכת פריט — ${persistedItem.itemName}`
+      : `פרטי פריט — ${persistedItem.itemName}`;
+
+  // Edit-mode preview: staged file, else current image (unless removal is staged).
+  const editImageSrc = previewUrl ?? (removeImageRequested ? null : persistedItem?.imageUrl ?? null);
+  const hasImageToRemove =
+    Boolean(previewUrl) || (!removeImageRequested && Boolean(persistedItem?.imageUrl));
+  // Create mode shows a neutral empty placeholder (never a category/fallback photo) until the
+  // user stages an actual image, so an unselected image is not mistaken for the product's photo.
+  const showEmptyImagePlaceholder = !persistedItem && !previewUrl;
 
   return (
     <Drawer
@@ -262,6 +399,59 @@ function InventoryDrawerContent({ inventoryItem, onClose, onSaved }: InventoryDr
         <InventoryReviewDetails inventoryItem={inventoryItem} />
       ) : (
         <div className="inventoryDrawer inventoryDrawer--edit">
+          <DetailsSection title="תמונת מוצר">
+            <div className="inventoryDrawer__imageEditor">
+              <div className="inventoryDrawer__imageFrame">
+                {showEmptyImagePlaceholder ? (
+                  <div className="inventoryDrawer__imagePlaceholder">
+                    <ImageOff size={32} aria-hidden="true" />
+                    <span>לא נבחרה תמונה</span>
+                  </div>
+                ) : (
+                  <InventoryImage
+                    src={editImageSrc}
+                    fallbackSrc={resolveCategoryImage(form.category)}
+                    alt={form.itemName || 'תמונת מוצר'}
+                    variant="drawer"
+                    eager
+                  />
+                )}
+              </div>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="image/jpeg,image/png,image/webp"
+                className="inventoryDrawer__fileInput"
+                onChange={handleSelectImageFile}
+              />
+              <div className="inventoryDrawer__imageActions">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  iconStart={<ImagePlus size={16} />}
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={isSaving}
+                >
+                  {hasImageToRemove ? 'החלפת תמונה' : 'העלאת תמונה'}
+                </Button>
+                {hasImageToRemove && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    iconStart={<Trash2 size={16} />}
+                    onClick={handleRemoveImage}
+                    disabled={isSaving}
+                  >
+                    הסרת תמונה
+                  </Button>
+                )}
+              </div>
+              <p className="inventoryDrawer__imageHint">
+                ניתן להעלות תמונה בפורמט JPEG, PNG או WebP בגודל עד 5MB.
+              </p>
+            </div>
+          </DetailsSection>
+
           <DetailsSection title="פרטים כלליים">
             <Input
               label="שם פריט"
@@ -277,17 +467,26 @@ function InventoryDrawerContent({ inventoryItem, onClose, onSaved }: InventoryDr
                 required
               />
 
-              <Input
+              <Select
                 label="קטגוריה"
-                list="inventoryCategoryOptions"
+                required
                 value={form.category}
                 onChange={(event) => setField('category', event.target.value)}
-              />
-              <datalist id="inventoryCategoryOptions">
-                {CATEGORY_OPTIONS.map((option) => (
-                  <option key={option} value={option} />
+              >
+                <option value="" disabled>
+                  בחר קטגוריה
+                </option>
+                {/* Defensive: surface a legacy/unexpected value so editing never crashes,
+                    while validation still forces a canonical choice before saving. */}
+                {form.category.trim() && !isCanonicalCategory(form.category) && (
+                  <option value={form.category}>{form.category} (לא נתמכת)</option>
+                )}
+                {CANONICAL_CATEGORIES.map((option) => (
+                  <option key={option} value={option}>
+                    {option}
+                  </option>
                 ))}
-              </datalist>
+              </Select>
             </div>
 
             {isExistingItem && (
@@ -368,14 +567,22 @@ function InventoryReviewDetails({ inventoryItem }: InventoryReviewDetailsProps) 
 
   return (
     <div className="inventoryDrawer inventoryDrawer--review">
-      <DetailsSection title="פרטי פריט">
+      <DetailsSection title="תמונה וזיהוי">
+        <div className="inventoryDrawer__imageFrame">
+          <InventoryImage
+            src={inventoryItem.imageUrl}
+            fallbackSrc={resolveCategoryImage(inventoryItem.category)}
+            alt={inventoryItem.itemName}
+            variant="drawer"
+            eager
+          />
+        </div>
         <div className="inventoryDrawer__detailsGrid">
           <DetailsField label="שם פריט" value={inventoryItem.itemName} />
           <DetailsField
             label="מק״ט"
             value={<span className="inventoryDrawer__skuValue">{inventoryItem.skuCode}</span>}
           />
-          <DetailsField label="קטגוריה" value={inventoryItem.category} />
           <DetailsField
             label="סטטוס"
             value={
@@ -417,13 +624,14 @@ function InventoryReviewDetails({ inventoryItem }: InventoryReviewDetailsProps) 
         )}
       </DetailsSection>
 
-      <DetailsSection title="מיקום">
+      <DetailsSection title="סיווג">
         <div className="inventoryDrawer__detailsGrid">
+          <DetailsField label="קטגוריה" value={inventoryItem.category} />
           <DetailsField label="מיקום אחסון" value={inventoryItem.locationName} />
         </div>
       </DetailsSection>
 
-      <DetailsSection title="הערות">
+      <DetailsSection title="מידע נוסף">
         <DetailsField label="הערות" value={inventoryItem.notes} />
       </DetailsSection>
     </div>
