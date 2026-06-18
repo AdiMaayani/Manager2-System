@@ -52,4 +52,5 @@ public static class AuditActions
     public const string WorkItemUpdated = "WorkItemUpdated";
     public const string WorkItemAssigned = "WorkItemAssigned";
     public const string WorkItemClosed = "WorkItemClosed";
+    public const string WorkItemDeleted = "WorkItemDeleted";
 }

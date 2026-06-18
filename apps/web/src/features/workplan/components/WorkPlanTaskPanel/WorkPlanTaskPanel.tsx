@@ -2,12 +2,12 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { ComponentProps } from 'react';
+import { Trash2 } from 'lucide-react';
 import { Badge } from '@shared/components/Badge';
 import { Button } from '@shared/components/Button';
-import { ConfirmInline } from '@shared/components/ConfirmInline';
 import { InlineAlert } from '@shared/components/InlineAlert';
 import { Modal } from '@shared/components/Modal';
-import { cancelWorkPlanTaskAsync } from '../../api/workplanApiClient';
+import { deleteWorkPlanTaskAsync } from '../../api/workplanApiClient';
 import { EditTaskDrawer } from '../EditTaskDrawer';
 import {
   getWorkPlanPriorityDisplay,
@@ -41,6 +41,7 @@ interface WorkPlanTaskPanelProps {
   task: WorkPlanTaskSelection | null;
   onClose: () => void;
   canEdit: boolean;
+  canDeleteTask: boolean;
   onTaskUpdated: () => void;
 }
 
@@ -48,25 +49,32 @@ export function WorkPlanTaskPanel({
   task,
   onClose,
   canEdit,
+  canDeleteTask,
   onTaskUpdated,
 }: WorkPlanTaskPanelProps) {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
-  const [cancelError, setCancelError] = useState<string | null>(null);
+  const [isDeleteConfirmOpen, setIsDeleteConfirmOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
 
-  // Task cancellation lives here (read-only details), separate from the edit drawer. After a
-  // successful cancel we refetch the work plan and close the panel, since the task drops out.
-  const cancelTaskMutation = useMutation({
-    mutationFn: (taskId: number) => cancelWorkPlanTaskAsync(taskId),
-    onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['workplan'] });
+  const deleteTaskMutation = useMutation({
+    mutationFn: ({ taskId }: { taskId: number; projectId: number }) =>
+      deleteWorkPlanTaskAsync(taskId),
+    onSuccess: async (_data, deletedTask) => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: ['workplan'] }),
+        queryClient.invalidateQueries({ queryKey: ['projects'] }),
+        queryClient.invalidateQueries({ queryKey: ['projectLifecycle', deletedTask.projectId] }),
+        queryClient.invalidateQueries({ queryKey: ['projectMilestones', deletedTask.projectId] }),
+      ]);
+      setIsDeleteConfirmOpen(false);
       onTaskUpdated();
       onClose();
     },
     onError: (err) => {
-      setCancelError(err instanceof Error ? err.message : 'ביטול המשימה נכשל');
+      setDeleteError(err instanceof Error ? err.message : 'מחיקת המשימה נכשלה. נסה שוב.');
     },
   });
 
@@ -106,7 +114,9 @@ export function WorkPlanTaskPanel({
     <>
       <Modal
         isOpen
-        onClose={onClose}
+        onClose={() => {
+          if (!deleteTaskMutation.isPending) onClose();
+        }}
         title="פרטי משימה"
         isMaximized={isMaximized}
         onToggleMaximize={() => setIsMaximized((value) => !value)}
@@ -168,7 +178,7 @@ export function WorkPlanTaskPanel({
             <p className={`workPlanTaskPanel__perms workPlanTaskPanel__perms--${permissionTone}`}>
               {permissionMessage}
             </p>
-            {cancelError && <InlineAlert variant="danger">{cancelError}</InlineAlert>}
+            {deleteError && <InlineAlert variant="danger">{deleteError}</InlineAlert>}
             <div className="workPlanTaskPanel__actions">
               <Button
                 type="button"
@@ -181,19 +191,58 @@ export function WorkPlanTaskPanel({
                 דיווח מהיר
               </Button>
 
-              {/* Locked tasks keep the existing lock rule: no destructive action. */}
-              {canEdit && !task.isLocked && (
+              {canDeleteTask && !task.isLocked && (
                 <div className="workPlanTaskPanel__dangerActions">
-                  <ConfirmInline
-                    triggerLabel="ביטול משימה"
-                    message="לבטל את המשימה?"
-                    confirmLabel="אישור ביטול"
-                    onConfirm={() => cancelTaskMutation.mutate(task.taskId)}
-                    isPending={cancelTaskMutation.isPending}
-                  />
+                  <Button
+                    type="button"
+                    variant="danger"
+                    iconStart={<Trash2 size={16} />}
+                    onClick={() => {
+                      setDeleteError(null);
+                      setIsDeleteConfirmOpen(true);
+                    }}
+                  >
+                    מחק משימה
+                  </Button>
                 </div>
               )}
             </div>
+          </div>
+        </div>
+      </Modal>
+
+      <Modal
+        isOpen={isDeleteConfirmOpen}
+        onClose={() => {
+          if (!deleteTaskMutation.isPending) setIsDeleteConfirmOpen(false);
+        }}
+        title="מחיקת משימה"
+      >
+        <div className="workPlanTaskPanel__confirm">
+          <p className="workPlanTaskPanel__confirmMessage">
+            האם למחוק את המשימה „{task.title}“? לא ניתן לבטל פעולה זו.
+          </p>
+          {deleteError && <InlineAlert variant="danger">{deleteError}</InlineAlert>}
+          <div className="workPlanTaskPanel__confirmActions">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setIsDeleteConfirmOpen(false)}
+              disabled={deleteTaskMutation.isPending}
+            >
+              ביטול
+            </Button>
+            <Button
+              type="button"
+              variant="danger"
+              iconStart={<Trash2 size={16} />}
+              onClick={() =>
+                deleteTaskMutation.mutate({ taskId: task.taskId, projectId: task.projectId })
+              }
+              isLoading={deleteTaskMutation.isPending}
+            >
+              {deleteTaskMutation.isPending ? 'מוחק...' : 'מחק משימה'}
+            </Button>
           </div>
         </div>
       </Modal>

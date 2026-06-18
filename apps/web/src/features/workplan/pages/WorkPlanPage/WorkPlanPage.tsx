@@ -22,6 +22,7 @@ function scheduledToSelection(task: ScheduledTaskBar): WorkPlanTaskSelection {
     title: task.title,
     description: task.description ?? null,
     status: task.status,
+    workType: task.workType ?? null,
     projectId: task.projectId,
     projectTitle: task.projectTitle,
     assigneeName: task.assigneeName,
@@ -150,7 +151,13 @@ export function WorkPlanPage() {
     scheduling.currentUserEmployeeId != null &&
     effectiveSelectedTask.assigneeEmployeeId === String(scheduling.currentUserEmployeeId);
 
-  const canEditTask = pageState.scope !== 'personal' || isSelectedTaskOwnedByCurrentUser;
+  const canManageWorkPlan = can('manageWorkPlan');
+  const canEditTask =
+    canManageWorkPlan && (pageState.scope !== 'personal' || isSelectedTaskOwnedByCurrentUser);
+  const canDeleteTask =
+    canManageWorkPlan &&
+    effectiveSelectedTask?.workType === 'Task' &&
+    effectiveSelectedTask?.projectId !== effectiveSelectedTask?.taskId;
 
   if (scheduling.isLoading) {
     return (
@@ -270,6 +277,7 @@ export function WorkPlanPage() {
           task={effectiveSelectedTask}
           onClose={closeTaskPanel}
           canEdit={canEditTask}
+          canDeleteTask={canDeleteTask}
           onTaskUpdated={closeTaskPanel}
         />
 

@@ -618,6 +618,46 @@ public class WorkItemsController : ControllerBase
     }
 
     [Authorize(Policy = Policies.CanManageWorkPlan)]
+    [HttpDelete("tasks/{taskId:int}")]
+    public async Task<IActionResult> DeleteTask(int taskId)
+    {
+        var existingWorkItem = await _workItemRepository.GetByIdAsync(taskId);
+        if (existingWorkItem == null)
+        {
+            return NotFound(new { message = "המשימה לא נמצאה." });
+        }
+
+        var result = await _workItemRepository.DeleteWorkPlanTaskAsync(taskId);
+
+        if (result.WasDeleted)
+        {
+            await _auditLogService.LogAsync(this.BuildAuditEvent(
+                AuditActions.WorkItemDeleted,
+                AuditEntityTypes.WorkItem,
+                $"Task '{existingWorkItem.Title}' (#{taskId}) deleted.",
+                entityId: taskId,
+                metadata: new Dictionary<string, object?>
+                {
+                    ["workType"] = existingWorkItem.WorkType,
+                    ["parentWorkItemId"] = existingWorkItem.ParentWorkItemId
+                }));
+
+            return NoContent();
+        }
+
+        if (result.ResultCode == DeleteWorkPlanTaskResultCode.NotFound)
+        {
+            return NotFound(new { message = result.Message });
+        }
+
+        return BadRequest(new
+        {
+            message = result.Message,
+            code = result.ResultCode.ToString()
+        });
+    }
+
+    [Authorize(Policy = Policies.CanManageWorkPlan)]
     [HttpPut("{id}/close")]
     // Soft-closes a work item by status/date handling in the repository and DB layer.
     public async Task<IActionResult> Close(int id)

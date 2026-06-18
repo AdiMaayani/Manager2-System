@@ -17,6 +17,7 @@ export interface WorkPlanTaskSummary {
   title: string;
   description?: string | null;
   status: string;
+  workType?: string | null;
   estimatedHours?: number | null;
   priority?: string | null;
   plannedStart?: string | null;
@@ -50,6 +51,7 @@ export interface MappedWorkPlan {
     title: string;
     description?: string | null;
     status: string;
+    workType?: string | null;
     estimatedHours?: number | null;
     priority?: string | null;
     plannedStart?: string | null;
@@ -84,6 +86,7 @@ export interface ScheduledTaskBar {
   title: string;
   description?: string | null;
   status: string;
+  workType?: string | null;
   projectId: number;
   projectTitle: string;
   assigneeName: string;
@@ -108,6 +111,7 @@ export interface WorkPlanTaskSelection {
   title: string;
   description?: string | null;
   status: string;
+  workType?: string | null;
   projectId: number;
   projectTitle: string;
   assigneeName: string;

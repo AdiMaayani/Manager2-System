@@ -23,6 +23,7 @@ namespace ManageR2.Infrastructure.Repositories
 
         Task<bool> CloseAsync(int id);
         Task<bool> SoftDeleteMilestoneAsync(int milestoneId);
+        Task<DeleteWorkPlanTaskResult> DeleteWorkPlanTaskAsync(int workItemId);
 
         Task<bool> AssignEmployeeToWorkAsync(int workItemId, int employeeId, string assignmentRole);
         Task<bool> AssignContractorToWorkAsync(int workItemId, int contractorId, string assignmentRole);
