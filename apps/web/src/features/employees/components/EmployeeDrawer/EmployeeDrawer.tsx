@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Drawer } from '@shared/components/Drawer';
+import { Drawer, useDrawerMaximize } from '@shared/components/Drawer';
 import { Badge } from '@shared/components/Badge';
 import { Button } from '@shared/components/Button';
 import { DetailsField } from '@shared/components/DetailsField';
@@ -99,6 +99,7 @@ function EmployeeDrawerContent({ employee, canEdit, onClose, onSaved }: Employee
   const [isEditing, setIsEditing] = useState(!isExistingEmployee && canEdit);
   const [form, setForm] = useState<EmployeeFormState>(() => buildInitialState(employee));
   const [error, setError] = useState<string | null>(null);
+  const { isMaximized, toggleMaximize } = useDrawerMaximize(true);
 
   function setField<K extends keyof EmployeeFormState>(key: K, value: EmployeeFormState[K]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -211,11 +212,47 @@ function EmployeeDrawerContent({ employee, canEdit, onClose, onSaved }: Employee
       ? `עריכת עובד — ${employee.fullName}`
       : `פרטי עובד — ${employee.fullName}`;
 
+  // Edit mode keeps only save/cancel; archive/restore lives in the read-only footer.
+  const editFooter = (
+    <div className="employeeDrawer__footerContent">
+      {error && <InlineAlert variant="danger">{error}</InlineAlert>}
+      <div className="employeeDrawer__actions">
+        <Button onClick={handleSave} isLoading={isSaving}>
+          שמור
+        </Button>
+        <Button variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
+          בטל שינויים
+        </Button>
+      </div>
+    </div>
+  );
+
+  const reviewFooter =
+    isExistingEmployee && canEdit ? (
+      <div className="employeeDrawer__footerContent">
+        {error && <InlineAlert variant="danger">{error}</InlineAlert>}
+        <div className="employeeDrawer__dangerActions">
+          <ConfirmInline
+            triggerLabel={employee.isActive ? 'העברה לארכיון' : 'החזרה לפעילות'}
+            message={
+              employee.isActive ? 'להעביר את העובד לארכיון?' : 'להחזיר את העובד לפעילות?'
+            }
+            confirmLabel="אישור"
+            variant={employee.isActive ? 'danger' : 'primary'}
+            onConfirm={handleStatusChange}
+            isPending={isSaving}
+          />
+        </div>
+      </div>
+    ) : undefined;
+
   return (
     <Drawer
       isOpen
       onClose={onClose}
       title={title}
+      isMaximized={isMaximized}
+      onToggleMaximize={toggleMaximize}
       headerActions={
         isExistingEmployee && !isEditing && canEdit ? (
           <Button type="button" variant="secondary" onClick={handleStartEdit}>
@@ -223,34 +260,7 @@ function EmployeeDrawerContent({ employee, canEdit, onClose, onSaved }: Employee
           </Button>
         ) : undefined
       }
-      footer={
-        isEditing ? (
-          <div className="employeeDrawer__footerContent">
-            {error && <InlineAlert variant="danger">{error}</InlineAlert>}
-            <div className="employeeDrawer__actions">
-              <Button onClick={handleSave} isLoading={isSaving}>
-                שמור
-              </Button>
-              <Button variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
-                בטל שינויים
-              </Button>
-
-              {isExistingEmployee && (
-                <div className="employeeDrawer__dangerActions">
-                  <ConfirmInline
-                    triggerLabel={employee.isActive ? 'השבת עובד' : 'הפעל עובד'}
-                    message={employee.isActive ? 'להשבית את העובד?' : 'להפעיל את העובד מחדש?'}
-                    confirmLabel="אישור"
-                    variant={employee.isActive ? 'danger' : 'primary'}
-                    onConfirm={handleStatusChange}
-                    isPending={isSaving}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-        ) : undefined
-      }
+      footer={isEditing ? editFooter : reviewFooter}
     >
       {!isEditing && isExistingEmployee ? (
         <EmployeeReviewDetails employee={employee} canViewLinkedUser={canEdit} />

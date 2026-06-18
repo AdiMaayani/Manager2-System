@@ -44,6 +44,15 @@ public class UpdateUserDto
     public List<string> Departments { get; set; } = new();
 }
 
+// UsersController POST /{id}/restore: admin-selected role/department names for a restored user.
+// Roles is required (>=1, validated server-side); Departments may be empty.
+public class RestoreUserDto
+{
+    public List<string> Roles { get; set; } = new();
+
+    public List<string> Departments { get; set; } = new();
+}
+
 // Public login body: credentials only (no token returned in this type).
 public class LoginRequestDto
 {

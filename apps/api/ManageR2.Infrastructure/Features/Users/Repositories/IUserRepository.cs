@@ -18,6 +18,10 @@ public interface IUserRepository
     Task SetUserRolesAsync(int userId, List<string> roles);
     Task SetUserDepartmentsAsync(int userId, List<string> departments);
 
+    // Restores a soft-deleted user in one transaction (sp_RestoreUser): reactivates the user and
+    // synchronizes roles/departments to exactly the admin-selected sets (>=1 role required).
+    Task<bool> RestoreUserAsync(int userId, List<string> roles, List<string> departments);
+
     Task<List<string>> GetAllRoleNamesAsync();
     Task<List<string>> GetAllDepartmentNamesAsync();
 

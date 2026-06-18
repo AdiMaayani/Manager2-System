@@ -14,6 +14,7 @@ import { Textarea } from '@shared/components/Textarea';
 import { Checkbox } from '@shared/components/Checkbox';
 import { InlineAlert } from '@shared/components/InlineAlert';
 import { FilterBar, FilterField } from '@shared/components/FilterBar';
+import { SegmentedControl, type SegmentItem } from '@shared/components/SegmentedControl';
 import { DataTable, type DataTableColumn } from '@shared/components/DataTable';
 import {
   createWorkReportAsync,
@@ -36,6 +37,10 @@ const QUICK_REPORT_KEY = 'manager2_quick_report_prefill';
 const SYSTEM_OPTIONS = ['חשמל חכם', 'בקרה', 'תקשורת', 'מולטימדיה', 'מצלמות ואבטחה'];
 const ROLE_OPTIONS = ['מתקין', 'מנהל פרויקט', 'טכנאי'];
 const LIST_STATUS_OPTIONS = ['הוגש', 'טיוטה'];
+const STATUS_FILTER_ITEMS: SegmentItem<string>[] = [
+  { id: '', label: 'הכול' },
+  ...LIST_STATUS_OPTIONS.map((status) => ({ id: status, label: status })),
+];
 
 type SubmitStatus = 'הוגש' | 'טיוטה';
 type ReportFormMode = 'create' | 'edit';
@@ -174,11 +179,8 @@ export function ReportsPage() {
 
   // List filter state
   const [filterSearch, setFilterSearch] = useState('');
-  const [filterProjectId, setFilterProjectId] = useState('');
   const [filterCustomer, setFilterCustomer] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
-  const [filterDateFrom, setFilterDateFrom] = useState('');
-  const [filterDateTo, setFilterDateTo] = useState('');
 
   const { data: projects = [] } = useQuery({
     queryKey: ['reports', 'projects'],
@@ -252,31 +254,20 @@ export function ReportsPage() {
           String(r.reportId).includes(q);
         if (!matchesSearch) return false;
       }
-      if (filterProjectId) {
-        const selectedTitle =
-          projects.find((p) => String(p.workItemId) === filterProjectId)?.title ?? '';
-        if (r.projectTitle !== selectedTitle) return false;
-      }
       if (filterCustomer && (r.customerName ?? '') !== filterCustomer) return false;
       if (filterStatus && r.status !== filterStatus) return false;
-      if (filterDateFrom && r.reportDate) {
-        if (formatReportDate(r.reportDate) < filterDateFrom) return false;
-      }
-      if (filterDateTo && r.reportDate) {
-        if (formatReportDate(r.reportDate) > filterDateTo) return false;
-      }
       return true;
     });
-  }, [
-    reports,
-    filterSearch,
-    filterProjectId,
-    filterCustomer,
-    filterStatus,
-    filterDateFrom,
-    filterDateTo,
-    projects,
-  ]);
+  }, [reports, filterSearch, filterCustomer, filterStatus]);
+
+  const hasActiveFilters =
+    Boolean(filterSearch.trim()) || Boolean(filterCustomer) || Boolean(filterStatus);
+
+  const resetFilters = () => {
+    setFilterSearch('');
+    setFilterCustomer('');
+    setFilterStatus('');
+  };
 
   useEffect(() => {
     if (searchParams.get('quick') !== '1') return;
@@ -486,9 +477,16 @@ export function ReportsPage() {
 
       <FilterBar
         actions={
-          <Button type="button" iconStart={<Plus size={18} />} onClick={openCreateModal}>
-            דיווח חדש
-          </Button>
+          <>
+            {hasActiveFilters && (
+              <Button type="button" variant="ghost" onClick={resetFilters}>
+                נקה סינון
+              </Button>
+            )}
+            <Button type="button" iconStart={<Plus size={18} />} onClick={openCreateModal}>
+              דיווח חדש
+            </Button>
+          </>
         }
       >
         <FilterField label="חיפוש" grow>
@@ -499,15 +497,14 @@ export function ReportsPage() {
             onChange={(e) => setFilterSearch(e.target.value)}
           />
         </FilterField>
-        <FilterField label="פרויקט">
-          <Select value={filterProjectId} onChange={(e) => setFilterProjectId(e.target.value)}>
-            <option value="">הכל</option>
-            {projects.map((p) => (
-              <option key={p.workItemId} value={String(p.workItemId)}>
-                {p.title}
-              </option>
-            ))}
-          </Select>
+        <FilterField label="סטטוס">
+          <SegmentedControl
+            items={STATUS_FILTER_ITEMS}
+            value={filterStatus}
+            onChange={setFilterStatus}
+            ariaLabel="סינון לפי סטטוס"
+            size="sm"
+          />
         </FilterField>
         <FilterField label="לקוח">
           <Select value={filterCustomer} onChange={(e) => setFilterCustomer(e.target.value)}>
@@ -518,30 +515,6 @@ export function ReportsPage() {
               </option>
             ))}
           </Select>
-        </FilterField>
-        <FilterField label="סטטוס">
-          <Select value={filterStatus} onChange={(e) => setFilterStatus(e.target.value)}>
-            <option value="">הכל</option>
-            {LIST_STATUS_OPTIONS.map((s) => (
-              <option key={s} value={s}>
-                {s}
-              </option>
-            ))}
-          </Select>
-        </FilterField>
-        <FilterField label="מתאריך">
-          <Input
-            type="date"
-            value={filterDateFrom}
-            onChange={(e) => setFilterDateFrom(e.target.value)}
-          />
-        </FilterField>
-        <FilterField label="עד תאריך">
-          <Input
-            type="date"
-            value={filterDateTo}
-            onChange={(e) => setFilterDateTo(e.target.value)}
-          />
         </FilterField>
       </FilterBar>
 

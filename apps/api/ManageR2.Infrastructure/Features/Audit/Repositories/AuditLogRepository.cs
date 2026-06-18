@@ -60,6 +60,7 @@ public class AuditLogRepository : IAuditLogRepository
         command.Parameters.AddWithValue("@EntityType", (object?)NullIfBlank(query.EntityType) ?? DBNull.Value);
         command.Parameters.AddWithValue("@Severity", (object?)NullIfBlank(query.Severity) ?? DBNull.Value);
         command.Parameters.AddWithValue("@UserId", (object?)query.UserId ?? DBNull.Value);
+        command.Parameters.AddWithValue("@Search", (object?)NullIfBlank(query.Search) ?? DBNull.Value);
         command.Parameters.AddWithValue("@MaxRows", query.MaxRows);
 
         await connection.OpenAsync();

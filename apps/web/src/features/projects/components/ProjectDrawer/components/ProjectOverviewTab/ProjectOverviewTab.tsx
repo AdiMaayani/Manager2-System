@@ -4,6 +4,7 @@ import { Input } from '@shared/components/Input';
 import { Select } from '@shared/components/Select';
 import { Textarea } from '@shared/components/Textarea';
 import { InlineAlert } from '@shared/components/InlineAlert';
+import { ConfirmInline } from '@shared/components/ConfirmInline';
 import { CustomerDrawer, type Customer } from '@features/customers';
 import { ProjectReportsCard } from '../ProjectReportsCard';
 import type {
@@ -246,11 +247,7 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
     setSiteError(null);
 
     if (!selectedSite) {
-      setSiteError('יש לבחור אתר להשבתה.');
-      return;
-    }
-
-    if (!window.confirm('להשבית את האתר? הוא יוסר מרשימות הבחירה הפעילות.')) {
+      setSiteError('יש לבחור אתר למחיקה.');
       return;
     }
 
@@ -262,7 +259,7 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
       const message =
         err instanceof Error && err.message
           ? err.message
-          : 'השבתת האתר נכשלה. ודא שאין עבודות פתוחות באתר.';
+          : 'מחיקת האתר נכשלה. ודא שאין עבודות פתוחות באתר.';
       setSiteError(message);
     }
   }, [onDeactivateSite, selectedSite]);
@@ -528,16 +525,15 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
                 {[selectedSite.city, selectedSite.addressLine].filter(Boolean).join(' · ') || 'ללא כתובת'}
               </span>
               {selectedSite.notes && <span>{selectedSite.notes}</span>}
-              {isEditMode && (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={handleDeactivateSite}
-                  disabled={!selectedSite}
-                >
-                  השבת אתר
-                </Button>
-              )}
+              <div className="projectOverviewTab__siteDangerAction">
+                <ConfirmInline
+                  triggerLabel="מחיקה"
+                  message="למחוק את האתר?"
+                  confirmLabel="אישור מחיקה"
+                  onConfirm={handleDeactivateSite}
+                  isPending={false}
+                />
+              </div>
             </div>
           )}
           {isEditMode && siteError && !showSiteForm && !showEditSiteForm && (

@@ -542,6 +542,79 @@ public class UserRepository : IUserRepository
         }
     }
 
+    // sp_RestoreUser: single-transaction restore — reactivate user + sync the selected roles/departments.
+    // Selected names are passed as dbo.NameList TVPs; the procedure enforces the >=1 role rule.
+    public async Task<bool> RestoreUserAsync(int userId, List<string> roles, List<string> departments)
+    {
+        _logger.LogInformation("RestoreUserAsync started for UserId={UserId}.", userId);
+
+        try
+        {
+            await using var connection = _dbServices.CreateConnection();
+            await using var command = new SqlCommand("dbo.sp_RestoreUser", connection)
+            {
+                CommandType = CommandType.StoredProcedure
+            };
+
+            command.Parameters.AddWithValue("@UserId", userId);
+
+            var rolesParameter = command.Parameters.AddWithValue("@Roles", BuildNameListTable(roles));
+            rolesParameter.SqlDbType = SqlDbType.Structured;
+            rolesParameter.TypeName = "dbo.NameList";
+
+            var departmentsParameter =
+                command.Parameters.AddWithValue("@Departments", BuildNameListTable(departments));
+            departmentsParameter.SqlDbType = SqlDbType.Structured;
+            departmentsParameter.TypeName = "dbo.NameList";
+
+            await connection.OpenAsync();
+
+            var result = await command.ExecuteScalarAsync();
+            var rowsAffected = result != null && result != DBNull.Value
+                ? Convert.ToInt32(result)
+                : 0;
+
+            var wasRestored = rowsAffected > 0;
+
+            if (wasRestored)
+            {
+                _logger.LogInformation("RestoreUserAsync succeeded for UserId={UserId}.", userId);
+            }
+            else
+            {
+                _logger.LogWarning("RestoreUserAsync affected 0 rows for UserId={UserId}.", userId);
+            }
+
+            return wasRestored;
+        }
+        catch (SqlException ex)
+        {
+            _logger.LogError(ex, "RestoreUserAsync failed with SQL error for UserId={UserId}.", userId);
+
+            throw new UserValidationException("Failed to restore the user.", ex);
+        }
+    }
+
+    // Builds the dbo.NameList TVP payload (single NVARCHAR column "Name") from a name list.
+    private static DataTable BuildNameListTable(IEnumerable<string>? names)
+    {
+        var table = new DataTable();
+        table.Columns.Add("Name", typeof(string));
+
+        if (names != null)
+        {
+            foreach (var name in names)
+            {
+                if (!string.IsNullOrWhiteSpace(name))
+                {
+                    table.Rows.Add(name.Trim());
+                }
+            }
+        }
+
+        return table;
+    }
+
     // sp_GetAllRoleNames: lookup catalog for create-user UI.
     public async Task<List<string>> GetAllRoleNamesAsync()
     {

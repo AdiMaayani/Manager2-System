@@ -23,7 +23,7 @@ public class AuditController : ControllerBase
         _auditLogService = auditLogService;
     }
 
-    // GET /api/audit?fromUtc=&toUtc=&action=&entityType=&severity=&userId=&maxRows=
+    // GET /api/audit?fromUtc=&toUtc=&action=&entityType=&severity=&userId=&search=&maxRows=
     [HttpGet]
     public async Task<ActionResult<IReadOnlyList<AuditLogResponseDto>>> GetList(
         [FromQuery] DateTime? fromUtc,
@@ -32,6 +32,7 @@ public class AuditController : ControllerBase
         [FromQuery] string? entityType,
         [FromQuery] string? severity,
         [FromQuery] int? userId,
+        [FromQuery] string? search,
         [FromQuery] int maxRows = 200)
     {
         var query = new AuditLogQuery
@@ -42,6 +43,7 @@ public class AuditController : ControllerBase
             EntityType = entityType,
             Severity = severity,
             UserId = userId,
+            Search = search,
             MaxRows = maxRows
         };
 

@@ -112,4 +112,13 @@
   display: flex;
   gap: var(--spacing-sm);
   flex-wrap: wrap;
+  align-items: center;
+}
+
+/* Destructive action sits apart from edit/report on the opposite edge. */
+.workPlanTaskPanel__dangerActions {
+  display: flex;
+  gap: var(--spacing-sm);
+  align-items: center;
+  margin-inline-start: auto;
 }

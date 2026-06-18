@@ -1,9 +1,13 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import type { ComponentProps } from 'react';
 import { Badge } from '@shared/components/Badge';
 import { Button } from '@shared/components/Button';
+import { ConfirmInline } from '@shared/components/ConfirmInline';
+import { InlineAlert } from '@shared/components/InlineAlert';
 import { Modal } from '@shared/components/Modal';
+import { cancelWorkPlanTaskAsync } from '../../api/workplanApiClient';
 import { EditTaskDrawer } from '../EditTaskDrawer';
 import {
   getWorkPlanPriorityDisplay,
@@ -47,8 +51,24 @@ export function WorkPlanTaskPanel({
   onTaskUpdated,
 }: WorkPlanTaskPanelProps) {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [isMaximized, setIsMaximized] = useState(false);
+  const [cancelError, setCancelError] = useState<string | null>(null);
+
+  // Task cancellation lives here (read-only details), separate from the edit drawer. After a
+  // successful cancel we refetch the work plan and close the panel, since the task drops out.
+  const cancelTaskMutation = useMutation({
+    mutationFn: (taskId: number) => cancelWorkPlanTaskAsync(taskId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['workplan'] });
+      onTaskUpdated();
+      onClose();
+    },
+    onError: (err) => {
+      setCancelError(err instanceof Error ? err.message : 'ביטול המשימה נכשל');
+    },
+  });
 
   if (!task) return null;
 
@@ -148,6 +168,7 @@ export function WorkPlanTaskPanel({
             <p className={`workPlanTaskPanel__perms workPlanTaskPanel__perms--${permissionTone}`}>
               {permissionMessage}
             </p>
+            {cancelError && <InlineAlert variant="danger">{cancelError}</InlineAlert>}
             <div className="workPlanTaskPanel__actions">
               <Button
                 type="button"
@@ -159,6 +180,19 @@ export function WorkPlanTaskPanel({
               <Button type="button" variant="secondary" onClick={handleQuickReport}>
                 דיווח מהיר
               </Button>
+
+              {/* Locked tasks keep the existing lock rule: no destructive action. */}
+              {canEdit && !task.isLocked && (
+                <div className="workPlanTaskPanel__dangerActions">
+                  <ConfirmInline
+                    triggerLabel="ביטול משימה"
+                    message="לבטל את המשימה?"
+                    confirmLabel="אישור ביטול"
+                    onConfirm={() => cancelTaskMutation.mutate(task.taskId)}
+                    isPending={cancelTaskMutation.isPending}
+                  />
+                </div>
+              )}
             </div>
           </div>
         </div>

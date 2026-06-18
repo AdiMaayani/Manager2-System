@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Drawer } from '@shared/components/Drawer';
+import { Drawer, useDrawerMaximize } from '@shared/components/Drawer';
 import { Badge } from '@shared/components/Badge';
 import { Button } from '@shared/components/Button';
 import { DetailsField } from '@shared/components/DetailsField';
@@ -121,13 +121,20 @@ function UserDrawerContent({
   // Guard against an admin locking themselves out mid-demo: editing your own user must not let you
   // delete/deactivate yourself or strip your own Admin role (session roles wouldn't refresh until re-login).
   const isSelf = isExistingUser && user.userId === getCurrentUser()?.userId;
-  const { createMutation, updateMutation, deleteMutation } = useUserMutations();
+  const { createMutation, updateMutation, deleteMutation, restoreMutation } = useUserMutations();
 
   // Existing users open in read-only review mode; create opens editable.
   // The whole /users route is Admin-only (AdminRoute), so edit is allowed here.
   const [isEditing, setIsEditing] = useState(!isExistingUser);
   const [form, setForm] = useState<UserFormState>(() => buildInitialState(user));
   const [error, setError] = useState<string | null>(null);
+  const { isMaximized, toggleMaximize } = useDrawerMaximize(true);
+
+  // Restore is an explicit admin-driven selection (not a blanket reactivation): the admin chooses
+  // which roles/departments the restored user gets, with at least one role required.
+  const [isRestoring, setIsRestoring] = useState(false);
+  const [restoreRoles, setRestoreRoles] = useState<string[]>([]);
+  const [restoreDepartments, setRestoreDepartments] = useState<string[]>([]);
 
   function setField<K extends keyof UserFormState>(key: K, value: UserFormState[K]) {
     setForm((current) => ({ ...current, [key]: value }));
@@ -241,8 +248,51 @@ function UserDrawerContent({
     }
   }
 
+  function handleStartRestore() {
+    setRestoreRoles([]);
+    setRestoreDepartments([]);
+    setError(null);
+    setIsRestoring(true);
+  }
+
+  function handleCancelRestore() {
+    setError(null);
+    setIsRestoring(false);
+  }
+
+  async function handleRestore() {
+    if (!isExistingUser) return;
+    if (restoreRoles.length === 0) {
+      setError('יש לבחור לפחות תפקיד אחד לשחזור המשתמש.');
+      return;
+    }
+    setError(null);
+
+    try {
+      const restoredUser = await restoreMutation.mutateAsync({
+        id: user.userId,
+        request: { roles: restoreRoles, departments: restoreDepartments },
+      });
+      onSaved(
+        restoredUser ?? {
+          ...user,
+          isActive: true,
+          roles: restoreRoles,
+          departments: restoreDepartments,
+        },
+        'המשתמש שוחזר בהצלחה.',
+      );
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'שחזור המשתמש נכשל');
+    }
+  }
+
   const isSaving =
-    createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
+    createMutation.isPending ||
+    updateMutation.isPending ||
+    deleteMutation.isPending ||
+    restoreMutation.isPending;
 
   const linkedEmployee = isExistingUser
     ? employees.find((employee) => employee.employeeId === user.employeeId) ?? null
@@ -250,51 +300,96 @@ function UserDrawerContent({
 
   const title = !isExistingUser
     ? 'משתמש חדש'
-    : isEditing
-      ? `עריכת משתמש — ${user.username}`
-      : `פרטי משתמש — ${user.username}`;
+    : isRestoring
+      ? `שחזור משתמש — ${user.username}`
+      : isEditing
+        ? `עריכת משתמש — ${user.username}`
+        : `פרטי משתמש — ${user.username}`;
+
+  // Edit mode keeps only save/cancel; delete + restore live in the read-only footer.
+  const editFooter = (
+    <div className="userDrawer__footerContent">
+      {error && <InlineAlert variant="danger">{error}</InlineAlert>}
+      <div className="userDrawer__actions">
+        <Button onClick={handleSave} isLoading={isSaving} disabled={isLookupLoading}>
+          שמור
+        </Button>
+        <Button variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
+          בטל שינויים
+        </Button>
+      </div>
+    </div>
+  );
+
+  const restoreFooter = (
+    <div className="userDrawer__footerContent">
+      {error && <InlineAlert variant="danger">{error}</InlineAlert>}
+      <div className="userDrawer__actions">
+        <Button onClick={handleRestore} isLoading={isSaving} disabled={isLookupLoading}>
+          שחזר משתמש
+        </Button>
+        <Button variant="secondary" onClick={handleCancelRestore} disabled={isSaving}>
+          ביטול
+        </Button>
+      </div>
+    </div>
+  );
+
+  const reviewFooter =
+    isExistingUser ? (
+      <div className="userDrawer__footerContent">
+        {error && <InlineAlert variant="danger">{error}</InlineAlert>}
+        <div className="userDrawer__dangerActions">
+          {user.isActive ? (
+            !isSelf && (
+              <ConfirmInline
+                triggerLabel="מחיקה"
+                message="למחוק את המשתמש? הגישה תבוטל."
+                confirmLabel="אישור מחיקה"
+                onConfirm={handleDelete}
+                isPending={isSaving}
+              />
+            )
+          ) : (
+            <Button type="button" variant="primary" onClick={handleStartRestore}>
+              שחזור
+            </Button>
+          )}
+        </div>
+      </div>
+    ) : undefined;
+
+  const footer = isEditing ? editFooter : isRestoring ? restoreFooter : reviewFooter;
 
   return (
     <Drawer
       isOpen
       onClose={onClose}
       title={title}
+      isMaximized={isMaximized}
+      onToggleMaximize={toggleMaximize}
       headerActions={
-        isExistingUser && !isEditing ? (
+        isExistingUser && !isEditing && !isRestoring ? (
           <Button type="button" variant="secondary" onClick={handleStartEdit}>
             ערוך פרטים
           </Button>
         ) : undefined
       }
-      footer={
-        isEditing ? (
-          <div className="userDrawer__footerContent">
-            {error && <InlineAlert variant="danger">{error}</InlineAlert>}
-            <div className="userDrawer__actions">
-              <Button onClick={handleSave} isLoading={isSaving} disabled={isLookupLoading}>
-                שמור
-              </Button>
-              <Button variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
-                בטל שינויים
-              </Button>
-
-              {isExistingUser && !isSelf && (
-                <div className="userDrawer__dangerActions">
-                  <ConfirmInline
-                    triggerLabel="מחק משתמש"
-                    message="למחוק את המשתמש לצמיתות? אם הוא מקושר לרשומות אחרות, השרת יחזיר שגיאה."
-                    confirmLabel="אישור מחיקה"
-                    onConfirm={handleDelete}
-                    isPending={isSaving}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-        ) : undefined
-      }
+      footer={footer}
     >
-      {!isEditing && isExistingUser ? (
+      {isRestoring && isExistingUser ? (
+        <UserRestoreForm
+          roles={roles}
+          departments={departments}
+          isLookupLoading={isLookupLoading}
+          selectedRoles={restoreRoles}
+          selectedDepartments={restoreDepartments}
+          onToggleRole={(role) => setRestoreRoles((current) => toggleSelection(current, role))}
+          onToggleDepartment={(department) =>
+            setRestoreDepartments((current) => toggleSelection(current, department))
+          }
+        />
+      ) : !isEditing && isExistingUser ? (
         <UserReviewDetails user={user} linkedEmployee={linkedEmployee} />
       ) : (
         <div className="userDrawer userDrawer--edit">
@@ -415,6 +510,77 @@ function UserDrawerContent({
         </div>
       )}
     </Drawer>
+  );
+}
+
+interface UserRestoreFormProps {
+  roles: string[];
+  departments: string[];
+  isLookupLoading: boolean;
+  selectedRoles: string[];
+  selectedDepartments: string[];
+  onToggleRole: (role: string) => void;
+  onToggleDepartment: (department: string) => void;
+}
+
+// Small admin-driven restore form: the admin explicitly chooses which roles (>=1) and departments the
+// restored user should have. It does not reactivate historical assignments automatically.
+function UserRestoreForm({
+  roles,
+  departments,
+  isLookupLoading,
+  selectedRoles,
+  selectedDepartments,
+  onToggleRole,
+  onToggleDepartment,
+}: UserRestoreFormProps) {
+  return (
+    <div className="userDrawer userDrawer--edit">
+      <p className="userDrawer__hint">
+        בחר אילו תפקידים ומחלקות יוקצו למשתמש המשוחזר. נדרש לפחות תפקיד אחד. הקצאות קודמות שלא ייבחרו לא
+        ישוחזרו.
+      </p>
+
+      {isLookupLoading && (
+        <p className="userDrawer__hint">טוען רשימות תפקידים ומחלקות...</p>
+      )}
+
+      <DetailsSection title="הרשאות לשחזור">
+        <div className="userDrawer__selectionGrid">
+          <fieldset className="userDrawer__fieldset">
+            <legend>תפקידים *</legend>
+            {roles.length === 0 ? (
+              <p className="userDrawer__hint">לא נמצאו תפקידים זמינים.</p>
+            ) : (
+              roles.map((role) => (
+                <Checkbox
+                  key={role}
+                  label={`${getRoleDisplayLabel(role)}${role === 'Admin' ? ' (Admin)' : ''}`}
+                  checked={selectedRoles.includes(role)}
+                  onChange={() => onToggleRole(role)}
+                />
+              ))
+            )}
+          </fieldset>
+
+          <fieldset className="userDrawer__fieldset">
+            <legend>מחלקות</legend>
+            {departments.length === 0 ? (
+              <p className="userDrawer__hint">לא נמצאו מחלקות זמינות.</p>
+            ) : (
+              departments.map((department) => (
+                <Checkbox
+                  key={department}
+                  label={department}
+                  checked={selectedDepartments.includes(department)}
+                  onChange={() => onToggleDepartment(department)}
+                />
+              ))
+            )}
+          </fieldset>
+        </div>
+      </DetailsSection>
+    </div>
   );
 }
 

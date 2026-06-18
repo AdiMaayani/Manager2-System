@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Drawer } from '@shared/components/Drawer';
+import { Drawer, useDrawerMaximize } from '@shared/components/Drawer';
 import { Badge } from '@shared/components/Badge';
 import { Button } from '@shared/components/Button';
 import { DetailsField } from '@shared/components/DetailsField';
@@ -102,6 +102,7 @@ function ContactDrawerContent({ contact, onClose, onSaved }: ContactDrawerConten
   const [isEditing, setIsEditing] = useState(!isExistingContact);
   const [form, setForm] = useState<ContactFormState>(() => buildInitialState(contact));
   const [error, setError] = useState<string | null>(null);
+  const { isMaximized, toggleMaximize } = useDrawerMaximize(true);
 
   const requiresCustomer = CUSTOMER_LINK_CATEGORIES.includes(form.contactCategory);
 
@@ -215,6 +216,40 @@ function ContactDrawerContent({ contact, onClose, onSaved }: ContactDrawerConten
     }
   }
 
+  // Restore re-uses the standard update path with IsActive=1 (no related-entity gap).
+  async function handleRestore() {
+    if (!isExistingContact) return;
+    setError(null);
+
+    const request: CreateContactRequest = {
+      fullName: contact.fullName,
+      jobTitle: contact.jobTitle || undefined,
+      contactCategory: contact.contactCategory,
+      customerId: contact.customerId ?? undefined,
+      companyName: contact.companyName || undefined,
+      phone: contact.phone || undefined,
+      secondaryPhone: contact.secondaryPhone || undefined,
+      email: contact.email || undefined,
+      preferredChannel: contact.preferredChannel || undefined,
+      city: contact.city || undefined,
+      address: contact.address || undefined,
+      status: 'פעיל',
+      notes: contact.notes || undefined,
+      isActive: true,
+    };
+
+    try {
+      const restoredContact = await updateMutation.mutateAsync({
+        id: contact.contactId,
+        req: request,
+      });
+      await onSaved?.(restoredContact ?? { ...contact, ...request });
+      onClose();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'שחזור נכשל');
+    }
+  }
+
   const isSaving =
     createMutation.isPending || updateMutation.isPending || deleteMutation.isPending;
 
@@ -224,11 +259,55 @@ function ContactDrawerContent({ contact, onClose, onSaved }: ContactDrawerConten
       ? `עריכת איש קשר — ${contact.fullName}`
       : `פרטי איש קשר — ${contact.fullName}`;
 
+  // Edit mode keeps only save/cancel; destructive + restore live in the read-only footer.
+  const editFooter = (
+    <div className="contactDrawer__footerContent">
+      {error && <InlineAlert variant="danger">{error}</InlineAlert>}
+      <div className="contactDrawer__actions">
+        <Button onClick={handleSave} isLoading={isSaving}>
+          שמור
+        </Button>
+        <Button variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
+          בטל שינויים
+        </Button>
+      </div>
+    </div>
+  );
+
+  const reviewFooter =
+    isExistingContact && canManage ? (
+      <div className="contactDrawer__footerContent">
+        {error && <InlineAlert variant="danger">{error}</InlineAlert>}
+        <div className="contactDrawer__dangerActions">
+          {contact.isActive ? (
+            <ConfirmInline
+              triggerLabel="מחיקה"
+              message="למחוק את איש הקשר?"
+              confirmLabel="אישור מחיקה"
+              onConfirm={handleDelete}
+              isPending={isSaving}
+            />
+          ) : (
+            <ConfirmInline
+              triggerLabel="שחזור"
+              message="לשחזר את איש הקשר?"
+              confirmLabel="אישור שחזור"
+              variant="primary"
+              onConfirm={handleRestore}
+              isPending={isSaving}
+            />
+          )}
+        </div>
+      </div>
+    ) : undefined;
+
   return (
     <Drawer
       isOpen
       onClose={onClose}
       title={title}
+      isMaximized={isMaximized}
+      onToggleMaximize={toggleMaximize}
       headerActions={
         isExistingContact && !isEditing && canManage ? (
           <Button type="button" variant="secondary" onClick={handleStartEdit}>
@@ -236,33 +315,7 @@ function ContactDrawerContent({ contact, onClose, onSaved }: ContactDrawerConten
           </Button>
         ) : undefined
       }
-      footer={
-        isEditing ? (
-          <div className="contactDrawer__footerContent">
-            {error && <InlineAlert variant="danger">{error}</InlineAlert>}
-            <div className="contactDrawer__actions">
-              <Button onClick={handleSave} isLoading={isSaving}>
-                שמור
-              </Button>
-              <Button variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
-                בטל שינויים
-              </Button>
-
-              {isExistingContact && (
-                <div className="contactDrawer__dangerActions">
-                  <ConfirmInline
-                    triggerLabel="מחק איש קשר"
-                    message="למחוק את איש הקשר?"
-                    confirmLabel="אישור מחיקה"
-                    onConfirm={handleDelete}
-                    isPending={isSaving}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-        ) : undefined
-      }
+      footer={isEditing ? editFooter : reviewFooter}
     >
       {!isEditing && isExistingContact ? (
         <ContactReviewDetails contact={contact} />

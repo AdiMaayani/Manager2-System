@@ -281,6 +281,42 @@ public class UsersController : ControllerBase
         return NoContent();
     }
 
+    // Restore a soft-deleted user with an explicit, admin-selected role/department set. This is NOT a
+    // blanket reactivation of every historical assignment: the repository/SP sync to exactly the
+    // chosen sets in one transaction. At least one role is required (a user with no role has no access).
+    [Authorize(Policy = Policies.CanManageUsers)]
+    [HttpPost("{id:int}/restore")]
+    public async Task<IActionResult> RestoreUser(int id, [FromBody] RestoreUserDto dto)
+    {
+        var existing = await _userRepository.GetUserByIdAsync(id);
+        if (existing == null)
+            return NotFound(new { message = $"User with id {id} was not found." });
+
+        var normalizedRoles = NormalizeNamesList(dto.Roles);
+        var normalizedDepartments = NormalizeNamesList(dto.Departments);
+
+        if (normalizedRoles.Count == 0)
+            return BadRequest(new { message = "At least one role is required to restore a user." });
+
+        await _userRepository.RestoreUserAsync(id, normalizedRoles, normalizedDepartments);
+
+        await _auditLogService.LogAsync(this.BuildAuditEvent(
+            AuditActions.UserRestored,
+            AuditEntityTypes.User,
+            $"User '{existing.Username}' (#{id}) restored.",
+            entityId: id,
+            severity: AuditSeverity.Warning,
+            metadata: new Dictionary<string, object?>
+            {
+                ["username"] = existing.Username,
+                ["restoredRoles"] = normalizedRoles,
+                ["restoredDepartments"] = normalizedDepartments
+            }));
+
+        var restored = await _userRepository.GetUserByIdAsync(id);
+        return Ok(await ToSafeUserAsync(restored!));
+    }
+
     // Public login: verify credentials, block inactive users, refresh last login, return JWT + role/department claims payload.
     // Rate limited per client IP (see the "login" policy in Program.cs) and backed by account lockout for defense-in-depth.
     [AllowAnonymous]

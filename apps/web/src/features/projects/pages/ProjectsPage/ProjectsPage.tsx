@@ -33,7 +33,6 @@ export function ProjectsPage() {
   const [stageFilter, setStageFilter] = useState(() => searchParams.get('stage') ?? '');
   const [customerFilter, setCustomerFilter] = useState(() => searchParams.get('customer') ?? '');
   const [pmFilter, setPmFilter] = useState(() => searchParams.get('pm') ?? '');
-  const [siteFilter, setSiteFilter] = useState(() => searchParams.get('site') ?? '');
   const [drawerState, setDrawerState] = useState<DrawerState | null>(null);
 
   const updateSearchParams = useCallback(
@@ -64,12 +63,6 @@ export function ProjectsPage() {
     [projects],
   );
 
-  const siteOptions = useMemo(
-    () =>
-      [...new Set((projects ?? []).map((p) => p.siteName).filter((s) => s !== '-'))].sort(),
-    [projects],
-  );
-
   const filtered = useMemo(() => {
     if (!projects) return [];
 
@@ -85,11 +78,10 @@ export function ProjectsPage() {
         project.projectNumber.toLowerCase().includes(query);
       const matchesCustomer = !customerFilter || project.customerName === customerFilter;
       const matchesPm = !pmFilter || project.projectManagerName === pmFilter;
-      const matchesSite = !siteFilter || project.siteName === siteFilter;
 
-      return matchesStage && matchesSearch && matchesCustomer && matchesPm && matchesSite;
+      return matchesStage && matchesSearch && matchesCustomer && matchesPm;
     });
-  }, [projects, search, stageFilter, customerFilter, pmFilter, siteFilter]);
+  }, [projects, search, stageFilter, customerFilter, pmFilter]);
 
   useEffect(() => {
     const modeParam = searchParams.get('mode');
@@ -145,16 +137,13 @@ export function ProjectsPage() {
     );
   };
 
-  const hasActiveFilters = Boolean(
-    search || stageFilter || customerFilter || pmFilter || siteFilter,
-  );
+  const hasActiveFilters = Boolean(search || stageFilter || customerFilter || pmFilter);
 
   const resetFilters = () => {
     setSearch('');
     setStageFilter('');
     setCustomerFilter('');
     setPmFilter('');
-    setSiteFilter('');
     updateSearchParams({ search: null, stage: null, customer: null, pm: null, site: null });
   };
 
@@ -258,22 +247,6 @@ export function ProjectsPage() {
           >
             <option value="">הכל</option>
             {pmOptions.map((name) => (
-              <option key={name} value={name}>
-                {name}
-              </option>
-            ))}
-          </Select>
-        </FilterField>
-        <FilterField label="אתר">
-          <Select
-            value={siteFilter}
-            onChange={(event) => {
-              setSiteFilter(event.target.value);
-              updateSearchParams({ site: event.target.value || null });
-            }}
-          >
-            <option value="">הכל</option>
-            {siteOptions.map((name) => (
               <option key={name} value={name}>
                 {name}
               </option>

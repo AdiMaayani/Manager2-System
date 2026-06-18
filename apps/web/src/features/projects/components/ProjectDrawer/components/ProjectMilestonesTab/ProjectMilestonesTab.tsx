@@ -6,6 +6,7 @@ import { Input } from '@shared/components/Input';
 import { Select } from '@shared/components/Select';
 import { Textarea } from '@shared/components/Textarea';
 import { Checkbox } from '@shared/components/Checkbox';
+import { ConfirmInline } from '@shared/components/ConfirmInline';
 import { PageSpinner } from '@shared/components/PageSpinner';
 import { useProjectMilestones } from '../../../../hooks/useProjectLifecycle';
 import type {
@@ -476,14 +477,15 @@ export function ProjectMilestonesTab({
                   >
                     ערוך
                   </Button>
-                  <Button
-                    type="button"
-                    variant="danger"
-                    disabled={isCancelled || isSaving}
-                    onClick={() => handleCancelMilestone(milestone.workItemId)}
-                  >
-                    בטל
-                  </Button>
+                  {!isCancelled && (
+                    <ConfirmInline
+                      triggerLabel="ביטול אבן דרך"
+                      message="לבטל את אבן הדרך?"
+                      confirmLabel="אישור ביטול"
+                      onConfirm={() => handleCancelMilestone(milestone.workItemId)}
+                      isPending={isSaving}
+                    />
+                  )}
                 </div>
               </article>
             );

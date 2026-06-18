@@ -35,3 +35,9 @@ export interface UpdateUserRequest {
   roles: string[];
   departments: string[];
 }
+
+// Admin-selected role/department names for restoring a soft-deleted user (roles required, >=1).
+export interface RestoreUserRequest {
+  roles: string[];
+  departments: string[];
+}

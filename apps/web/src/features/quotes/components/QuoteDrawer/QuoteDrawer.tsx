@@ -4,7 +4,7 @@ import { Badge } from '@shared/components/Badge';
 import { Button } from '@shared/components/Button';
 import { DetailsField } from '@shared/components/DetailsField';
 import { DetailsSection } from '@shared/components/DetailsSection';
-import { Drawer } from '@shared/components/Drawer';
+import { Drawer, useDrawerMaximize } from '@shared/components/Drawer';
 import { Input } from '@shared/components/Input';
 import { Select } from '@shared/components/Select';
 import { Textarea } from '@shared/components/Textarea';
@@ -119,6 +119,7 @@ function QuoteDrawerContent({ quoteId, onClose, onSaved, initialProjectId }: Quo
   const [isEditing, setIsEditing] = useState(!isExistingQuote);
   const [form, setForm] = useState<QuoteFormState>(() => buildCreateState(initialProjectId));
   const [error, setError] = useState<string | null>(null);
+  const { isMaximized, toggleMaximize } = useDrawerMaximize(true);
 
   function setField<K extends keyof QuoteFormState>(key: K, value: QuoteFormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));
@@ -299,11 +300,45 @@ function QuoteDrawerContent({ quoteId, onClose, onSaved, initialProjectId }: Quo
       ? `עריכת הצעת מחיר ${quote?.quoteNumber ?? ''}`.trim()
       : `פרטי הצעת מחיר — ${quote?.quoteNumber ?? ''}`.trim();
 
+  // Edit mode keeps only save/cancel; quote cancellation lives in the read-only footer.
+  const editFooter =
+    isQuoteReady ? (
+      <div className="quoteDrawer__footerContent">
+        {error && <InlineAlert variant="danger">{error}</InlineAlert>}
+        <div className="quoteDrawer__actions">
+          <Button onClick={handleSave} isLoading={isSaving}>
+            שמור
+          </Button>
+          <Button variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
+            בטל שינויים
+          </Button>
+        </div>
+      </div>
+    ) : undefined;
+
+  const reviewFooter =
+    isExistingQuote && quote?.isActive ? (
+      <div className="quoteDrawer__footerContent">
+        {error && <InlineAlert variant="danger">{error}</InlineAlert>}
+        <div className="quoteDrawer__dangerActions">
+          <ConfirmInline
+            triggerLabel="ביטול הצעה"
+            message="לבטל את הצעת המחיר?"
+            confirmLabel="אישור ביטול"
+            onConfirm={handleDeactivate}
+            isPending={isSaving}
+          />
+        </div>
+      </div>
+    ) : undefined;
+
   return (
     <Drawer
       isOpen
       onClose={onClose}
       title={isQuoteReady ? title : 'הצעת מחיר'}
+      isMaximized={isMaximized}
+      onToggleMaximize={toggleMaximize}
       headerActions={
         isExistingQuote && !isEditing && quote ? (
           <Button type="button" variant="secondary" onClick={handleStartEdit}>
@@ -311,33 +346,7 @@ function QuoteDrawerContent({ quoteId, onClose, onSaved, initialProjectId }: Quo
           </Button>
         ) : undefined
       }
-      footer={
-        isEditing && isQuoteReady ? (
-          <div className="quoteDrawer__footerContent">
-            {error && <InlineAlert variant="danger">{error}</InlineAlert>}
-            <div className="quoteDrawer__actions">
-              <Button onClick={handleSave} isLoading={isSaving}>
-                שמור
-              </Button>
-              <Button variant="secondary" onClick={handleCancelEdit} disabled={isSaving}>
-                בטל שינויים
-              </Button>
-
-              {isExistingQuote && quote?.isActive && (
-                <div className="quoteDrawer__dangerActions">
-                  <ConfirmInline
-                    triggerLabel="בטל הצעה"
-                    message="לבטל את הצעת המחיר?"
-                    confirmLabel="אישור ביטול"
-                    onConfirm={handleDeactivate}
-                    isPending={isSaving}
-                  />
-                </div>
-              )}
-            </div>
-          </div>
-        ) : undefined
-      }
+      footer={isEditing ? editFooter : reviewFooter}
     >
       {!isQuoteReady ? (
         isLoadingQuote ? (
