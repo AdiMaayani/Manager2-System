@@ -26,3 +26,19 @@
   object-fit: cover;
   object-position: center;
 }
+
+/* Explicit product missing-image state: a neutral, in-frame indicator. Never a category photo. */
+.inventoryImage__missing {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  text-align: center;
+  color: var(--color-neutral-500);
+  background-color: var(--color-neutral-100);
+  font-size: var(--font-size-sm);
+}

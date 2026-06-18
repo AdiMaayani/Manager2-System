@@ -1,6 +1,6 @@
 import { Badge } from '@shared/components/Badge';
 import { InventoryImage } from '../InventoryImage';
-import { resolveCategoryImage } from '../../utils/categoryImages';
+import { resolveInventoryItemImage } from '../../utils/productImages';
 import { formatQuantity, isLowStock } from '../../utils/stock';
 import type { InventoryItem } from '../../types';
 import './InventoryProductCard.css';
@@ -15,6 +15,8 @@ interface InventoryProductCardProps {
 // product drawer; it shows the most useful identity/stock information without overloading.
 export function InventoryProductCard({ item, isSelected, onSelect }: InventoryProductCardProps) {
   const lowStock = isLowStock(item);
+  // Product image only: uploaded → seeded SKU image → explicit missing state. Never a category image.
+  const productImage = resolveInventoryItemImage(item);
 
   return (
     <button
@@ -24,10 +26,10 @@ export function InventoryProductCard({ item, isSelected, onSelect }: InventoryPr
       aria-label={`פתיחת פרטי הפריט ${item.itemName}`}
     >
       <InventoryImage
-        src={item.imageUrl}
-        fallbackSrc={resolveCategoryImage(item.category)}
+        sources={productImage.sources}
         alt={item.itemName}
         variant="card"
+        showMissingState
       />
 
       <div className="inventoryProductCard__body">

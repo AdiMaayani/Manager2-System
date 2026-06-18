@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  createInventoryItemAsync,
+  createInventoryItemWithImageAsync,
   deactivateInventoryItemAsync,
   getInventoryItemsAsync,
   removeInventoryItemImageAsync,
@@ -23,8 +23,11 @@ export function useInventoryMutations() {
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ['inventoryItems'] });
 
-  const createMutation = useMutation({
-    mutationFn: (request: CreateInventoryItemRequest) => createInventoryItemAsync(request),
+  // New products are always created through the image-required multipart endpoint. There is no
+  // image-less JSON create mutation, so an active item can never be created without an image.
+  const createWithImageMutation = useMutation({
+    mutationFn: ({ request, file }: { request: CreateInventoryItemRequest; file: File }) =>
+      createInventoryItemWithImageAsync(request, file),
     onSuccess: invalidate,
   });
 
@@ -51,7 +54,7 @@ export function useInventoryMutations() {
   });
 
   return {
-    createMutation,
+    createWithImageMutation,
     updateMutation,
     deactivateMutation,
     uploadImageMutation,

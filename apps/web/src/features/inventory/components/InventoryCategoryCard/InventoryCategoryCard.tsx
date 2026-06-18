@@ -21,7 +21,7 @@ export function InventoryCategoryCard({ name, activeCount, onSelect }: Inventory
       onClick={() => onSelect(name)}
       aria-label={`${label} — ${activeCount} פריטים פעילים`}
     >
-      <InventoryImage src={resolveCategoryImage(name)} alt={label} variant="category" />
+      <InventoryImage sources={[resolveCategoryImage(name)]} alt={label} variant="category" />
       <div className="inventoryCategoryCard__body">
         <span className="inventoryCategoryCard__name">{label}</span>
         <span className="inventoryCategoryCard__count">

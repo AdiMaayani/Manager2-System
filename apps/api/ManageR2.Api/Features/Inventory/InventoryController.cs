@@ -61,9 +61,28 @@ public class InventoryController : ControllerBase
         return Ok(MapToDto(inventoryItem));
     }
 
+    // The image-less JSON create path is permanently closed. Every new inventory item — of any status
+    // — requires a product image, which this endpoint cannot carry, so it never creates a row (active
+    // or inactive) and would otherwise expose an image-less record through inactive/all-status views.
+    // The route is retained only to return a clear, explained 400; all creation must use the multipart
+    // POST api/Inventory/with-image endpoint, which inserts the item and its image metadata atomically.
     [Authorize(Policy = Policies.CanManageInventory)]
     [HttpPost]
-    public async Task<IActionResult> Create([FromBody] InventoryItemDto dto)
+    public IActionResult Create()
+    {
+        return BadRequest(new
+        {
+            message = "A product image is required. Use the multipart /api/Inventory/with-image endpoint."
+        });
+    }
+
+    // Atomic create with a required image. Creating the record and attaching its image in a single
+    // request guarantees a newly created active item can never be left without an image, and that a
+    // failed attempt followed by a retry can never leave an active duplicate in the catalog.
+    [Authorize(Policy = Policies.CanManageInventory)]
+    [HttpPost("with-image")]
+    [RequestSizeLimit(MaxImageFileSizeBytes)]
+    public async Task<IActionResult> CreateWithImage([FromForm] InventoryItemDto dto, IFormFile? file)
     {
         var categoryError = ValidateCategory(dto.Category);
         if (categoryError != null)
@@ -71,16 +90,64 @@ public class InventoryController : ControllerBase
             return BadRequest(new { message = categoryError });
         }
 
-        var inventoryItem = MapToEntity(dto);
-        var id = await _repository.CreateAsync(inventoryItem);
+        var imageError = ValidateImageFile(file);
+        if (imageError != null)
+        {
+            return BadRequest(new { message = imageError });
+        }
 
-        var created = await _repository.GetByIdAsync(id);
+        var uploadedFile = file!;
+        var storagePath = BuildImageStoragePath(uploadedFile.ContentType);
+        if (storagePath == null)
+        {
+            return BadRequest(new { message = "Invalid upload path." });
+        }
+
+        var (relativePath, fullFilePath) = storagePath.Value;
+
+        // Filesystem/database execution order:
+        //   1. Validate the request + file (done above).
+        //   2. Save the image file to the managed upload directory.
+        //   3. Insert the item AND its image metadata atomically (single transactional procedure).
+        //   4. If the database operation fails, the procedure rolls back fully (no row) and we delete
+        //      the file we just wrote.
+        // The committed row therefore always already contains its image metadata when it becomes
+        // visible, and a failed attempt leaves neither a stray row nor an orphaned file.
+        await using (var stream = System.IO.File.Create(fullFilePath))
+        {
+            await uploadedFile.CopyToAsync(stream);
+        }
+
+        int newId;
+        try
+        {
+            var inventoryItem = MapToEntity(dto);
+            inventoryItem.ImagePath = relativePath;
+            inventoryItem.ImageContentType = uploadedFile.ContentType;
+            inventoryItem.ImageFileSizeBytes = uploadedFile.Length;
+
+            newId = await _repository.CreateWithImageAsync(inventoryItem);
+        }
+        catch
+        {
+            // The create is atomic and rolled back, so no row exists. Remove the orphaned file and let
+            // the global handler shape the error response. Unavoidable residual limitation: if the
+            // process crashes between the file write and this point, the written file can be orphaned
+            // on disk (with no database row) until manual/background cleanup — but no row ever points
+            // to a missing file, and no active item is ever left without an image.
+            DeleteImageFileIfExists(relativePath);
+            throw;
+        }
+
+        var created = await _repository.GetByIdAsync(newId);
         if (created == null)
         {
+            // The insert committed (row + image metadata exist); only the reload read failed. Do NOT
+            // delete the file — that would leave a real row pointing at a missing image.
             return BadRequest(new { message = "Inventory item was created but could not be reloaded." });
         }
 
-        return CreatedAtAction(nameof(GetById), new { id }, MapToDto(created));
+        return CreatedAtAction(nameof(GetById), new { id = newId }, MapToDto(created));
     }
 
     [Authorize(Policy = Policies.CanManageInventory)]
@@ -258,6 +325,23 @@ public class InventoryController : ControllerBase
         // Compose an absolute URL so the SPA can use it directly in <img> regardless of its API base path.
         var normalizedPath = imagePath.Replace('\\', '/').TrimStart('/');
         return $"{Request.Scheme}://{Request.Host}{Request.PathBase}/{normalizedPath}";
+    }
+
+    // Builds a safe, unique storage path for a validated image content type. Returns null if the
+    // resolved path would escape the managed upload directory.
+    private (string relativePath, string fullFilePath)? BuildImageStoragePath(string contentType)
+    {
+        var extension = AllowedImageContentTypes[contentType];
+        var storedFileName = $"{Guid.NewGuid():N}{extension}";
+        var storageRoot = GetImageStorageRoot();
+        var fullFilePath = Path.GetFullPath(Path.Combine(storageRoot, storedFileName));
+        if (!fullFilePath.StartsWith(storageRoot, StringComparison.OrdinalIgnoreCase))
+        {
+            return null;
+        }
+
+        var relativePath = $"{ImageRelativeRoot}/{storedFileName}";
+        return (relativePath, fullFilePath);
     }
 
     private string GetImageStorageRoot()
