@@ -73,15 +73,25 @@ GO
 
 IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_WorkItems_TypeCategory')
     ALTER TABLE dbo.WorkItems WITH NOCHECK ADD CONSTRAINT CK_WorkItems_TypeCategory CHECK (
-        IsArchived = 1 OR
-        (WorkType = N'Project' AND TaskCategory IS NULL AND ParentWorkItemId IS NULL AND MilestoneId IS NULL) OR
-        (WorkType = N'Task' AND TaskCategory = N'Regular' AND ParentWorkItemId IS NULL AND MilestoneId IS NULL) OR
-        (WorkType = N'Task' AND TaskCategory = N'Project' AND ParentWorkItemId IS NOT NULL) OR
-        (WorkType = N'ServiceCall' AND TaskCategory = N'ServiceCall' AND ParentWorkItemId IS NULL AND MilestoneId IS NULL)
+        CASE
+            WHEN IsArchived = 1 THEN 1
+            WHEN WorkType = N'Project' AND TaskCategory IS NULL AND ParentWorkItemId IS NULL AND MilestoneId IS NULL THEN 1
+            WHEN WorkType = N'Task' AND TaskCategory = N'Regular' AND ParentWorkItemId IS NULL AND MilestoneId IS NULL THEN 1
+            WHEN WorkType = N'Task' AND TaskCategory = N'Project' AND ParentWorkItemId IS NOT NULL THEN 1
+            WHEN WorkType = N'ServiceCall' AND TaskCategory = N'ServiceCall' AND ParentWorkItemId IS NULL AND MilestoneId IS NULL THEN 1
+            ELSE 0
+        END = 1
     );
 IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_WorkItems_RegularNoProject')
     ALTER TABLE dbo.WorkItems WITH NOCHECK ADD CONSTRAINT CK_WorkItems_RegularNoProject CHECK (
-        IsArchived = 1 OR TaskCategory <> N'Regular' OR (ParentWorkItemId IS NULL AND MilestoneId IS NULL)
+        CASE
+            WHEN IsArchived = 1 THEN 1
+            WHEN WorkType <> N'Task' THEN 1
+            WHEN TaskCategory IS NULL THEN 0
+            WHEN TaskCategory <> N'Regular' THEN 1
+            WHEN ParentWorkItemId IS NULL AND MilestoneId IS NULL THEN 1
+            ELSE 0
+        END = 1
     );
 IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = N'CK_WorkItems_ArchiveMetadata')
     ALTER TABLE dbo.WorkItems WITH NOCHECK ADD CONSTRAINT CK_WorkItems_ArchiveMetadata CHECK (
@@ -367,13 +377,14 @@ GO
 /* Required diagnostics. A non-zero count blocks CHECK enabling in the legacy package. */
 SELECT WorkType, TaskCategory, ParentWorkItemId, MilestoneId, IsArchived, COUNT_BIG(*) AS [RowCount]
 FROM dbo.WorkItems
-WHERE NOT (
-    IsArchived = 1 OR
-    (WorkType=N'Project' AND TaskCategory IS NULL AND ParentWorkItemId IS NULL AND MilestoneId IS NULL) OR
-    (WorkType=N'Task' AND TaskCategory=N'Regular' AND ParentWorkItemId IS NULL AND MilestoneId IS NULL) OR
-    (WorkType=N'Task' AND TaskCategory=N'Project' AND ParentWorkItemId IS NOT NULL) OR
-    (WorkType=N'ServiceCall' AND TaskCategory=N'ServiceCall' AND ParentWorkItemId IS NULL AND MilestoneId IS NULL)
-)
+WHERE CASE
+    WHEN IsArchived = 1 THEN 1
+    WHEN WorkType = N'Project' AND TaskCategory IS NULL AND ParentWorkItemId IS NULL AND MilestoneId IS NULL THEN 1
+    WHEN WorkType = N'Task' AND TaskCategory = N'Regular' AND ParentWorkItemId IS NULL AND MilestoneId IS NULL THEN 1
+    WHEN WorkType = N'Task' AND TaskCategory = N'Project' AND ParentWorkItemId IS NOT NULL THEN 1
+    WHEN WorkType = N'ServiceCall' AND TaskCategory = N'ServiceCall' AND ParentWorkItemId IS NULL AND MilestoneId IS NULL THEN 1
+    ELSE 0
+END = 0
 GROUP BY WorkType, TaskCategory, ParentWorkItemId, MilestoneId, IsArchived;
 
 SELECT Status AS WorkflowStatus, LifecycleStatus, COUNT_BIG(*) AS [RowCount]

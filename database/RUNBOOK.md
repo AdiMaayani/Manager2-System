@@ -21,29 +21,36 @@ Exact order:
    unambiguous category/lifecycle backfills, four domain tables, and four empty control/audit tables.
    Its first mutation gate lists and rejects unknown Hebrew workflow statuses before any DDL or
    backfill runs. `_MilestoneMigrationMap` remains empty.
-2. Deploy the changed/new canonical `SP/*.sql` files. Do not expose the flat UTC schedule endpoint
+2. Run `migrations/2026-06-19_workitems_check_constraints_null_semantics_fix.sql`. It replaces the
+   two WorkItems type/category CHECK constraints with NULL-safe `CASE ... ELSE 0 END = 1` expressions
+   (`WITH NOCHECK`, no data mutation). **Required on databases where step 1 already ran** with the
+   original OR/`NOT(...)` predicates; safe to rerun; run before the guarded INTERNAL migration.
+3. Deploy the changed/new canonical `SP/*.sql` files. Do not expose the flat UTC schedule endpoint
    to application traffic until the timezone gate passes.
-3. Run `migrations/2026-06-19_legacy_data_migration.sql` for read-only diagnostics. It performs no
+4. Run `migrations/2026-06-19_legacy_data_migration.sql` for read-only diagnostics. It performs no
    DDL or DML. Do not populate `_MilestoneMigrationMap` without approved exact WorkItem ids.
-4. Run `migrations/2026-06-19_planned_datetime_utc.sql` with every flag `0`; this is fully read-only.
+5. Run `migrations/2026-06-19_planned_datetime_utc.sql` with every flag `0`; this is fully read-only.
    Review winter/summer, midnight-crossing, multi-day, API-write-path, DST-hour, and representative
    production previews.
-5. With explicit timezone approval, set `@ConventionConfirmedIsraelLocal=1` and
+6. With explicit timezone approval, set `@ConventionConfirmedIsraelLocal=1` and
    `@ApplyConversion=1` in an execution copy. Inspect shadows, then approve `@ApproveSwap=1`.
    The later milestone copy preserves those already-converted UTC WorkItem values.
-6. With explicit INTERNAL approval, set `@ApproveInternalContext=1` and set
+7. With explicit INTERNAL approval, set `@ApproveInternalContext=1` and set
    `@ApprovedInternalProjectId` to the confirmed reserved container id in
    `2026-06-19_legacy_data_migration_apply.sql`. It clears only confirmed synthetic ids, preserves
    real customer/site references and all WorkItem references, and archives only the INTERNAL project.
    It never deactivates the Internal customer or site.
-7. Only after `_MilestoneMigrationMap` rows contain `ApprovedBy`/`ApprovedAt`, set
+8. Only after `_MilestoneMigrationMap` rows contain `ApprovedBy`/`ApprovedAt`, set
    `@ApproveMilestoneMap=1`. Empty, incomplete, cross-project, or archived mappings roll back.
-8. Run `2026-06-19_legacy_data_migration_verify.sql`; require zero invalid matrix rows, zero
+9. Run `2026-06-19_legacy_data_migration_verify.sql`; require zero invalid type/category matrix
+   rows (`InvalidTypeCategoryRows`), zero invalid Regular-task rows (`InvalidRegularNoProjectRows`), zero
    cross-project milestones, map/copy parity, assignment audit coverage, and expected INTERNAL state.
    Then set `@ApproveEnableWorkItemChecks=1` in an approved verification copy to enable the three
    `CK_WorkItems_*` constraints with `WITH CHECK CHECK CONSTRAINT`.
-9. In an isolated DB only, run `tests/2026-06-19_workplan_reports_smoke.sql` and the two-session
-   `tests/2026-06-19_inventory_finalize_concurrency.sql` after setting their approval/fixture values.
+10. In an isolated DB only, run `tests/2026-06-19_workitems_type_category_checks.sql` (static section
+    always; gated trusted-check section with `@ApprovedNonProduction=1`), then
+    `tests/2026-06-19_workplan_reports_smoke.sql` and the two-session
+    `tests/2026-06-19_inventory_finalize_concurrency.sql` after setting their approval/fixture values.
 
 Required gates and verification:
 
@@ -133,6 +140,7 @@ later adds 2 audit tables (52 total); its default diagnostics-only run adds noth
 | `migrations/2026-06-15_audit_log_core.sql` | **Required** migration | Yes (`IF NOT EXISTS` + `CREATE OR ALTER`) | Fresh build + existing DBs (independent; additive only) |
 | `migrations/2026-06-17_dashboard_command_center.sql` | **Required** migration | Yes (`CREATE OR ALTER`) | Fresh build + existing DBs (independent; read-only SPs only) |
 | `migrations/2026-06-19_workplan_reports_overhaul.sql` | **Required foundation** | Yes (guarded additive DDL/backfill) | Fresh build + existing DBs; after earlier required migrations |
+| `migrations/2026-06-19_workitems_check_constraints_null_semantics_fix.sql` | **Required corrective** | Yes (drop/recreate two CHECK constraints) | After foundation; before INTERNAL migration on DBs that already ran foundation |
 | `migrations/2026-06-19_legacy_data_migration.sql` | Read-only diagnostics | Yes | Existing populated DBs after foundation |
 | `migrations/2026-06-19_planned_datetime_utc.sql` | Read-only by default; operator-gated conversion | Yes | Existing populated DBs after foundation |
 | other `migrations/2026-06-0x_*.sql` | Historical (folded into baseline) | Yes | Only to upgrade an **older** DB; redundant for a fresh build |
