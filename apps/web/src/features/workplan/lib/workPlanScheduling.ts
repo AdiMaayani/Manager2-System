@@ -1,11 +1,18 @@
+import {
+  clampUtcIntervalToLocalDay,
+  localDateKeyFromUtc,
+  toLocalDateKey,
+} from '@shared/utils/utcDateTime';
+import { getTaskCategoryLabel } from '@shared/constants/taskCategories';
 import type {
-  MappedWorkPlan,
   ResolvedAssignment,
   ScheduledTaskBar,
   TaskInsightCounts,
   WorkPlanEmployee,
+  WorkPlanSchedule,
+  WorkPlanScheduleAssignment,
+  WorkPlanScheduledTask,
   WorkPlanTaskSelection,
-  WorkPlanTaskSummary,
 } from '../types';
 import {
   getWorkPlanPriorityDisplay,
@@ -16,11 +23,6 @@ import {
   matchesWorkPlanStatusFilter,
 } from '../constants';
 
-/**
- * Case-insensitive "contains" match across a task's searchable text fields.
- * Pure helper shared by every view so search behaves consistently. An empty
- * query matches everything.
- */
 export function matchesWorkPlanSearch(
   fields: Array<string | null | undefined>,
   query: string,
@@ -32,16 +34,18 @@ export function matchesWorkPlanSearch(
   );
 }
 
-/** Builds the searchable text fields for a task within its work plan. */
 export function buildTaskSearchFields(
-  task: WorkPlanTaskSummary,
-  workPlan: MappedWorkPlan,
+  task: WorkPlanScheduledTask,
   assignment: ResolvedAssignment,
 ): Array<string | null | undefined> {
   return [
     task.title,
     task.description,
-    workPlan.project.title,
+    task.projectTitle,
+    task.customerName,
+    task.siteName,
+    task.milestoneTitle,
+    getTaskCategoryLabel(task.taskCategory),
     assignment.displayName,
     assignment.role,
     task.requiredRole,
@@ -52,41 +56,21 @@ export function buildTaskSearchFields(
   ];
 }
 
-function localDateKey(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
-}
-
-/**
- * Returns true when a task belongs on the given calendar day. Used to wire the
- * daily period anchor into the daily views. The date is taken from the stored
- * `plannedStart` string (no timezone reinterpretation) so the displayed times
- * and scheduling values are never altered. A null `selectedDate` disables the
- * filter; tasks without a planned date are treated as unscheduled and remain
- * visible on every day so no data is hidden.
- */
-export function taskMatchesSelectedDate(
-  plannedStart: string | null | undefined,
+export function taskMatchesSelectedLocalDate(
+  plannedStartUtc: string | null | undefined,
+  plannedEndUtc: string | null | undefined,
   selectedDate?: Date | null,
 ): boolean {
   if (!selectedDate) return true;
-  if (!plannedStart) return true;
+  if (!plannedStartUtc || !plannedEndUtc) return false;
 
-  const isoMatch = plannedStart.match(/^(\d{4})-(\d{2})-(\d{2})/);
-  if (isoMatch) {
-    return `${isoMatch[1]}-${isoMatch[2]}-${isoMatch[3]}` === localDateKey(selectedDate);
-  }
-
-  const parsed = new Date(plannedStart);
-  if (Number.isNaN(parsed.getTime())) return true;
-  return localDateKey(parsed) === localDateKey(selectedDate);
+  const dayKey = toLocalDateKey(selectedDate);
+  return clampUtcIntervalToLocalDay(plannedStartUtc, plannedEndUtc, dayKey) != null;
 }
 
-export function resolveAssignment(
-  task: WorkPlanTaskSummary,
-  workPlan: MappedWorkPlan,
+export function resolveFlatAssignment(
+  task: WorkPlanScheduledTask,
+  assignments: WorkPlanScheduleAssignment[],
 ): ResolvedAssignment {
   const empty: ResolvedAssignment = {
     displayName: '—',
@@ -97,39 +81,36 @@ export function resolveAssignment(
     role: '',
   };
 
-  if (!workPlan.assignments.length) return empty;
-
-  let assignment = workPlan.assignments.find((a) => a.workItemId === task.workItemId);
-  let source: ResolvedAssignment['source'] = 'task';
-
-  if (!assignment) {
-    assignment = workPlan.assignments.find((a) => a.workItemId === workPlan.project.id);
-    source = assignment ? 'project' : 'none';
-  }
-
-  if (!assignment) return empty;
-
-  if (assignment.employeeName || assignment.employeeId != null) {
+  const taskAssignment = assignments.find((a) => a.workItemId === task.workItemId);
+  if (taskAssignment?.employeeId != null || taskAssignment?.employeeName) {
     return {
-      displayName: assignment.employeeName ?? String(assignment.employeeId),
-      source,
+      displayName: taskAssignment.employeeName ?? String(taskAssignment.employeeId),
+      source: taskAssignment.assignmentSource === 'Project' ? 'project' : 'task',
       type: 'employee',
-      employeeId: assignment.employeeId != null ? String(assignment.employeeId) : null,
+      employeeId:
+        taskAssignment.employeeId != null ? String(taskAssignment.employeeId) : null,
       contractorId: null,
-      role: assignment.assignmentRole ?? '',
+      role: taskAssignment.assignmentRole ?? '',
     };
   }
 
-  if (assignment.contractorName || assignment.contractorId != null) {
-    return {
-      displayName: assignment.contractorName ?? String(assignment.contractorId),
-      source,
-      type: 'contractor',
-      employeeId: null,
-      contractorId:
-        assignment.contractorId != null ? String(assignment.contractorId) : null,
-      role: assignment.assignmentRole ?? '',
-    };
+  if (task.projectId != null) {
+    const projectAssignment = assignments.find(
+      (a) => a.workItemId === task.projectId && a.assignmentSource === 'Project',
+    );
+    if (projectAssignment?.employeeId != null || projectAssignment?.employeeName) {
+      return {
+        displayName: projectAssignment.employeeName ?? String(projectAssignment.employeeId),
+        source: 'project',
+        type: 'employee',
+        employeeId:
+          projectAssignment.employeeId != null
+            ? String(projectAssignment.employeeId)
+            : null,
+        contractorId: null,
+        role: projectAssignment.assignmentRole ?? '',
+      };
+    }
   }
 
   return empty;
@@ -149,14 +130,21 @@ export function buildTaskInsightCounts(
 }
 
 export function buildWorkPlanTaskSelection(
-  workPlan: MappedWorkPlan,
-  task: MappedWorkPlan['tasks'][number],
-  fallbackIndex = 0,
+  task: WorkPlanScheduledTask,
+  assignment: ResolvedAssignment,
+  localDayKey: string,
+  isUnscheduled: boolean,
 ): WorkPlanTaskSelection {
-  const assignment = resolveAssignment(task, workPlan);
-  const fallbackStartHour = Math.min(8 + fallbackIndex * 2, 22);
-  const duration = Math.max(2, Math.ceil((task.estimatedHours ?? 2) / 1));
-  const timeWindow = resolveTaskTimeWindow(task, fallbackStartHour, duration);
+  let startHour = 0;
+  let endHour = 0;
+
+  if (!isUnscheduled && task.plannedStart && task.plannedEnd) {
+    const clamped = clampUtcIntervalToLocalDay(task.plannedStart, task.plannedEnd, localDayKey);
+    if (clamped) {
+      startHour = clamped.startHour;
+      endHour = clamped.endHour;
+    }
+  }
 
   return {
     taskId: task.workItemId,
@@ -164,53 +152,115 @@ export function buildWorkPlanTaskSelection(
     description: task.description ?? null,
     status: task.status,
     workType: task.workType ?? null,
-    projectId: workPlan.project.id,
-    projectTitle: workPlan.project.title,
+    taskCategory: task.taskCategory ?? null,
+    projectId: task.projectId ?? null,
+    projectTitle: task.projectTitle ?? task.customerName ?? '—',
+    customerName: task.customerName ?? null,
+    siteName: task.siteName ?? null,
+    milestoneId: task.milestoneId ?? null,
+    milestoneTitle: task.milestoneTitle ?? null,
     assigneeName: assignment.displayName,
     assigneeEmployeeId: assignment.employeeId,
-    startHour: timeWindow.startHour,
-    endHour: timeWindow.endHour,
+    startHour,
+    endHour,
     plannedStart: task.plannedStart,
     plannedEnd: task.plannedEnd,
+    derivedDurationMinutes: task.derivedDurationMinutes,
     isLocked: task.isLocked,
+    isUnscheduled,
     estimatedHours: task.estimatedHours,
     priority: task.priority,
-    requiredRole: task.requiredRole,
+    requiredRole: task.requiredRole ?? null,
+  };
+}
+
+function scheduledTaskToBar(
+  task: WorkPlanScheduledTask,
+  assignment: ResolvedAssignment,
+  employeeId: string,
+  assigneeName: string,
+  localDayKey: string,
+  insightMap: Map<number, TaskInsightCounts>,
+  isUnscheduled: boolean,
+): ScheduledTaskBar | null {
+  let startHour = 0;
+  let endHour = 0;
+
+  if (!isUnscheduled) {
+    if (!task.plannedStart || !task.plannedEnd) return null;
+    const clamped = clampUtcIntervalToLocalDay(task.plannedStart, task.plannedEnd, localDayKey);
+    if (!clamped || clamped.endHour <= clamped.startHour) return null;
+    startHour = clamped.startHour;
+    endHour = clamped.endHour;
+  }
+
+  const insights = buildTaskInsightCounts(task.workItemId, insightMap);
+
+  return {
+    taskId: task.workItemId,
+    title: task.title,
+    description: task.description ?? null,
+    status: task.status,
+    workType: task.workType ?? null,
+    taskCategory: task.taskCategory ?? null,
+    projectId: task.projectId ?? null,
+    projectTitle: task.projectTitle ?? task.customerName ?? '—',
+    customerName: task.customerName ?? null,
+    siteName: task.siteName ?? null,
+    milestoneTitle: task.milestoneTitle ?? null,
+    assigneeName,
+    employeeId,
+    startHour,
+    endHour,
+    plannedStart: task.plannedStart,
+    plannedEnd: task.plannedEnd,
+    derivedDurationMinutes: task.derivedDurationMinutes,
+    estimatedHours: task.estimatedHours,
+    priority: task.priority,
+    requiredRole: task.requiredRole ?? null,
+    isLocked: task.isLocked,
+    isUrgent: isWorkPlanPriorityUrgent(task.priority),
+    isUnscheduled,
+    assignmentSource: assignment.source,
+    violationCount: insights.violationCount,
+    warningCount: insights.warningCount,
+    suggestionCount: insights.suggestionCount,
   };
 }
 
 export function buildEmployeeDailyBars(
-  employees: WorkPlanEmployee[],
-  workPlans: MappedWorkPlan[],
+  schedule: WorkPlanSchedule,
   insightMap: Map<number, TaskInsightCounts>,
   options: {
     employeeFilterId?: string;
     currentUserEmployeeId?: number | null;
     scope: 'company' | 'personal' | 'employee' | 'project';
     statusFilter: string;
+    taskCategoryFilter?: string;
     searchQuery?: string;
     selectedDate?: Date | null;
   },
 ): Array<{ employee: WorkPlanEmployee; tasks: ScheduledTaskBar[] }> {
   const searchQuery = options.searchQuery ?? '';
-  const taskContexts = workPlans.flatMap((workPlan) =>
-    workPlan.tasks.map((task) => ({ task, workPlan })),
-  );
+  const localDayKey = options.selectedDate
+    ? toLocalDateKey(options.selectedDate)
+    : toLocalDateKey(new Date());
 
-  const filteredEmployees = employees.filter((employee) => {
+  const allTasks = [
+    ...schedule.scheduledTasks.map((task) => ({ task, isUnscheduled: false })),
+    ...schedule.unscheduledTasks.map((task) => ({ task, isUnscheduled: true })),
+  ];
+
+  const filteredEmployees = schedule.employees.filter((employee) => {
     if (!employee.fullName || !employee.isActive) return false;
-    const employeeId = String(employee.employeeId);
 
     if (options.scope === 'personal') {
-      // Personal scope must reflect the signed-in user only. Without a linked
-      // employee we surface an empty state at the page level instead of
-      // silently falling back to "everyone".
       if (options.currentUserEmployeeId == null) return false;
       return employee.employeeId === options.currentUserEmployeeId;
     }
 
     if (options.scope === 'employee' && options.employeeFilterId) {
-      return employeeId === options.employeeFilterId;
+      return String(employee.employeeId) === options.employeeFilterId;
     }
 
     return true;
@@ -218,113 +268,204 @@ export function buildEmployeeDailyBars(
 
   return filteredEmployees.map((employee) => {
     const employeeId = String(employee.employeeId);
-    const employeeTasks = taskContexts.filter(({ task, workPlan }) => {
-      const assignment = resolveAssignment(task, workPlan);
-      if (String(assignment.employeeId ?? '').trim() !== employeeId) return false;
-      if (!matchesWorkPlanStatusFilter(task.status, options.statusFilter)) return false;
-      if (!taskMatchesSelectedDate(task.plannedStart, options.selectedDate)) return false;
-      return matchesWorkPlanSearch(
-        buildTaskSearchFields(task, workPlan, assignment),
-        searchQuery,
-      );
-    });
+    const tasks: ScheduledTaskBar[] = [];
 
-    const tasks: ScheduledTaskBar[] = employeeTasks.map(({ task, workPlan }, index) => {
-      const assignment = resolveAssignment(task, workPlan);
-      const insights = buildTaskInsightCounts(task.workItemId, insightMap);
-      const fallbackStartHour = Math.min(8 + index * 2, 22);
-      const duration = Math.max(2, Math.ceil((task.estimatedHours ?? 2) / 1));
-      const timeWindow = resolveTaskTimeWindow(task, fallbackStartHour, duration);
+    for (const { task, isUnscheduled } of allTasks) {
+      if (!matchesWorkPlanStatusFilter(task.status, options.statusFilter)) continue;
+      if (
+        options.taskCategoryFilter &&
+        options.taskCategoryFilter !== 'all' &&
+        task.taskCategory !== options.taskCategoryFilter
+      ) {
+        continue;
+      }
 
-      return {
-        taskId: task.workItemId,
-        title: task.title,
-        description: task.description ?? null,
-        status: task.status,
-        workType: task.workType ?? null,
-        projectId: task.parentWorkItemId ?? workPlan.project.id,
-        projectTitle: workPlan.project.title,
-        assigneeName: employee.fullName,
+      const assignment = resolveFlatAssignment(task, schedule.assignments);
+      if (String(assignment.employeeId ?? '').trim() !== employeeId) continue;
+
+      if (!isUnscheduled && !taskMatchesSelectedLocalDate(task.plannedStart, task.plannedEnd, options.selectedDate)) {
+        continue;
+      }
+
+      if (!matchesWorkPlanSearch(buildTaskSearchFields(task, assignment), searchQuery)) {
+        continue;
+      }
+
+      const bar = scheduledTaskToBar(
+        task,
+        assignment,
         employeeId,
-        startHour: timeWindow.startHour,
-        endHour: timeWindow.endHour,
-        plannedStart: task.plannedStart,
-        plannedEnd: task.plannedEnd,
-        estimatedHours: task.estimatedHours,
-        priority: task.priority,
-        requiredRole: task.requiredRole,
-        isLocked: task.isLocked,
-        isUrgent: isWorkPlanPriorityUrgent(task.priority),
-        assignmentSource: assignment.source,
-        violationCount: insights.violationCount,
-        warningCount: insights.warningCount,
-        suggestionCount: insights.suggestionCount,
-      };
-    });
+        employee.fullName,
+        localDayKey,
+        insightMap,
+        isUnscheduled,
+      );
+      if (bar) tasks.push(bar);
+    }
 
     return { employee, tasks };
-  });
+  }).concat(buildUnassignedEmployeeDailyRow(
+    schedule,
+    allTasks,
+    insightMap,
+    options,
+    searchQuery,
+    localDayKey,
+  ));
+}
+
+function buildUnassignedEmployeeDailyRow(
+  schedule: WorkPlanSchedule,
+  allTasks: Array<{ task: WorkPlanScheduledTask; isUnscheduled: boolean }>,
+  insightMap: Map<number, TaskInsightCounts>,
+  options: {
+    employeeFilterId?: string;
+    currentUserEmployeeId?: number | null;
+    scope: 'company' | 'personal' | 'employee' | 'project';
+    statusFilter: string;
+    taskCategoryFilter?: string;
+    searchQuery?: string;
+    selectedDate?: Date | null;
+  },
+  searchQuery: string,
+  localDayKey: string,
+): Array<{ employee: WorkPlanEmployee; tasks: ScheduledTaskBar[] }> {
+  if (options.scope === 'employee' && options.employeeFilterId) {
+    return [];
+  }
+
+  const tasks: ScheduledTaskBar[] = [];
+
+  for (const { task, isUnscheduled } of allTasks) {
+    if (!matchesWorkPlanStatusFilter(task.status, options.statusFilter)) continue;
+    if (
+      options.taskCategoryFilter &&
+      options.taskCategoryFilter !== 'all' &&
+      task.taskCategory !== options.taskCategoryFilter
+    ) {
+      continue;
+    }
+
+    const assignment = resolveFlatAssignment(task, schedule.assignments);
+    if (assignment.employeeId) continue;
+
+    if (!isUnscheduled && !taskMatchesSelectedLocalDate(task.plannedStart, task.plannedEnd, options.selectedDate)) {
+      continue;
+    }
+
+    if (!matchesWorkPlanSearch(buildTaskSearchFields(task, assignment), searchQuery)) {
+      continue;
+    }
+
+    const bar = scheduledTaskToBar(
+      task,
+      assignment,
+      '',
+      'לא משויך',
+      localDayKey,
+      insightMap,
+      isUnscheduled,
+    );
+    if (bar) tasks.push(bar);
+  }
+
+  if (tasks.length === 0) return [];
+
+  return [{
+    employee: {
+      employeeId: 0,
+      fullName: 'לא משויך',
+      primaryRole: '',
+      isAssignable: false,
+      isActive: true,
+    },
+    tasks,
+  }];
 }
 
 export function buildProjectDailyBars(
-  workPlans: MappedWorkPlan[],
+  schedule: WorkPlanSchedule,
   insightMap: Map<number, TaskInsightCounts>,
   statusFilter: string,
+  taskCategoryFilter: string,
   searchQuery = '',
   selectedDate?: Date | null,
-): Array<{ projectId: number; projectTitle: string; tasks: ScheduledTaskBar[] }> {
-  return workPlans
-    .filter((workPlan) => workPlan.project.id > 0 && workPlan.tasks.length > 0)
-    .map((workPlan) => {
-      const tasks: ScheduledTaskBar[] = workPlan.tasks
-        .filter((task) => {
-          if (!matchesWorkPlanStatusFilter(task.status, statusFilter)) return false;
-          if (!taskMatchesSelectedDate(task.plannedStart, selectedDate)) return false;
-          const assignment = resolveAssignment(task, workPlan);
-          return matchesWorkPlanSearch(
-            buildTaskSearchFields(task, workPlan, assignment),
-            searchQuery,
-          );
-        })
-        .map((task, index) => {
-          const assignment = resolveAssignment(task, workPlan);
-          const insights = buildTaskInsightCounts(task.workItemId, insightMap);
-          const fallbackStartHour = Math.min(8 + index * 2, 22);
-          const timeWindow = resolveTaskTimeWindow(task, fallbackStartHour, 2);
+): Array<{ projectId: number | null; projectTitle: string; tasks: ScheduledTaskBar[] }> {
+  const localDayKey = selectedDate ? toLocalDateKey(selectedDate) : toLocalDateKey(new Date());
+  const projectMap = new Map<number | null, { projectTitle: string; tasks: ScheduledTaskBar[] }>();
 
-          return {
-            taskId: task.workItemId,
-            title: task.title,
-            description: task.description ?? null,
-            status: task.status,
-            workType: task.workType ?? null,
-            projectId: workPlan.project.id,
-            projectTitle: workPlan.project.title,
-            assigneeName: assignment.displayName,
-            employeeId: assignment.employeeId ?? '',
-            startHour: timeWindow.startHour,
-            endHour: timeWindow.endHour,
-            plannedStart: task.plannedStart,
-            plannedEnd: task.plannedEnd,
-            estimatedHours: task.estimatedHours,
-            priority: task.priority,
-            requiredRole: task.requiredRole,
-            isLocked: task.isLocked,
-            isUrgent: isWorkPlanPriorityUrgent(task.priority),
-            assignmentSource: assignment.source,
-            violationCount: insights.violationCount,
-            warningCount: insights.warningCount,
-            suggestionCount: insights.suggestionCount,
-          };
-        });
+  const allTasks = [
+    ...schedule.scheduledTasks.map((task) => ({ task, isUnscheduled: false })),
+    ...schedule.unscheduledTasks.map((task) => ({ task, isUnscheduled: true })),
+  ];
 
-      return {
-        projectId: workPlan.project.id,
-        projectTitle: workPlan.project.title,
-        tasks,
-      };
-    })
-    .filter((row) => row.tasks.length > 0 || !searchQuery.trim());
+  for (const { task, isUnscheduled } of allTasks) {
+    if (!matchesWorkPlanStatusFilter(task.status, statusFilter)) continue;
+    if (taskCategoryFilter !== 'all' && task.taskCategory !== taskCategoryFilter) continue;
+
+    const assignment = resolveFlatAssignment(task, schedule.assignments);
+    if (!matchesWorkPlanSearch(buildTaskSearchFields(task, assignment), searchQuery)) continue;
+
+    if (!isUnscheduled && !taskMatchesSelectedLocalDate(task.plannedStart, task.plannedEnd, selectedDate)) {
+      continue;
+    }
+
+    const projectId = task.projectId ?? null;
+    const projectTitle = task.projectTitle ?? task.customerName ?? 'משימות ללא פרויקט';
+    const bar = scheduledTaskToBar(
+      task,
+      assignment,
+      assignment.employeeId ?? '',
+      assignment.displayName,
+      localDayKey,
+      insightMap,
+      isUnscheduled,
+    );
+    if (!bar) continue;
+
+    if (!projectMap.has(projectId)) {
+      projectMap.set(projectId, { projectTitle, tasks: [] });
+    }
+    projectMap.get(projectId)!.tasks.push(bar);
+  }
+
+  return Array.from(projectMap.entries()).map(([projectId, entry]) => ({
+    projectId,
+    projectTitle: entry.projectTitle,
+    tasks: entry.tasks,
+  }));
+}
+
+export function buildUnscheduledTaskBars(
+  schedule: WorkPlanSchedule,
+  insightMap: Map<number, TaskInsightCounts>,
+  statusFilter: string,
+  taskCategoryFilter: string,
+  searchQuery = '',
+): ScheduledTaskBar[] {
+  const bars: ScheduledTaskBar[] = [];
+  const localDayKey = toLocalDateKey(new Date());
+
+  for (const task of schedule.unscheduledTasks) {
+    if (!matchesWorkPlanStatusFilter(task.status, statusFilter)) continue;
+    if (taskCategoryFilter !== 'all' && task.taskCategory !== taskCategoryFilter) continue;
+
+    const assignment = resolveFlatAssignment(task, schedule.assignments);
+    if (!matchesWorkPlanSearch(buildTaskSearchFields(task, assignment), searchQuery)) continue;
+
+    const bar = scheduledTaskToBar(
+      task,
+      assignment,
+      assignment.employeeId ?? '',
+      assignment.displayName,
+      localDayKey,
+      insightMap,
+      true,
+    );
+    if (bar) bars.push(bar);
+  }
+
+  return bars;
 }
 
 export function hourToPercent(hour: number): number {
@@ -343,53 +484,10 @@ export function formatHourAsTime(hour: number): string {
   return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
 }
 
-function resolveTaskTimeWindow(
-  task: Pick<WorkPlanTaskSummary, 'plannedStart' | 'plannedEnd'>,
-  fallbackStartHour: number,
-  fallbackDurationHours: number,
-): { startHour: number; endHour: number } {
-  const plannedStartHour = parsePlannedHour(task.plannedStart);
-  const plannedEndHour = parsePlannedHour(task.plannedEnd);
-
-  if (plannedStartHour != null && plannedEndHour != null && plannedEndHour > plannedStartHour) {
-    return {
-      startHour: plannedStartHour,
-      endHour: plannedEndHour,
-    };
-  }
-
-  return {
-    startHour: fallbackStartHour,
-    endHour: Math.min(fallbackStartHour + fallbackDurationHours, 24),
-  };
-}
-
-function parsePlannedHour(value?: string | null): number | null {
-  if (!value) return null;
-
-  const localTimeMatch = value.match(/T(\d{2}):(\d{2})/);
-  if (localTimeMatch) {
-    const hours = Number(localTimeMatch[1]);
-    const minutes = Number(localTimeMatch[2]);
-    if (hours >= 0 && hours < 24 && minutes >= 0 && minutes < 60) {
-      return hours + minutes / 60;
-    }
-
-    if (hours === 24 && minutes === 0) {
-      return 24;
-    }
-  }
-
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return null;
-
-  return date.getHours() + date.getMinutes() / 60;
-}
-
-export function buildGanttTasksFromWorkPlan(workPlan: MappedWorkPlan) {
-  return workPlan.tasks.map((task) => {
-    const start = task.plannedStart?.slice(0, 10) ?? '2025-01-20';
-    const end = task.plannedEnd?.slice(0, 10) ?? '2025-01-28';
+export function buildGanttTasksFromSchedule(schedule: WorkPlanSchedule) {
+  return schedule.scheduledTasks.map((task) => {
+    const start = task.plannedStart ? localDateKeyFromUtc(task.plannedStart) : '';
+    const end = task.plannedEnd ? localDateKeyFromUtc(task.plannedEnd) : start;
     const progress = isWorkPlanStatusDone(task.status)
       ? 100
       : isWorkPlanStatusInProgress(task.status)
@@ -404,4 +502,27 @@ export function buildGanttTasksFromWorkPlan(workPlan: MappedWorkPlan) {
       progress,
     };
   });
+}
+
+export function findTaskInSchedule(
+  schedule: WorkPlanSchedule,
+  workItemId: number,
+): { task: WorkPlanScheduledTask; isUnscheduled: boolean } | null {
+  const scheduled = schedule.scheduledTasks.find((t) => t.workItemId === workItemId);
+  if (scheduled) return { task: scheduled, isUnscheduled: false };
+  const unscheduled = schedule.unscheduledTasks.find((t) => t.workItemId === workItemId);
+  if (unscheduled) return { task: unscheduled, isUnscheduled: true };
+  return null;
+}
+
+export function collectProjectOptions(schedule: WorkPlanSchedule): Array<{ id: number; title: string }> {
+  const map = new Map<number, string>();
+  for (const task of [...schedule.scheduledTasks, ...schedule.unscheduledTasks]) {
+    if (task.projectId != null && task.projectId > 0 && task.projectTitle) {
+      map.set(task.projectId, task.projectTitle);
+    }
+  }
+  return Array.from(map.entries())
+    .map(([id, title]) => ({ id, title }))
+    .sort((a, b) => a.title.localeCompare(b.title, 'he'));
 }

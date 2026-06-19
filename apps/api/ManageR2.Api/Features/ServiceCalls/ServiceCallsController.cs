@@ -2,6 +2,8 @@ using ManageR2.Api.Authorization;
 using ManageR2.Api.Features.Audit;
 using ManageR2.Api.Features.ServiceCalls.DTOs;
 using ManageR2.Domain.Entities;
+using ManageR2.Domain.Features.WorkItems;
+using ManageR2.Infrastructure.Features.WorkItems.Services;
 using ManageR2.Infrastructure.Repositories;
 using ManageR2.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
@@ -14,21 +16,24 @@ namespace ManageR2.Api.Features.ServiceCalls;
 [Authorize(Policy = Policies.CanViewServiceCalls)]
 public class ServiceCallsController : ControllerBase
 {
-    private const string ServiceCallWorkType = "ServiceCall";
-
     private readonly IWorkItemRepository _workItemRepository;
+    private readonly IWorkItemTaskService _workItemTaskService;
     private readonly IAuditLogService _auditLogService;
 
-    public ServiceCallsController(IWorkItemRepository workItemRepository, IAuditLogService auditLogService)
+    public ServiceCallsController(
+        IWorkItemRepository workItemRepository,
+        IWorkItemTaskService workItemTaskService,
+        IAuditLogService auditLogService)
     {
         _workItemRepository = workItemRepository;
+        _workItemTaskService = workItemTaskService;
         _auditLogService = auditLogService;
     }
 
     [HttpGet]
     public async Task<ActionResult<List<ServiceCallResponseDto>>> GetAll()
     {
-        var serviceCalls = await _workItemRepository.GetByTypeAsync(ServiceCallWorkType);
+        var serviceCalls = await _workItemRepository.GetByTypeAsync(WorkItemWorkTypes.ServiceCall);
         return Ok(serviceCalls.Select(MapToResponse).ToList());
     }
 
@@ -48,32 +53,39 @@ public class ServiceCallsController : ControllerBase
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] CreateServiceCallRequestDto request)
     {
-        var serviceCall = BuildServiceCall(request);
-        var newWorkItemId = await _workItemRepository.CreateAsync(serviceCall);
-
-        if (newWorkItemId <= 0)
+        try
         {
-            return BadRequest("Failed to create service call.");
-        }
+            var serviceCall = BuildServiceCall(request);
+            var newWorkItemId = await _workItemRepository.CreateAsync(serviceCall);
 
-        await _auditLogService.LogAsync(this.BuildAuditEvent(
-            AuditActions.ServiceCallCreated,
-            AuditEntityTypes.ServiceCall,
-            $"Service call '{serviceCall.Title}' (#{newWorkItemId}) created.",
-            entityId: newWorkItemId,
-            metadata: new Dictionary<string, object?>
+            if (newWorkItemId <= 0)
             {
-                ["customerId"] = serviceCall.CustomerId,
-                ["siteId"] = serviceCall.SiteId,
-                ["status"] = serviceCall.Status,
-                ["priority"] = serviceCall.Priority
-            }));
+                return BadRequest("Failed to create service call.");
+            }
 
-        return Ok(new
+            await _auditLogService.LogAsync(this.BuildAuditEvent(
+                AuditActions.ServiceCallCreated,
+                AuditEntityTypes.ServiceCall,
+                $"Service call '{serviceCall.Title}' (#{newWorkItemId}) created.",
+                entityId: newWorkItemId,
+                metadata: new Dictionary<string, object?>
+                {
+                    ["customerId"] = serviceCall.CustomerId,
+                    ["siteId"] = serviceCall.SiteId,
+                    ["status"] = serviceCall.Status,
+                    ["priority"] = serviceCall.Priority
+                }));
+
+            return Ok(new
+            {
+                message = "Service call created successfully.",
+                workItemId = newWorkItemId
+            });
+        }
+        catch (ArgumentException ex)
         {
-            message = "Service call created successfully.",
-            workItemId = newWorkItemId
-        });
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [Authorize(Policy = Policies.CanManageServiceCalls)]
@@ -86,26 +98,33 @@ public class ServiceCallsController : ControllerBase
             return NotFound($"Service call with ID {id} was not found.");
         }
 
-        var serviceCall = BuildServiceCall(request);
-        var updated = await _workItemRepository.UpdateAsync(id, serviceCall);
-
-        if (!updated)
+        try
         {
-            return BadRequest("Failed to update service call.");
-        }
+            var serviceCall = BuildServiceCall(request, existingServiceCall.Status);
+            var updated = await _workItemRepository.UpdateAsync(id, serviceCall);
 
-        await _auditLogService.LogAsync(this.BuildAuditEvent(
-            AuditActions.ServiceCallUpdated,
-            AuditEntityTypes.ServiceCall,
-            $"Service call '{serviceCall.Title}' (#{id}) updated.",
-            entityId: id,
-            metadata: new Dictionary<string, object?>
+            if (!updated)
             {
-                ["status"] = serviceCall.Status,
-                ["priority"] = serviceCall.Priority
-            }));
+                return BadRequest("Failed to update service call.");
+            }
 
-        return Ok(new { message = "Service call updated successfully." });
+            await _auditLogService.LogAsync(this.BuildAuditEvent(
+                AuditActions.ServiceCallUpdated,
+                AuditEntityTypes.ServiceCall,
+                $"Service call '{serviceCall.Title}' (#{id}) updated.",
+                entityId: id,
+                metadata: new Dictionary<string, object?>
+                {
+                    ["status"] = serviceCall.Status,
+                    ["priority"] = serviceCall.Priority
+                }));
+
+            return Ok(new { message = "Service call updated successfully." });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [Authorize(Policy = Policies.CanManageServiceCalls)]
@@ -178,7 +197,7 @@ public class ServiceCallsController : ControllerBase
     {
         var workItem = await _workItemRepository.GetByIdAsync(workItemId);
         if (workItem == null ||
-            !string.Equals(workItem.WorkType, ServiceCallWorkType, StringComparison.OrdinalIgnoreCase))
+            !string.Equals(workItem.WorkType, WorkItemWorkTypes.ServiceCall, StringComparison.OrdinalIgnoreCase))
         {
             return null;
         }
@@ -186,29 +205,42 @@ public class ServiceCallsController : ControllerBase
         return workItem;
     }
 
-    private static WorkItem BuildServiceCall(CreateServiceCallRequestDto request)
+    private WorkItem BuildServiceCall(CreateServiceCallRequestDto request, string? existingStatus = null)
     {
-        return new WorkItem
+        var (plannedStartUtc, plannedEndUtc) = UtcDateTimeNormalizer.NormalizePlannedRange(
+            request.PlannedStart,
+            request.PlannedEnd);
+
+        var validationInput = new WorkItemTaskValidationInput
+        {
+            TaskCategory = WorkItemTaskCategories.ServiceCall,
+            CustomerId = request.CustomerId,
+            SiteId = request.SiteId,
+            PlannedStartUtc = plannedStartUtc,
+            PlannedEndUtc = plannedEndUtc
+        };
+
+        _workItemTaskService.ValidateCreateOrUpdate(validationInput, isServiceCallPath: true);
+
+        return _workItemTaskService.ApplyCanonicalFields(new WorkItem
         {
             Title = request.Title.Trim(),
             Description = request.Description,
-            WorkType = ServiceCallWorkType,
-            Status = request.Status,
+            Status = ResolveTaskStatus(request.Status, existingStatus),
             BillingType = request.BillingType,
-            CustomerId = request.CustomerId,
-            SiteId = request.SiteId,
             Priority = request.Priority,
-            PlannedStart = request.PlannedStart,
-            PlannedEnd = request.PlannedEnd,
-            EstimatedHours = request.EstimatedHours,
             ActualStart = request.ActualStart,
             ActualEnd = request.ActualEnd,
             ActualHours = request.ActualHours,
             RequiredRole = request.RequiredRole,
-            IsLocked = request.IsLocked,
-            ParentWorkItemId = null
-        };
+            IsLocked = request.IsLocked
+        }, validationInput);
     }
+
+    private static string ResolveTaskStatus(string? requestedStatus, string? existingStatus = null) =>
+        string.IsNullOrWhiteSpace(requestedStatus)
+            ? (existingStatus ?? WorkItemDefaultStatuses.Planned)
+            : requestedStatus;
 
     private static ServiceCallResponseDto MapToResponse(WorkItem serviceCall)
     {
@@ -217,7 +249,8 @@ public class ServiceCallsController : ControllerBase
             WorkItemId = serviceCall.WorkItemId,
             Title = serviceCall.Title,
             Description = serviceCall.Description,
-            WorkType = serviceCall.WorkType ?? ServiceCallWorkType,
+            WorkType = serviceCall.WorkType ?? WorkItemWorkTypes.ServiceCall,
+            TaskCategory = serviceCall.TaskCategory,
             Status = serviceCall.Status ?? string.Empty,
             BillingType = serviceCall.BillingType,
             CustomerId = serviceCall.CustomerId,

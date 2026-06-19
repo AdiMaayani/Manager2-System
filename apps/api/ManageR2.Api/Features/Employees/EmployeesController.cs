@@ -39,6 +39,14 @@ public class EmployeesController : ControllerBase
         return Ok(employees.Select(ToLookupDto));
     }
 
+    [Authorize(Policy = Policies.CanLookupEmployees)]
+    [HttpGet("primary-roles")]
+    public async Task<IActionResult> GetDistinctPrimaryRoles()
+    {
+        var roles = await _employeeRepository.GetDistinctPrimaryRolesAsync();
+        return Ok(roles);
+    }
+
     [Authorize(Policy = Policies.CanViewEmployees)]
     [HttpGet("{id:int}")]
     // Returns one employee used in assignment validation flows.

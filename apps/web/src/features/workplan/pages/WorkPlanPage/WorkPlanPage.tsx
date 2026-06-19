@@ -10,9 +10,15 @@ import { WorkPlanYearlyView } from '../../components/WorkPlanYearlyView';
 import { WorkPlanTaskPanel } from '../../components/WorkPlanTaskPanel';
 import { NewTaskModal } from '../../components/NewTaskModal';
 import { usePermissions } from '@shared/auth/usePermissions';
+import { useProjects } from '@features/projects/hooks/useProjects';
 import { useWorkPlanPageState } from '../../hooks/useWorkPlanPageState';
 import { useWorkPlanScheduling } from '../../hooks/useWorkPlanData';
-import { buildWorkPlanTaskSelection } from '../../lib/workPlanScheduling';
+import {
+  buildWorkPlanTaskSelection,
+  findTaskInSchedule,
+  resolveFlatAssignment,
+} from '../../lib/workPlanScheduling';
+import { toLocalDateKey } from '@shared/utils/utcDateTime';
 import type { ScheduledTaskBar, WorkPlanTaskSelection } from '../../types';
 import './WorkPlanPage.css';
 
@@ -23,15 +29,21 @@ function scheduledToSelection(task: ScheduledTaskBar): WorkPlanTaskSelection {
     description: task.description ?? null,
     status: task.status,
     workType: task.workType ?? null,
+    taskCategory: task.taskCategory ?? null,
     projectId: task.projectId,
     projectTitle: task.projectTitle,
+    customerName: task.customerName ?? null,
+    siteName: task.siteName ?? null,
+    milestoneTitle: task.milestoneTitle ?? null,
     assigneeName: task.assigneeName,
     assigneeEmployeeId: task.employeeId || null,
     startHour: task.startHour,
     endHour: task.endHour,
     plannedStart: task.plannedStart,
     plannedEnd: task.plannedEnd,
+    derivedDurationMinutes: task.derivedDurationMinutes,
     isLocked: task.isLocked,
+    isUnscheduled: task.isUnscheduled,
     estimatedHours: task.estimatedHours,
     priority: task.priority,
     requiredRole: task.requiredRole,
@@ -40,38 +52,40 @@ function scheduledToSelection(task: ScheduledTaskBar): WorkPlanTaskSelection {
 
 export function WorkPlanPage() {
   const { can } = usePermissions();
+  const { data: activeProjects = [] } = useProjects();
   const pageState = useWorkPlanPageState();
   const scheduling = useWorkPlanScheduling({
     scope: pageState.scope,
     projectFilter: pageState.projectFilter,
-    isAllProjectsMode: pageState.isAllProjectsMode,
     statusFilter: pageState.statusFilter,
+    taskCategoryFilter: pageState.taskCategoryFilter,
     employeeFilterId: pageState.employeeFilterId,
     searchQuery: pageState.searchQuery,
-    selectedDate: pageState.periodAnchor,
+    periodAnchor: pageState.periodAnchor,
+    range: pageState.range,
   });
 
   const [selectedTask, setSelectedTask] = useState<WorkPlanTaskSelection | null>(null);
   const [isNewTaskModalOpen, setIsNewTaskModalOpen] = useState(false);
-  // Once the user closes (or saves) a deep-linked task we stop auto-reopening it, so the drawer never
-  // springs back on the next render while the workItemId query parameter is still in the URL.
+  const [newTaskModalKey, setNewTaskModalKey] = useState(0);
   const [dismissedWorkItemId, setDismissedWorkItemId] = useState<number | null>(null);
 
   const requestedWorkItemId = pageState.requestedWorkItemId;
+  const localDayKey = toLocalDateKey(pageState.periodAnchor);
 
-  // Deep-link target resolved from the already-loaded work plans (no extra fetch). Looking it up in the
-  // full set means we can open the task even when the current scope/date filters it out of the grid.
   const requestedTaskSelection = useMemo<WorkPlanTaskSelection | null>(() => {
     if (requestedWorkItemId == null) return null;
-    for (const workPlan of scheduling.allWorkPlans) {
-      const match = workPlan.tasks.find((task) => task.workItemId === requestedWorkItemId);
-      if (match) return buildWorkPlanTaskSelection(workPlan, match);
-    }
-    return null;
-  }, [requestedWorkItemId, scheduling.allWorkPlans]);
+    const match = findTaskInSchedule(scheduling.schedule, requestedWorkItemId);
+    if (!match) return null;
+    const assignment = resolveFlatAssignment(match.task, scheduling.schedule.assignments);
+    return buildWorkPlanTaskSelection(
+      match.task,
+      assignment,
+      localDayKey,
+      match.isUnscheduled,
+    );
+  }, [requestedWorkItemId, scheduling.schedule, localDayKey]);
 
-  // Auto-open the deep-linked task unless the user has explicitly dismissed it. A manual selection
-  // always wins so normal clicking is unaffected.
   const autoOpenTask =
     requestedWorkItemId != null && dismissedWorkItemId !== requestedWorkItemId
       ? requestedTaskSelection
@@ -132,20 +146,26 @@ export function WorkPlanPage() {
 
   const effectiveProjectId = useMemo(() => {
     if (typeof pageState.projectFilter === 'number') return pageState.projectFilter;
-    if (!pageState.isAllProjectsMode) return null;
-    return scheduling.singleWorkPlan?.project.id ?? null;
-  }, [pageState.projectFilter, pageState.isAllProjectsMode, scheduling.singleWorkPlan]);
+    return null;
+  }, [pageState.projectFilter]);
+
+  const projectOptions = useMemo(
+    () =>
+      activeProjects.map((project) => ({
+        id: project.workItemId,
+        title: project.title,
+      })),
+    [activeProjects],
+  );
 
   const pageTitle = useMemo(() => {
     if (pageState.scope === 'project' && typeof pageState.projectFilter === 'number') {
-      const project = scheduling.projectOptions.find((p) => p.id === pageState.projectFilter);
+      const project = projectOptions.find((p) => p.id === pageState.projectFilter);
       return project ? `תוכנית עבודה · ${project.title}` : 'תוכנית עבודה';
     }
     return 'תוכנית עבודה';
-  }, [pageState.scope, pageState.projectFilter, scheduling.projectOptions]);
+  }, [pageState.scope, pageState.projectFilter, projectOptions]);
 
-  // In personal scope, users may edit only their own tasks; locked tasks are
-  // blocked separately inside the task panel.
   const isSelectedTaskOwnedByCurrentUser =
     effectiveSelectedTask != null &&
     scheduling.currentUserEmployeeId != null &&
@@ -156,10 +176,10 @@ export function WorkPlanPage() {
     canManageWorkPlan && (pageState.scope !== 'personal' || isSelectedTaskOwnedByCurrentUser);
   const canDeleteTask =
     canManageWorkPlan &&
-    effectiveSelectedTask?.workType === 'Task' &&
-    effectiveSelectedTask?.projectId !== effectiveSelectedTask?.taskId;
+    effectiveSelectedTask?.taskCategory !== 'ServiceCall' &&
+    effectiveSelectedTask?.workType !== 'Project';
 
-  if (scheduling.isLoading) {
+  if (scheduling.isLoading && !scheduling.isScopeSelectionPending) {
     return (
       <PageShell title={pageTitle} wide>
         <PageSpinner />
@@ -167,21 +187,15 @@ export function WorkPlanPage() {
     );
   }
 
-  if (scheduling.error) {
+  if (scheduling.scheduleError && !scheduling.isScopeSelectionPending) {
     const errorMessage =
-      scheduling.error instanceof Error ? scheduling.error.message : 'טעינת תוכנית העבודה נכשלה';
+      scheduling.scheduleError instanceof Error
+        ? scheduling.scheduleError.message
+        : 'טעינת תוכנית העבודה נכשלה';
 
     return (
       <PageShell title={pageTitle} wide>
         <ErrorState message={errorMessage} />
-      </PageShell>
-    );
-  }
-
-  if (!scheduling.employees.length && !scheduling.allWorkPlans.length) {
-    return (
-      <PageShell title={pageTitle} wide>
-        <ErrorState message="לא נטענו נתוני תוכנית עבודה" />
       </PageShell>
     );
   }
@@ -193,15 +207,17 @@ export function WorkPlanPage() {
           scope={pageState.scope}
           range={pageState.range}
           statusFilter={pageState.statusFilter}
+          taskCategoryFilter={pageState.taskCategoryFilter}
           projectFilter={pageState.projectFilter}
           employeeFilterId={pageState.employeeFilterId}
           searchQuery={pageState.searchQuery}
           periodLabel={pageState.periodLabel}
-          projectOptions={scheduling.projectOptions}
+          projectOptions={projectOptions}
           employees={scheduling.employees}
           onScopeChange={pageState.setScope}
           onRangeChange={pageState.setRange}
           onStatusFilterChange={pageState.setStatusFilter}
+          onTaskCategoryFilterChange={pageState.setTaskCategoryFilter}
           onProjectFilterChange={pageState.setProjectFilter}
           onEmployeeFilterChange={pageState.setEmployeeFilterId}
           onSearchChange={pageState.setSearchQuery}
@@ -209,9 +225,18 @@ export function WorkPlanPage() {
           onNextPeriod={pageState.goToNextPeriod}
           onToday={pageState.goToToday}
           onPrint={handlePrint}
-          onNewTask={() => setIsNewTaskModalOpen(true)}
+          onNewTask={() => {
+            setNewTaskModalKey((current) => current + 1);
+            setIsNewTaskModalOpen(true);
+          }}
           canCreateTask={can('manageWorkPlan')}
         />
+
+        {scheduling.scopeMessage && (
+          <div className="workPlanPage__scopeBanner workPlanPage__scopeBanner--info" role="status">
+            {scheduling.scopeMessage}
+          </div>
+        )}
 
         {personalScopeInfo && (
           <div
@@ -232,6 +257,7 @@ export function WorkPlanPage() {
           <WorkPlanDailyGrid
             mode="projects"
             projectRows={scheduling.projectRows}
+            unscheduledTasks={scheduling.unscheduledBars}
             onTaskSelect={(task) => setSelectedTask(scheduledToSelection(task))}
             selectedTaskId={effectiveSelectedTask?.taskId ?? null}
           />
@@ -241,6 +267,7 @@ export function WorkPlanPage() {
           <WorkPlanDailyGrid
             mode="employees"
             employeeRows={scheduling.employeeRows}
+            unscheduledTasks={scheduling.unscheduledBars}
             onTaskSelect={(task) => setSelectedTask(scheduledToSelection(task))}
             selectedTaskId={effectiveSelectedTask?.taskId ?? null}
           />
@@ -248,8 +275,9 @@ export function WorkPlanPage() {
 
         {pageState.range === 'weekly' && (
           <WorkPlanWeeklyView
-            workPlans={scheduling.activeWorkPlans}
+            schedule={scheduling.schedule}
             statusFilter={pageState.statusFilter}
+            taskCategoryFilter={pageState.taskCategoryFilter}
             searchQuery={pageState.searchQuery}
             periodAnchor={pageState.periodAnchor}
             onTaskClick={setSelectedTask}
@@ -258,7 +286,9 @@ export function WorkPlanPage() {
 
         {pageState.range === 'monthly' && (
           <WorkPlanMonthlyView
-            workPlans={scheduling.activeWorkPlans}
+            schedule={scheduling.schedule}
+            statusFilter={pageState.statusFilter}
+            taskCategoryFilter={pageState.taskCategoryFilter}
             searchQuery={pageState.searchQuery}
             periodAnchor={pageState.periodAnchor}
             onTaskClick={setSelectedTask}
@@ -267,7 +297,8 @@ export function WorkPlanPage() {
 
         {pageState.range === 'yearly' && (
           <WorkPlanYearlyView
-            workPlans={scheduling.activeWorkPlans}
+            schedule={scheduling.schedule}
+            taskCategoryFilter={pageState.taskCategoryFilter}
             searchQuery={pageState.searchQuery}
             periodAnchor={pageState.periodAnchor}
           />
@@ -282,11 +313,12 @@ export function WorkPlanPage() {
         />
 
         <NewTaskModal
+          key={newTaskModalKey}
           isOpen={isNewTaskModalOpen}
           onClose={() => setIsNewTaskModalOpen(false)}
           projectFilter={pageState.projectFilter}
           defaultProjectId={effectiveProjectId}
-          projectOptions={scheduling.projectOptions}
+          projectOptions={projectOptions}
           employees={scheduling.employees}
         />
       </div>

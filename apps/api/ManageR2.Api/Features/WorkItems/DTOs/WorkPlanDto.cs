@@ -69,4 +69,56 @@ namespace ManageR2.Api.DTOs
         public string? EmployeeName { get; set; }
         public string? ContractorName { get; set; }
     }
+
+    public class WorkPlanScheduleDto
+    {
+        public List<WorkPlanScheduledTaskDto> ScheduledTasks { get; set; } = new();
+        public List<WorkPlanScheduledTaskDto> UnscheduledTasks { get; set; } = new();
+        public List<WorkPlanEmployeeDto> Employees { get; set; } = new();
+    }
+
+    public class WorkPlanScheduledTaskDto
+    {
+        public int WorkItemId { get; set; }
+        public string Title { get; set; } = string.Empty;
+        public string? Description { get; set; }
+        public string? TaskCategory { get; set; }
+        public string? WorkType { get; set; }
+        public string? Status { get; set; }
+        public string? Priority { get; set; }
+        public DateTime? PlannedStart { get; set; }
+        public DateTime? PlannedEnd { get; set; }
+        public int? DerivedDurationMinutes { get; set; }
+        public decimal? EstimatedHours { get; set; }
+        public bool IsLocked { get; set; }
+        public int? CustomerId { get; set; }
+        public string? CustomerName { get; set; }
+        public int? SiteId { get; set; }
+        public string? SiteName { get; set; }
+        public int? ProjectId { get; set; }
+        public string? ProjectTitle { get; set; }
+        public int? MilestoneId { get; set; }
+        public string? MilestoneTitle { get; set; }
+        public bool IsServiceCall { get; set; }
+        public List<WorkPlanTaskAssignmentDto> Assignments { get; set; } = new();
+    }
+
+    public class WorkPlanTaskAssignmentDto
+    {
+        public int? EmployeeId { get; set; }
+        public string? EmployeeName { get; set; }
+        public string? AssignmentRole { get; set; }
+        public decimal? AssignedHours { get; set; }
+        public bool IsManualAssignment { get; set; }
+        public string AssignmentSource { get; set; } = "Task";
+    }
+
+    public class WorkPlanEmployeeDto
+    {
+        public int EmployeeId { get; set; }
+        public string FullName { get; set; } = string.Empty;
+        public string? PrimaryRole { get; set; }
+        public bool IsActive { get; set; }
+        public bool IsAssignable { get; set; }
+    }
 }

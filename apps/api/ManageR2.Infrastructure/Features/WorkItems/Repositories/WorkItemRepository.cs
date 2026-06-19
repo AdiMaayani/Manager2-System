@@ -1,6 +1,7 @@
 using System.Data;
 using ManageR2.Domain.Entities;
 using ManageR2.Infrastructure.DAL;
+using ManageR2.Infrastructure.Features.WorkItems.Models;
 using ManageR2.Infrastructure.Models;
 using Microsoft.Data.SqlClient;
 
@@ -123,15 +124,16 @@ public class WorkItemRepository : IWorkItemRepository
         command.Parameters.AddWithValue("@Status", workItem.Status ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("@BillingType", workItem.BillingType ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("@Description", workItem.Description ?? (object)DBNull.Value);
-        command.Parameters.AddWithValue("@CustomerId", workItem.CustomerId);
-        command.Parameters.AddWithValue("@SiteId", workItem.SiteId);
+        command.Parameters.AddWithValue("@CustomerId", (object?)workItem.CustomerId ?? DBNull.Value);
+        command.Parameters.AddWithValue("@SiteId", (object?)workItem.SiteId ?? DBNull.Value);
         command.Parameters.AddWithValue("@ParentWorkItemId", workItem.ParentWorkItemId ?? (object)DBNull.Value);
+        command.Parameters.AddWithValue("@TaskCategory", (object?)workItem.TaskCategory ?? DBNull.Value);
+        command.Parameters.AddWithValue("@MilestoneId", workItem.MilestoneId ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("@DealCloseDate", (object?)workItem.DealCloseDate ?? DBNull.Value);
         command.Parameters.AddWithValue("@FinanceProjectNumber", (object?)workItem.FinanceProjectNumber ?? DBNull.Value);
         command.Parameters.AddWithValue("@InvoiceNumber", (object?)workItem.InvoiceNumber ?? DBNull.Value);
         command.Parameters.AddWithValue("@PlannedStart", (object?)workItem.PlannedStart ?? DBNull.Value);
         command.Parameters.AddWithValue("@PlannedEnd", (object?)workItem.PlannedEnd ?? DBNull.Value);
-        AddDecimalHoursParameter(command, "@EstimatedHours", workItem.EstimatedHours);
         command.Parameters.AddWithValue("@ActualStart", (object?)workItem.ActualStart ?? DBNull.Value);
         command.Parameters.AddWithValue("@ActualEnd", (object?)workItem.ActualEnd ?? DBNull.Value);
         AddDecimalHoursParameter(command, "@ActualHours", workItem.ActualHours);
@@ -145,37 +147,6 @@ public class WorkItemRepository : IWorkItemRepository
         var newWorkItemId = result != null ? Convert.ToInt32(result) : 0;
 
         return newWorkItemId;
-    }
-
-    public async Task<int> CreateMilestoneAsync(WorkItem workItem)
-    {
-        // Milestones use the same persistence flow as other work items.
-        return await CreateAsync(workItem);
-    }
-
-    public async Task<InternalWorkContext> GetInternalWorkContextAsync()
-    {
-        // Idempotent get-or-create handled entirely by the stored procedure.
-        await using var connection = _dbServices.CreateConnection();
-        await using var command = new SqlCommand("sp_WorkItems_GetInternalContext", connection)
-        {
-            CommandType = CommandType.StoredProcedure
-        };
-
-        await connection.OpenAsync();
-        await using var reader = await command.ExecuteReaderAsync();
-
-        if (await reader.ReadAsync())
-        {
-            return new InternalWorkContext
-            {
-                CustomerId = Convert.ToInt32(reader["CustomerId"]),
-                SiteId = Convert.ToInt32(reader["SiteId"]),
-                ContainerProjectId = Convert.ToInt32(reader["ContainerProjectId"])
-            };
-        }
-
-        throw new InvalidOperationException("Failed to resolve the internal work context.");
     }
 
     public async Task<bool> UpdateAsync(int id, WorkItem workItem)
@@ -193,14 +164,16 @@ public class WorkItemRepository : IWorkItemRepository
         command.Parameters.AddWithValue("@WorkType", workItem.WorkType ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("@BillingType", workItem.BillingType ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("@Status", workItem.Status ?? (object)DBNull.Value);
-        command.Parameters.AddWithValue("@CustomerId", workItem.CustomerId);
-        command.Parameters.AddWithValue("@SiteId", workItem.SiteId);
+        command.Parameters.AddWithValue("@CustomerId", (object?)workItem.CustomerId ?? DBNull.Value);
+        command.Parameters.AddWithValue("@SiteId", (object?)workItem.SiteId ?? DBNull.Value);
+        command.Parameters.AddWithValue("@TaskCategory", (object?)workItem.TaskCategory ?? DBNull.Value);
+        command.Parameters.AddWithValue("@ParentWorkItemId", workItem.ParentWorkItemId ?? (object)DBNull.Value);
+        command.Parameters.AddWithValue("@MilestoneId", workItem.MilestoneId ?? (object)DBNull.Value);
         command.Parameters.AddWithValue("@DealCloseDate", (object?)workItem.DealCloseDate ?? DBNull.Value);
         command.Parameters.AddWithValue("@FinanceProjectNumber", (object?)workItem.FinanceProjectNumber ?? DBNull.Value);
         command.Parameters.AddWithValue("@InvoiceNumber", (object?)workItem.InvoiceNumber ?? DBNull.Value);
         command.Parameters.AddWithValue("@PlannedStart", (object?)workItem.PlannedStart ?? DBNull.Value);
         command.Parameters.AddWithValue("@PlannedEnd", (object?)workItem.PlannedEnd ?? DBNull.Value);
-        AddDecimalHoursParameter(command, "@EstimatedHours", workItem.EstimatedHours);
         command.Parameters.AddWithValue("@ActualStart", (object?)workItem.ActualStart ?? DBNull.Value);
         command.Parameters.AddWithValue("@ActualEnd", (object?)workItem.ActualEnd ?? DBNull.Value);
         AddDecimalHoursParameter(command, "@ActualHours", workItem.ActualHours);
@@ -208,19 +181,10 @@ public class WorkItemRepository : IWorkItemRepository
         command.Parameters.AddWithValue("@RequiredRole", (object?)workItem.RequiredRole ?? DBNull.Value);
         command.Parameters.AddWithValue("@IsLocked", workItem.IsLocked);
 
-
-        await connection.OpenAsync();
-
         var result = await command.ExecuteScalarAsync();
         var rowsAffected = result != null ? Convert.ToInt32(result) : 0;
 
         return rowsAffected > 0;
-    }
-
-    public async Task<bool> UpdateMilestoneAsync(int milestoneId, WorkItem workItem)
-    {
-        // Milestone update reuses shared work item update logic.
-        return await UpdateAsync(milestoneId, workItem);
     }
 
     public async Task<bool> CloseAsync(int workItemId)
@@ -240,12 +204,6 @@ public class WorkItemRepository : IWorkItemRepository
         var rowsAffected = result != null ? Convert.ToInt32(result) : 0;
 
         return rowsAffected > 0;
-    }
-
-    public async Task<bool> SoftDeleteMilestoneAsync(int milestoneId)
-    {
-        // Milestone cancel uses the same close behavior.
-        return await CloseAsync(milestoneId);
     }
 
     public async Task<DeleteWorkPlanTaskResult> DeleteWorkPlanTaskAsync(int workItemId)
@@ -492,6 +450,113 @@ public class WorkItemRepository : IWorkItemRepository
 
         return results;
     }
+
+    public async Task<WorkPlanScheduleResult> GetWorkPlanScheduleAsync(WorkPlanScheduleQuery query)
+    {
+        var result = new WorkPlanScheduleResult();
+
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand("sp_GetWorkPlanSchedule", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+
+        command.Parameters.AddWithValue("@Scope", query.Scope);
+        command.Parameters.AddWithValue("@ProjectId", (object?)query.ProjectId ?? DBNull.Value);
+        command.Parameters.AddWithValue("@EmployeeId", (object?)query.EmployeeId ?? DBNull.Value);
+        command.Parameters.AddWithValue("@Status", (object?)query.Status ?? DBNull.Value);
+        command.Parameters.AddWithValue("@TaskCategory", (object?)query.TaskCategory ?? DBNull.Value);
+        command.Parameters.AddWithValue("@FromUtc", (object?)query.FromUtc ?? DBNull.Value);
+        command.Parameters.AddWithValue("@ToUtc", (object?)query.ToUtc ?? DBNull.Value);
+        command.Parameters.AddWithValue("@IncludeUnscheduled", query.IncludeUnscheduled);
+        command.Parameters.AddWithValue("@CurrentUserEmployeeId", (object?)query.CurrentUserEmployeeId ?? DBNull.Value);
+
+        await connection.OpenAsync();
+        await using var reader = await command.ExecuteReaderAsync();
+
+        while (await reader.ReadAsync())
+        {
+            result.ScheduledTasks.Add(MapWorkPlanScheduledTask(reader));
+        }
+
+        if (!await reader.NextResultAsync())
+        {
+            throw new InvalidOperationException("sp_GetWorkPlanSchedule missing unscheduled tasks result set.");
+        }
+
+        while (await reader.ReadAsync())
+        {
+            result.UnscheduledTasks.Add(MapWorkPlanScheduledTask(reader));
+        }
+
+        if (!await reader.NextResultAsync())
+        {
+            throw new InvalidOperationException("sp_GetWorkPlanSchedule missing assignments result set.");
+        }
+
+        while (await reader.ReadAsync())
+        {
+            result.Assignments.Add(new WorkPlanAssignmentResult
+            {
+                WorkItemId = GetIntValue(reader, "WorkItemId"),
+                EmployeeId = GetNullableIntValue(reader, "EmployeeId"),
+                AssignmentRole = GetStringValue(reader, "AssignmentRole"),
+                AssignedHours = GetDecimalValue(reader, "AssignedHours"),
+                IsManualAssignment = GetBoolValue(reader, "IsManualAssignment"),
+                EmployeeName = GetStringValue(reader, "EmployeeName"),
+                AssignmentType = "Employee",
+                AssignmentSource = GetStringValue(reader, "AssignmentSource")
+            });
+        }
+
+        if (!await reader.NextResultAsync())
+        {
+            throw new InvalidOperationException("sp_GetWorkPlanSchedule missing employees result set.");
+        }
+
+        while (await reader.ReadAsync())
+        {
+            result.Employees.Add(new WorkPlanEmployeeResult
+            {
+                EmployeeId = GetIntValue(reader, "EmployeeId"),
+                FullName = GetStringValue(reader, "FullName") ?? string.Empty,
+                PrimaryRole = GetStringValue(reader, "PrimaryRole"),
+                IsActive = GetBoolValue(reader, "IsActive"),
+                IsAssignable = GetBoolValue(reader, "IsAssignable")
+            });
+        }
+
+        return result;
+    }
+
+    private static WorkPlanScheduledTaskResult MapWorkPlanScheduledTask(SqlDataReader reader)
+    {
+        return new WorkPlanScheduledTaskResult
+        {
+            WorkItemId = GetIntValue(reader, "WorkItemId"),
+            Title = GetStringValue(reader, "Title") ?? string.Empty,
+            Description = GetStringValue(reader, "Description"),
+            WorkType = GetStringValue(reader, "WorkType"),
+            TaskCategory = GetStringValue(reader, "TaskCategory"),
+            Status = GetStringValue(reader, "Status"),
+            Priority = GetStringValue(reader, "Priority"),
+            PlannedStart = GetDateTimeValue(reader, "PlannedStart"),
+            PlannedEnd = GetDateTimeValue(reader, "PlannedEnd"),
+            DerivedDurationMinutes = GetNullableIntValue(reader, "DerivedDurationMinutes"),
+            EstimatedHours = GetDecimalValue(reader, "EstimatedHours"),
+            IsLocked = GetBoolValue(reader, "IsLocked"),
+            CustomerId = GetNullableIntValue(reader, "CustomerId"),
+            CustomerName = GetStringValue(reader, "CustomerName"),
+            SiteId = GetNullableIntValue(reader, "SiteId"),
+            SiteName = GetStringValue(reader, "SiteName"),
+            ProjectId = GetNullableIntValue(reader, "ProjectId"),
+            ProjectTitle = GetStringValue(reader, "ProjectTitle"),
+            MilestoneId = GetNullableIntValue(reader, "MilestoneId"),
+            MilestoneTitle = GetStringValue(reader, "MilestoneTitle"),
+            IsServiceCall = GetBoolValue(reader, "IsServiceCall")
+        };
+    }
+
     private static WorkItem MapWorkItem(SqlDataReader reader)
     {
         // Reader-to-entity mapping for shared work item shape across procedures.
@@ -501,6 +566,7 @@ public class WorkItemRepository : IWorkItemRepository
             Title = GetStringValue(reader, "Title") ?? string.Empty,
             Description = GetStringValue(reader, "Description"),
             WorkType = GetStringValue(reader, "WorkType"),
+            TaskCategory = GetStringValue(reader, "TaskCategory"),
             BillingType = GetStringValue(reader, "BillingType"),
             Status = GetStringValue(reader, "Status"),
             EstimatedHours = GetDecimalValue(reader, "EstimatedHours"),
@@ -511,14 +577,19 @@ public class WorkItemRepository : IWorkItemRepository
             PlannedStart = GetDateTimeValue(reader, "PlannedStart"),
             PlannedEnd = GetDateTimeValue(reader, "PlannedEnd"),
             RequiredRole = GetStringValue(reader, "RequiredRole"),
-            IsLocked = HasColumn(reader, "IsLocked") && reader["IsLocked"] != DBNull.Value && Convert.ToBoolean(reader["IsLocked"]),
-            CustomerId = GetIntValue(reader, "CustomerId"),
+            IsLocked = GetBoolValue(reader, "IsLocked"),
+            CustomerId = GetNullableIntValue(reader, "CustomerId"),
             CustomerName = GetStringValue(reader, "CustomerName"),
-            SiteId = GetIntValue(reader, "SiteId"),
+            SiteId = GetNullableIntValue(reader, "SiteId"),
             SiteName = GetStringValue(reader, "SiteName"),
             CreatedAt = GetDateTimeValue(reader, "CreatedAt") ?? DateTime.MinValue,
             ClosedAt = GetDateTimeValue(reader, "ClosedAt"),
             ParentWorkItemId = GetNullableIntValue(reader, "ParentWorkItemId"),
+            MilestoneId = GetNullableIntValue(reader, "MilestoneId"),
+            MilestoneTitle = GetStringValue(reader, "MilestoneTitle"),
+            ProjectTitle = GetStringValue(reader, "ProjectTitle"),
+            IsArchived = GetBoolValue(reader, "IsArchived"),
+            ArchivedAt = GetDateTimeValue(reader, "ArchivedAt"),
             DealCloseDate = GetDateTimeValue(reader, "DealCloseDate"),
             FinanceProjectNumber = GetStringValue(reader, "FinanceProjectNumber"),
             InvoiceNumber = GetStringValue(reader, "InvoiceNumber")

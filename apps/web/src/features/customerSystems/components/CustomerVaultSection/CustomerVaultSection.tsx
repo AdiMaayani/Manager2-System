@@ -9,7 +9,6 @@ import { InlineAlert } from '@shared/components/InlineAlert';
 import { ConfirmInline } from '@shared/components/ConfirmInline';
 import { ApiError } from '@api/client';
 import { usePermissions } from '@shared/auth/usePermissions';
-import { isLocalDataMode } from '@/config/appConfig';
 import {
   useCustomerSystemMutations,
   useCustomerSystemSecretMutations,
@@ -115,8 +114,7 @@ export function CustomerVaultSection({ customerId }: CustomerVaultSectionProps) 
   const canManage = can('manageCustomerSystems');
   const canReveal = can('revealCustomerSystemSecrets');
 
-  // Vault data is only available against the real API (not the mock dataset).
-  const isEnabled = canView && isLocalDataMode;
+  const isEnabled = canView;
 
   const systemsQuery = useCustomerSystems(customerId, isEnabled);
   const { createMutation } = useCustomerSystemMutations(customerId);
@@ -146,9 +144,7 @@ export function CustomerVaultSection({ customerId }: CustomerVaultSectionProps) 
   const sectionTitle = 'מערכות לקוח (כספת)';
 
   let body: ReactNode;
-  if (!isLocalDataMode) {
-    body = <p className="vault__hint">כספת המערכות זמינה בחיבור לשרת בלבד.</p>;
-  } else if (systemsQuery.isLoading) {
+  if (systemsQuery.isLoading) {
     body = <p className="vault__hint">טוען מערכות…</p>;
   } else if (systemsQuery.isError) {
     body = (

@@ -9,6 +9,31 @@
   flex-direction: column;
   gap: var(--spacing-xs);
   align-items: flex-start;
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-neutral-300);
+  border-inline-start-width: 4px;
+  border-radius: var(--radius-md);
+}
+
+.workPlanTaskPanel__intro--regular {
+  background: var(--task-category-regular-bg);
+  border-color: var(--task-category-regular-border);
+}
+
+.workPlanTaskPanel__intro--project {
+  background: var(--task-category-project-bg);
+  border-color: var(--task-category-project-border);
+}
+
+.workPlanTaskPanel__intro--serviceCall {
+  background: var(--task-category-serviceCall-bg);
+  border-color: var(--task-category-serviceCall-border);
+}
+
+.workPlanTaskPanel__category {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-800);
 }
 
 .workPlanTaskPanel__project {

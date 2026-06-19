@@ -1,6 +1,8 @@
 import { useState } from 'react';
 import type { CSSProperties } from 'react';
 import { getWorkPlanStatusDisplay, HOUR_LABELS } from '../../constants';
+import { getTaskCategoryLabel } from '@shared/constants/taskCategories';
+import { taskCategoryModifierClass } from '@shared/constants/taskCategoryStyles';
 import { formatHourAsTime, hourSpanToWidth, hourToPercent } from '../../lib/workPlanScheduling';
 import type { ScheduledTaskBar } from '../../types';
 import './WorkPlanDailyGrid.css';
@@ -11,7 +13,7 @@ interface EmployeeRow {
 }
 
 interface ProjectRow {
-  projectId: number;
+  projectId: number | null;
   projectTitle: string;
   tasks: ScheduledTaskBar[];
 }
@@ -20,6 +22,7 @@ interface WorkPlanDailyGridProps {
   mode: 'employees' | 'projects';
   employeeRows?: EmployeeRow[];
   projectRows?: ProjectRow[];
+  unscheduledTasks?: ScheduledTaskBar[];
   onTaskSelect: (task: ScheduledTaskBar) => void;
   selectedTaskId?: number | null;
 }
@@ -66,9 +69,9 @@ function assignLanes(tasks: ScheduledTaskBar[]): { positioned: PositionedTask[];
 }
 
 function taskClassName(task: ScheduledTaskBar): string {
-  const classes = ['workPlanDailyGrid__task'];
+  const classes = [taskCategoryModifierClass('workPlanDailyGrid__task', task.taskCategory)];
+  if (task.isUnscheduled) classes.push('workPlanDailyGrid__task--unscheduled');
   if (task.isLocked) classes.push('workPlanDailyGrid__task--locked');
-  else classes.push('workPlanDailyGrid__task--normal');
   if (task.violationCount > 0) classes.push('workPlanDailyGrid__task--violation');
   else if (task.warningCount > 0) classes.push('workPlanDailyGrid__task--warning');
   if (task.isUrgent) classes.push('workPlanDailyGrid__task--urgent');
@@ -78,10 +81,12 @@ function taskClassName(task: ScheduledTaskBar): string {
 function buildTaskTooltip(task: ScheduledTaskBar): string {
   return [
     task.title,
+    getTaskCategoryLabel(task.taskCategory),
     `${task.projectTitle} · ${getWorkPlanStatusDisplay(task.status)}`,
     task.assigneeName && task.assigneeName !== '—' ? `מבצע: ${task.assigneeName}` : null,
-    task.isUrgent ? 'דחיפות: דחוף' : null,
-    `שעות: ${formatHourAsTime(task.startHour)}–${formatHourAsTime(task.endHour)}`,
+    task.isUnscheduled
+      ? 'לא מתוזמנת'
+      : `שעות: ${formatHourAsTime(task.startHour)}–${formatHourAsTime(task.endHour)}`,
     task.description?.trim() ? task.description.trim() : null,
   ]
     .filter(Boolean)
@@ -114,6 +119,9 @@ function TaskBar({
       title={buildTaskTooltip(task)}
     >
       <span className="workPlanDailyGrid__taskTop">
+        <span className="workPlanDailyGrid__taskType" title={getTaskCategoryLabel(task.taskCategory)}>
+          {task.taskCategory === 'ServiceCall' ? 'ש' : task.taskCategory === 'Regular' ? 'ר' : 'פ'}
+        </span>
         {task.isUrgent && (
           <span className="workPlanDailyGrid__taskFlag" title="דחוף">
             דחוף
@@ -122,7 +130,10 @@ function TaskBar({
         <span className="workPlanDailyGrid__taskName">{task.title}</span>
       </span>
       <span className="workPlanDailyGrid__taskMeta">
-        {formatHourAsTime(task.startHour)}–{formatHourAsTime(task.endHour)} · {getWorkPlanStatusDisplay(task.status)}
+        {task.isUnscheduled
+          ? 'לא מתוזמנת'
+          : `${formatHourAsTime(task.startHour)}–${formatHourAsTime(task.endHour)}`}{' '}
+        · {getWorkPlanStatusDisplay(task.status)}
       </span>
       {(task.violationCount > 0 || task.warningCount > 0 || task.suggestionCount > 0) && (
         <span className="workPlanDailyGrid__taskIndicators" aria-hidden>
@@ -139,6 +150,7 @@ export function WorkPlanDailyGrid({
   mode,
   employeeRows = [],
   projectRows = [],
+  unscheduledTasks = [],
   onTaskSelect,
   selectedTaskId,
 }: WorkPlanDailyGridProps) {
@@ -231,6 +243,32 @@ export function WorkPlanDailyGrid({
         )}
         </div>
       </div>
+
+      {unscheduledTasks.length > 0 && (
+        <section className="workPlanDailyGrid__unscheduled" aria-label="משימות לא מתוזמנות">
+          <h3 className="workPlanDailyGrid__unscheduledTitle">
+            משימות ללא זמן מתוכנן ({unscheduledTasks.length})
+          </h3>
+          <div className="workPlanDailyGrid__unscheduledList">
+            {unscheduledTasks.map((task) => (
+              <button
+                key={task.taskId}
+                type="button"
+                className={`${taskClassName(task)} ${
+                  selectedTaskId === task.taskId ? 'workPlanDailyGrid__task--selected' : ''
+                } workPlanDailyGrid__unscheduledItem`}
+                onClick={() => onTaskSelect(task)}
+                title={buildTaskTooltip(task)}
+              >
+                <span className="workPlanDailyGrid__taskName">{task.title}</span>
+                <span className="workPlanDailyGrid__taskMeta">
+                  {getTaskCategoryLabel(task.taskCategory)} · {task.projectTitle}
+                </span>
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
     </div>
   );
 }

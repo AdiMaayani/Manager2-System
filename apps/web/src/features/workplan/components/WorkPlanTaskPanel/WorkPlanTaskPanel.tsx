@@ -8,6 +8,7 @@ import { Button } from '@shared/components/Button';
 import { InlineAlert } from '@shared/components/InlineAlert';
 import { Modal } from '@shared/components/Modal';
 import { deleteWorkPlanTaskAsync } from '../../api/workplanApiClient';
+import { invalidateWorkPlanQueries } from '../../hooks/useWorkPlanData';
 import { EditTaskDrawer } from '../EditTaskDrawer';
 import {
   getWorkPlanPriorityDisplay,
@@ -17,6 +18,10 @@ import {
 } from '../../constants';
 import { formatHourAsTime } from '../../lib/workPlanScheduling';
 import type { WorkPlanTaskSelection } from '../../types';
+import { getTaskCategoryLabel } from '@shared/constants/taskCategories';
+import {
+  taskCategoryModifierClass,
+} from '@shared/constants/taskCategoryStyles';
 import './WorkPlanTaskPanel.css';
 
 const QUICK_REPORT_KEY = 'manager2_quick_report_prefill';
@@ -63,12 +68,7 @@ export function WorkPlanTaskPanel({
     mutationFn: ({ taskId }: { taskId: number; projectId: number }) =>
       deleteWorkPlanTaskAsync(taskId),
     onSuccess: async (_data, deletedTask) => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['workplan'] }),
-        queryClient.invalidateQueries({ queryKey: ['projects'] }),
-        queryClient.invalidateQueries({ queryKey: ['projectLifecycle', deletedTask.projectId] }),
-        queryClient.invalidateQueries({ queryKey: ['projectMilestones', deletedTask.projectId] }),
-      ]);
+      await invalidateWorkPlanQueries(queryClient, deletedTask.projectId);
       setIsDeleteConfirmOpen(false);
       onTaskUpdated();
       onClose();
@@ -122,7 +122,15 @@ export function WorkPlanTaskPanel({
         onToggleMaximize={() => setIsMaximized((value) => !value)}
       >
         <div className="workPlanTaskPanel">
-          <div className="workPlanTaskPanel__intro">
+          <div
+            className={taskCategoryModifierClass(
+              'workPlanTaskPanel__intro',
+              task.taskCategory,
+            )}
+          >
+            <span className="workPlanTaskPanel__category">
+              {getTaskCategoryLabel(task.taskCategory)}
+            </span>
             <p className="workPlanTaskPanel__project">{task.projectTitle}</p>
             <h3 className="workPlanTaskPanel__title">{task.title}</h3>
             <Badge variant={resolveStatusVariant(task.status)}>
@@ -237,7 +245,10 @@ export function WorkPlanTaskPanel({
               variant="danger"
               iconStart={<Trash2 size={16} />}
               onClick={() =>
-                deleteTaskMutation.mutate({ taskId: task.taskId, projectId: task.projectId })
+                deleteTaskMutation.mutate({
+                  taskId: task.taskId,
+                  projectId: task.projectId ?? 0,
+                })
               }
               isLoading={deleteTaskMutation.isPending}
             >

@@ -65,10 +65,11 @@ namespace ManageR2.Api.DTOs
     // New Task draft recommendation request: scores candidates for a not-yet-saved task context.
     public class DraftTaskRecommendationRequestDto
     {
-        public int ProjectId { get; set; }
+        public string TaskCategory { get; set; } = string.Empty;
+        public int? ProjectId { get; set; }
+        public int? CustomerId { get; set; }
         public DateTime PlannedStart { get; set; }
         public DateTime PlannedEnd { get; set; }
-        public decimal? EstimatedHours { get; set; }
         public string? Priority { get; set; }
         public string? RequiredRole { get; set; }
         public int? SiteId { get; set; }

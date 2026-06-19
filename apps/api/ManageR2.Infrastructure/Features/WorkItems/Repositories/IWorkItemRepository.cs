@@ -1,4 +1,5 @@
 using ManageR2.Domain.Entities;
+using ManageR2.Infrastructure.Features.WorkItems.Models;
 using ManageR2.Infrastructure.Models;
 
 namespace ManageR2.Infrastructure.Repositories
@@ -13,16 +14,10 @@ namespace ManageR2.Infrastructure.Repositories
         Task<List<WorkItem>> GetByTypeAsync(string workType);
         Task<List<WorkItem>> GetTasksByParentIdAsync(int parentWorkItemId);
         Task<int> CreateAsync(WorkItem workItem);
-        Task<int> CreateMilestoneAsync(WorkItem workItem);
-
-        // Get-or-create the reserved internal/office work context (customer, site, container project).
-        Task<InternalWorkContext> GetInternalWorkContextAsync();
 
         Task<bool> UpdateAsync(int id, WorkItem workItem);
-        Task<bool> UpdateMilestoneAsync(int milestoneId, WorkItem workItem);
 
         Task<bool> CloseAsync(int id);
-        Task<bool> SoftDeleteMilestoneAsync(int milestoneId);
         Task<DeleteWorkPlanTaskResult> DeleteWorkPlanTaskAsync(int workItemId);
 
         Task<bool> AssignEmployeeToWorkAsync(int workItemId, int employeeId, string assignmentRole);
@@ -34,12 +29,14 @@ namespace ManageR2.Infrastructure.Repositories
 
         Task<List<ProjectListItemResult>> GetProjectsListAsync();
 
-        // Work plan queries combine project + tasks + assignments.
+        // Legacy nested work plan (compatibility wrapper).
         Task<WorkPlanResult?> GetWorkPlanAsync(int projectId);
         Task<List<WorkPlanResult>> GetAllWorkPlansAsync();
 
-        // Milestone tree with embedded participants for project drill-down endpoints.
-        Task<List<ProjectMilestoneResult>> GetProjectMilestonesAsync(int projectId);
+        // Flat work plan schedule contract.
+        Task<WorkPlanScheduleResult> GetWorkPlanScheduleAsync(WorkPlanScheduleQuery query);
 
+        // Milestone list for legacy GET endpoint (reads ProjectMilestones table).
+        Task<List<ProjectMilestoneResult>> GetProjectMilestonesAsync(int projectId);
     }
 }

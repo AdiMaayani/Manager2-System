@@ -14,7 +14,6 @@ import { Checkbox } from '@shared/components/Checkbox';
 import { InlineAlert } from '@shared/components/InlineAlert';
 import { ConfirmInline } from '@shared/components/ConfirmInline';
 import { usePermissions } from '@shared/auth/usePermissions';
-import { isLocalDataMode } from '@/config/appConfig';
 import { getProjectsListAsync, getSitesAsync } from '@features/projects/api/projectsApiClient';
 import { getQuotesAsync } from '@features/quotes/api/quotesApiClient';
 import {
@@ -406,10 +405,7 @@ interface CustomerReviewDetailsProps {
 }
 
 function CustomerReviewDetails({ customer }: CustomerReviewDetailsProps) {
-  // Related operational data is read through existing feature API clients.
-  // In mock mode these endpoints are unavailable, so the queries stay
-  // disabled and each section explains that instead of inventing data.
-  const areRelatedQueriesEnabled = isLocalDataMode;
+  const areRelatedQueriesEnabled = true;
 
   const projectsQuery = useQuery({
     queryKey: ['customers', 'related', 'projects'],

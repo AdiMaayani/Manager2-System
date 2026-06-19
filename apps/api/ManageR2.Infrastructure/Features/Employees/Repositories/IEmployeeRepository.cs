@@ -10,4 +10,5 @@ public interface IEmployeeRepository
     Task<int> CreateAsync(Employee employee);
     Task<bool> UpdateAsync(Employee employee);
     Task<bool> SetActiveStatusAsync(int employeeId, bool isActive);
+    Task<List<string>> GetDistinctPrimaryRolesAsync();
 }

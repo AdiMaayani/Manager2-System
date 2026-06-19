@@ -2,28 +2,34 @@ using ManageR2.Api.Authorization;
 using ManageR2.Api.DTOs;
 using ManageR2.Api.Features.Audit;
 using ManageR2.Domain.Entities;
+using ManageR2.Domain.Features.WorkItems;
+using ManageR2.Infrastructure.Features.WorkItems.Models;
+using ManageR2.Api.Features.WorkItems.Mapping;
+using ManageR2.Infrastructure.Features.WorkItems.Services;
+using ManageR2.Infrastructure.Models;
 using ManageR2.Infrastructure.Repositories;
 using ManageR2.Infrastructure.Services;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
-using ManageR2.Infrastructure.Models;
 
 namespace ManageR2.Api.Controllers;
 
 [ApiController]
 [Route("api/[controller]")]
 [Authorize(Policy = Policies.CanViewWorkPlan)]
-// API layer for work items (projects, tasks, milestones) and assignment-related work-plan views.
 public class WorkItemsController : ControllerBase
 {
-    // Single entry point to work-item graph: hierarchy, assignments, milestones, and work-plan projections.
     private readonly IWorkItemRepository _workItemRepository;
+    private readonly IWorkItemTaskService _workItemTaskService;
     private readonly IAuditLogService _auditLogService;
 
-    // IWorkItemRepository is the bridge from HTTP to SQL/stored procedures for operational planning data.
-    public WorkItemsController(IWorkItemRepository workItemRepository, IAuditLogService auditLogService)
+    public WorkItemsController(
+        IWorkItemRepository workItemRepository,
+        IWorkItemTaskService workItemTaskService,
+        IAuditLogService auditLogService)
     {
         _workItemRepository = workItemRepository;
+        _workItemTaskService = workItemTaskService;
         _auditLogService = auditLogService;
     }
 
@@ -69,6 +75,42 @@ public class WorkItemsController : ControllerBase
         return Ok(result);
     }
 
+    [HttpGet("report-targets")]
+    public async Task<ActionResult<List<WorkItemReportTargetDto>>> GetReportTargets()
+    {
+        var tasks = await _workItemRepository.GetByTypeAsync(WorkItemWorkTypes.Task);
+        var serviceCalls = await _workItemRepository.GetByTypeAsync(WorkItemWorkTypes.ServiceCall);
+
+        var targets = tasks
+            .Where(task => !task.IsArchived &&
+                           (task.TaskCategory == WorkItemTaskCategories.Regular ||
+                            task.TaskCategory == WorkItemTaskCategories.Project))
+            .Select(task => new WorkItemReportTargetDto
+            {
+                WorkItemId = task.WorkItemId,
+                Title = task.Title,
+                TaskCategory = task.TaskCategory ?? WorkItemTaskCategories.Regular,
+                CustomerId = task.CustomerId,
+                SiteId = task.SiteId,
+                ProjectId = task.ParentWorkItemId
+            })
+            .Concat(serviceCalls
+                .Where(call => !call.IsArchived)
+                .Select(call => new WorkItemReportTargetDto
+                {
+                    WorkItemId = call.WorkItemId,
+                    Title = call.Title,
+                    TaskCategory = WorkItemTaskCategories.ServiceCall,
+                    CustomerId = call.CustomerId,
+                    SiteId = call.SiteId,
+                    ProjectId = null
+                }))
+            .OrderBy(target => target.Title, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        return Ok(targets);
+    }
+
     [HttpGet("{id}")]
     // Returns one work item by id (can be project, task, milestone, or service call).
     public async Task<ActionResult<WorkItem>> GetById(int id)
@@ -105,8 +147,41 @@ public class WorkItemsController : ControllerBase
         return Ok(tasks);
     }
 
+    [HttpGet("work-plan")]
+    public async Task<ActionResult<WorkPlanScheduleDto>> GetWorkPlanSchedule(
+        [FromQuery] string scope = "company",
+        [FromQuery] int? projectId = null,
+        [FromQuery] int? employeeId = null,
+        [FromQuery] string? status = null,
+        [FromQuery] string? taskCategory = null,
+        [FromQuery] DateTime? fromUtc = null,
+        [FromQuery] DateTime? toUtc = null,
+        [FromQuery] bool includeUnscheduled = true)
+    {
+        var query = new WorkPlanScheduleQuery
+        {
+            Scope = scope,
+            ProjectId = projectId,
+            EmployeeId = employeeId,
+            Status = status,
+            TaskCategory = taskCategory,
+            FromUtc = fromUtc,
+            ToUtc = toUtc,
+            IncludeUnscheduled = includeUnscheduled,
+            CurrentUserEmployeeId = GetCurrentEmployeeId()
+        };
+
+        var validationError = WorkPlanScheduleQueryValidator.Validate(query);
+        if (validationError != null)
+        {
+            return BadRequest(new { message = validationError });
+        }
+
+        var schedule = await _workItemRepository.GetWorkPlanScheduleAsync(query);
+        return Ok(WorkPlanScheduleDtoFactory.Create(schedule));
+    }
+
     [HttpGet("{id}/work-plan")]
-    // Builds one project work plan: project header + child tasks + assignments.
     public async Task<ActionResult<WorkPlanDto>> GetWorkPlan(int id)
     {
         var workItem = await _workItemRepository.GetByIdAsync(id);
@@ -115,74 +190,20 @@ public class WorkItemsController : ControllerBase
             return NotFound($"Work item with ID {id} was not found.");
         }
 
-        // Work plan endpoint is intentionally limited to project root work items.
         if (!string.Equals(workItem.WorkType, "Project", StringComparison.OrdinalIgnoreCase))
         {
             return BadRequest($"Work plan is only available for projects. WorkItem {id} is of type '{workItem.WorkType}'.");
         }
 
-        var workPlanResult = await _workItemRepository.GetWorkPlanAsync(id);
-
-        if (workPlanResult == null)
+        var schedule = await _workItemRepository.GetWorkPlanScheduleAsync(new WorkPlanScheduleQuery
         {
-            return NotFound($"Project with ID {id} was not found.");
-        }
+            Scope = "project",
+            ProjectId = id,
+            IncludeUnscheduled = true,
+            CurrentUserEmployeeId = GetCurrentEmployeeId()
+        });
 
-        // Maps DB/repository model into API contract for defense-friendly presentation.
-        var response = new WorkPlanDto
-        {
-            // Project section of the work plan.
-            Project = new ProjectSummaryDto
-            {
-                WorkItemId = workPlanResult.Project.WorkItemId,
-                Title = workPlanResult.Project.Title ?? string.Empty,
-                Description = workPlanResult.Project.Description,
-                WorkType = workPlanResult.Project.WorkType ?? string.Empty,
-                Status = workPlanResult.Project.Status ?? string.Empty,
-                BillingType = workPlanResult.Project.BillingType,
-                CustomerId = workPlanResult.Project.CustomerId,
-                SiteId = workPlanResult.Project.SiteId,
-                CreatedAt = workPlanResult.Project.CreatedAt,
-                ClosedAt = workPlanResult.Project.ClosedAt,
-                ParentWorkItemId = workPlanResult.Project.ParentWorkItemId
-            },
-            // Task/milestone section linked under the project.
-            Tasks = workPlanResult.Tasks.Select(task => new TaskSummaryDto
-            {
-                WorkItemId = task.WorkItemId,
-                Title = task.Title ?? string.Empty,
-                Description = task.Description,
-                WorkType = task.WorkType ?? string.Empty,
-                Status = task.Status ?? string.Empty,
-                BillingType = task.BillingType,
-                EstimatedHours = task.EstimatedHours,
-                Priority = task.Priority,
-                PlannedStart = task.PlannedStart,
-                PlannedEnd = task.PlannedEnd,
-                RequiredRole = task.RequiredRole,
-                IsLocked = task.IsLocked,
-                CustomerId = task.CustomerId,
-                SiteId = task.SiteId,
-                CreatedAt = task.CreatedAt,
-                ClosedAt = task.ClosedAt,
-                ParentWorkItemId = task.ParentWorkItemId
-            }).ToList(),
-            // Assignment section linking employees/contractors to work items.
-            Assignments = workPlanResult.Assignments.Select(assignment => new WorkAssignmentDto
-            {
-                WorkItemId = assignment.WorkItemId,
-                EmployeeId = assignment.EmployeeId,
-                ContractorId = assignment.ContractorId,
-                AssignmentType = assignment.AssignmentType,
-                AssignmentRole = assignment.AssignmentRole,
-                AssignedHours = assignment.AssignedHours,
-                IsManualAssignment = assignment.IsManualAssignment,
-                EmployeeName = assignment.EmployeeName,
-                ContractorName = assignment.ContractorName
-            }).ToList()
-        };
-
-        return Ok(response);
+        return Ok(MapLegacyWorkPlanFromSchedule(workItem, schedule));
     }
 
     [HttpGet("work-plan/all")]
@@ -246,16 +267,11 @@ public class WorkItemsController : ControllerBase
     }
 
     [HttpGet("internal-context")]
-    // Resolves the reserved internal/office context so the WorkPlan can create non-project tasks.
-    public async Task<ActionResult<InternalWorkContextResponseDto>> GetInternalContext()
+    public IActionResult GetInternalContext()
     {
-        var context = await _workItemRepository.GetInternalWorkContextAsync();
-
-        return Ok(new InternalWorkContextResponseDto
+        return StatusCode(StatusCodes.Status410Gone, new
         {
-            CustomerId = context.CustomerId,
-            SiteId = context.SiteId,
-            ContainerProjectId = context.ContainerProjectId
+            message = "The internal-context endpoint is deprecated. Create Regular tasks without a project parent."
         });
     }
 
@@ -349,14 +365,14 @@ public class WorkItemsController : ControllerBase
             return BadRequest("BillingType is required.");
         }
 
-        if (workItem.CustomerId <= 0)
+        if (workItem.CustomerId.HasValue && workItem.CustomerId.Value <= 0)
         {
-            return BadRequest("CustomerId must be greater than 0.");
+            return BadRequest("CustomerId must be greater than 0 when supplied.");
         }
 
-        if (workItem.SiteId <= 0)
+        if (workItem.SiteId.HasValue && workItem.SiteId.Value <= 0)
         {
-            return BadRequest("SiteId must be greater than 0.");
+            return BadRequest("SiteId must be greater than 0 when supplied.");
         }
 
         // Validates hierarchy links so child work items reference an existing parent.
@@ -476,7 +492,6 @@ public class WorkItemsController : ControllerBase
 
     [Authorize(Policy = Policies.CanManageWorkPlan)]
     [HttpPost("task")]
-    // Creates a task under an existing project.
     public async Task<IActionResult> CreateTask([FromBody] CreateTaskRequest request)
     {
         if (request == null)
@@ -484,100 +499,166 @@ public class WorkItemsController : ControllerBase
             return BadRequest("Task data is required.");
         }
 
-        if (string.IsNullOrWhiteSpace(request.Title))
+        try
         {
-            return BadRequest("Title is required.");
-        }
+            var (plannedStartUtc, plannedEndUtc) = UtcDateTimeNormalizer.NormalizePlannedRange(
+                request.PlannedStart,
+                request.PlannedEnd);
 
-        if (string.IsNullOrWhiteSpace(request.Status))
-        {
-            return BadRequest("Status is required.");
-        }
+            int? resolvedCustomerId = request.CustomerId;
+            int? resolvedSiteId = request.SiteId;
 
-        if (string.IsNullOrWhiteSpace(request.BillingType))
-        {
-            return BadRequest("BillingType is required.");
-        }
-
-        if (!request.ParentWorkItemId.HasValue || request.ParentWorkItemId.Value <= 0)
-        {
-            return BadRequest("ParentWorkItemId is required for task creation.");
-        }
-
-        // Task must be linked to an existing parent project.
-        var parentWorkItem = await _workItemRepository.GetByIdAsync(request.ParentWorkItemId.Value);
-        if (parentWorkItem == null)
-        {
-            return NotFound($"Parent project with ID {request.ParentWorkItemId.Value} was not found.");
-        }
-
-        if (!string.Equals(parentWorkItem.WorkType, "Project", StringComparison.OrdinalIgnoreCase))
-        {
-            return BadRequest($"Parent work item {request.ParentWorkItemId.Value} is not a project.");
-        }
-
-        var taskCustomerId = request.CustomerId.HasValue && request.CustomerId.Value > 0
-            ? request.CustomerId.Value
-            : parentWorkItem.CustomerId;
-        var taskSiteId = request.SiteId.HasValue && request.SiteId.Value > 0
-            ? request.SiteId.Value
-            : parentWorkItem.SiteId;
-
-        if (taskCustomerId <= 0)
-        {
-            return BadRequest("CustomerId must be greater than 0.");
-        }
-
-        if (taskSiteId <= 0)
-        {
-            return BadRequest("SiteId must be greater than 0.");
-        }
-
-        // WorkType is fixed to Task for child planning items.
-        var task = new WorkItem
-        {
-            Title = request.Title,
-            Description = request.Description,
-            WorkType = "Task",
-            Status = request.Status,
-            BillingType = request.BillingType,
-            CustomerId = taskCustomerId,
-            SiteId = taskSiteId,
-            ParentWorkItemId = request.ParentWorkItemId,
-            PlannedStart = request.PlannedStart,
-            PlannedEnd = request.PlannedEnd,
-            EstimatedHours = request.EstimatedHours,
-            Priority = request.Priority,
-            RequiredRole = request.RequiredRole,
-            DealCloseDate = request.DealCloseDate,
-            FinanceProjectNumber = request.FinanceProjectNumber,
-            InvoiceNumber = request.InvoiceNumber
-        };
-
-        var newWorkItemId = await _workItemRepository.CreateAsync(task);
-
-        if (newWorkItemId <= 0)
-        {
-            return BadRequest("Failed to create task.");
-        }
-
-        await _auditLogService.LogAsync(this.BuildAuditEvent(
-            AuditActions.WorkItemCreated,
-            AuditEntityTypes.WorkItem,
-            $"Task '{task.Title}' (#{newWorkItemId}) created under project #{task.ParentWorkItemId}.",
-            entityId: newWorkItemId,
-            metadata: new Dictionary<string, object?>
+            if (request.TaskCategory == WorkItemTaskCategories.Project)
             {
-                ["workType"] = task.WorkType,
-                ["status"] = task.Status,
-                ["parentWorkItemId"] = task.ParentWorkItemId
-            }));
+                var parentWorkItem = await _workItemRepository.GetByIdAsync(request.ParentWorkItemId!.Value);
+                if (parentWorkItem == null)
+                {
+                    return NotFound($"Parent project with ID {request.ParentWorkItemId.Value} was not found.");
+                }
 
-        return Ok(new
+                if (!string.Equals(parentWorkItem.WorkType, WorkItemWorkTypes.Project, StringComparison.OrdinalIgnoreCase))
+                {
+                    return BadRequest($"Parent work item {request.ParentWorkItemId.Value} is not a project.");
+                }
+
+                resolvedCustomerId = resolvedCustomerId is > 0 ? resolvedCustomerId : parentWorkItem.CustomerId;
+                resolvedSiteId = resolvedSiteId is > 0 ? resolvedSiteId : parentWorkItem.SiteId;
+            }
+
+            var validationInput = new WorkItemTaskValidationInput
+            {
+                TaskCategory = request.TaskCategory,
+                ParentWorkItemId = request.ParentWorkItemId,
+                MilestoneId = request.MilestoneId,
+                CustomerId = resolvedCustomerId,
+                SiteId = resolvedSiteId,
+                PlannedStartUtc = plannedStartUtc,
+                PlannedEndUtc = plannedEndUtc
+            };
+
+            _workItemTaskService.ValidateCreateOrUpdate(validationInput);
+
+            var task = _workItemTaskService.ApplyCanonicalFields(new WorkItem
+            {
+                Title = request.Title,
+                Description = request.Description,
+                Status = ResolveTaskStatus(request.Status),
+                BillingType = request.BillingType,
+                Priority = request.Priority,
+                RequiredRole = request.RequiredRole,
+                DealCloseDate = request.DealCloseDate,
+                FinanceProjectNumber = request.FinanceProjectNumber,
+                InvoiceNumber = request.InvoiceNumber
+            }, validationInput);
+
+            var newWorkItemId = await _workItemRepository.CreateAsync(task);
+            if (newWorkItemId <= 0)
+            {
+                return BadRequest("Failed to create task.");
+            }
+
+            await _auditLogService.LogAsync(this.BuildAuditEvent(
+                AuditActions.WorkItemCreated,
+                AuditEntityTypes.WorkItem,
+                $"Task '{task.Title}' (#{newWorkItemId}, {task.TaskCategory}) created.",
+                entityId: newWorkItemId,
+                metadata: new Dictionary<string, object?>
+                {
+                    ["workType"] = task.WorkType,
+                    ["taskCategory"] = task.TaskCategory,
+                    ["status"] = task.Status,
+                    ["parentWorkItemId"] = task.ParentWorkItemId
+                }));
+
+            return Ok(new
+            {
+                message = "Task created successfully.",
+                workItemId = newWorkItemId
+            });
+        }
+        catch (ArgumentException ex)
         {
-            message = "Task created successfully.",
-            workItemId = newWorkItemId
-        });
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [Authorize(Policy = Policies.CanManageWorkPlan)]
+    [HttpPut("task/{taskId:int}")]
+    public async Task<IActionResult> UpdateTask(int taskId, [FromBody] UpdateTaskRequest request)
+    {
+        if (request == null)
+        {
+            return BadRequest("Task data is required.");
+        }
+
+        var existingTask = await _workItemRepository.GetByIdAsync(taskId);
+        if (existingTask == null)
+        {
+            return NotFound($"Task with ID {taskId} was not found.");
+        }
+
+        if (existingTask.IsArchived ||
+            string.Equals(existingTask.WorkType, WorkItemWorkTypes.ServiceCall, StringComparison.Ordinal))
+        {
+            return BadRequest("Only Regular and Project tasks can be updated through this endpoint.");
+        }
+
+        try
+        {
+            var (plannedStartUtc, plannedEndUtc) = UtcDateTimeNormalizer.NormalizePlannedRange(
+                request.PlannedStart,
+                request.PlannedEnd);
+
+            var validationInput = new WorkItemTaskValidationInput
+            {
+                TaskCategory = request.TaskCategory,
+                ParentWorkItemId = request.ParentWorkItemId,
+                MilestoneId = request.MilestoneId,
+                CustomerId = request.CustomerId,
+                SiteId = request.SiteId,
+                PlannedStartUtc = plannedStartUtc,
+                PlannedEndUtc = plannedEndUtc
+            };
+
+            _workItemTaskService.ValidateCreateOrUpdate(validationInput);
+
+            var task = _workItemTaskService.ApplyCanonicalFields(new WorkItem
+            {
+                Title = request.Title,
+                Description = request.Description,
+                Status = ResolveTaskStatus(request.Status, existingTask.Status),
+                BillingType = request.BillingType,
+                Priority = request.Priority,
+                RequiredRole = request.RequiredRole,
+                IsLocked = request.IsLocked,
+                DealCloseDate = request.DealCloseDate,
+                FinanceProjectNumber = request.FinanceProjectNumber,
+                InvoiceNumber = request.InvoiceNumber
+            }, validationInput);
+
+            var updated = await _workItemRepository.UpdateAsync(taskId, task);
+            if (!updated)
+            {
+                return BadRequest("Failed to update task.");
+            }
+
+            await _auditLogService.LogAsync(this.BuildAuditEvent(
+                AuditActions.WorkItemUpdated,
+                AuditEntityTypes.WorkItem,
+                $"Task #{taskId} ('{existingTask.Title}') updated.",
+                entityId: taskId,
+                metadata: new Dictionary<string, object?>
+                {
+                    ["taskCategory"] = task.TaskCategory,
+                    ["status"] = task.Status
+                }));
+
+            return Ok(new { message = "Task updated successfully." });
+        }
+        catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [Authorize(Policy = Policies.CanManageWorkPlan)]
@@ -823,365 +904,96 @@ public class WorkItemsController : ControllerBase
 
     [Authorize(Policy = Policies.CanManageWorkPlan)]
     [HttpPost("{projectId}/milestones")]
-    // Creates a milestone (stored as task type) under a project and attaches assignments.
-    public async Task<IActionResult> CreateMilestone(int projectId, [FromBody] CreateMilestoneRequest request)
+    public IActionResult CreateMilestone(int projectId, [FromBody] CreateMilestoneRequest request)
     {
-        if (request == null)
+        return StatusCode(StatusCodes.Status410Gone, new
         {
-            return BadRequest("Milestone data is required.");
-        }
-
-        if (string.IsNullOrWhiteSpace(request.Title))
-        {
-            return BadRequest("Title is required.");
-        }
-
-        if (string.IsNullOrWhiteSpace(request.Status))
-        {
-            return BadRequest("Status is required.");
-        }
-
-        if (string.IsNullOrWhiteSpace(request.BillingType))
-        {
-            return BadRequest("BillingType is required.");
-        }
-
-        if (request.CustomerId <= 0)
-        {
-            return BadRequest("CustomerId must be greater than 0.");
-        }
-
-        if (request.SiteId <= 0)
-        {
-            return BadRequest("SiteId must be greater than 0.");
-        }
-
-        if (request.PlannedStart.HasValue && request.PlannedEnd.HasValue)
-        {
-            if (request.PlannedEnd <= request.PlannedStart)
-            {
-                return BadRequest("PlannedEnd must be after PlannedStart.");
-            }
-        }
-
-        if (request.ActualStart.HasValue && request.ActualEnd.HasValue)
-        {
-            if (request.ActualEnd <= request.ActualStart)
-            {
-                return BadRequest("ActualEnd must be after ActualStart.");
-            }
-        }
-
-        // לוודא שהפרויקט קיים
-        var project = await _workItemRepository.GetByIdAsync(projectId);
-        if (project == null)
-        {
-            return NotFound($"Project with ID {projectId} was not found.");
-        }
-
-        if (!string.Equals(project.WorkType, "Project", StringComparison.OrdinalIgnoreCase))
-        {
-            return BadRequest($"WorkItem {projectId} is not a project.");
-        }
-
-        // יצירת ה־milestone
-        var milestone = new WorkItem
-        {
-            Title = request.Title,
-            Description = request.Description,
-            WorkType = "Task",
-            Status = request.Status,
-            BillingType = request.BillingType,
-            CustomerId = request.CustomerId,
-            SiteId = request.SiteId,
-            ParentWorkItemId = projectId,
-
-            PlannedStart = request.PlannedStart,
-            PlannedEnd = request.PlannedEnd,
-            EstimatedHours = request.EstimatedHours,
-
-            ActualStart = request.ActualStart,
-            ActualEnd = request.ActualEnd,
-            ActualHours = CalculateHours(request.ActualStart, request.ActualEnd)
-              ?? request.ActualHours,
-            Priority = request.Priority,
-            RequiredRole = request.RequiredRole,
-            IsLocked = request.IsLocked
-        };
-
-        var newMilestoneId = await _workItemRepository.CreateMilestoneAsync(milestone);
-
-        if (newMilestoneId <= 0)
-        {
-            return BadRequest("Failed to create milestone.");
-        }
-
-        // Adds employee assignments after milestone creation.
-        if (request.Employees != null && request.Employees.Any())
-        {
-            foreach (var employee in request.Employees)
-            {
-                try
-                {
-                    var assigned = await _workItemRepository.AssignEmployeeToWorkAsync(
-                        newMilestoneId,
-                        employee.EmployeeId,
-                        employee.AssignmentRole
-                    );
-
-                    if (!assigned)
-                    {
-                        return BadRequest(new { message = "Failed to assign employee to milestone." });
-                    }
-                }
-                catch (InvalidOperationException ex)
-                {
-                    return BadRequest(new { message = ex.Message });
-                }
-            }
-        }
-
-        // Adds contractor assignments after milestone creation.
-        if (request.Contractors != null && request.Contractors.Any())
-        {
-            foreach (var contractor in request.Contractors)
-            {
-                try
-                {
-                    var assigned = await _workItemRepository.AssignContractorToWorkAsync(
-                        newMilestoneId,
-                        contractor.ContractorId,
-                        contractor.AssignmentRole
-                    );
-
-                    if (!assigned)
-                    {
-                        return BadRequest(new { message = "Failed to assign contractor to milestone." });
-                    }
-                }
-                catch (InvalidOperationException ex)
-                {
-                    return BadRequest(new { message = ex.Message });
-                }
-            }
-        }
-
-        return Ok(new
-        {
-            message = "Milestone created successfully.",
-            milestoneId = newMilestoneId
+            message = "Milestone-as-work-item creation is deprecated. Use POST /api/projects/{projectId}/milestones."
         });
     }
 
     [Authorize(Policy = Policies.CanManageWorkPlan)]
     [HttpPut("milestones/{milestoneId}")]
-    // Updates a milestone and refreshes its assignment links.
-    public async Task<IActionResult> UpdateMilestone(int milestoneId, [FromBody] UpdateMilestoneRequest request)
+    public IActionResult UpdateMilestone(int milestoneId, [FromBody] UpdateMilestoneRequest request)
     {
-        if (request == null)
+        return StatusCode(StatusCodes.Status410Gone, new
         {
-            return BadRequest("Milestone data is required.");
-        }
-
-        if (string.IsNullOrWhiteSpace(request.Title))
-        {
-            return BadRequest("Title is required.");
-        }
-
-        if (string.IsNullOrWhiteSpace(request.Status))
-        {
-            return BadRequest("Status is required.");
-        }
-
-        if (string.IsNullOrWhiteSpace(request.BillingType))
-        {
-            return BadRequest("BillingType is required.");
-        }
-
-        if (request.CustomerId <= 0)
-        {
-            return BadRequest("CustomerId must be greater than 0.");
-        }
-
-        if (request.SiteId <= 0)
-        {
-            return BadRequest("SiteId must be greater than 0.");
-        }
-
-        if (request.PlannedStart.HasValue && request.PlannedEnd.HasValue)
-        {
-            if (request.PlannedEnd <= request.PlannedStart)
-            {
-                return BadRequest("PlannedEnd must be after PlannedStart.");
-            }
-        }
-
-        if (request.ActualStart.HasValue && request.ActualEnd.HasValue)
-        {
-            if (request.ActualEnd <= request.ActualStart)
-            {
-                return BadRequest("ActualEnd must be after ActualStart.");
-            }
-        }
-
-        var existingMilestone = await _workItemRepository.GetByIdAsync(milestoneId);
-        if (existingMilestone == null)
-        {
-            return NotFound($"Milestone with ID {milestoneId} was not found.");
-        }
-
-        if (!string.Equals(existingMilestone.WorkType, "Task", StringComparison.OrdinalIgnoreCase))
-        {
-            return BadRequest($"WorkItem {milestoneId} is not a milestone/task.");
-        }
-
-        var milestone = new WorkItem
-        {
-            Title = request.Title,
-            Description = request.Description,
-            WorkType = existingMilestone.WorkType,
-            Status = request.Status,
-            BillingType = request.BillingType,
-            CustomerId = request.CustomerId,
-            SiteId = request.SiteId,
-            ParentWorkItemId = existingMilestone.ParentWorkItemId,
-            DealCloseDate = existingMilestone.DealCloseDate,
-            FinanceProjectNumber = existingMilestone.FinanceProjectNumber,
-            InvoiceNumber = existingMilestone.InvoiceNumber,
-
-            PlannedStart = request.PlannedStart,
-            PlannedEnd = request.PlannedEnd,
-            EstimatedHours = request.EstimatedHours,
-
-            ActualStart = request.ActualStart,
-            ActualEnd = request.ActualEnd,
-            ActualHours = CalculateHours(request.ActualStart, request.ActualEnd)
-              ?? request.ActualHours,
-
-            Priority = request.Priority,
-            RequiredRole = request.RequiredRole,
-            IsLocked = request.IsLocked
-        };
-
-        var updated = await _workItemRepository.UpdateMilestoneAsync(milestoneId, milestone);
-
-        if (!updated)
-        {
-            return BadRequest("Failed to update milestone.");
-        }
-
-        // Rebuilds assignment lists to match the updated payload exactly.
-        var deletedEmployees = await _workItemRepository.DeleteEmployeeAssignmentsByWorkItemIdAsync(milestoneId);
-        if (!deletedEmployees)
-        {
-            return BadRequest("Failed to reset employee assignments.");
-        }
-
-        var deletedContractors = await _workItemRepository.DeleteContractorAssignmentsByWorkItemIdAsync(milestoneId);
-        if (!deletedContractors)
-        {
-            return BadRequest("Failed to reset contractor assignments.");
-        }
-
-        if (request.Employees != null && request.Employees.Any())
-        {
-            foreach (var employee in request.Employees)
-            {
-                try
-                {
-                    var assigned = await _workItemRepository.AssignEmployeeToWorkAsync(
-                        milestoneId,
-                        employee.EmployeeId,
-                        employee.AssignmentRole
-                    );
-
-                    if (!assigned)
-                    {
-                        return BadRequest(new { message = "Failed to assign employee to milestone." });
-                    }
-                }
-                catch (InvalidOperationException ex)
-                {
-                    return BadRequest(new { message = ex.Message });
-                }
-            }
-        }
-
-        if (request.Contractors != null && request.Contractors.Any())
-        {
-            foreach (var contractor in request.Contractors)
-            {
-                try
-                {
-                    var assigned = await _workItemRepository.AssignContractorToWorkAsync(
-                        milestoneId,
-                        contractor.ContractorId,
-                        contractor.AssignmentRole
-                    );
-
-                    if (!assigned)
-                    {
-                        return BadRequest(new { message = "Failed to assign contractor to milestone." });
-                    }
-                }
-                catch (InvalidOperationException ex)
-                {
-                    return BadRequest(new { message = ex.Message });
-                }
-            }
-        }
-
-        return Ok(new
-        {
-            message = "Milestone updated successfully."
+            message = "Milestone-as-work-item updates are deprecated. Use PUT /api/projects/{projectId}/milestones/{milestoneId}."
         });
     }
 
     [Authorize(Policy = Policies.CanManageWorkPlan)]
     [HttpPut("milestones/{milestoneId}/cancel")]
-    // Cancels a milestone using repository soft-delete behavior.
-    public async Task<IActionResult> SoftDeleteMilestone(int milestoneId)
+    public IActionResult SoftDeleteMilestone(int milestoneId)
     {
-        var existingMilestone = await _workItemRepository.GetByIdAsync(milestoneId);
-
-        if (existingMilestone == null)
+        return StatusCode(StatusCodes.Status410Gone, new
         {
-            return NotFound($"Milestone with ID {milestoneId} was not found.");
-        }
-
-        if (!string.Equals(existingMilestone.WorkType, "Task", StringComparison.OrdinalIgnoreCase))
-        {
-            return BadRequest($"WorkItem {milestoneId} is not a milestone/task.");
-        }
-
-        var deleted = await _workItemRepository.SoftDeleteMilestoneAsync(milestoneId);
-
-        if (!deleted)
-        {
-            return BadRequest("Failed to cancel milestone.");
-        }
-
-        return Ok(new
-        {
-            message = "Milestone cancelled successfully."
+            message = "Milestone-as-work-item cancellation is deprecated. Use PUT /api/projects/{projectId}/milestones/{milestoneId}/deactivate."
         });
     }
 
-    private static decimal? CalculateHours(DateTime? start, DateTime? end)
+    private static string ResolveTaskStatus(string? requestedStatus, string? existingStatus = null) =>
+        string.IsNullOrWhiteSpace(requestedStatus)
+            ? (existingStatus ?? WorkItemDefaultStatuses.Planned)
+            : requestedStatus;
+
+    private int? GetCurrentEmployeeId()
     {
-        if (!start.HasValue || !end.HasValue)
+        return int.TryParse(User.FindFirst("employeeId")?.Value, out var employeeId) && employeeId > 0
+            ? employeeId
+            : null;
+    }
+
+    private static WorkPlanDto MapLegacyWorkPlanFromSchedule(WorkItem project, WorkPlanScheduleResult schedule)
+    {
+        var projectTasks = schedule.ScheduledTasks
+            .Concat(schedule.UnscheduledTasks)
+            .Where(task => string.Equals(task.TaskCategory, WorkItemTaskCategories.Project, StringComparison.Ordinal))
+            .ToList();
+
+        return new WorkPlanDto
         {
-            return null;
-        }
-
-        if (end <= start)
-        {
-            return null;
-        }
-
-        var totalHours = (decimal)(end.Value - start.Value).TotalHours;
-
-        return Math.Round(totalHours, 2);
+            Project = new ProjectSummaryDto
+            {
+                WorkItemId = project.WorkItemId,
+                Title = project.Title ?? string.Empty,
+                Description = project.Description,
+                WorkType = project.WorkType ?? string.Empty,
+                Status = project.Status ?? string.Empty,
+                BillingType = project.BillingType,
+                CustomerId = project.CustomerId,
+                SiteId = project.SiteId,
+                CreatedAt = project.CreatedAt,
+                ClosedAt = project.ClosedAt,
+                ParentWorkItemId = project.ParentWorkItemId
+            },
+            Tasks = projectTasks.Select(task => new TaskSummaryDto
+            {
+                WorkItemId = task.WorkItemId,
+                Title = task.Title,
+                Description = task.Description,
+                WorkType = task.WorkType ?? string.Empty,
+                Status = task.Status ?? string.Empty,
+                EstimatedHours = task.EstimatedHours,
+                Priority = task.Priority,
+                PlannedStart = task.PlannedStart,
+                PlannedEnd = task.PlannedEnd,
+                IsLocked = task.IsLocked,
+                CustomerId = task.CustomerId,
+                SiteId = task.SiteId,
+                ParentWorkItemId = task.ProjectId
+            }).ToList(),
+            Assignments = schedule.Assignments.Select(assignment => new WorkAssignmentDto
+            {
+                WorkItemId = assignment.WorkItemId,
+                EmployeeId = assignment.EmployeeId,
+                AssignmentType = assignment.AssignmentType,
+                AssignmentRole = assignment.AssignmentRole,
+                AssignedHours = assignment.AssignedHours,
+                IsManualAssignment = assignment.IsManualAssignment,
+                EmployeeName = assignment.EmployeeName
+            }).ToList()
+        };
     }
 }
 

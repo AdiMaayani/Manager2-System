@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Drawer, useDrawerMaximize } from '@shared/components/Drawer';
 import { Button } from '@shared/components/Button';
@@ -7,18 +7,23 @@ import { Input } from '@shared/components/Input';
 import { Select } from '@shared/components/Select';
 import { Textarea } from '@shared/components/Textarea';
 import { InlineAlert } from '@shared/components/InlineAlert';
-import { isLocalDataMode } from '@/config/appConfig';
+import { getTaskCategoryLabel } from '@shared/constants/taskCategories';
+import {
+  durationMinutesBetweenUtc,
+  formatDurationMinutes,
+  localPartsToUtcIso,
+  utcToLocalParts,
+} from '@shared/utils/utcDateTime';
+import { updateServiceCallAsync } from '@features/serviceCalls/api/serviceCallsApiClient';
 import { getWorkItemByIdAsync, updateWorkItemAsync } from '../../api/workplanApiClient';
+import { useEmployeePrimaryRoles } from '@features/employees/hooks/useEmployeePrimaryRoles';
+import { invalidateWorkPlanQueries } from '../../hooks/useWorkPlanData';
 import {
   normalizeWorkPlanPriorityCode,
-  normalizeWorkPlanStatusCode,
   WORKPLAN_PRIORITY_OPTIONS,
-  WORKPLAN_STATUS_OPTIONS,
 } from '../../constants';
 import type { WorkItemResponse, WorkPlanTaskSelection } from '../../types';
 import './EditTaskDrawer.css';
-
-const ROLE_OPTIONS = ['מתקין', 'מנהל פרויקט', 'טכנאי'];
 
 interface EditTaskDrawerProps {
   isOpen: boolean;
@@ -37,44 +42,31 @@ interface EditableTaskFieldsSource {
   status?: string | null;
   priority?: string | null;
   requiredRole?: string | null;
+  taskCategory?: string | null;
 }
 
-function splitDateTime(value?: string | null): { date: string; time: string } {
+function splitUtcToLocal(value?: string | null): { date: string; time: string } {
   if (!value) return { date: '', time: '' };
-  const [datePart, timePart = ''] = value.split('T');
-  return { date: datePart, time: timePart.slice(0, 5) };
+  try {
+    return utcToLocalParts(value);
+  } catch {
+    return { date: '', time: '' };
+  }
 }
 
-function combineDateAndTime(date: string, time: string): string | null {
-  if (!date || !time) return null;
-  return `${date}T${time}:00`;
-}
-
-function validatePlannedTimeRange(date: string, startTime: string, endTime: string): {
+function validatePlannedUtcRange(date: string, startTime: string, endTime: string): {
   plannedStart: string;
   plannedEnd: string;
 } {
-  if (!date) throw new Error('יש להזין תאריך מתוכנן.');
-  if (!startTime) throw new Error('יש להזין זמן התחלה מתוכנן.');
-  if (!endTime) throw new Error('יש להזין זמן סיום מתוכנן.');
-
-  const plannedStart = combineDateAndTime(date, startTime);
-  const plannedEnd = combineDateAndTime(date, endTime);
-  const plannedStartDate = plannedStart ? new Date(plannedStart) : null;
-  const plannedEndDate = plannedEnd ? new Date(plannedEnd) : null;
-
-  if (!plannedStart || !plannedStartDate || Number.isNaN(plannedStartDate.getTime())) {
-    throw new Error('יש להזין זמן התחלה מתוכנן.');
+  if (!date || !startTime || !endTime) {
+    throw new Error('יש להזין תאריך, שעת התחלה ושעת סיום');
   }
-
-  if (!plannedEnd || !plannedEndDate || Number.isNaN(plannedEndDate.getTime())) {
-    throw new Error('יש להזין זמן סיום מתוכנן.');
+  const plannedStart = localPartsToUtcIso(date, startTime);
+  const plannedEnd = localPartsToUtcIso(date, endTime);
+  const minutes = durationMinutesBetweenUtc(plannedStart, plannedEnd);
+  if (minutes == null || minutes <= 0) {
+    throw new Error('זמן הסיום חייב להיות אחרי זמן ההתחלה');
   }
-
-  if (plannedEndDate <= plannedStartDate) {
-    throw new Error('זמן הסיום חייב להיות אחרי זמן ההתחלה.');
-  }
-
   return { plannedStart, plannedEnd };
 }
 
@@ -90,7 +82,7 @@ export function EditTaskDrawer({
   const workItemQuery = useQuery({
     queryKey: ['workplan', 'workItem', task?.taskId],
     queryFn: () => getWorkItemByIdAsync(task!.taskId),
-    enabled: isOpen && isLocalDataMode && !!task?.taskId,
+    enabled: isOpen && !!task?.taskId,
   });
 
   const closeFooter = (
@@ -100,26 +92,6 @@ export function EditTaskDrawer({
       </Button>
     </div>
   );
-
-  if (!isLocalDataMode) {
-    return (
-      <Drawer
-        isOpen={isOpen}
-        onClose={onClose}
-        title="עריכת משימה"
-        isMaximized={isMaximized}
-        onToggleMaximize={toggleMaximize}
-        footer={closeFooter}
-      >
-        <div className="editTaskDrawer__body">
-          <p className="editTaskDrawer__notice">
-            עריכת משימות אינה זמינה במצב נתוני דמו. יש להפעיל את האפליקציה במצב חיבור לשרת
-            (VITE_APP_DATA_MODE=local) כדי לערוך ולשמור משימות.
-          </p>
-        </div>
-      </Drawer>
-    );
-  }
 
   if (workItemQuery.isError) {
     return (
@@ -197,25 +169,34 @@ function EditTaskForm({
   onSaved,
 }: EditTaskFormProps) {
   const queryClient = useQueryClient();
-  const initialStartParts = splitDateTime(initialValues.plannedStart);
-  const initialEndParts = splitDateTime(initialValues.plannedEnd);
+  const initialStartParts = splitUtcToLocal(initialValues.plannedStart);
+  const initialEndParts = splitUtcToLocal(initialValues.plannedEnd);
+  const isServiceCall =
+    workItem?.taskCategory === 'ServiceCall' || workItem?.workType === 'ServiceCall';
 
   const [title, setTitle] = useState(initialValues.title || '');
   const [description, setDescription] = useState(initialValues.description || '');
   const [plannedDate, setPlannedDate] = useState(initialStartParts.date || initialEndParts.date);
   const [plannedStart, setPlannedStart] = useState(initialStartParts.time);
   const [plannedEnd, setPlannedEnd] = useState(initialEndParts.time);
-  const [estimatedHours, setEstimatedHours] = useState(
-    initialValues.estimatedHours != null ? String(initialValues.estimatedHours) : '',
-  );
-  const [status, setStatus] = useState<string>(
-    normalizeWorkPlanStatusCode(initialValues.status) ?? WORKPLAN_STATUS_OPTIONS[0].code,
-  );
   const [priority, setPriority] = useState<string>(
     normalizeWorkPlanPriorityCode(initialValues.priority) ?? WORKPLAN_PRIORITY_OPTIONS[1].code,
   );
   const [requiredRole, setRequiredRole] = useState(initialValues.requiredRole || '');
   const [error, setError] = useState<string | null>(null);
+
+  const rolesQuery = useEmployeePrimaryRoles(isOpen);
+
+  const derivedDurationMinutes = useMemo(() => {
+    if (!plannedDate || !plannedStart || !plannedEnd) return null;
+    try {
+      const start = localPartsToUtcIso(plannedDate, plannedStart);
+      const end = localPartsToUtcIso(plannedDate, plannedEnd);
+      return durationMinutesBetweenUtc(start, end);
+    } catch {
+      return null;
+    }
+  }, [plannedDate, plannedStart, plannedEnd]);
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -224,34 +205,51 @@ function EditTaskForm({
       }
 
       if (!title.trim()) throw new Error('יש להזין כותרת משימה');
-      const plannedTimeRange = validatePlannedTimeRange(plannedDate, plannedStart, plannedEnd);
+      const plannedTimeRange = validatePlannedUtcRange(plannedDate, plannedStart, plannedEnd);
 
-      await updateWorkItemAsync(taskId, {
-        title: title.trim(),
-        description: description.trim() || null,
-        status,
-        billingType: workItem.billingType || 'Hourly',
-        workType: workItem.workType,
-        customerId: workItem.customerId,
-        siteId: workItem.siteId,
-        plannedStart: plannedTimeRange.plannedStart,
-        plannedEnd: plannedTimeRange.plannedEnd,
-        estimatedHours: estimatedHours ? Number(estimatedHours) : null,
-        priority: priority || null,
-        requiredRole: requiredRole || null,
-        isLocked: workItem.isLocked,
-        // Preserve fields the form does not edit; the backend update replaces
-        // every column, so omitting these would wipe them to NULL.
-        dealCloseDate: workItem.dealCloseDate ?? null,
-        financeProjectNumber: workItem.financeProjectNumber ?? null,
-        invoiceNumber: workItem.invoiceNumber ?? null,
-        actualStart: workItem.actualStart ?? null,
-        actualEnd: workItem.actualEnd ?? null,
-        actualHours: workItem.actualHours ?? null,
-      });
+      if (isServiceCall) {
+        await updateServiceCallAsync(taskId, {
+          title: title.trim(),
+          description: description.trim() || null,
+          billingType: workItem.billingType || 'Hourly',
+          customerId: workItem.customerId ?? 0,
+          siteId: workItem.siteId ?? 0,
+          priority: priority || null,
+          plannedStart: plannedTimeRange.plannedStart,
+          plannedEnd: plannedTimeRange.plannedEnd,
+          requiredRole: requiredRole || null,
+          isLocked: workItem.isLocked,
+        });
+      } else {
+        await updateWorkItemAsync(taskId, {
+          title: title.trim(),
+          description: description.trim() || null,
+          billingType: workItem.billingType || 'Hourly',
+          workType: workItem.workType,
+          taskCategory: workItem.taskCategory,
+          customerId: workItem.customerId,
+          siteId: workItem.siteId,
+          parentWorkItemId: workItem.parentWorkItemId,
+          milestoneId: workItem.milestoneId,
+          plannedStart: plannedTimeRange.plannedStart,
+          plannedEnd: plannedTimeRange.plannedEnd,
+          priority: priority || null,
+          requiredRole: requiredRole || null,
+          isLocked: workItem.isLocked,
+          dealCloseDate: workItem.dealCloseDate ?? null,
+          financeProjectNumber: workItem.financeProjectNumber ?? null,
+          invoiceNumber: workItem.invoiceNumber ?? null,
+          actualStart: workItem.actualStart ?? null,
+          actualEnd: workItem.actualEnd ?? null,
+          actualHours: workItem.actualHours ?? null,
+        });
+      }
     },
     onSuccess: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['workplan'] });
+      await invalidateWorkPlanQueries(queryClient, workItem?.parentWorkItemId);
+      if (isServiceCall) {
+        await queryClient.invalidateQueries({ queryKey: ['serviceCalls'] });
+      }
       onSaved?.();
       onClose();
     },
@@ -299,6 +297,11 @@ function EditTaskForm({
 
         <section className="editTaskDrawer__section">
           <h3 className="editTaskDrawer__sectionTitle">פרטי משימה</h3>
+          {workItem?.taskCategory && (
+            <p className="editTaskDrawer__hint">
+              סוג: {getTaskCategoryLabel(workItem.taskCategory)}
+            </p>
+          )}
           <Input
             label="כותרת משימה"
             value={title}
@@ -336,12 +339,9 @@ function EditTaskForm({
               onChange={(event) => setPlannedEnd(event.target.value)}
             />
             <Input
-              label="הערכת שעות"
-              type="number"
-              min="0"
-              step="0.5"
-              value={estimatedHours}
-              onChange={(event) => setEstimatedHours(event.target.value)}
+              label="סה״כ זמן (מחושב)"
+              value={formatDurationMinutes(derivedDurationMinutes)}
+              readOnly
             />
           </div>
         </section>
@@ -349,17 +349,6 @@ function EditTaskForm({
         <section className="editTaskDrawer__section">
           <h3 className="editTaskDrawer__sectionTitle">סיווג</h3>
           <div className="editTaskDrawer__grid">
-            <Select
-              label="סטטוס"
-              value={status}
-              onChange={(event) => setStatus(event.target.value)}
-            >
-              {WORKPLAN_STATUS_OPTIONS.map((option) => (
-                <option key={option.code} value={option.code}>
-                  {option.display}
-                </option>
-              ))}
-            </Select>
             <Select
               label="דחיפות"
               value={priority}
@@ -377,13 +366,18 @@ function EditTaskForm({
               onChange={(event) => setRequiredRole(event.target.value)}
             >
               <option value="">בחר תפקיד</option>
-              {ROLE_OPTIONS.map((option) => (
+              {(rolesQuery.data ?? []).map((option) => (
                 <option key={option} value={option}>
                   {option}
                 </option>
               ))}
             </Select>
           </div>
+          {rolesQuery.isError && (
+            <InlineAlert variant="danger">
+              טעינת תפקידים נכשלה. יש לפרוס את sp_Employees_GetDistinctPrimaryRoles בבסיס הנתונים.
+            </InlineAlert>
+          )}
         </section>
       </div>
     </Drawer>

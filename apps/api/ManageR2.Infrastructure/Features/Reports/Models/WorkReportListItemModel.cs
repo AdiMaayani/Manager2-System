@@ -11,4 +11,9 @@ public class WorkReportListItemModel
     public string? ReporterName { get; set; }
     public string? Status { get; set; }
     public bool FollowUpRequired { get; set; }
+    public string? LifecycleStatus { get; set; }
+    public DateTime? FinalizedAt { get; set; }
+    public DateTime? ReversedAt { get; set; }
+    public int? AmendsWorkReportId { get; set; }
+    public DateTime? UpdatedAt { get; set; }
 }

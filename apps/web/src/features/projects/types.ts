@@ -32,6 +32,8 @@ export interface ProjectLifecycleProject {
 
 export interface ProjectLifecycleMilestone {
   workItemId: number;
+  milestoneId?: number;
+  projectMilestoneId?: number;
   title: string;
   description?: string;
   status: string;
@@ -44,6 +46,8 @@ export interface ProjectLifecycleMilestone {
   priority?: string;
   requiredRole?: string;
   isLocked: boolean;
+  sortOrder?: number;
+  progressPercent?: number | null;
 }
 
 export interface ProjectLifecycleAssignment {
@@ -108,27 +112,24 @@ export interface ProjectMilestoneContractor {
 }
 
 export interface ProjectMilestone {
-  workItemId: number;
+  milestoneId?: number;
+  projectMilestoneId?: number;
+  workItemId?: number;
+  projectId?: number;
   title: string;
   description?: string;
-  workType: string;
   status: string;
-  billingType?: string;
-  customerId: number;
-  siteId?: number;
-  createdAt: string;
+  sortOrder?: number;
+  progressPercent?: number | null;
+  isActive?: boolean;
+  managerEmployeeId?: number;
+  managerEmployeeName?: string;
+  createdAt?: string;
+  updatedAt?: string | null;
   plannedStart?: string;
   plannedEnd?: string;
-  closedAt?: string;
-  priority?: string;
-  requiredRole?: string;
-  estimatedHours?: number;
   actualStart?: string;
   actualEnd?: string;
-  actualHours?: number;
-  isLocked: boolean;
-  employees: ProjectMilestoneEmployee[];
-  contractors: ProjectMilestoneContractor[];
 }
 
 export interface CreateProjectRequest {
@@ -174,23 +175,24 @@ export interface CreateMilestoneRequest {
   title: string;
   description?: string;
   status: string;
-  billingType: string;
-  customerId: number;
-  siteId: number;
+  managerEmployeeId: number;
   plannedStart?: string;
   plannedEnd?: string;
-  estimatedHours?: number;
-  actualStart?: string;
-  actualEnd?: string;
-  actualHours?: number;
-  priority?: string;
-  requiredRole?: string;
-  isLocked: boolean;
-  employees: CreateMilestoneEmployeeAssignment[];
-  contractors: CreateMilestoneContractorAssignment[];
+  sortOrder?: number;
 }
 
-export type UpdateMilestoneRequest = CreateMilestoneRequest;
+export interface UpdateMilestoneRequest {
+  title: string;
+  description?: string;
+  status: string;
+  managerEmployeeId?: number;
+  plannedStart?: string;
+  plannedEnd?: string;
+  actualStart?: string;
+  actualEnd?: string;
+  progressPercent?: number;
+  sortOrder?: number;
+}
 
 export interface Site {
   siteId: number;
@@ -355,18 +357,13 @@ export interface ProjectMilestoneForm {
   title: string;
   description: string;
   status: string;
-  billingType: string;
+  managerEmployeeId: number | null;
   plannedStart: string;
   plannedEnd: string;
-  estimatedHours: string;
   actualStart: string;
   actualEnd: string;
-  actualHours: string;
-  priority: string;
-  requiredRole: string;
-  isLocked: boolean;
-  employees: CreateMilestoneEmployeeAssignment[];
-  contractors: CreateMilestoneContractorAssignment[];
+  progressPercent: string;
+  sortOrder: number | null;
 }
 
 export interface ProjectTeamForm {

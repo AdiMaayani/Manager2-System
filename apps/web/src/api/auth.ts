@@ -1,7 +1,4 @@
-import { isMockDataMode } from '@/config/appConfig';
-
 const SESSION_TOKEN_KEY = 'manager2_token';
-const MOCK_TOKEN = 'mock-jwt-token';
 const SESSION_USER_KEY = 'manager2_user';
 const SESSION_RETURN_URL_KEY = 'manager2_return_url';
 const SESSION_EXPIRED_NOTICE_KEY = 'manager2_session_expired';
@@ -82,7 +79,6 @@ export function getRoleDisplayLabel(role?: string | null): string {
 }
 
 export function isTokenExpired(token: string): boolean {
-  if (isMockDataMode && token === MOCK_TOKEN) return false;
   if (!token) return true;
   try {
     const parts = token.split('.');

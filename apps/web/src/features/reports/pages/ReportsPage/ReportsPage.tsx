@@ -17,33 +17,62 @@ import { FilterBar, FilterField } from '@shared/components/FilterBar';
 import { SegmentedControl, type SegmentItem } from '@shared/components/SegmentedControl';
 import { DataTable, type DataTableColumn } from '@shared/components/DataTable';
 import {
+  canEditReportAttachments,
+  canEditReportInventory,
+} from '@shared/constants/reportLifecycle';
+import { useEmployeePrimaryRoles } from '@features/employees/hooks/useEmployeePrimaryRoles';
+import {
+  addReportInventoryLineAsync,
   createWorkReportAsync,
+  filterReportTargetsByType,
+  formatReportTargetLabel,
   getReportEmployeesAsync,
-  getReportProjectsAsync,
-  getReportServiceCallsAsync,
+  getReportTargetsAsync,
+  REPORT_TARGETS_QUERY_KEY,
+  REPORTS_INVALIDATION,
   updateWorkReportAsync,
+  uploadReportAttachmentAsync,
 } from '../../api/reportsApiClient';
 import { ReportDetailModal } from '../../components/ReportDetailModal';
-import { useReports } from '../../hooks/useReports';
+import {
+  ReportFormAttachmentsSection,
+  type PendingAttachment,
+} from '../../components/ReportFormAttachmentsSection';
+import {
+  ReportFormInventorySection,
+  type PendingInventoryLine,
+} from '../../components/ReportFormInventorySection';
+import { useReportDetail, useReports } from '../../hooks/useReports';
 import type {
   CreateWorkReportRequest,
-  ReportProjectOption,
+  WorkItemReportTarget,
   WorkReportDetails,
   WorkReportListItem,
 } from '../../types';
 import './ReportsPage.css';
 
 const QUICK_REPORT_KEY = 'manager2_quick_report_prefill';
-const SYSTEM_OPTIONS = ['חשמל חכם', 'בקרה', 'תקשורת', 'מולטימדיה', 'מצלמות ואבטחה'];
-const ROLE_OPTIONS = ['מתקין', 'מנהל פרויקט', 'טכנאי'];
 const LIST_STATUS_OPTIONS = ['הוגש', 'טיוטה'];
 const STATUS_FILTER_ITEMS: SegmentItem<string>[] = [
   { id: '', label: 'הכול' },
   ...LIST_STATUS_OPTIONS.map((status) => ({ id: status, label: status })),
 ];
 
+const REPORT_TARGET_TYPE_ITEMS: SegmentItem<ReportTypeValue>[] = [
+  { id: 'regular', label: 'דיווח למשימה רגילה' },
+  { id: 'project', label: 'דיווח למשימת פרויקט' },
+  { id: 'service_call', label: 'דיווח לקריאת שירות' },
+];
+
+const REPORT_TARGET_EMPTY_MESSAGES: Record<ReportTypeValue, string> = {
+  regular: 'אין משימות רגילות זמינות לדיווח.',
+  project: 'אין משימות פרויקט זמינות לדיווח.',
+  service_call: 'אין קריאות שירות זמינות לדיווח.',
+};
+
 type SubmitStatus = 'הוגש' | 'טיוטה';
 type ReportFormMode = 'create' | 'edit';
+type ReportTypeValue = 'regular' | 'project' | 'service_call';
 
 interface QuickReportPrefill {
   date?: string;
@@ -61,12 +90,12 @@ interface QuickReportPrefill {
 }
 
 interface ReportFormState {
-  reportType: 'project' | 'service_call';
+  reportTargetType: ReportTypeValue;
+  reportType: ReportTypeValue;
+  workItemId: string;
   date: string;
   projectId: string;
   customerName: string;
-  serviceCallId: string;
-  serviceCallTitle: string;
   site: string;
   start: string;
   end: string;
@@ -76,7 +105,6 @@ interface ReportFormState {
   notes: string;
   followup: boolean;
   followupReason: string;
-  systems: string[];
   relatedWorkerIds: string[];
 }
 
@@ -84,14 +112,45 @@ function todayYmd() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function taskCategoryToReportType(taskCategory: string): ReportTypeValue {
+  if (taskCategory === 'ServiceCall') return 'service_call';
+  if (taskCategory === 'Project') return 'project';
+  return 'regular';
+}
+
+function reportTypeFromDetails(report: WorkReportDetails): ReportTypeValue {
+  if (report.reportType === 'service_call') return 'service_call';
+  if (report.reportType === 'regular') return 'regular';
+  return 'project';
+}
+
+function resolveWorkItemIdFromReport(report: WorkReportDetails): string {
+  if (report.serviceCallId != null) return String(report.serviceCallId);
+  if (report.projectId != null) return String(report.projectId);
+  return '';
+}
+
 function createInitialFormState(prefill?: QuickReportPrefill | null): ReportFormState {
+  const workItemId =
+    prefill?.serviceCallId != null
+      ? String(prefill.serviceCallId)
+      : prefill?.projectId != null
+        ? String(prefill.projectId)
+        : '';
+
+  const reportTargetType: ReportTypeValue = prefill?.serviceCallId
+    ? 'service_call'
+    : prefill?.projectId
+      ? 'project'
+      : 'regular';
+
   return {
-    reportType: prefill?.serviceCallId ? 'service_call' : 'project',
+    reportTargetType,
+    reportType: reportTargetType,
+    workItemId,
     date: prefill?.date || todayYmd(),
-    projectId: prefill?.projectId != null ? String(prefill.projectId) : '',
+    projectId: '',
     customerName: prefill?.customerName || '',
-    serviceCallId: prefill?.serviceCallId != null ? String(prefill.serviceCallId) : '',
-    serviceCallTitle: prefill?.serviceCallTitle || '',
     site: prefill?.site || '',
     start: prefill?.start || '',
     end: prefill?.end || '',
@@ -101,19 +160,19 @@ function createInitialFormState(prefill?: QuickReportPrefill | null): ReportForm
     notes: '',
     followup: false,
     followupReason: '',
-    systems: [],
     relatedWorkerIds: [],
   };
 }
 
 function createFormStateFromReport(report: WorkReportDetails): ReportFormState {
+  const reportType = reportTypeFromDetails(report);
   return {
-    reportType: report.reportType === 'service_call' ? 'service_call' : 'project',
+    reportTargetType: reportType,
+    reportType,
+    workItemId: resolveWorkItemIdFromReport(report),
     date: formatReportDate(report.reportDate) || todayYmd(),
-    projectId: report.projectId != null ? String(report.projectId) : '',
+    projectId: '',
     customerName: report.customerName || '',
-    serviceCallId: report.serviceCallId != null ? String(report.serviceCallId) : '',
-    serviceCallTitle: report.serviceCallTitle || '',
     site: report.site || '',
     start: report.start || '',
     end: report.end || '',
@@ -123,7 +182,6 @@ function createFormStateFromReport(report: WorkReportDetails): ReportFormState {
     notes: report.notes || '',
     followup: report.followUpRequired ?? false,
     followupReason: report.followUpReason || '',
-    systems: report.systems,
     relatedWorkerIds: report.relatedWorkers
       .map((worker) => (worker.id != null ? String(worker.id) : ''))
       .filter(Boolean),
@@ -139,27 +197,44 @@ function parseNullableInt(value: string): number | null {
 
 function enrichQuickReportPrefill(
   prefill: QuickReportPrefill,
-  projects: ReportProjectOption[],
+  targets: WorkItemReportTarget[],
 ): QuickReportPrefill {
-  if (prefill.projectId == null) return prefill;
+  const workItemId = prefill.serviceCallId ?? prefill.projectId;
+  if (workItemId == null) return prefill;
 
-  const project = projects.find(
-    (row) => String(row.workItemId) === String(prefill.projectId),
-  );
-
-  if (!project) return prefill;
+  const target = targets.find((row) => String(row.workItemId) === String(workItemId));
+  if (!target) return prefill;
 
   return {
     ...prefill,
-    projectName: prefill.projectName || project.title,
-    customerName: project.customerName || prefill.customerName || '',
-    site: project.siteName || prefill.site || '',
+    projectName: prefill.projectName || target.title,
   };
 }
 
 function formatReportDate(value?: string | null) {
   if (!value) return '';
   return value.split('T')[0];
+}
+
+function applyTargetToForm(
+  target: WorkItemReportTarget | null,
+  reportTargetType: ReportTypeValue,
+): Partial<ReportFormState> {
+  if (!target) {
+    return {
+      workItemId: '',
+      reportType: reportTargetType,
+      projectId: '',
+    };
+  }
+
+  const reportType = taskCategoryToReportType(target.taskCategory);
+  return {
+    workItemId: String(target.workItemId),
+    reportType,
+    projectId:
+      reportType === 'project' && target.projectId != null ? String(target.projectId) : '',
+  };
 }
 
 export function ReportsPage() {
@@ -173,52 +248,70 @@ export function ReportsPage() {
   const [formMode, setFormMode] = useState<ReportFormMode>('create');
   const [editingReportId, setEditingReportId] = useState<number | null>(null);
   const [form, setForm] = useState<ReportFormState>(() => createInitialFormState());
+  const [pendingInventoryLines, setPendingInventoryLines] = useState<PendingInventoryLine[]>([]);
+  const [pendingAttachments, setPendingAttachments] = useState<PendingAttachment[]>([]);
   const [formError, setFormError] = useState<string | null>(null);
   const [pageMessage, setPageMessage] = useState<string | null>(null);
   const [workerToAddId, setWorkerToAddId] = useState('');
+  const [targetSearchQuery, setTargetSearchQuery] = useState('');
 
-  // List filter state
   const [filterSearch, setFilterSearch] = useState('');
   const [filterCustomer, setFilterCustomer] = useState('');
   const [filterStatus, setFilterStatus] = useState('');
 
-  const { data: projects = [] } = useQuery({
-    queryKey: ['reports', 'projects'],
-    queryFn: getReportProjectsAsync,
-  });
-
-  const { data: serviceCalls = [] } = useQuery({
-    queryKey: ['reports', 'serviceCalls'],
-    queryFn: getReportServiceCallsAsync,
+  const reportTargetsQuery = useQuery({
+    queryKey: REPORT_TARGETS_QUERY_KEY,
+    queryFn: getReportTargetsAsync,
+    enabled: isCreateOpen,
+    retry: false,
   });
 
   const { data: employees = [] } = useQuery({
     queryKey: ['reports', 'employees'],
     queryFn: getReportEmployeesAsync,
+    enabled: isCreateOpen,
   });
 
-  const selectedProject = useMemo(
-    () => projects.find((project) => String(project.workItemId) === form.projectId) ?? null,
-    [form.projectId, projects],
+  const primaryRolesQuery = useEmployeePrimaryRoles(isCreateOpen);
+
+  const editReportQuery = useReportDetail(
+    editingReportId,
+    isCreateOpen && formMode === 'edit',
   );
 
-  const selectedServiceCall = useMemo(
-    () =>
-      serviceCalls.find((serviceCall) => String(serviceCall.workItemId) === form.serviceCallId) ??
-      null,
-    [form.serviceCallId, serviceCalls],
-  );
+  const editingReport = editReportQuery.data;
+  const reportTargets = reportTargetsQuery.data;
+  const primaryRoles = primaryRolesQuery.data ?? [];
+
+  const targetsForSelectedType = useMemo(() => {
+    if (!reportTargets) return [];
+    return filterReportTargetsByType(reportTargets, form.reportTargetType);
+  }, [form.reportTargetType, reportTargets]);
+
+  const visibleTargets = useMemo(() => {
+    const query = targetSearchQuery.trim().toLowerCase();
+    if (!query) return targetsForSelectedType;
+    return targetsForSelectedType.filter((target) =>
+      formatReportTargetLabel(target).toLowerCase().includes(query),
+    );
+  }, [targetSearchQuery, targetsForSelectedType]);
+
+  const selectedTarget = useMemo(() => {
+    if (!reportTargets || !form.workItemId) return null;
+    return (
+      reportTargets.find((target) => String(target.workItemId) === form.workItemId) ?? null
+    );
+  }, [form.workItemId, reportTargets]);
 
   const selectedReporter = useMemo(
     () => employees.find((employee) => String(employee.employeeId) === form.reporterId) ?? null,
     [employees, form.reporterId],
   );
 
-  // Available workers for "related workers" section = active employees excluding the reporter
   const availableRelatedWorkers = useMemo(
     () =>
       employees.filter(
-        (e) => e.isActive !== false && String(e.employeeId) !== form.reporterId,
+        (employee) => employee.isActive !== false && String(employee.employeeId) !== form.reporterId,
       ),
     [employees, form.reporterId],
   );
@@ -226,36 +319,42 @@ export function ReportsPage() {
   const selectedRelatedWorkers = useMemo(
     () =>
       form.relatedWorkerIds
-        .map((id) => employees.find((e) => String(e.employeeId) === id))
-        .filter((e): e is NonNullable<typeof e> => e != null),
+        .map((id) => employees.find((employee) => String(employee.employeeId) === id))
+        .filter((employee): employee is NonNullable<typeof employee> => employee != null),
     [form.relatedWorkerIds, employees],
   );
 
-  // Distinct customer names present in the loaded reports (client-side filter source)
+  const canEditInventory = formMode === 'create'
+    ? true
+    : canEditReportInventory(editingReport?.lifecycleStatus);
+
+  const canEditAttachments = formMode === 'create'
+    ? true
+    : canEditReportAttachments(editingReport?.lifecycleStatus);
+
   const customerOptions = useMemo(() => {
     if (!reports) return [];
     const names = new Set<string>();
-    reports.forEach((r) => {
-      if (r.customerName) names.add(r.customerName);
+    reports.forEach((report) => {
+      if (report.customerName) names.add(report.customerName);
     });
     return Array.from(names).sort((a, b) => a.localeCompare(b, 'he'));
   }, [reports]);
 
-  // Filtered reports list — all filters are client-side, no new API calls
   const filteredReports = useMemo(() => {
     if (!reports) return [];
-    return reports.filter((r) => {
+    return reports.filter((report) => {
       if (filterSearch) {
-        const q = filterSearch.toLowerCase();
+        const query = filterSearch.toLowerCase();
         const matchesSearch =
-          (r.projectTitle ?? '').toLowerCase().includes(q) ||
-          (r.reportedByName ?? '').toLowerCase().includes(q) ||
-          (r.customerName ?? '').toLowerCase().includes(q) ||
-          String(r.reportId).includes(q);
+          (report.projectTitle ?? '').toLowerCase().includes(query) ||
+          (report.reportedByName ?? '').toLowerCase().includes(query) ||
+          (report.customerName ?? '').toLowerCase().includes(query) ||
+          String(report.reportId).includes(query);
         if (!matchesSearch) return false;
       }
-      if (filterCustomer && (r.customerName ?? '') !== filterCustomer) return false;
-      if (filterStatus && r.status !== filterStatus) return false;
+      if (filterCustomer && (report.customerName ?? '') !== filterCustomer) return false;
+      if (filterStatus && report.status !== filterStatus) return false;
       return true;
     });
   }, [reports, filterSearch, filterCustomer, filterStatus]);
@@ -277,11 +376,22 @@ export function ReportsPage() {
 
     try {
       const prefill = JSON.parse(rawPrefill) as QuickReportPrefill;
-      if (prefill.projectId != null && projects.length === 0) return;
-      const enrichedPrefill = enrichQuickReportPrefill(prefill, projects);
+      const workItemId = prefill.serviceCallId ?? prefill.projectId;
+      if (workItemId != null && reportTargets == null) return;
+
+      const enrichedPrefill = enrichQuickReportPrefill(prefill, reportTargets ?? []);
+      const initial = createInitialFormState(enrichedPrefill);
+      const target =
+        reportTargets?.find((row) => String(row.workItemId) === initial.workItemId) ?? null;
 
       window.setTimeout(() => {
-        setForm(createInitialFormState(enrichedPrefill));
+        setForm({
+          ...initial,
+          ...applyTargetToForm(target, initial.reportTargetType),
+        });
+        setTargetSearchQuery('');
+        setPendingInventoryLines([]);
+        setPendingAttachments([]);
         setFormMode('create');
         setEditingReportId(null);
         setIsCreateOpen(true);
@@ -291,14 +401,21 @@ export function ReportsPage() {
     } catch {
       sessionStorage.removeItem(QUICK_REPORT_KEY);
     }
-  }, [navigate, projects, searchParams]);
+  }, [navigate, reportTargets, searchParams]);
 
-  function openCreateModal() {
+  function resetFormState() {
     setForm(createInitialFormState());
+    setTargetSearchQuery('');
+    setPendingInventoryLines([]);
+    setPendingAttachments([]);
     setFormMode('create');
     setEditingReportId(null);
     setWorkerToAddId('');
     setFormError(null);
+  }
+
+  function openCreateModal() {
+    resetFormState();
     setPageMessage(null);
     setIsCreateOpen(true);
   }
@@ -312,6 +429,9 @@ export function ReportsPage() {
   function openEditModal(report: WorkReportDetails) {
     setSelectedReportId(null);
     setForm(createFormStateFromReport(report));
+    setTargetSearchQuery('');
+    setPendingInventoryLines([]);
+    setPendingAttachments([]);
     setFormMode('edit');
     setEditingReportId(report.reportId);
     setWorkerToAddId('');
@@ -324,33 +444,22 @@ export function ReportsPage() {
     setForm((current) => ({ ...current, ...patch }));
   }
 
-  function handleProjectChange(projectId: string) {
-    const project = projects.find((row) => String(row.workItemId) === projectId);
+  function handleReportTargetTypeChange(reportTargetType: ReportTypeValue) {
+    setTargetSearchQuery('');
     updateForm({
-      projectId,
-      customerName: project?.customerName || '',
-      site: project?.siteName || form.site,
+      reportTargetType,
+      reportType: reportTargetType,
+      workItemId: '',
+      projectId: '',
+      customerName: '',
+      site: '',
     });
   }
 
-  function handleServiceCallChange(serviceCallId: string) {
-    const serviceCall = serviceCalls.find((row) => String(row.workItemId) === serviceCallId);
-    updateForm({
-      serviceCallId,
-      serviceCallTitle: serviceCall?.title || '',
-      projectId: serviceCallId,
-      customerName: serviceCall?.customerName || '',
-      site: serviceCall?.siteName || '',
-    });
-  }
-
-  function toggleSystem(system: string) {
-    setForm((current) => ({
-      ...current,
-      systems: current.systems.includes(system)
-        ? current.systems.filter((item) => item !== system)
-        : [...current.systems, system],
-    }));
+  function handleTargetChange(workItemId: string) {
+    const target =
+      reportTargets?.find((row) => String(row.workItemId) === workItemId) ?? null;
+    updateForm(applyTargetToForm(target, form.reportTargetType));
   }
 
   function handleAddRelatedWorker() {
@@ -365,45 +474,44 @@ export function ReportsPage() {
     });
   }
 
+  async function invalidateEditingReportDetail() {
+    if (editingReportId == null) return;
+    await queryClient.invalidateQueries({
+      queryKey: REPORTS_INVALIDATION.detail(editingReportId),
+    });
+  }
+
   const saveReport = useMutation({
     mutationFn: async (submitStatus: SubmitStatus) => {
       const isDraft = submitStatus === 'טיוטה';
+      const workItemId = parseNullableInt(form.workItemId);
 
       if (!form.date) throw new Error('יש להזין תאריך דיווח');
       if (!isDraft) {
-        if (form.reportType === 'project' && !form.projectId) throw new Error('יש לבחור פרויקט');
-        if (form.reportType === 'service_call' && !form.serviceCallId) {
-          throw new Error('יש לבחור קריאת שירות');
-        }
+        if (!workItemId) throw new Error('יש לבחור משימה או קריאת שירות');
         if (!form.reporterId) throw new Error('יש לבחור מדווח');
         if (!form.start || !form.end) throw new Error('יש להזין שעות עבודה');
         if (!form.summary.trim()) throw new Error('יש להזין סיכום עבודה');
       }
 
-      const linkedWorkItemId =
-        form.reportType === 'service_call'
-          ? parseNullableInt(form.serviceCallId)
-          : parseNullableInt(form.projectId);
+      const parentProjectId =
+        form.reportType === 'project'
+          ? parseNullableInt(form.projectId) ?? selectedTarget?.projectId ?? null
+          : null;
 
       const payload: CreateWorkReportRequest = {
         reportType: form.reportType,
         date: form.date,
-        // Backend currently names this ProjectId, but it is the WorkReports.WorkItemId link.
-        projectId: linkedWorkItemId,
+        workItemId,
+        projectId: form.reportType === 'regular' ? null : parentProjectId,
         projectName:
           form.reportType === 'service_call'
-            ? selectedServiceCall?.title || form.serviceCallTitle || null
-            : selectedProject?.title || null,
-        customerName:
-          form.customerName ||
-          selectedServiceCall?.customerName ||
-          selectedProject?.customerName ||
-          null,
-        serviceCallId: form.reportType === 'service_call' ? linkedWorkItemId : null,
+            ? null
+            : selectedTarget?.title || null,
+        customerName: form.customerName || null,
+        serviceCallId: form.reportType === 'service_call' ? workItemId : null,
         serviceCallTitle:
-          form.reportType === 'service_call'
-            ? selectedServiceCall?.title || form.serviceCallTitle || null
-            : null,
+          form.reportType === 'service_call' ? selectedTarget?.title || null : null,
         site: form.site || null,
         start: form.start || null,
         end: form.end || null,
@@ -413,10 +521,10 @@ export function ReportsPage() {
         reporterName: selectedReporter?.fullName || null,
         role: form.role || selectedReporter?.primaryRole || null,
         status: submitStatus,
-        systems: form.systems,
+        systems: [],
         relatedWorkers: form.relatedWorkerIds.map((id) => {
-          const emp = employees.find((e) => String(e.employeeId) === id);
-          return { id: emp?.employeeId ?? null, name: emp?.fullName ?? null };
+          const employee = employees.find((row) => String(row.employeeId) === id);
+          return { id: employee?.employeeId ?? null, name: employee?.fullName ?? null };
         }),
         followup: form.followup,
         followupReason: form.followup ? form.followupReason || null : null,
@@ -427,16 +535,26 @@ export function ReportsPage() {
         return updateWorkReportAsync(editingReportId, payload);
       }
 
-      return createWorkReportAsync(payload);
+      const created = await createWorkReportAsync(payload);
+
+      for (const line of pendingInventoryLines) {
+        await addReportInventoryLineAsync(created.workReportId, {
+          inventoryItemId: line.inventoryItemId,
+          quantity: line.quantity,
+          usageType: line.usageType,
+        });
+      }
+
+      for (const attachment of pendingAttachments) {
+        await uploadReportAttachmentAsync(created.workReportId, attachment.file);
+      }
+
+      return created;
     },
     onSuccess: async () => {
       setIsCreateOpen(false);
       setIsFormMaximized(false);
-      setForm(createInitialFormState());
-      setFormMode('create');
-      setEditingReportId(null);
-      setWorkerToAddId('');
-      setFormError(null);
+      resetFormState();
       setPageMessage(formMode === 'edit' ? 'הדיווח עודכן בהצלחה.' : 'הדיווח נשמר בהצלחה.');
       await queryClient.invalidateQueries({ queryKey: ['reports'] });
     },
@@ -455,17 +573,19 @@ export function ReportsPage() {
   }
 
   const reportColumns: DataTableColumn<WorkReportListItem>[] = [
-    { id: 'date', header: 'תאריך', cell: (r) => formatReportDate(r.reportDate) || '—' },
-    { id: 'number', header: 'מס׳ דיווח', cell: (r) => `#${r.reportId}` },
-    { id: 'project', header: 'פרויקט', cell: (r) => r.projectTitle ?? '—' },
-    { id: 'customer', header: 'לקוח', cell: (r) => r.customerName ?? '—' },
-    { id: 'reporter', header: 'מדווח', cell: (r) => r.reportedByName ?? '—' },
+    { id: 'date', header: 'תאריך', cell: (report) => formatReportDate(report.reportDate) || '—' },
+    { id: 'number', header: 'מס׳ דיווח', cell: (report) => `#${report.reportId}` },
+    { id: 'project', header: 'פרויקט', cell: (report) => report.projectTitle ?? '—' },
+    { id: 'customer', header: 'לקוח', cell: (report) => report.customerName ?? '—' },
+    { id: 'reporter', header: 'מדווח', cell: (report) => report.reportedByName ?? '—' },
     {
       id: 'status',
       header: 'סטטוס',
-      cell: (r) => <StatusBadge domain="report" status={r.status} />,
+      cell: (report) => <StatusBadge domain="report" status={report.status} />,
     },
   ];
+
+  const legacySystems = editingReport?.systems ?? [];
 
   return (
     <PageShell title="דיווחים">
@@ -494,7 +614,7 @@ export function ReportsPage() {
             type="search"
             placeholder="פרויקט, לקוח, מדווח או מס׳ דיווח"
             value={filterSearch}
-            onChange={(e) => setFilterSearch(e.target.value)}
+            onChange={(event) => setFilterSearch(event.target.value)}
           />
         </FilterField>
         <FilterField label="סטטוס">
@@ -507,7 +627,7 @@ export function ReportsPage() {
           />
         </FilterField>
         <FilterField label="לקוח">
-          <Select value={filterCustomer} onChange={(e) => setFilterCustomer(e.target.value)}>
+          <Select value={filterCustomer} onChange={(event) => setFilterCustomer(event.target.value)}>
             <option value="">הכל</option>
             {customerOptions.map((name) => (
               <option key={name} value={name}>
@@ -521,8 +641,8 @@ export function ReportsPage() {
       <DataTable
         columns={reportColumns}
         rows={filteredReports}
-        getRowId={(r) => r.reportId}
-        onRowClick={(r) => setSelectedReportId(r.reportId)}
+        getRowId={(report) => report.reportId}
+        onRowClick={(report) => setSelectedReportId(report.reportId)}
         selectedRowId={selectedReportId}
         emptyTitle={reports?.length ? 'לא נמצאו דיווחים לפי הסינון הנוכחי' : 'אין דיווחים'}
       />
@@ -534,274 +654,320 @@ export function ReportsPage() {
         isMaximized={isFormMaximized}
         onToggleMaximize={() => setIsFormMaximized((value) => !value)}
       >
-        <form
-          className="reportsPage__form"
-          onSubmit={(event) => {
-            event.preventDefault();
-            saveReport.mutate('הוגש');
-          }}
-        >
-          <section className="reportsPage__formSection">
-            <h3>פרטי דיווח</h3>
-            <div className="reportsPage__typeOptions" role="group" aria-label="סוג דיווח">
-              <label>
-                <input
-                  type="radio"
-                  name="report-type"
-                  checked={form.reportType === 'project'}
-                  onChange={() =>
-                    updateForm({
-                      reportType: 'project',
-                      serviceCallId: '',
-                      serviceCallTitle: '',
-                      customerName: selectedProject?.customerName || '',
-                      site: selectedProject?.siteName || '',
-                    })
-                  }
-                />
-                <span>פרויקט</span>
-              </label>
-              <label>
-                <input
-                  type="radio"
-                  name="report-type"
-                  checked={form.reportType === 'service_call'}
-                  onChange={() =>
-                    updateForm({
-                      reportType: 'service_call',
-                      projectId: '',
-                      customerName: '',
-                      site: '',
-                    })
-                  }
-                />
-                <span>קריאת שירות</span>
-              </label>
-            </div>
+        {formMode === 'edit' && editReportQuery.isLoading && <PageSpinner />}
+        {formMode === 'edit' && editReportQuery.error && (
+          <ErrorState
+            message={
+              editReportQuery.error instanceof Error
+                ? editReportQuery.error.message
+                : 'טעינת הדיווח נכשלה'
+            }
+            onRetry={() => void editReportQuery.refetch()}
+          />
+        )}
 
-            <div className="reportsPage__grid">
-              <Input
-                label="תאריך"
-                type="date"
-                value={form.date}
-                onChange={(event) => updateForm({ date: event.target.value })}
-                required
-              />
+        {(formMode === 'create' || (!editReportQuery.isLoading && !editReportQuery.error)) && (
+          <form
+            className="reportsPage__form"
+            onSubmit={(event) => {
+              event.preventDefault();
+              saveReport.mutate('הוגש');
+            }}
+          >
+            <section className="reportsPage__formSection">
+              <h3>פרטי דיווח</h3>
 
-              {form.reportType === 'project' ? (
-                <Select
-                  label="פרויקט"
-                  value={form.projectId}
-                  onChange={(event) => handleProjectChange(event.target.value)}
-                  required
-                >
-                  <option value="">בחר פרויקט</option>
-                  {projects.map((project) => (
-                    <option key={project.workItemId} value={project.workItemId}>
-                      {project.title}
-                    </option>
-                  ))}
-                </Select>
-              ) : (
-                <Select
-                  label="קריאת שירות"
-                  value={form.serviceCallId}
-                  onChange={(event) => handleServiceCallChange(event.target.value)}
-                  required
-                >
-                  <option value="">בחר קריאת שירות</option>
-                  {serviceCalls.map((serviceCall) => (
-                    <option key={serviceCall.workItemId} value={serviceCall.workItemId}>
-                      {serviceCall.title}
-                    </option>
-                  ))}
-                </Select>
+              {reportTargetsQuery.isLoading && <PageSpinner />}
+              {reportTargetsQuery.error && (
+                <ErrorState
+                  message={
+                    reportTargetsQuery.error instanceof Error
+                      ? reportTargetsQuery.error.message
+                      : 'טעינת יעדי דיווח נכשלה'
+                  }
+                  onRetry={() => void reportTargetsQuery.refetch()}
+                />
               )}
 
-              <Input
-                label="לקוח"
-                value={form.customerName}
-                onChange={(event) => updateForm({ customerName: event.target.value })}
-              />
-              <Input
-                label="אתר / מיקום עבודה"
-                value={form.site}
-                onChange={(event) => updateForm({ site: event.target.value })}
-              />
-              <Input
-                label="שעת התחלה"
-                type="time"
-                value={form.start}
-                onChange={(event) => updateForm({ start: event.target.value })}
-                required
-              />
-              <Input
-                label="שעת סיום"
-                type="time"
-                value={form.end}
-                onChange={(event) => updateForm({ end: event.target.value })}
-                required
-              />
-              <Select
-                label="מדווח"
-                value={form.reporterId}
-                onChange={(event) => {
-                  const employee = employees.find(
-                    (row) => String(row.employeeId) === event.target.value,
-                  );
-                  updateForm({
-                    reporterId: event.target.value,
-                    role: employee?.primaryRole || form.role,
-                  });
-                }}
-                required
-              >
-                <option value="">בחר מדווח</option>
-                {employees
-                  .filter((employee) => employee.isActive !== false)
-                  .map((employee) => (
-                    <option key={employee.employeeId} value={employee.employeeId}>
-                      {employee.fullName}
-                    </option>
-                  ))}
-              </Select>
-              <Select
-                label="תפקיד"
-                value={form.role}
-                onChange={(event) => updateForm({ role: event.target.value })}
-              >
-                <option value="">בחר תפקיד</option>
-                {ROLE_OPTIONS.map((opt) => (
-                  <option key={opt} value={opt}>
-                    {opt}
-                  </option>
-                ))}
-              </Select>
-            </div>
-          </section>
+              {!reportTargetsQuery.isLoading && !reportTargetsQuery.error && (
+                <div className="reportsPage__targetSelection">
+                  <div className="reportsPage__targetType">
+                    <span className="reportsPage__targetTypeLabel">סוג דיווח</span>
+                    <SegmentedControl
+                      items={REPORT_TARGET_TYPE_ITEMS}
+                      value={form.reportTargetType}
+                      onChange={handleReportTargetTypeChange}
+                      ariaLabel="סוג יעד דיווח"
+                    />
+                  </div>
 
-          <section className="reportsPage__formSection">
-            <h3>סיכום עבודה</h3>
-            <Textarea
-              label="סיכום"
-              rows={4}
-              value={form.summary}
-              onChange={(event) => updateForm({ summary: event.target.value })}
-              required
-            />
-          </section>
+                  {targetsForSelectedType.length === 0 ? (
+                    <InlineAlert variant="warning">
+                      {REPORT_TARGET_EMPTY_MESSAGES[form.reportTargetType]}
+                    </InlineAlert>
+                  ) : (
+                    <div className="reportsPage__targetSelect">
+                      <Input
+                        type="search"
+                        label="חיפוש יעד"
+                        placeholder="חפש לפי שם משימה או הקשר"
+                        value={targetSearchQuery}
+                        onChange={(event) => setTargetSearchQuery(event.target.value)}
+                      />
+                      <Select
+                        label={
+                          form.reportTargetType === 'regular'
+                            ? 'משימה רגילה'
+                            : form.reportTargetType === 'project'
+                              ? 'משימת פרויקט'
+                              : 'קריאת שירות'
+                        }
+                        value={form.workItemId}
+                        onChange={(event) => handleTargetChange(event.target.value)}
+                        required
+                      >
+                        <option value="">בחר יעד דיווח</option>
+                        {visibleTargets.map((target) => (
+                          <option key={target.workItemId} value={target.workItemId}>
+                            {formatReportTargetLabel(target)}
+                          </option>
+                        ))}
+                      </Select>
+                      {targetSearchQuery.trim() && visibleTargets.length === 0 && (
+                        <InlineAlert variant="warning">
+                          לא נמצאו יעדים התואמים לחיפוש הנוכחי.
+                        </InlineAlert>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
-          <section className="reportsPage__formSection">
-            <h3>מערכות שבוצעו</h3>
-            <div className="reportsPage__chips">
-              {SYSTEM_OPTIONS.map((system) => (
-                <button
-                  key={system}
-                  type="button"
-                  className={`reportsPage__chip ${
-                    form.systems.includes(system) ? 'reportsPage__chip--selected' : ''
-                  }`}
-                  onClick={() => toggleSystem(system)}
+              <div className="reportsPage__grid">
+                <Input
+                  label="תאריך"
+                  type="date"
+                  value={form.date}
+                  onChange={(event) => updateForm({ date: event.target.value })}
+                  required
+                />
+                <Input
+                  label="לקוח"
+                  value={form.customerName}
+                  onChange={(event) => updateForm({ customerName: event.target.value })}
+                />
+                <Input
+                  label="אתר / מיקום עבודה"
+                  value={form.site}
+                  onChange={(event) => updateForm({ site: event.target.value })}
+                />
+                <Input
+                  label="שעת התחלה"
+                  type="time"
+                  value={form.start}
+                  onChange={(event) => updateForm({ start: event.target.value })}
+                  required
+                />
+                <Input
+                  label="שעת סיום"
+                  type="time"
+                  value={form.end}
+                  onChange={(event) => updateForm({ end: event.target.value })}
+                  required
+                />
+                <Select
+                  label="מדווח"
+                  value={form.reporterId}
+                  onChange={(event) => {
+                    const employee = employees.find(
+                      (row) => String(row.employeeId) === event.target.value,
+                    );
+                    updateForm({
+                      reporterId: event.target.value,
+                      role: employee?.primaryRole || form.role,
+                    });
+                  }}
+                  required
                 >
-                  {system}
-                </button>
-              ))}
-            </div>
-          </section>
-
-          <section className="reportsPage__formSection">
-            <h3>עובדים קשורים</h3>
-            <div className="reportsPage__workerAdd">
-              <Select
-                className="reportsPage__workerSelect"
-                value={workerToAddId}
-                onChange={(e) => setWorkerToAddId(e.target.value)}
-                aria-label="בחר עובד להוספה"
-              >
-                <option value="">בחר עובד</option>
-                {availableRelatedWorkers
-                  .filter((e) => !form.relatedWorkerIds.includes(String(e.employeeId)))
-                  .map((e) => (
-                    <option key={e.employeeId} value={String(e.employeeId)}>
-                      {e.fullName}
+                  <option value="">בחר מדווח</option>
+                  {employees
+                    .filter((employee) => employee.isActive !== false)
+                    .map((employee) => (
+                      <option key={employee.employeeId} value={employee.employeeId}>
+                        {employee.fullName}
+                      </option>
+                    ))}
+                </Select>
+                <Select
+                  label="תפקיד"
+                  value={form.role}
+                  onChange={(event) => updateForm({ role: event.target.value })}
+                  disabled={primaryRolesQuery.isLoading || primaryRolesQuery.isError}
+                >
+                  <option value="">
+                    {primaryRolesQuery.isLoading
+                      ? 'טוען תפקידים…'
+                      : primaryRolesQuery.isError
+                        ? 'טעינת תפקידים נכשלה'
+                        : 'בחר תפקיד'}
+                  </option>
+                  {primaryRolesQuery.isError && (
+                    <option value="" disabled>
+                      יש לפרוס את sp_Employees_GetDistinctPrimaryRoles
+                    </option>
+                  )}
+                  {primaryRoles.map((role) => (
+                    <option key={role} value={role}>
+                      {role}
                     </option>
                   ))}
-              </Select>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={handleAddRelatedWorker}
-                disabled={!workerToAddId}
-              >
-                הוסף
-              </Button>
-            </div>
-            {selectedRelatedWorkers.length > 0 && (
-              <div className="reportsPage__workerChips">
-                {selectedRelatedWorkers.map((emp) => (
-                  <span key={emp.employeeId} className="reportsPage__workerChip">
-                    {emp.fullName}
-                    <button
-                      type="button"
-                      className="reportsPage__workerChipRemove"
-                      onClick={() => handleRemoveRelatedWorker(String(emp.employeeId))}
-                      aria-label={`הסר ${emp.fullName}`}
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
+                </Select>
+                {primaryRolesQuery.isError && (
+                  <InlineAlert variant="danger">
+                    {primaryRolesQuery.error instanceof Error
+                      ? primaryRolesQuery.error.message
+                      : 'טעינת תפקידים נכשלה. יש לפרוס את sp_Employees_GetDistinctPrimaryRoles בבסיס הנתונים.'}
+                  </InlineAlert>
+                )}
               </div>
-            )}
-          </section>
+            </section>
 
-          <section className="reportsPage__formSection">
-            <h3>הערות</h3>
-            <Textarea
-              label="הערות נוספות"
-              rows={3}
-              value={form.notes}
-              onChange={(event) => updateForm({ notes: event.target.value })}
-            />
-            <Checkbox
-              label="דורש ביקור חוזר"
-              checked={form.followup}
-              onChange={(event) => updateForm({ followup: event.target.checked })}
-            />
-            {form.followup && (
-              <Input
-                label="סיבת ביקור חוזר"
-                value={form.followupReason}
-                onChange={(event) => updateForm({ followupReason: event.target.value })}
+            <section className="reportsPage__formSection">
+              <h3>סיכום עבודה</h3>
+              <Textarea
+                label="סיכום"
+                rows={4}
+                value={form.summary}
+                onChange={(event) => updateForm({ summary: event.target.value })}
+                required
               />
-            )}
-          </section>
+            </section>
 
-          <div className="reportsPage__formFooter">
-            {formError && <InlineAlert variant="danger">{formError}</InlineAlert>}
-            <div className="reportsPage__actions">
-              <Button type="submit" isLoading={saveReport.isPending}>
-                {formMode === 'edit' ? 'שמור שינויים' : 'שלח דיווח'}
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => saveReport.mutate('טיוטה')}
-                disabled={saveReport.isPending}
-              >
-                שמור טיוטה
-              </Button>
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={closeCreateModal}
-                disabled={saveReport.isPending}
-              >
-                ביטול
-              </Button>
+            <ReportFormInventorySection
+              canEdit={canEditInventory}
+              reportId={formMode === 'edit' ? editingReportId : null}
+              pendingLines={pendingInventoryLines}
+              onPendingLinesChange={setPendingInventoryLines}
+              savedLines={editingReport?.inventoryLines}
+              onSavedLinesChange={() => void invalidateEditingReportDetail()}
+            />
+
+            {formMode === 'edit' && legacySystems.length > 0 && (
+              <section className="reportsPage__formSection">
+                <h3>מערכות (legacy)</h3>
+                <div className="reportsPage__chips">
+                  {legacySystems.map((system) => (
+                    <span key={system} className="reportsPage__chip reportsPage__chip--selected">
+                      {system}
+                    </span>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            <ReportFormAttachmentsSection
+              canEdit={canEditAttachments}
+              reportId={formMode === 'edit' ? editingReportId : null}
+              pendingAttachments={pendingAttachments}
+              onPendingAttachmentsChange={setPendingAttachments}
+              savedAttachments={editingReport?.attachments}
+              onSavedAttachmentsChange={() => void invalidateEditingReportDetail()}
+            />
+
+            <section className="reportsPage__formSection">
+              <h3>עובדים קשורים</h3>
+              <div className="reportsPage__workerAdd">
+                <Select
+                  className="reportsPage__workerSelect"
+                  value={workerToAddId}
+                  onChange={(event) => setWorkerToAddId(event.target.value)}
+                  aria-label="בחר עובד להוספה"
+                >
+                  <option value="">בחר עובד</option>
+                  {availableRelatedWorkers
+                    .filter((employee) => !form.relatedWorkerIds.includes(String(employee.employeeId)))
+                    .map((employee) => (
+                      <option key={employee.employeeId} value={String(employee.employeeId)}>
+                        {employee.fullName}
+                      </option>
+                    ))}
+                </Select>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleAddRelatedWorker}
+                  disabled={!workerToAddId}
+                >
+                  הוסף
+                </Button>
+              </div>
+              {selectedRelatedWorkers.length > 0 && (
+                <div className="reportsPage__workerChips">
+                  {selectedRelatedWorkers.map((employee) => (
+                    <span key={employee.employeeId} className="reportsPage__workerChip">
+                      {employee.fullName}
+                      <button
+                        type="button"
+                        className="reportsPage__workerChipRemove"
+                        onClick={() => handleRemoveRelatedWorker(String(employee.employeeId))}
+                        aria-label={`הסר ${employee.fullName}`}
+                      >
+                        ×
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            <section className="reportsPage__formSection">
+              <h3>הערות</h3>
+              <Textarea
+                label="הערות נוספות"
+                rows={3}
+                value={form.notes}
+                onChange={(event) => updateForm({ notes: event.target.value })}
+              />
+              <Checkbox
+                label="דורש ביקור חוזר"
+                checked={form.followup}
+                onChange={(event) => updateForm({ followup: event.target.checked })}
+              />
+              {form.followup && (
+                <Input
+                  label="סיבת ביקור חוזר"
+                  value={form.followupReason}
+                  onChange={(event) => updateForm({ followupReason: event.target.value })}
+                />
+              )}
+            </section>
+
+            <div className="reportsPage__formFooter">
+              {formError && <InlineAlert variant="danger">{formError}</InlineAlert>}
+              <div className="reportsPage__actions">
+                <Button type="submit" isLoading={saveReport.isPending}>
+                  {formMode === 'edit' ? 'שמור שינויים' : 'שלח דיווח'}
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() => saveReport.mutate('טיוטה')}
+                  disabled={saveReport.isPending}
+                >
+                  שמור טיוטה
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={closeCreateModal}
+                  disabled={saveReport.isPending}
+                >
+                  ביטול
+                </Button>
+              </div>
             </div>
-          </div>
-        </form>
+          </form>
+        )}
       </Modal>
 
       <ReportDetailModal

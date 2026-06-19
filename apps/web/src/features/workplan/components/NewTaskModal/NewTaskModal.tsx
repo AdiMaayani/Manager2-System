@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Drawer } from '@shared/components/Drawer';
 import { Button } from '@shared/components/Button';
@@ -8,26 +8,42 @@ import { Textarea } from '@shared/components/Textarea';
 import { InlineAlert } from '@shared/components/InlineAlert';
 import { SegmentedControl } from '@shared/components/SegmentedControl';
 import { PageSpinner } from '@shared/components/PageSpinner';
-import { isLocalDataMode } from '@/config/appConfig';
+import {
+  TASK_CATEGORIES,
+  TASK_CATEGORY_LABELS,
+  type TaskCategory,
+} from '@shared/constants/taskCategories';
+import {
+  durationMinutesBetweenUtc,
+  formatDurationMinutes,
+  localPartsToUtcIso,
+} from '@shared/utils/utcDateTime';
 import {
   assignEmployeeToWorkItemAsync,
   createWorkItemAsync,
   getDraftRecommendationsAsync,
-  getInternalWorkContextAsync,
-  getSmartAssignmentRecommendationsAsync,
 } from '../../api/workplanApiClient';
-import { WORKPLAN_PRIORITY_OPTIONS, WORKPLAN_STATUS_OPTIONS } from '../../constants';
+import { useEmployeePrimaryRoles } from '@features/employees/hooks/useEmployeePrimaryRoles';
+import { invalidateWorkPlanQueries } from '../../hooks/useWorkPlanData';
+import { MilestoneSelector } from '../MilestoneSelector';
+import { WORKPLAN_PRIORITY_OPTIONS } from '../../constants';
+import {
+  assignEmployeeToServiceCallAsync,
+  createServiceCallAsync,
+  getServiceCallCustomersAsync,
+  getServiceCallSitesAsync,
+} from '@features/serviceCalls/api/serviceCallsApiClient';
 import type {
   DraftRecommendationCandidate,
-  NewTaskKind,
   WorkPlanEmployee,
   WorkPlanProjectFilter,
 } from '../../types';
 import './NewTaskModal.css';
 
-const TASK_KIND_OPTIONS: Array<{ id: NewTaskKind; label: string }> = [
-  { id: 'project', label: 'משימת פרויקט' },
-  { id: 'internal', label: 'משימה פנימית / משרדית' },
+const TASK_CATEGORY_OPTIONS: Array<{ id: TaskCategory; label: string }> = [
+  { id: TASK_CATEGORIES.Regular, label: TASK_CATEGORY_LABELS.Regular },
+  { id: TASK_CATEGORIES.Project, label: TASK_CATEGORY_LABELS.Project },
+  { id: TASK_CATEGORIES.ServiceCall, label: TASK_CATEGORY_LABELS.ServiceCall },
 ];
 
 interface ProjectOption {
@@ -44,55 +60,31 @@ interface NewTaskModalProps {
   employees: WorkPlanEmployee[];
 }
 
-type NewTaskStep = 'details' | 'assignment' | 'recommendation';
+type WizardStep = 'category' | 'context' | 'schedule' | 'assignment';
 
-interface AcceptedRecommendation {
-  employeeId: number;
-  employeeName: string;
-  score?: number | null;
-  reasons: string[];
-  warnings: string[];
-}
-
-const STEPS: Array<{ id: NewTaskStep; label: string }> = [
-  { id: 'details', label: 'פרטי משימה' },
-  { id: 'assignment', label: 'שיוך עובד' },
-  { id: 'recommendation', label: 'המלצת שיבוץ' },
-];
-
-const ROLE_OPTIONS = ['מתקין', 'מנהל פרויקט', 'טכנאי'];
-
-function combineDateAndTime(date: string, time: string): string | null {
-  if (!date || !time) return null;
-  return `${date}T${time}:00`;
-}
-
-function validatePlannedTimeRange(date: string, startTime: string, endTime: string): {
-  plannedStart: string;
-  plannedEnd: string;
-} {
-  if (!date) throw new Error('יש להזין תאריך מתוכנן.');
-  if (!startTime) throw new Error('יש להזין זמן התחלה מתוכנן.');
-  if (!endTime) throw new Error('יש להזין זמן סיום מתוכנן.');
-
-  const plannedStart = combineDateAndTime(date, startTime);
-  const plannedEnd = combineDateAndTime(date, endTime);
-  const plannedStartDate = plannedStart ? new Date(plannedStart) : null;
-  const plannedEndDate = plannedEnd ? new Date(plannedEnd) : null;
-
-  if (!plannedStart || !plannedStartDate || Number.isNaN(plannedStartDate.getTime())) {
-    throw new Error('יש להזין זמן התחלה מתוכנן.');
+function getStepsForCategory(category: TaskCategory): Array<{ id: WizardStep; label: string }> {
+  switch (category) {
+    case TASK_CATEGORIES.Project:
+      return [
+        { id: 'category', label: 'סוג, פרטים והקשר' },
+        { id: 'schedule', label: 'תזמון' },
+        { id: 'assignment', label: 'שיוך עובד' },
+      ];
+    case TASK_CATEGORIES.ServiceCall:
+      return [
+        { id: 'category', label: 'סוג ופרטים' },
+        { id: 'context', label: 'הקשר' },
+        { id: 'schedule', label: 'תזמון' },
+        { id: 'assignment', label: 'שיוך עובד' },
+      ];
+    case TASK_CATEGORIES.Regular:
+    default:
+      return [
+        { id: 'category', label: 'סוג ופרטים' },
+        { id: 'schedule', label: 'תזמון' },
+        { id: 'assignment', label: 'שיוך עובד' },
+      ];
   }
-
-  if (!plannedEnd || !plannedEndDate || Number.isNaN(plannedEndDate.getTime())) {
-    throw new Error('יש להזין זמן סיום מתוכנן.');
-  }
-
-  if (plannedEndDate <= plannedStartDate) {
-    throw new Error('זמן הסיום חייב להיות אחרי זמן ההתחלה.');
-  }
-
-  return { plannedStart, plannedEnd };
 }
 
 function formatRecommendationScore(score?: number | null): string {
@@ -111,87 +103,93 @@ export function NewTaskModal({
 }: NewTaskModalProps) {
   const queryClient = useQueryClient();
   const [isMaximized, setIsMaximized] = useState(false);
-  const [step, setStep] = useState<NewTaskStep>('details');
-  const [taskKind, setTaskKind] = useState<NewTaskKind>('project');
-  const [selectedProjectId, setSelectedProjectId] = useState('');
+  const [step, setStep] = useState<WizardStep>('category');
+  const [taskCategory, setTaskCategory] = useState<TaskCategory>(TASK_CATEGORIES.Project);
+  const [selectedProjectId, setSelectedProjectId] = useState(() => {
+    const projectId = typeof projectFilter === 'number' ? projectFilter : defaultProjectId;
+    return projectId ? String(projectId) : '';
+  });
+  const [milestoneId, setMilestoneId] = useState('');
+  const [customerId, setCustomerId] = useState('');
+  const [siteId, setSiteId] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [plannedDate, setPlannedDate] = useState('');
-  const [plannedStart, setPlannedStart] = useState('');
-  const [plannedEnd, setPlannedEnd] = useState('');
-  const [estimatedHours, setEstimatedHours] = useState('');
-  const [status, setStatus] = useState<string>(WORKPLAN_STATUS_OPTIONS[0].code);
+  const [plannedStartTime, setPlannedStartTime] = useState('');
+  const [plannedEndTime, setPlannedEndTime] = useState('');
   const [priority, setPriority] = useState<string>(WORKPLAN_PRIORITY_OPTIONS[1].code);
   const [requiredRole, setRequiredRole] = useState('');
   const [employeeId, setEmployeeId] = useState('');
-  const [draftCandidates, setDraftCandidates] = useState<DraftRecommendationCandidate[] | null>(null);
+  const [draftCandidates, setDraftCandidates] = useState<DraftRecommendationCandidate[] | null>(
+    null,
+  );
   const [draftMessage, setDraftMessage] = useState<string | null>(null);
-  const [acceptedRecommendation, setAcceptedRecommendation] = useState<AcceptedRecommendation | null>(null);
+  const [acceptedRecommendation, setAcceptedRecommendation] = useState<{
+    employeeId: number;
+    employeeName: string;
+  } | null>(null);
   const [isSmartLoading, setIsSmartLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const isTaskPersistenceAvailable = isLocalDataMode;
-  const taskPersistenceMessage = 'יצירת משימות זמינה רק בחיבור לשרת אמיתי.';
-  const isInternalTask = taskKind === 'internal';
 
-  const internalContextQuery = useQuery({
-    queryKey: ['workplan', 'internal-context'],
-    queryFn: getInternalWorkContextAsync,
-    enabled: isOpen && isTaskPersistenceAvailable,
-    staleTime: Infinity,
+  const customersQuery = useQuery({
+    queryKey: ['serviceCallCustomers'],
+    queryFn: getServiceCallCustomersAsync,
+    enabled: isOpen && taskCategory === TASK_CATEGORIES.ServiceCall,
   });
-  const internalContext = internalContextQuery.data ?? null;
 
-  const parentId = useMemo(() => {
-    if (isInternalTask) {
-      return internalContext?.containerProjectId ?? null;
-    }
+  const sitesQuery = useQuery({
+    queryKey: ['serviceCallSites'],
+    queryFn: getServiceCallSitesAsync,
+    enabled: isOpen && taskCategory === TASK_CATEGORIES.ServiceCall,
+  });
+
+  const primaryRolesQuery = useEmployeePrimaryRoles(isOpen);
+
+  const wizardSteps = useMemo(() => getStepsForCategory(taskCategory), [taskCategory]);
+
+  const parsedProjectId = useMemo(() => {
     const parsed = Number(selectedProjectId);
     return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
-  }, [internalContext, isInternalTask, selectedProjectId]);
+  }, [selectedProjectId]);
 
-  const selectableProjectOptions = useMemo(
-    () => projectOptions.filter((project) => project.id !== internalContext?.containerProjectId),
-    [internalContext, projectOptions],
-  );
+  const derivedDurationMinutes = useMemo(() => {
+    if (!plannedDate || !plannedStartTime || !plannedEndTime) return null;
+    try {
+      const start = localPartsToUtcIso(plannedDate, plannedStartTime);
+      const end = localPartsToUtcIso(plannedDate, plannedEndTime);
+      return durationMinutesBetweenUtc(start, end);
+    } catch {
+      return null;
+    }
+  }, [plannedDate, plannedStartTime, plannedEndTime]);
 
   const assignableEmployees = useMemo(
     () =>
-      employees.filter((employee) => employee.isActive && employee.isAssignable && employee.employeeId > 0),
+      employees.filter((e) => e.isActive && e.isAssignable && e.employeeId > 0),
     [employees],
   );
 
-  const selectedEmployeeName = useMemo(() => {
-    if (!employeeId) return null;
-    const match = assignableEmployees.find((employee) => String(employee.employeeId) === employeeId);
-    if (match) return match.fullName;
-    if (acceptedRecommendation && String(acceptedRecommendation.employeeId) === employeeId) {
-      return acceptedRecommendation.employeeName;
-    }
-    return `עובד #${employeeId}`;
-  }, [acceptedRecommendation, assignableEmployees, employeeId]);
+  const filteredSites = useMemo(() => {
+    const sites = sitesQuery.data ?? [];
+    if (!customerId) return sites;
+    return sites.filter((s) => String(s.customerId) === customerId);
+  }, [sitesQuery.data, customerId]);
 
-  const isManualSelection = Boolean(employeeId) && !acceptedRecommendation;
-
-  useEffect(() => {
-    if (!isOpen) return;
-
-    const projectId = typeof projectFilter === 'number' ? projectFilter : defaultProjectId;
-    setSelectedProjectId(projectId ? String(projectId) : '');
-    setStep('details');
-    setError(null);
-  }, [defaultProjectId, isOpen, projectFilter]);
+  const primaryRoles = primaryRolesQuery.data ?? [];
 
   function resetForm() {
     setIsMaximized(false);
-    setStep('details');
-    setTaskKind('project');
+    setStep('category');
+    setTaskCategory(TASK_CATEGORIES.Project);
+    setSelectedProjectId('');
+    setMilestoneId('');
+    setCustomerId('');
+    setSiteId('');
     setTitle('');
     setDescription('');
     setPlannedDate('');
-    setPlannedStart('');
-    setPlannedEnd('');
-    setEstimatedHours('');
-    setStatus(WORKPLAN_STATUS_OPTIONS[0].code);
+    setPlannedStartTime('');
+    setPlannedEndTime('');
     setPriority(WORKPLAN_PRIORITY_OPTIONS[1].code);
     setRequiredRole('');
     setEmployeeId('');
@@ -202,50 +200,85 @@ export function NewTaskModal({
     setError(null);
   }
 
-  function validateDetails() {
-    if (!parentId) {
-      throw new Error(
-        isInternalTask
-          ? 'הקשר המשימה הפנימית עדיין נטען. נסה שוב בעוד רגע.'
-          : 'יש לבחור פרויקט לפני יצירת משימה',
-      );
-    }
-    if (!title.trim()) throw new Error('יש להזין כותרת משימה');
-    validatePlannedTimeRange(plannedDate, plannedStart, plannedEnd);
+  function clearRecommendationState() {
+    setDraftCandidates(null);
+    setDraftMessage(null);
+    setAcceptedRecommendation(null);
   }
 
-  function validateAssignment() {
-    validateDetails();
+  function buildPlannedUtcRange(): { plannedStart: string; plannedEnd: string } {
+    if (!plannedDate || !plannedStartTime || !plannedEndTime) {
+      throw new Error('יש להזין תאריך, שעת התחלה ושעת סיום');
+    }
+    const plannedStart = localPartsToUtcIso(plannedDate, plannedStartTime);
+    const plannedEnd = localPartsToUtcIso(plannedDate, plannedEndTime);
+    const minutes = durationMinutesBetweenUtc(plannedStart, plannedEnd);
+    if (minutes == null || minutes <= 0) {
+      throw new Error('זמן הסיום חייב להיות אחרי זמן ההתחלה');
+    }
+    return { plannedStart, plannedEnd };
+  }
+
+  function validateDetailsStep() {
+    if (!title.trim()) throw new Error('יש להזין כותרת משימה');
+    if (taskCategory === TASK_CATEGORIES.Project && !parsedProjectId) {
+      throw new Error('יש לבחור פרויקט');
+    }
+  }
+
+  function validateContextStep() {
+    if (taskCategory !== TASK_CATEGORIES.ServiceCall) return;
+    if (!customerId) throw new Error('יש לבחור לקוח');
+    if (!siteId) throw new Error('יש לבחור אתר');
+  }
+
+  function validateScheduleStep() {
+    validateDetailsStep();
+    validateContextStep();
+    buildPlannedUtcRange();
+  }
+
+  function validateCurrentStep() {
+    switch (step) {
+      case 'category':
+        validateDetailsStep();
+        break;
+      case 'context':
+        validateContextStep();
+        break;
+      case 'schedule':
+        validateScheduleStep();
+        break;
+      default:
+        break;
+    }
+  }
+
+  function validateAssignmentStep() {
+    validateScheduleStep();
     if (!employeeId) throw new Error('יש לבחור עובד לשיוך');
   }
 
   async function handleRunSmartRecommendation() {
     try {
-      validateDetails();
-      if (!isTaskPersistenceAvailable) {
-        setError('שיבוץ חכם זמין בחיבור לשרת בלבד.');
-        return;
-      }
-      if (!parentId) return;
-
-      const timeRange = validatePlannedTimeRange(plannedDate, plannedStart, plannedEnd);
+      validateScheduleStep();
+      const { plannedStart, plannedEnd } = buildPlannedUtcRange();
       setIsSmartLoading(true);
       setError(null);
 
-      // Recommendations are scored for THIS draft task (project/date/duration/role), not for
-      // unrelated existing project tasks.
       const result = await getDraftRecommendationsAsync({
-        projectId: parentId,
-        plannedStart: timeRange.plannedStart,
-        plannedEnd: timeRange.plannedEnd,
-        estimatedHours: estimatedHours ? Number(estimatedHours) : null,
+        taskCategory,
+        projectId: parsedProjectId,
+        customerId: customerId ? Number(customerId) : null,
+        siteId: siteId ? Number(siteId) : null,
+        plannedStart,
+        plannedEnd,
         priority: priority || null,
         requiredRole: requiredRole || null,
       });
 
       setDraftCandidates(result.candidates);
       setDraftMessage(result.message);
-      setAcceptedRecommendation(null);
       if (result.candidates.length === 0) {
         setError('לא נמצאו עובדים מתאימים. ניתן לבחור עובד ידנית ולשמור.');
       }
@@ -261,77 +294,72 @@ export function NewTaskModal({
     setAcceptedRecommendation({
       employeeId: candidate.employeeId,
       employeeName: candidate.fullName ?? `עובד #${candidate.employeeId}`,
-      score: candidate.totalScore ?? null,
-      reasons: candidate.recommendationSummary ? [candidate.recommendationSummary] : [],
-      warnings: candidate.warnings ?? [],
     });
     setError(null);
   }
 
   const mutation = useMutation({
     mutationFn: async () => {
-      validateAssignment();
-      if (!isTaskPersistenceAvailable) {
-        throw new Error(taskPersistenceMessage);
-      }
-
+      validateAssignmentStep();
       const parsedEmployeeId = Number(employeeId);
       if (!Number.isInteger(parsedEmployeeId) || parsedEmployeeId <= 0) {
         throw new Error('יש לבחור עובד תקין לשיוך');
       }
 
-      // Smart Assignment is optional. A manually selected employee is enough to
-      // save; accepting a recommendation only replaces the selected employee.
-      // The single requirement is that some employee is assigned (enforced above).
+      const { plannedStart, plannedEnd } = buildPlannedUtcRange();
+      let workItemId: number;
 
-      const plannedTimeRange = validatePlannedTimeRange(plannedDate, plannedStart, plannedEnd);
-
-      const created = await createWorkItemAsync({
-        title: title.trim(),
-        description: description.trim() || undefined,
-        status,
-        billingType: isInternalTask ? 'Internal' : 'Hourly',
-        parentWorkItemId: parentId,
-        plannedStart: plannedTimeRange.plannedStart,
-        plannedEnd: plannedTimeRange.plannedEnd,
-        estimatedHours: estimatedHours ? Number(estimatedHours) : null,
-        priority,
-        requiredRole: requiredRole || null,
-      });
-
-      const workItemId = created?.workItemId;
-      if (!workItemId || workItemId <= 0) {
-        throw new Error('השרת לא החזיר מזהה משימה תקין');
-      }
-
-      await assignEmployeeToWorkItemAsync(workItemId, {
-        employeeId: parsedEmployeeId,
-        assignmentRole: requiredRole || 'Executor',
-      });
-
-      // Best-effort: persist a recommendation run for the now-created task so the choice is recorded
-      // (saveRun). Never blocks task creation if persistence fails.
-      try {
-        await getSmartAssignmentRecommendationsAsync({
-          workItemIds: [workItemId],
-          includeLockedTasks: true,
-          saveRun: true,
+      if (taskCategory === TASK_CATEGORIES.ServiceCall) {
+        const created = await createServiceCallAsync({
+          title: title.trim(),
+          description: description.trim() || null,
+          billingType: 'Hourly',
+          customerId: Number(customerId),
+          siteId: Number(siteId),
+          priority,
+          plannedStart,
+          plannedEnd,
+          requiredRole: requiredRole || null,
+          isLocked: false,
         });
-      } catch {
-        // Intentionally ignored — recommendation persistence is a non-critical side effect.
+        workItemId = created.workItemId;
+        await assignEmployeeToServiceCallAsync(workItemId, {
+          employeeId: parsedEmployeeId,
+          assignmentRole: requiredRole || 'Executor',
+        });
+      } else {
+        const created = await createWorkItemAsync({
+          title: title.trim(),
+          description: description.trim() || undefined,
+          billingType: taskCategory === TASK_CATEGORIES.Regular ? 'Internal' : 'Hourly',
+          taskCategory,
+          parentWorkItemId: taskCategory === TASK_CATEGORIES.Project ? parsedProjectId : null,
+          milestoneId: milestoneId ? Number(milestoneId) : null,
+          plannedStart,
+          plannedEnd,
+          priority,
+          requiredRole: requiredRole || null,
+        });
+        workItemId = created.workItemId ?? 0;
+        if (!workItemId) throw new Error('השרת לא החזיר מזהה משימה תקין');
+        await assignEmployeeToWorkItemAsync(workItemId, {
+          employeeId: parsedEmployeeId,
+          assignmentRole: requiredRole || 'Executor',
+        });
       }
 
-      return created;
+      return { workItemId, projectId: parsedProjectId };
     },
-    onSuccess: async () => {
+    onSuccess: async (result) => {
       resetForm();
       onClose();
+      await invalidateWorkPlanQueries(queryClient, result.projectId);
+      if (taskCategory === TASK_CATEGORIES.ServiceCall) {
+        await queryClient.invalidateQueries({ queryKey: ['serviceCalls'] });
+      }
     },
     onError: (err) => {
       setError(err instanceof Error ? err.message : 'יצירת המשימה נכשלה');
-    },
-    onSettled: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['workplan'] });
     },
   });
 
@@ -340,28 +368,93 @@ export function NewTaskModal({
     onClose();
   }
 
-  function handleContinueFromDetails() {
+  function handleCategoryChange(next: TaskCategory) {
+    setTaskCategory(next);
+    clearRecommendationState();
+    setMilestoneId('');
+    setCustomerId('');
+    setSiteId('');
+    setError(null);
+    const nextSteps = getStepsForCategory(next);
+    setStep((currentStep) =>
+      nextSteps.some((item) => item.id === currentStep) ? currentStep : nextSteps[0].id,
+    );
+  }
+
+  const currentStepIndex = wizardSteps.findIndex((item) => item.id === step);
+  const currentStepLabel = wizardSteps[currentStepIndex]?.label ?? '';
+  const isFirstStep = currentStepIndex === 0;
+  const isLastStep = currentStepIndex === wizardSteps.length - 1;
+
+  function handleGoBack() {
+    const prev = wizardSteps[currentStepIndex - 1]?.id;
+    if (prev) setStep(prev);
+  }
+
+  function handleGoNext() {
     try {
-      validateDetails();
+      validateCurrentStep();
+      const next = wizardSteps[currentStepIndex + 1]?.id;
+      if (next) setStep(next);
       setError(null);
-      setStep('assignment');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'המעבר לשלב הבא נכשל');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'שגיאה');
     }
   }
 
-  async function handleContinueFromAssignment() {
-    try {
-      validateDetails();
-      setError(null);
-      setStep('recommendation');
-      await handleRunSmartRecommendation();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'המעבר לשלב הבא נכשל');
+  function renderRequiredRoleSelect() {
+    if (primaryRolesQuery.isLoading) {
+      return (
+        <Select label="תפקיד נדרש" value="" disabled>
+          <option value="">טוען תפקידים...</option>
+        </Select>
+      );
     }
-  }
 
-  const currentStepIndex = STEPS.findIndex((item) => item.id === step);
+    if (primaryRolesQuery.isError) {
+      return (
+        <div className="newTaskModal__field">
+          <InlineAlert variant="danger">
+            טעינת תפקידים נכשלה. יש לפרוס את sp_Employees_GetDistinctPrimaryRoles בבסיס הנתונים.
+          </InlineAlert>
+          <Select
+            label="תפקיד נדרש"
+            value={requiredRole}
+            onChange={(e) => {
+              setRequiredRole(e.target.value);
+              clearRecommendationState();
+            }}
+          >
+            <option value="">בחר תפקיד</option>
+          </Select>
+        </div>
+      );
+    }
+
+    return (
+      <Select
+        label="תפקיד נדרש"
+        value={requiredRole}
+        onChange={(e) => {
+          setRequiredRole(e.target.value);
+          clearRecommendationState();
+        }}
+      >
+        <option value="">בחר תפקיד</option>
+        {primaryRoles.length === 0 ? (
+          <option value="" disabled>
+            אין תפקידים זמינים
+          </option>
+        ) : (
+          primaryRoles.map((role) => (
+            <option key={role} value={role}>
+              {role}
+            </option>
+          ))
+        )}
+      </Select>
+    );
+  }
 
   return (
     <Drawer
@@ -369,7 +462,7 @@ export function NewTaskModal({
       onClose={handleClose}
       title="משימה חדשה"
       isMaximized={isMaximized}
-      onToggleMaximize={() => setIsMaximized((value) => !value)}
+      onToggleMaximize={() => setIsMaximized((v) => !v)}
     >
       <form
         className="newTaskModal"
@@ -378,208 +471,168 @@ export function NewTaskModal({
           mutation.mutate();
         }}
       >
-        <div className="newTaskModal__header">
-          <ol className="newTaskModal__steps" aria-label="שלבי יצירת משימה">
-            {STEPS.map((item, index) => {
-              const isActive = step === item.id;
-              const isComplete = index < currentStepIndex;
-              return (
-                <li
-                  key={item.id}
-                  className={`newTaskModal__step ${isActive ? 'newTaskModal__step--active' : ''} ${
-                    isComplete ? 'newTaskModal__step--complete' : ''
-                  }`}
-                  aria-current={isActive ? 'step' : undefined}
-                >
-                  <span className="newTaskModal__stepIndex">{index + 1}</span>
-                  <span className="newTaskModal__stepLabel">{item.label}</span>
-                </li>
-              );
-            })}
-          </ol>
-        </div>
+        <ol className="newTaskModal__steps" aria-label="שלבי יצירת משימה">
+          {wizardSteps.map((item, index) => (
+            <li
+              key={item.id}
+              className={`newTaskModal__step ${step === item.id ? 'newTaskModal__step--active' : ''} ${
+                index < currentStepIndex ? 'newTaskModal__step--complete' : ''
+              }`}
+              aria-current={step === item.id ? 'step' : undefined}
+            >
+              <span className="newTaskModal__stepIndex">{index + 1}</span>
+              <span className="newTaskModal__stepLabel">{item.label}</span>
+            </li>
+          ))}
+        </ol>
 
         <div className="newTaskModal__body">
-          {step === 'details' && (
+          {step === 'category' && (
             <section className="newTaskModal__section">
-              <h3 className="newTaskModal__sectionTitle">פרטי משימה</h3>
-
-              <div className="newTaskModal__field">
-                <span>סוג משימה</span>
-                <SegmentedControl
-                  ariaLabel="סוג משימה"
-                  items={TASK_KIND_OPTIONS}
-                  value={taskKind}
-                  onChange={(id) => {
-                    setTaskKind(id);
-                    setDraftCandidates(null);
-                    setDraftMessage(null);
-                    setAcceptedRecommendation(null);
-                    setError(null);
-                  }}
-                />
-              </div>
-
-              {!isInternalTask && (
-                <Select
-                  label="פרויקט"
-                  required
-                  value={selectedProjectId}
-                  onChange={(event) => {
-                    setSelectedProjectId(event.target.value);
-                    setDraftCandidates(null);
-                    setDraftMessage(null);
-                    setAcceptedRecommendation(null);
-                  }}
-                >
-                  <option value="">בחר פרויקט</option>
-                  {selectableProjectOptions.map((project) => (
-                    <option key={project.id} value={project.id}>
-                      {project.title}
-                    </option>
-                  ))}
-                </Select>
-              )}
-
-              {isInternalTask && (
-                <p className="newTaskModal__hint">
-                  משימה פנימית / משרדית נשמרת ללא שיוך לפרויקט לקוח, ומוצגת בתוכנית העבודה תחת קבוצת המשימות הפנימיות.
-                </p>
-              )}
-
-              <Input
-                label="כותרת משימה"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                required
+              <h3 className="newTaskModal__sectionTitle">{currentStepLabel}</h3>
+              <SegmentedControl
+                ariaLabel="סוג משימה"
+                items={TASK_CATEGORY_OPTIONS}
+                value={taskCategory}
+                onChange={handleCategoryChange}
               />
-
+              <Input label="כותרת" value={title} onChange={(e) => setTitle(e.target.value)} required />
               <Textarea
                 label="תיאור"
                 value={description}
-                onChange={(event) => setDescription(event.target.value)}
+                onChange={(e) => setDescription(e.target.value)}
                 rows={3}
               />
-
               <div className="newTaskModal__grid">
-                <Input
-                  label="תאריך מתוכנן"
-                  type="date"
-                  value={plannedDate}
-                  onChange={(event) => setPlannedDate(event.target.value)}
-                  required
-                />
-                <Input
-                  label="שעת התחלה"
-                  type="time"
-                  value={plannedStart}
-                  onChange={(event) => setPlannedStart(event.target.value)}
-                  required
-                />
-                <Input
-                  label="שעת סיום"
-                  type="time"
-                  value={plannedEnd}
-                  onChange={(event) => setPlannedEnd(event.target.value)}
-                  required
-                />
-                <Input
-                  label="הערכת שעות"
-                  type="number"
-                  min="0"
-                  step="0.5"
-                  value={estimatedHours}
-                  onChange={(event) => setEstimatedHours(event.target.value)}
-                />
+                <Select label="דחיפות" value={priority} onChange={(e) => setPriority(e.target.value)}>
+                  {WORKPLAN_PRIORITY_OPTIONS.map((o) => (
+                    <option key={o.code} value={o.code}>{o.display}</option>
+                  ))}
+                </Select>
+                {renderRequiredRoleSelect()}
               </div>
+              {taskCategory === TASK_CATEGORIES.Project && (
+                <>
+                  <Select
+                    label="פרויקט"
+                    required
+                    value={selectedProjectId}
+                    onChange={(e) => {
+                      setSelectedProjectId(e.target.value);
+                      setMilestoneId('');
+                      clearRecommendationState();
+                    }}
+                  >
+                    <option value="">בחר פרויקט</option>
+                    {projectOptions.map((p) => (
+                      <option key={p.id} value={p.id}>{p.title}</option>
+                    ))}
+                  </Select>
+                  <MilestoneSelector
+                    projectId={parsedProjectId}
+                    value={milestoneId}
+                    onChange={(v) => {
+                      setMilestoneId(v);
+                      clearRecommendationState();
+                    }}
+                  />
+                </>
+              )}
+            </section>
+          )}
 
-              <p className="newTaskModal__fieldHint">
-                הערכת השעות משמשת לתכנון עומס העובדים ולחישוב המלצת השיבוץ החכם. היא אינה משנה את חלון
-                הזמן המתוכנן (שעת התחלה וסיום).
-              </p>
+          {step === 'context' && taskCategory === TASK_CATEGORIES.ServiceCall && (
+            <section className="newTaskModal__section">
+              <h3 className="newTaskModal__sectionTitle">{currentStepLabel}</h3>
+              <Select
+                label="לקוח"
+                required
+                value={customerId}
+                onChange={(e) => {
+                  setCustomerId(e.target.value);
+                  setSiteId('');
+                  clearRecommendationState();
+                }}
+              >
+                <option value="">בחר לקוח</option>
+                {(customersQuery.data ?? []).map((c) => (
+                  <option key={c.customerId} value={c.customerId}>{c.customerName}</option>
+                ))}
+              </Select>
+              <Select
+                label="אתר"
+                required
+                value={siteId}
+                onChange={(e) => {
+                  setSiteId(e.target.value);
+                  clearRecommendationState();
+                }}
+              >
+                <option value="">בחר אתר</option>
+                {filteredSites.map((s) => (
+                  <option key={s.siteId} value={s.siteId}>{s.siteName}</option>
+                ))}
+              </Select>
+            </section>
+          )}
 
+          {step === 'schedule' && (
+            <section className="newTaskModal__section">
+              <h3 className="newTaskModal__sectionTitle">{currentStepLabel}</h3>
               <div className="newTaskModal__grid">
-                <Select
-                  label="סטטוס"
-                  value={status}
-                  onChange={(event) => setStatus(event.target.value)}
-                >
-                  {WORKPLAN_STATUS_OPTIONS.map((option) => (
-                    <option key={option.code} value={option.code}>
-                      {option.display}
-                    </option>
-                  ))}
-                </Select>
-                <Select
-                  label="דחיפות"
-                  value={priority}
-                  onChange={(event) => setPriority(event.target.value)}
-                >
-                  {WORKPLAN_PRIORITY_OPTIONS.map((option) => (
-                    <option key={option.code} value={option.code}>
-                      {option.display}
-                    </option>
-                  ))}
-                </Select>
-                <Select
-                  label="תפקיד נדרש"
-                  value={requiredRole}
-                  onChange={(event) => setRequiredRole(event.target.value)}
-                >
-                  <option value="">בחר תפקיד</option>
-                  {ROLE_OPTIONS.map((option) => (
-                    <option key={option} value={option}>
-                      {option}
-                    </option>
-                  ))}
-                </Select>
+                <Input label="תאריך" type="date" value={plannedDate} onChange={(e) => {
+                  setPlannedDate(e.target.value);
+                  clearRecommendationState();
+                }} required />
+                <Input label="שעת התחלה" type="time" value={plannedStartTime} onChange={(e) => {
+                  setPlannedStartTime(e.target.value);
+                  clearRecommendationState();
+                }} required />
+                <Input label="שעת סיום" type="time" value={plannedEndTime} onChange={(e) => {
+                  setPlannedEndTime(e.target.value);
+                  clearRecommendationState();
+                }} required />
               </div>
+              <Input
+                label="סה״כ זמן (מחושב)"
+                value={formatDurationMinutes(derivedDurationMinutes)}
+                readOnly
+              />
             </section>
           )}
 
           {step === 'assignment' && (
             <section className="newTaskModal__section">
-              <h3 className="newTaskModal__sectionTitle">שיוך עובד</h3>
+              <h3 className="newTaskModal__sectionTitle">{currentStepLabel}</h3>
               <Select
                 label="עובד משויך"
                 value={employeeId}
-                onChange={(event) => {
-                  setEmployeeId(event.target.value);
-                  if (acceptedRecommendation?.employeeId !== Number(event.target.value)) {
+                onChange={(e) => {
+                  setEmployeeId(e.target.value);
+                  if (acceptedRecommendation?.employeeId !== Number(e.target.value)) {
                     setAcceptedRecommendation(null);
                   }
                 }}
               >
                 <option value="">בחר עובד</option>
-                {assignableEmployees.map((employee) => (
-                  <option key={employee.employeeId} value={employee.employeeId}>
-                    {employee.fullName} {employee.primaryRole ? `· ${employee.primaryRole}` : ''}
+                {assignableEmployees.map((e) => (
+                  <option key={e.employeeId} value={e.employeeId}>
+                    {e.fullName}{e.primaryRole ? ` · ${e.primaryRole}` : ''}
                   </option>
                 ))}
               </Select>
-              <p className="newTaskModal__hint">
-                ניתן לבחור עובד ידנית, או להמשיך לשלב הבא לקבלת המלצת שיבוץ חכם אוטומטית.
-              </p>
-            </section>
-          )}
-
-          {step === 'recommendation' && (
-            <section className="newTaskModal__section">
-              <div className="newTaskModal__smartHead">
-                <h3 className="newTaskModal__sectionTitle">שיבוץ חכם</h3>
-                <p className="newTaskModal__hint">
-                  ההמלצה מחושבת עבור המשימה החדשה לפי התאמה מקצועית, זמינות, עומס, מרחק וניסיון.
-                  זוהי תצוגה מקדימה — ההמלצה תתועד ביומן ההמלצות בעת שמירת המשימה.
-                </p>
-              </div>
-
-              {selectedEmployeeName && (
+              {acceptedRecommendation && (
                 <p className="newTaskModal__assignedNote">
-                  {acceptedRecommendation
-                    ? `העובד המשויך: ${selectedEmployeeName} · התקבל מהמלצת השיבוץ.`
-                    : `כבר נבחר עובד: ${selectedEmployeeName}. קבלת המלצת השיבוץ היא אופציונלית — ניתן לשמור עם העובד שנבחר.`}
+                  נבחר מהמלצה: {acceptedRecommendation.employeeName}
                 </p>
               )}
+
+              <div className="newTaskModal__smartHead">
+                <h4 className="newTaskModal__sectionTitle">שיבוץ חכם</h4>
+                <p className="newTaskModal__hint">
+                  ניתן להריץ שיבוץ חכם ללא בחירת עובד מראש. בחירת עובד מומלץ תתבצע רק בלחיצה מפורשת.
+                </p>
+              </div>
 
               {isSmartLoading && (
                 <div className="newTaskModal__smartLoading">
@@ -588,23 +641,17 @@ export function NewTaskModal({
               )}
 
               {!isSmartLoading && draftMessage && (
-                <div className="newTaskModal__smartSummary">
-                  <strong className="newTaskModal__smartMessage">{draftMessage}</strong>
-                </div>
+                <p className="newTaskModal__smartMessage">{draftMessage}</p>
               )}
 
-              {!isSmartLoading && draftCandidates && draftCandidates.slice(0, 5).map((candidate) => {
-                const isAccepted = acceptedRecommendation?.employeeId === candidate.employeeId;
-                return (
+              {!isSmartLoading &&
+                draftCandidates?.map((candidate) => (
                   <div className="newTaskModal__recommendation" key={candidate.employeeId}>
                     <div className="newTaskModal__recommendationHead">
                       <div className="newTaskModal__recommendationWho">
-                        <span className="newTaskModal__recommendationLabel">
-                          {candidate.rankOrder ? `#${candidate.rankOrder} ` : ''}עובד מומלץ
-                        </span>
+                        <span className="newTaskModal__recommendationLabel">מומלץ</span>
                         <strong className="newTaskModal__recommendationName">
                           {candidate.fullName ?? `עובד #${candidate.employeeId}`}
-                          {candidate.primaryRole ? ` · ${candidate.primaryRole}` : ''}
                         </strong>
                       </div>
                       {candidate.totalScore != null && (
@@ -614,44 +661,52 @@ export function NewTaskModal({
                       )}
                     </div>
 
-                    {!candidate.isEligible && (
-                      <p className="newTaskModal__warning">{candidate.status}</p>
+                    {candidate.recommendationSummary && (
+                      <p className="newTaskModal__hint">{candidate.recommendationSummary}</p>
                     )}
 
-                    <ul className="newTaskModal__factors">
-                      {(candidate.factors ?? []).map((factor) => (
-                        <li key={factor.key} className="newTaskModal__factor">
-                          <div className="newTaskModal__factorHead">
-                            <span className="newTaskModal__factorLabel">
-                              {factor.label} · {factor.weightPercent}%
-                            </span>
-                            <span className="newTaskModal__factorScore">
-                              {factor.hasData && factor.score != null
-                                ? Math.round(Number(factor.score))
-                                : 'אין נתונים'}
-                            </span>
-                          </div>
-                          <span className="newTaskModal__factorExplain">{factor.explanation}</span>
-                          <span className="newTaskModal__factorSource">מקור: {factor.dataSource}</span>
-                        </li>
-                      ))}
-                    </ul>
+                    {candidate.warnings.length > 0 && (
+                      <ul className="newTaskModal__reasons">
+                        {candidate.warnings.map((warning) => (
+                          <li key={warning} className="newTaskModal__warning">
+                            {warning}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
 
-                    {(candidate.warnings ?? []).length > 0 && (
-                      <p className="newTaskModal__warning">{(candidate.warnings ?? []).join(' · ')}</p>
+                    {candidate.factors.length > 0 && (
+                      <ul className="newTaskModal__factors">
+                        {candidate.factors.map((factor) => (
+                          <li className="newTaskModal__factor" key={factor.key}>
+                            <div className="newTaskModal__factorHead">
+                              <span className="newTaskModal__factorLabel">{factor.label}</span>
+                              <span className="newTaskModal__factorScore">
+                                {formatRecommendationScore(factor.score)}
+                              </span>
+                            </div>
+                            <span className="newTaskModal__factorExplain">{factor.explanation}</span>
+                          </li>
+                        ))}
+                      </ul>
                     )}
 
                     <Button
                       type="button"
-                      variant={isAccepted ? 'secondary' : 'primary'}
+                      variant={
+                        acceptedRecommendation?.employeeId === candidate.employeeId
+                          ? 'secondary'
+                          : 'primary'
+                      }
                       onClick={() => handleAcceptRecommendation(candidate)}
                       disabled={!candidate.isEligible}
                     >
-                      {isAccepted ? 'ההמלצה התקבלה' : 'קבל המלצה'}
+                      {acceptedRecommendation?.employeeId === candidate.employeeId
+                        ? 'נבחר'
+                        : 'בחר עובד מומלץ'}
                     </Button>
                   </div>
-                );
-              })}
+                ))}
 
               <div className="newTaskModal__smartRun">
                 <Button
@@ -660,7 +715,7 @@ export function NewTaskModal({
                   onClick={handleRunSmartRecommendation}
                   disabled={isSmartLoading}
                 >
-                  {draftCandidates ? 'הרץ המלצה מחדש' : 'הרץ שיבוץ חכם'}
+                  {draftCandidates ? 'הרץ שיבוץ חכם מחדש' : 'הרץ שיבוץ חכם'}
                 </Button>
               </div>
             </section>
@@ -669,43 +724,33 @@ export function NewTaskModal({
 
         <div className="newTaskModal__footer">
           {error && <InlineAlert variant="danger">{error}</InlineAlert>}
-          {!isTaskPersistenceAvailable && (
-            <p className="newTaskModal__hint">{taskPersistenceMessage}</p>
-          )}
-
           <div className="newTaskModal__actions">
-            {step !== 'details' && (
-              <Button
-                type="button"
-                variant="secondary"
-                onClick={() => setStep(step === 'recommendation' ? 'assignment' : 'details')}
-              >
+            {!isFirstStep && (
+              <Button type="button" variant="secondary" onClick={handleGoBack}>
                 חזור
               </Button>
             )}
-            {step === 'details' && (
-              <Button type="button" onClick={handleContinueFromDetails}>
+            {!isLastStep && (
+              <Button type="button" onClick={handleGoNext}>
                 המשך
               </Button>
             )}
-            {step === 'assignment' && (
-              <Button type="button" onClick={handleContinueFromAssignment} isLoading={isSmartLoading}>
-                המשך לשיבוץ חכם
-              </Button>
+            {isLastStep && (
+              <>
+                <Button type="submit" isLoading={mutation.isPending}>
+                  שמור משימה
+                </Button>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleRunSmartRecommendation}
+                  disabled={isSmartLoading}
+                >
+                  {draftCandidates ? 'הרץ שיבוץ חכם מחדש' : 'הרץ שיבוץ חכם'}
+                </Button>
+              </>
             )}
-            {step === 'recommendation' && (
-              <Button
-                type="submit"
-                isLoading={mutation.isPending}
-                disabled={!isTaskPersistenceAvailable}
-                title={!isTaskPersistenceAvailable ? taskPersistenceMessage : undefined}
-              >
-                {isManualSelection ? 'שמור עם העובד שנבחר' : 'שמור משימה'}
-              </Button>
-            )}
-            <Button type="button" variant="secondary" onClick={handleClose}>
-              ביטול
-            </Button>
+            <Button type="button" variant="secondary" onClick={handleClose}>ביטול</Button>
           </div>
         </div>
       </form>

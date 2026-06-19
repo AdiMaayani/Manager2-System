@@ -29,7 +29,9 @@ namespace ManageR2.Infrastructure.Models.SmartAssignment
     // Draft (not-yet-saved) task context used to score candidates for the New Task flow.
     public class DraftTaskRecommendationContextModel
     {
-        public int ProjectId { get; set; }
+        public string TaskCategory { get; set; } = string.Empty;
+        public int? ProjectId { get; set; }
+        public int? CustomerId { get; set; }
         public System.DateTime PlannedStart { get; set; }
         public System.DateTime PlannedEnd { get; set; }
         public decimal? EstimatedHours { get; set; }

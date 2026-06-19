@@ -7,7 +7,12 @@ import {
   parseAnchorDate,
   toAnchorParam,
 } from '../lib/workPlanPeriod';
-import type { WorkPlanProjectFilter, WorkPlanRange, WorkPlanScope } from '../types';
+import type {
+  WorkPlanProjectFilter,
+  WorkPlanRange,
+  WorkPlanScope,
+  WorkPlanTaskCategoryFilter,
+} from '../types';
 
 export function useWorkPlanPageState() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -15,6 +20,8 @@ export function useWorkPlanPageState() {
   const scope = (searchParams.get('scope') as WorkPlanScope) || WORKPLAN_DEFAULTS.SCOPE;
   const range = (searchParams.get('range') as WorkPlanRange) || WORKPLAN_DEFAULTS.RANGE;
   const statusFilter = searchParams.get('status') ?? 'all';
+  const taskCategoryFilter =
+    (searchParams.get('taskCategory') as WorkPlanTaskCategoryFilter) ?? 'all';
   const employeeFilterId = searchParams.get('employeeId') ?? '';
   const searchQuery = searchParams.get(WORKPLAN_QUERY.SEARCH) ?? '';
 
@@ -51,6 +58,9 @@ export function useWorkPlanPageState() {
         next.set('scope', nextScope);
         if (nextScope !== 'project') {
           next.delete(WORKPLAN_QUERY.PROJECT_ID);
+        }
+        if (nextScope !== 'employee') {
+          next.delete('employeeId');
         }
         return next;
       });
@@ -107,6 +117,18 @@ export function useWorkPlanPageState() {
     [setSearchParams],
   );
 
+  const setTaskCategoryFilter = useCallback(
+    (category: WorkPlanTaskCategoryFilter) => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        if (category === 'all') next.delete('taskCategory');
+        else next.set('taskCategory', category);
+        return next;
+      });
+    },
+    [setSearchParams],
+  );
+
   const setSearchQuery = useCallback(
     (query: string) => {
       setSearchParams(
@@ -155,6 +177,7 @@ export function useWorkPlanPageState() {
     scope,
     range,
     statusFilter,
+    taskCategoryFilter,
     employeeFilterId,
     projectFilter,
     isAllProjectsMode,
@@ -167,6 +190,7 @@ export function useWorkPlanPageState() {
     setProjectFilter,
     setEmployeeFilterId,
     setStatusFilter,
+    setTaskCategoryFilter,
     setSearchQuery,
     goToPreviousPeriod,
     goToNextPeriod,

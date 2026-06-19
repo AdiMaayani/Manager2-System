@@ -37,5 +37,7 @@ namespace ManageR2.Infrastructure.Models
         public string? EmployeeName { get; set; }
 
         public string? ContractorName { get; set; }
+
+        public string? AssignmentSource { get; set; }
     }
 }
