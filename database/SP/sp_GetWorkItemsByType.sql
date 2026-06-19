@@ -14,6 +14,7 @@ BEGIN
         wi.Title,
         wi.Description,
         wi.WorkType,
+        wi.TaskCategory,
         wi.BillingType,
         wi.Status,
         wi.EstimatedHours,
@@ -35,12 +36,16 @@ BEGIN
         wi.DealCloseDate,
         wi.FinanceProjectNumber,
         wi.InvoiceNumber
+        ,wi.MilestoneId
+        ,wi.IsArchived
+        ,wi.ArchivedAt
     FROM dbo.WorkItems wi
     LEFT JOIN dbo.Customers c
         ON wi.CustomerId = c.CustomerId
     LEFT JOIN dbo.Sites s
         ON wi.SiteId = s.SiteId
     WHERE wi.WorkType = @WorkType
+      AND wi.IsArchived = 0
     ORDER BY wi.CreatedAt DESC;
 END
 GO

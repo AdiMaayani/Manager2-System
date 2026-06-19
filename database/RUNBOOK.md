@@ -10,9 +10,69 @@ Authoritative, step-by-step procedure to rebuild, configure, and verify the Mana
 
 ---
 
+## 2026-06-19 WorkPlan/reports in-place database phase
+
+Back up and restore the target to a non-production verification database first. Confirm `DB_NAME()`
+before every step. Never execute `igroup30_prod.sql`; it is read-only reference material.
+
+Exact order:
+
+1. Run `migrations/2026-06-19_workplan_reports_overhaul.sql`. It adds the guarded schema and only
+   unambiguous category/lifecycle backfills, four domain tables, and four empty control/audit tables.
+   Its first mutation gate lists and rejects unknown Hebrew workflow statuses before any DDL or
+   backfill runs. `_MilestoneMigrationMap` remains empty.
+2. Deploy the changed/new canonical `SP/*.sql` files. Do not expose the flat UTC schedule endpoint
+   to application traffic until the timezone gate passes.
+3. Run `migrations/2026-06-19_legacy_data_migration.sql` for read-only diagnostics. It performs no
+   DDL or DML. Do not populate `_MilestoneMigrationMap` without approved exact WorkItem ids.
+4. Run `migrations/2026-06-19_planned_datetime_utc.sql` with every flag `0`; this is fully read-only.
+   Review winter/summer, midnight-crossing, multi-day, API-write-path, DST-hour, and representative
+   production previews.
+5. With explicit timezone approval, set `@ConventionConfirmedIsraelLocal=1` and
+   `@ApplyConversion=1` in an execution copy. Inspect shadows, then approve `@ApproveSwap=1`.
+   The later milestone copy preserves those already-converted UTC WorkItem values.
+6. With explicit INTERNAL approval, set `@ApproveInternalContext=1` and set
+   `@ApprovedInternalProjectId` to the confirmed reserved container id in
+   `2026-06-19_legacy_data_migration_apply.sql`. It clears only confirmed synthetic ids, preserves
+   real customer/site references and all WorkItem references, and archives only the INTERNAL project.
+   It never deactivates the Internal customer or site.
+7. Only after `_MilestoneMigrationMap` rows contain `ApprovedBy`/`ApprovedAt`, set
+   `@ApproveMilestoneMap=1`. Empty, incomplete, cross-project, or archived mappings roll back.
+8. Run `2026-06-19_legacy_data_migration_verify.sql`; require zero invalid matrix rows, zero
+   cross-project milestones, map/copy parity, assignment audit coverage, and expected INTERNAL state.
+   Then set `@ApproveEnableWorkItemChecks=1` in an approved verification copy to enable the three
+   `CK_WorkItems_*` constraints with `WITH CHECK CHECK CONSTRAINT`.
+9. In an isolated DB only, run `tests/2026-06-19_workplan_reports_smoke.sql` and the two-session
+   `tests/2026-06-19_inventory_finalize_concurrency.sql` after setting their approval/fixture values.
+
+Required gates and verification:
+
+- `WorkReports.Status` stays the Hebrew business workflow state. `LifecycleStatus` is independent.
+  `טיוטה` maps to `Draft`; `הוגש`/`הועבר להנה״ח` map to `Finalized`; unknown values block.
+- Legacy finalized reports get no stock movements. Verify finalization leaves `Status` unchanged.
+- Every milestone reference must belong to the task's project. Milestones never enter the schedule.
+- Report inventory and attachment metadata are editable only while `LifecycleStatus='Draft'`.
+- Verify inventory aggregated by `InventoryItemId`, deterministic ascending locking, one movement per
+  line/type, repeated finalize/reverse idempotency, cross-report safety, no negative stock, and no
+  partial movement or lifecycle transition.
+- Ambiguous datetime convention is a hard stop. Do not shift any value or enable the UTC API contract.
+
+Rollback:
+
+- Prefer the pre-migration backup before new application traffic. For legacy changes, use
+  `2026-06-19_legacy_data_migration_reverse.sql`; it refuses milestone reversal when new tasks refer
+  to migrated milestones, requires the confirmed INTERNAL project id, refuses to overwrite tasks
+  changed after migration, and never touches customers/sites. Reversing INTERNAL tasks intentionally
+  leaves the legacy matrix checks disabled/untrusted until a forward migration is reapplied. For datetime rollback, set only
+  `@ApproveReverse=1` in an execution copy of the timezone script to restore audited local values.
+- Keep audit/shadow tables through the rollback window. Do not recreate, replace, or manually drop
+  operational tables; use a forward fix after traffic begins.
+
+---
+
 ## 1. Current authoritative DB state
 
-Validated against the production schema dump `igroup30_prod.sql` (current Ruppin database):
+Validated against the pre-overhaul production schema dump `igroup30_prod.sql` (read-only reference):
 
 | Object | Current DB (dump) | Repo baseline (`schema/` + `functions/` + `SP/`) | Gap closed by migrations |
 |---|---|---|---|
@@ -40,7 +100,10 @@ The 4 tables and 17 procedures that exist **only in migrations** (not in `schema
   table `AuditLog` (append-only security/operational trail); SPs `sp_AuditLog_Create` (server-side
   write path) and `sp_AuditLog_GetList` (read path for the Admin/SeniorManagement audit screen).
 
-117 + 17 = 134 SPs, 38 + 4 = 42 tables — the repo + required migrations reproduce the dump exactly.
+117 + 17 = 134 SPs, 38 + 4 = 42 tables — the pre-overhaul repo + required migrations reproduce
+the dump exactly. The 2026-06-19 foundation then adds 8 tables and 16 canonical procedures, so the
+expected post-foundation totals are **50 tables / 150 procedures**. An approved timezone conversion
+later adds 2 audit tables (52 total); its default diagnostics-only run adds nothing.
 
 ---
 
@@ -69,6 +132,9 @@ The 4 tables and 17 procedures that exist **only in migrations** (not in `schema
 | `migrations/2026-06-15_smart_assignment_factor_activation.sql` | **Required** migration | Yes | Fresh build + existing DBs (run **after** persistence) |
 | `migrations/2026-06-15_audit_log_core.sql` | **Required** migration | Yes (`IF NOT EXISTS` + `CREATE OR ALTER`) | Fresh build + existing DBs (independent; additive only) |
 | `migrations/2026-06-17_dashboard_command_center.sql` | **Required** migration | Yes (`CREATE OR ALTER`) | Fresh build + existing DBs (independent; read-only SPs only) |
+| `migrations/2026-06-19_workplan_reports_overhaul.sql` | **Required foundation** | Yes (guarded additive DDL/backfill) | Fresh build + existing DBs; after earlier required migrations |
+| `migrations/2026-06-19_legacy_data_migration.sql` | Read-only diagnostics | Yes | Existing populated DBs after foundation |
+| `migrations/2026-06-19_planned_datetime_utc.sql` | Read-only by default; operator-gated conversion | Yes | Existing populated DBs after foundation |
 | other `migrations/2026-06-0x_*.sql` | Historical (folded into baseline) | Yes | Only to upgrade an **older** DB; redundant for a fresh build |
 | `seed/2026-06-14_permission_roles.sql` | **Required** seed (role catalog) | Yes | Fresh build |
 | `seed/initial_admin/00_seed_initial_admin.sql` | **Required** seed (first login) | Yes | Fresh build |
@@ -104,7 +170,7 @@ Run every `database/SP/*.sql` **except** the two `2026-04-20_*` files. Order irr
 (`CREATE OR ALTER` does not require referenced objects to exist at create time). → 117 procs.
 
 ### Step 5 — Required recent migrations (idempotent, **order-sensitive**)
-Run these six, **in this order**:
+Run these seven, **in this order**:
 
 1. `migrations/2026-06-14_users_login_lockout.sql` — adds 2 `Users` columns + 3 `sp_Users_*` SPs.
 2. `migrations/2026-06-15_customer_systems_vault.sql` — adds 3 Vault tables + 11 Vault SPs.
@@ -112,6 +178,8 @@ Run these six, **in this order**:
 4. `migrations/2026-06-15_smart_assignment_persistence_explainability.sql` — adds `Rec_GetDraftTaskRecommendationInput`, updates `Rec_GetLatestRecommendationsForTask`.
 5. `migrations/2026-06-15_smart_assignment_factor_activation.sql` — updates `Rec_GetTaskRecommendationInput` **and** `Rec_GetDraftTaskRecommendationInput` to emit result sets 13 (current load) + 14 (continuity).
 6. `migrations/2026-06-17_dashboard_command_center.sql` — adds six read-only `sp_Dashboard_*` procedures that back `GET /api/dashboard`. Additive and order-independent (only references baseline tables for reads).
+7. `migrations/2026-06-19_workplan_reports_overhaul.sql` — adds the WorkPlan/report foundation,
+   guarded legacy backfills, and empty migration-control/audit tables. Stop on unknown report status.
 
 > ℹ️ **The audit-log migration (#3) is order-independent** — it only adds new objects and references
 > the existing baseline `Users` table for display joins. It is placed between the Vault and Smart
@@ -176,6 +244,7 @@ $migrations = @(
   "$root\migrations\2026-06-15_smart_assignment_persistence_explainability.sql",
   "$root\migrations\2026-06-15_smart_assignment_factor_activation.sql",
   "$root\migrations\2026-06-17_dashboard_command_center.sql"
+  "$root\migrations\2026-06-19_workplan_reports_overhaul.sql"
 )
 $migrations | ForEach-Object { sqlcmd -S $server -d $db -b -i $_ }
 
@@ -262,13 +331,14 @@ npm run build      # production build of apps/web
 Run these against the target database after [§4](#4-database-build-fresh-database).
 
 ```sql
--- (a) Object counts — expect 42 / 134 / 2 / 0
+-- (a) Object counts after the 2026-06-19 foundation — expect 50 / 150 / 2 / 0.
+-- After an approved timezone conversion, USER_TABLE becomes 52.
 SELECT type_desc, COUNT(*) AS Cnt
 FROM sys.objects
 WHERE is_ms_shipped = 0 AND schema_id = SCHEMA_ID('dbo')
   AND type_desc IN ('USER_TABLE','SQL_STORED_PROCEDURE','SQL_SCALAR_FUNCTION','VIEW')
 GROUP BY type_desc ORDER BY type_desc;
--- USER_TABLE = 42, SQL_STORED_PROCEDURE = 134, SQL_SCALAR_FUNCTION = 2, VIEW = 0
+-- USER_TABLE = 50, SQL_STORED_PROCEDURE = 150, SQL_SCALAR_FUNCTION = 2, VIEW = 0
 
 -- (b) Customer Systems Vault tables exist (expect 3 rows)
 SELECT name FROM sys.tables
@@ -323,8 +393,8 @@ ORDER BY OccurredAtUtc DESC, AuditLogId DESC;
 ```
 
 ### Final verification checklist
-- [ ] **Tables exist** — query (a) returns `USER_TABLE = 42`.
-- [ ] **Important SPs exist** — query (d) returns all 9; query (a) returns `SQL_STORED_PROCEDURE = 134`.
+- [ ] **Tables exist** — query (a) returns `USER_TABLE = 50` after foundation (`52` after approved timezone conversion).
+- [ ] **Important SPs exist** — query (d) returns all 9; query (a) returns `SQL_STORED_PROCEDURE = 150`.
 - [ ] **Vault tables + lockout columns** — queries (b) = 3 rows, (c) = 2 rows.
 - [ ] **Smart Assignment SPs exist & factor activation applied** — query (e) = `PASS`.
 - [ ] **Audit log objects exist** — query (i) = 1 row (`AuditLog`); query (j) = 2 rows (`sp_AuditLog_Create`, `sp_AuditLog_GetList`).
@@ -352,7 +422,7 @@ ORDER BY OccurredAtUtc DESC, AuditLogId DESC;
 
 Comparison of the repository scripts against the attached `igroup30_prod.sql` dump.
 
-**Matches (the repo + the five required migrations reproduce the dump exactly):**
+**Pre-overhaul match (the earlier repo + required migrations reproduce the read-only dump):**
 - 42 tables = 38 (`schema/tables.sql`) + 3 Vault (vault migration) + 1 `AuditLog` (audit-log migration).
 - 134 SPs = 117 (`SP/`) + 11 Vault + 3 login-lockout + 1 SA draft + 2 AuditLog (migrations).
 - 2 scalar functions, 0 views, 0 triggers — match.

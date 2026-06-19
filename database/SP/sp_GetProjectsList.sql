@@ -20,7 +20,7 @@ BEGIN
         ISNULL(s.SiteName, N'-') AS SiteName,
         ISNULL(pm.FullName, N'-') AS ProjectManagerName
     FROM dbo.WorkItems wi
-    INNER JOIN dbo.Customers c
+    LEFT JOIN dbo.Customers c
         ON wi.CustomerId = c.CustomerId
     LEFT JOIN dbo.Sites s
         ON wi.SiteId = s.SiteId
@@ -42,6 +42,8 @@ BEGIN
         ON wi.WorkItemId = pm.WorkItemId
        AND pm.RowNum = 1
     WHERE wi.WorkType = 'Project'
+      AND wi.IsArchived = 0
+      AND ISNULL(wi.FinanceProjectNumber, N'') <> N'INTERNAL'
     ORDER BY wi.CreatedAt DESC;
 END;
 GO

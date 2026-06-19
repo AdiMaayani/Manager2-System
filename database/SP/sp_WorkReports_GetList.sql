@@ -15,7 +15,12 @@ BEGIN
         CustomerName,
         ReporterName,
         Status,
-        FollowUpRequired
+        FollowUpRequired,
+        LifecycleStatus,
+        FinalizedAt,
+        ReversedAt,
+        AmendsWorkReportId,
+        UpdatedAt
     FROM dbo.WorkReports
     ORDER BY ReportDate DESC, WorkReportId DESC;
 END

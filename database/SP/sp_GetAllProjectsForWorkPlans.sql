@@ -13,6 +13,7 @@ BEGIN
         wi.Title,
         wi.Description,
         wi.WorkType,
+        wi.TaskCategory,
         wi.BillingType,
         wi.Status,
         wi.CustomerId,
@@ -28,6 +29,8 @@ BEGIN
     LEFT JOIN dbo.Customers c
         ON wi.CustomerId = c.CustomerId
     WHERE wi.WorkType = 'Project'
+      AND wi.IsArchived = 0
+      AND ISNULL(wi.FinanceProjectNumber, N'') <> N'INTERNAL'
     ORDER BY wi.CreatedAt DESC, wi.WorkItemId DESC;
 END
 GO

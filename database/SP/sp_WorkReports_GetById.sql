@@ -26,7 +26,16 @@ BEGIN
         ReporterRole,
         Status,
         FollowUpRequired,
-        FollowUpReason
+        FollowUpReason,
+        LifecycleStatus,
+        FinalizedAt,
+        FinalizedByUserId,
+        ReversedAt,
+        ReversedByUserId,
+        ReversalReason,
+        AmendsWorkReportId,
+        UpdatedAt,
+        UpdatedByUserId
     FROM dbo.WorkReports
     WHERE WorkReportId = @WorkReportId;
 END
