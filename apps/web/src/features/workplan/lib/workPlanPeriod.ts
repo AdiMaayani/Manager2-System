@@ -1,3 +1,10 @@
+import {
+  localDayUtcBounds,
+  localMonthUtcBounds,
+  localWeekUtcBounds,
+  localYearUtcBounds,
+  toLocalDateKey,
+} from '@shared/utils/utcDateTime';
 import type { WorkPlanRange } from '../types';
 
 const ANCHOR_PARAM_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
@@ -94,6 +101,23 @@ export function isSameDay(left: Date, right: Date): boolean {
 }
 
 /** Builds the human-readable label shown in the period navigator. */
+/** Converts the visible local period anchor + range into UTC query bounds. */
+export function periodToUtcBounds(
+  anchor: Date,
+  range: WorkPlanRange,
+): { fromUtc: string; toUtc: string } {
+  switch (range) {
+    case 'daily':
+      return localDayUtcBounds(toLocalDateKey(anchor));
+    case 'weekly':
+      return localWeekUtcBounds(anchor);
+    case 'monthly':
+      return localMonthUtcBounds(anchor);
+    case 'yearly':
+      return localYearUtcBounds(anchor);
+  }
+}
+
 export function formatPeriodLabel(anchor: Date, range: WorkPlanRange): string {
   switch (range) {
     case 'daily':

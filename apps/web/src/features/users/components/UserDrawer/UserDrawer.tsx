@@ -165,7 +165,7 @@ function UserDrawerContent({
     if (form.roles.length === 0) return 'יש לבחור לפחות תפקיד אחד.';
     if (form.departments.length === 0) return 'יש לבחור לפחות מחלקה אחת.';
     if (isSelf && !form.isActive) {
-      return 'לא ניתן להשבית את המשתמש שאיתו אתה מחובר.';
+      return 'לא ניתן לבטל את פעילות המשתמש שאיתו אתה מחובר.';
     }
     if (isSelf && user.roles.includes('Admin') && !form.roles.includes('Admin')) {
       return 'לא ניתן להסיר לעצמך את תפקיד המנהל.';
@@ -343,9 +343,9 @@ function UserDrawerContent({
           {user.isActive ? (
             !isSelf && (
               <ConfirmInline
-                triggerLabel="מחיקה"
-                message="למחוק את המשתמש? הגישה תבוטל."
-                confirmLabel="אישור מחיקה"
+                triggerLabel="בטל פעילות"
+                message="לבטל את פעילות המשתמש? הגישה תבוטל."
+                confirmLabel="אישור"
                 onConfirm={handleDelete}
                 isPending={isSaving}
               />

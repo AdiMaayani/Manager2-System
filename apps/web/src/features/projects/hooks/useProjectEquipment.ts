@@ -1,7 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { isLocalDataMode } from '@/config/appConfig';
-import { resolveDataAsync } from '@shared/data/resolveDataAsync';
-import { delayMock } from '@shared/mock';
 import {
   createProjectEquipmentAsync,
   deleteProjectEquipmentAsync,
@@ -15,26 +12,16 @@ import type {
   ReorderProjectEquipmentRequest,
   UpdateProjectEquipmentItemRequest,
 } from '../types';
-import { DEFAULT_EQUIPMENT } from '../utils/projectDisplayUtils';
 
 export function useProjectEquipment(projectId: number | null, enabled = true) {
   return useQuery({
-    queryKey: ['projectEquipment', projectId, isLocalDataMode],
+    queryKey: ['projectEquipment', projectId],
     queryFn: () => {
       if (projectId == null) {
         throw new Error('Project id is required.');
       }
 
-      return resolveDataAsync(
-        () => getProjectEquipmentAsync(projectId),
-        () =>
-          delayMock(
-            DEFAULT_EQUIPMENT.map((equipmentItem) => ({
-              ...equipmentItem,
-              projectId,
-            })),
-          ),
-      );
+      return getProjectEquipmentAsync(projectId);
     },
     enabled: enabled && projectId != null && projectId > 0,
   });

@@ -9,7 +9,7 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    SELECT 
+    SELECT
         wi.WorkItemId,
         wi.Title,
         wi.Description,

@@ -99,6 +99,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--spacing-lg);
+  padding-bottom: calc(var(--spacing-2xl) + 3.5rem);
 }
 
 .reportsPage__formSection {
@@ -161,6 +162,55 @@
   resize: vertical;
 }
 
+.reportsPage__targetSelection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.reportsPage__quickTarget {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-md);
+  background: var(--color-neutral-50);
+}
+
+.reportsPage__quickTargetLabel {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-600);
+}
+
+.reportsPage__quickTargetValue {
+  margin: 0;
+  font-weight: var(--font-weight-medium);
+}
+
+.reportsPage__targetType {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.reportsPage__targetTypeLabel {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-500);
+}
+
+.reportsPage__targetType .segmented {
+  flex-wrap: wrap;
+}
+
+.reportsPage__targetSelect {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
 .reportsPage__typeOptions,
 .reportsPage__checkbox {
   display: flex;
@@ -206,6 +256,13 @@
   border-color: var(--color-primary-500);
   color: var(--color-primary-700);
   background: var(--color-primary-50);
+  cursor: default;
+}
+
+.reportsPage__targetHint {
+  margin: 0;
+  color: var(--color-neutral-600);
+  font-size: var(--font-size-sm);
 }
 
 /* ── Related workers ─────────────────────────────────── */

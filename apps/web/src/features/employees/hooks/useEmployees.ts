@@ -1,7 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { isLocalDataMode } from '@/config/appConfig';
-import { resolveDataAsync } from '@shared/data/resolveDataAsync';
-import { mockEmployees, delayMock } from '@shared/mock';
 import {
   createEmployeeAsync,
   getEmployeeLookupAsync,
@@ -9,13 +6,12 @@ import {
   setEmployeeActiveStatusAsync,
   updateEmployeeAsync,
 } from '../api/employeesApiClient';
-import type { EmployeeLookupItem, UpsertEmployeeRequest } from '../types';
+import type { UpsertEmployeeRequest } from '../types';
 
 export function useEmployees() {
   return useQuery({
-    queryKey: ['employees', isLocalDataMode],
-    queryFn: () =>
-      resolveDataAsync(getEmployeesAsync, () => delayMock(mockEmployees)),
+    queryKey: ['employees'],
+    queryFn: getEmployeesAsync,
   });
 }
 
@@ -23,12 +19,8 @@ export function useEmployees() {
 // granted (e.g. the shared dashboard) and gated by the caller via `enabled`.
 export function useEmployeeLookup(options?: { enabled?: boolean }) {
   return useQuery({
-    queryKey: ['employees', 'lookup', isLocalDataMode],
-    queryFn: () =>
-      resolveDataAsync<EmployeeLookupItem[]>(
-        getEmployeeLookupAsync,
-        () => delayMock(mockEmployees as EmployeeLookupItem[]),
-      ),
+    queryKey: ['employees', 'lookup'],
+    queryFn: getEmployeeLookupAsync,
     enabled: options?.enabled ?? true,
   });
 }

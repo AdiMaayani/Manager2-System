@@ -40,12 +40,34 @@
   font-size: var(--font-size-base);
 }
 
-.workPlanYearlyView__status {
+.workPlanYearlyView__categories {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  justify-content: flex-end;
+}
+
+.workPlanYearlyView__categoryChip {
   font-size: var(--font-size-xs);
   padding: var(--spacing-xs) var(--spacing-sm);
-  background: var(--color-neutral-100);
+  border: 1px solid var(--color-neutral-300);
   border-radius: var(--radius-full);
   white-space: nowrap;
+}
+
+.workPlanYearlyView__categoryChip--regular {
+  background: var(--task-category-regular-bg);
+  border-color: var(--task-category-regular-border);
+}
+
+.workPlanYearlyView__categoryChip--project {
+  background: var(--task-category-project-bg);
+  border-color: var(--task-category-project-border);
+}
+
+.workPlanYearlyView__categoryChip--serviceCall {
+  background: var(--task-category-serviceCall-bg);
+  border-color: var(--task-category-serviceCall-border);
 }
 
 .workPlanYearlyView__progress {

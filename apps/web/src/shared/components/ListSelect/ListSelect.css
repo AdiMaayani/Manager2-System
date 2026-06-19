@@ -1,0 +1,99 @@
+.listSelect {
+  position: relative;
+  width: 100%;
+}
+
+.listSelect__trigger {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+  width: 100%;
+  min-height: var(--control-height-md);
+  padding: var(--spacing-sm) var(--control-padding-x);
+  border: var(--border-control);
+  border-radius: var(--radius-md);
+  background: var(--color-neutral-0);
+  color: var(--color-neutral-900);
+  font: inherit;
+  text-align: start;
+  cursor: pointer;
+}
+
+.listSelect__trigger:hover:not(:disabled) {
+  border-color: var(--color-neutral-400);
+}
+
+.listSelect__trigger:focus-visible {
+  outline: 2px solid var(--color-primary-500);
+  outline-offset: 1px;
+}
+
+.listSelect__trigger:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.listSelect__trigger--error {
+  border-color: var(--color-danger-500);
+}
+
+.listSelect__triggerLabel {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.listSelect__triggerLabel--placeholder {
+  color: var(--color-neutral-500);
+}
+
+.listSelect__chevron {
+  flex-shrink: 0;
+  color: var(--color-neutral-500);
+  transition: transform 0.15s ease;
+}
+
+.listSelect__trigger[aria-expanded='true'] .listSelect__chevron {
+  transform: rotate(180deg);
+}
+
+.listSelect__menu {
+  position: fixed;
+  z-index: var(--z-index-popover, 1200);
+  margin: 0;
+  padding: var(--spacing-xs);
+  list-style: none;
+  border: var(--border-control);
+  border-radius: var(--radius-md);
+  background: var(--color-neutral-0);
+  box-shadow: var(--shadow-lg);
+  max-height: 240px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.listSelect__option {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.listSelect__option:hover,
+.listSelect__option--active {
+  background: var(--color-primary-50);
+  color: var(--color-primary-900);
+}
+
+.listSelect__option--selected {
+  font-weight: var(--font-weight-medium);
+}
+
+.listSelect__option--disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}

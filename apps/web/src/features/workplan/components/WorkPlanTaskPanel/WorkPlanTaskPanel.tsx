@@ -8,6 +8,7 @@ import { Button } from '@shared/components/Button';
 import { InlineAlert } from '@shared/components/InlineAlert';
 import { Modal } from '@shared/components/Modal';
 import { deleteWorkPlanTaskAsync } from '../../api/workplanApiClient';
+import { invalidateWorkPlanQueries } from '../../hooks/useWorkPlanData';
 import { EditTaskDrawer } from '../EditTaskDrawer';
 import {
   getWorkPlanPriorityDisplay,
@@ -17,10 +18,18 @@ import {
 } from '../../constants';
 import { formatHourAsTime } from '../../lib/workPlanScheduling';
 import type { WorkPlanTaskSelection } from '../../types';
+import { getTaskCategoryLabel } from '@shared/constants/taskCategories';
+import {
+  taskCategoryModifierClass,
+} from '@shared/constants/taskCategoryStyles';
 import './WorkPlanTaskPanel.css';
 
-const QUICK_REPORT_KEY = 'manager2_quick_report_prefill';
-const WORKPLAN_REFRESH_KEY = 'manager2_workplan_refresh_needed';
+import { localDateKeyFromUtc, localTimeFromUtc } from '@shared/utils/utcDateTime';
+import {
+  taskCategoryToReportTargetType,
+  writeQuickReportPrefill,
+  type QuickReportPrefill,
+} from '@features/reports/quickReportPrefill';
 
 type BadgeVariant = ComponentProps<typeof Badge>['variant'];
 
@@ -63,12 +72,7 @@ export function WorkPlanTaskPanel({
     mutationFn: ({ taskId }: { taskId: number; projectId: number }) =>
       deleteWorkPlanTaskAsync(taskId),
     onSuccess: async (_data, deletedTask) => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: ['workplan'] }),
-        queryClient.invalidateQueries({ queryKey: ['projects'] }),
-        queryClient.invalidateQueries({ queryKey: ['projectLifecycle', deletedTask.projectId] }),
-        queryClient.invalidateQueries({ queryKey: ['projectMilestones', deletedTask.projectId] }),
-      ]);
+      await invalidateWorkPlanQueries(queryClient, deletedTask.projectId);
       setIsDeleteConfirmOpen(false);
       onTaskUpdated();
       onClose();
@@ -83,21 +87,28 @@ export function WorkPlanTaskPanel({
   function handleQuickReport() {
     if (!task) return;
 
-    const today = new Date().toISOString().slice(0, 10);
-    const prefill = {
-      date: today,
-      projectId: task.projectId,
-      projectName: task.projectTitle,
-      start: formatHourAsTime(task.startHour),
-      end: formatHourAsTime(task.endHour),
+    const reportDate = task.plannedStart
+      ? localDateKeyFromUtc(task.plannedStart)
+      : new Date().toISOString().slice(0, 10);
+    const prefill: QuickReportPrefill = {
+      workItemId: task.taskId,
+      taskCategory: task.taskCategory ?? 'Regular',
+      title: task.title,
+      date: reportDate,
+      start: task.plannedStart ? localTimeFromUtc(task.plannedStart) : formatHourAsTime(task.startHour),
+      end: task.plannedEnd ? localTimeFromUtc(task.plannedEnd) : formatHourAsTime(task.endHour),
+      reporterId: task.assigneeEmployeeId ? Number(task.assigneeEmployeeId) : null,
       reporterName: task.assigneeName !== '—' ? task.assigneeName : '',
       reporterRole: task.requiredRole || '',
-      taskAssigneeName: task.assigneeName,
+      customerName: task.customerName ?? undefined,
+      site: task.siteName ?? undefined,
+      projectId: task.projectId,
+      projectTitle: task.projectTitle ?? undefined,
     };
 
-    sessionStorage.setItem(QUICK_REPORT_KEY, JSON.stringify(prefill));
-    sessionStorage.setItem(WORKPLAN_REFRESH_KEY, '1');
-    navigate('/reports?quick=1');
+    writeQuickReportPrefill(prefill);
+    const reportType = taskCategoryToReportTargetType(prefill.taskCategory);
+    navigate(`/reports?quick=1&workItemId=${task.taskId}&reportType=${reportType}`);
   }
 
   const permissionTone = task.isLocked ? 'locked' : canEdit ? 'allowed' : 'blocked';
@@ -122,7 +133,15 @@ export function WorkPlanTaskPanel({
         onToggleMaximize={() => setIsMaximized((value) => !value)}
       >
         <div className="workPlanTaskPanel">
-          <div className="workPlanTaskPanel__intro">
+          <div
+            className={taskCategoryModifierClass(
+              'workPlanTaskPanel__intro',
+              task.taskCategory,
+            )}
+          >
+            <span className="workPlanTaskPanel__category">
+              {getTaskCategoryLabel(task.taskCategory)}
+            </span>
             <p className="workPlanTaskPanel__project">{task.projectTitle}</p>
             <h3 className="workPlanTaskPanel__title">{task.title}</h3>
             <Badge variant={resolveStatusVariant(task.status)}>
@@ -237,7 +256,10 @@ export function WorkPlanTaskPanel({
               variant="danger"
               iconStart={<Trash2 size={16} />}
               onClick={() =>
-                deleteTaskMutation.mutate({ taskId: task.taskId, projectId: task.projectId })
+                deleteTaskMutation.mutate({
+                  taskId: task.taskId,
+                  projectId: task.projectId ?? 0,
+                })
               }
               isLoading={deleteTaskMutation.isPending}
             >

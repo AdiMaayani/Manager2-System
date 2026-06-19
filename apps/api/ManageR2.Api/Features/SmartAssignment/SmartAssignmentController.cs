@@ -1,5 +1,6 @@
 using ManageR2.Api.Authorization;
 using ManageR2.Api.DTOs;
+using ManageR2.Infrastructure.Features.WorkItems.Services;
 using ManageR2.Infrastructure.Models;
 using ManageR2.Infrastructure.Models.SmartAssignment;
 using ManageR2.Infrastructure.Services;
@@ -93,10 +94,12 @@ public class SmartAssignmentController : ControllerBase
     {
         var context = new DraftTaskRecommendationContextModel
         {
+            TaskCategory = request.TaskCategory,
             ProjectId = request.ProjectId,
+            CustomerId = request.CustomerId,
             PlannedStart = request.PlannedStart,
             PlannedEnd = request.PlannedEnd,
-            EstimatedHours = request.EstimatedHours,
+            EstimatedHours = DeriveEstimatedHours(request.PlannedStart, request.PlannedEnd),
             Priority = request.Priority,
             RequiredRole = request.RequiredRole,
             SiteId = request.SiteId
@@ -114,6 +117,16 @@ public class SmartAssignmentController : ControllerBase
         };
 
         return Ok(response);
+    }
+
+    private static decimal? DeriveEstimatedHours(DateTime plannedStart, DateTime plannedEnd)
+    {
+        if (plannedEnd <= plannedStart)
+        {
+            return null;
+        }
+
+        return DurationCalculator.TryCalculate(plannedStart, plannedEnd)?.EstimatedHours;
     }
 
     private int? GetCurrentUserId()

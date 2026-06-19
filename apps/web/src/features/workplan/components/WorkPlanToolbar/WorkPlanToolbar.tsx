@@ -11,9 +11,12 @@ import {
 import { Button } from '@shared/components/Button';
 import { IconButton } from '@shared/components/IconButton';
 import { Select } from '@shared/components/Select';
+import { ListSelect } from '@shared/components/ListSelect';
+import { InlineAlert } from '@shared/components/InlineAlert';
 import { SegmentedControl, type SegmentItem } from '@shared/components/SegmentedControl';
-import { RANGE_LABELS, SCOPE_LABELS, STATUS_FILTER_OPTIONS } from '../../constants';
-import type { WorkPlanProjectFilter, WorkPlanRange, WorkPlanScope } from '../../types';
+import { RANGE_LABELS, SCOPE_LABELS, STATUS_FILTER_OPTIONS, TASK_CATEGORY_FILTER_OPTIONS } from '../../constants';
+import { TASK_CATEGORY_LEGEND_ITEMS } from '@shared/constants/taskCategoryStyles';
+import type { WorkPlanProjectFilter, WorkPlanRange, WorkPlanScope, WorkPlanTaskCategoryFilter } from '../../types';
 import './WorkPlanToolbar.css';
 
 interface ProjectOption {
@@ -25,15 +28,19 @@ interface WorkPlanToolbarProps {
   scope: WorkPlanScope;
   range: WorkPlanRange;
   statusFilter: string;
+  taskCategoryFilter: WorkPlanTaskCategoryFilter;
   projectFilter: WorkPlanProjectFilter;
   employeeFilterId: string;
   searchQuery: string;
   periodLabel: string;
   projectOptions: ProjectOption[];
   employees: Array<{ employeeId: number; fullName: string }>;
+  employeeLoadError?: string | null;
+  isEmployeeListLoading?: boolean;
   onScopeChange: (scope: WorkPlanScope) => void;
   onRangeChange: (range: WorkPlanRange) => void;
   onStatusFilterChange: (status: string) => void;
+  onTaskCategoryFilterChange: (category: WorkPlanTaskCategoryFilter) => void;
   onProjectFilterChange: (projectId: WorkPlanProjectFilter) => void;
   onEmployeeFilterChange: (employeeId: string) => void;
   onSearchChange: (query: string) => void;
@@ -53,27 +60,31 @@ const RANGE_ITEMS: SegmentItem<WorkPlanRange>[] = (
   ['daily', 'weekly', 'monthly', 'yearly'] as WorkPlanRange[]
 ).map((id) => ({ id, label: RANGE_LABELS[id] }));
 
-const LEGEND_ITEMS: Array<{ modifier: string; label: string }> = [
-  { modifier: 'normal', label: 'משימת פרויקט' },
+const OVERLAY_LEGEND_ITEMS: Array<{ modifier: string; label: string }> = [
   { modifier: 'locked', label: 'נעולה' },
   { modifier: 'warning', label: 'אזהרה' },
   { modifier: 'violation', label: 'חריגה / ללא שיבוץ' },
   { modifier: 'urgent', label: 'דחוף' },
+  { modifier: 'unscheduled', label: 'לא מתוזמנת' },
 ];
 
 export function WorkPlanToolbar({
   scope,
   range,
   statusFilter,
+  taskCategoryFilter,
   projectFilter,
   employeeFilterId,
   searchQuery,
   periodLabel,
   projectOptions,
   employees,
+  employeeLoadError,
+  isEmployeeListLoading = false,
   onScopeChange,
   onRangeChange,
   onStatusFilterChange,
+  onTaskCategoryFilterChange,
   onProjectFilterChange,
   onEmployeeFilterChange,
   onSearchChange,
@@ -101,36 +112,43 @@ export function WorkPlanToolbar({
               />
 
               {scope === 'employee' && (
-                <Select
-                  value={employeeFilterId}
-                  onChange={(e) => onEmployeeFilterChange(e.target.value)}
-                  aria-label="בחירת עובד"
-                >
-                  <option value="">כל העובדים</option>
-                  {employees.map((employee) => (
-                    <option key={employee.employeeId} value={String(employee.employeeId)}>
-                      {employee.fullName}
-                    </option>
-                  ))}
-                </Select>
+                <div className="workPlanToolbar__scopeSelect">
+                  <ListSelect
+                    aria-label="בחירת עובד"
+                    placeholder={isEmployeeListLoading ? 'טוען עובדים…' : 'בחר עובד'}
+                    value={employeeFilterId}
+                    disabled={isEmployeeListLoading || !!employeeLoadError}
+                    onChange={onEmployeeFilterChange}
+                    options={[
+                      { value: '', label: 'בחר עובד' },
+                      ...employees.map((employee) => ({
+                        value: String(employee.employeeId),
+                        label: employee.fullName,
+                      })),
+                    ]}
+                  />
+                  {employeeLoadError && (
+                    <InlineAlert variant="danger">{employeeLoadError}</InlineAlert>
+                  )}
+                </div>
               )}
 
               {isProjectScope && (
-                <Select
-                  value={projectFilter === 'all' ? 'all' : String(projectFilter)}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    onProjectFilterChange(value === 'all' ? 'all' : Number(value));
-                  }}
+                <ListSelect
                   aria-label="בחירת פרויקט"
-                >
-                  <option value="all">כל הפרויקטים</option>
-                  {projectOptions.map((project) => (
-                    <option key={project.id} value={String(project.id)}>
-                      {project.title}
-                    </option>
-                  ))}
-                </Select>
+                  placeholder="בחר פרויקט"
+                  value={projectFilter === 'all' ? '' : String(projectFilter)}
+                  onChange={(value) => {
+                    onProjectFilterChange(value ? Number(value) : 'all');
+                  }}
+                  options={[
+                    { value: '', label: 'בחר פרויקט' },
+                    ...projectOptions.map((project) => ({
+                      value: String(project.id),
+                      label: project.title,
+                    })),
+                  ]}
+                />
               )}
             </div>
           </div>
@@ -145,22 +163,37 @@ export function WorkPlanToolbar({
             />
           </div>
 
-          {isProjectScope && (
-            <div className="workPlanToolbar__group">
-              <span className="workPlanToolbar__groupLabel">סטטוס</span>
-              <Select
-                value={statusFilter}
-                onChange={(e) => onStatusFilterChange(e.target.value)}
-                aria-label="סינון לפי סטטוס"
-              >
-                {STATUS_FILTER_OPTIONS.map((option) => (
-                  <option key={option.id} value={option.id}>
-                    {option.label}
-                  </option>
-                ))}
-              </Select>
-            </div>
-          )}
+          <div className="workPlanToolbar__group">
+            <span className="workPlanToolbar__groupLabel">סוג משימה</span>
+            <Select
+              value={taskCategoryFilter}
+              onChange={(e) =>
+                onTaskCategoryFilterChange(e.target.value as WorkPlanTaskCategoryFilter)
+              }
+              aria-label="סינון לפי סוג משימה"
+            >
+              {TASK_CATEGORY_FILTER_OPTIONS.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </Select>
+          </div>
+
+          <div className="workPlanToolbar__group">
+            <span className="workPlanToolbar__groupLabel">סטטוס</span>
+            <Select
+              value={statusFilter}
+              onChange={(e) => onStatusFilterChange(e.target.value)}
+              aria-label="סינון לפי סטטוס"
+            >
+              {STATUS_FILTER_OPTIONS.map((option) => (
+                <option key={option.id} value={option.id}>
+                  {option.label}
+                </option>
+              ))}
+            </Select>
+          </div>
         </div>
 
         <div className="workPlanToolbar__actions">
@@ -244,7 +277,16 @@ export function WorkPlanToolbar({
       </div>
 
       <div className="workPlanToolbar__legend" aria-label="מקרא משימות">
-        {LEGEND_ITEMS.map((item) => (
+        {TASK_CATEGORY_LEGEND_ITEMS.map((item) => (
+          <span key={item.modifier} className="workPlanToolbar__legendItem">
+            <span
+              className={`workPlanToolbar__chip workPlanToolbar__chip--${item.modifier}`}
+              aria-hidden
+            />
+            {item.label}
+          </span>
+        ))}
+        {OVERLAY_LEGEND_ITEMS.map((item) => (
           <span key={item.modifier} className="workPlanToolbar__legendItem">
             <span
               className={`workPlanToolbar__chip workPlanToolbar__chip--${item.modifier}`}

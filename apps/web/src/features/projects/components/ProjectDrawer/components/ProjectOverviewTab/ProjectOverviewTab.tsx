@@ -728,4 +728,3 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
     </div>
   );
 });
-

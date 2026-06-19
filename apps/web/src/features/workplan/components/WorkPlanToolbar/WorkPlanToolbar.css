@@ -266,6 +266,33 @@
   border: 1px solid transparent;
 }
 
+.workPlanToolbar__chip--regular {
+  background: var(--task-category-regular-bg);
+  border-color: var(--task-category-regular-border);
+}
+
+.workPlanToolbar__chip--project {
+  background: var(--task-category-project-bg);
+  border-color: var(--task-category-project-border);
+}
+
+.workPlanToolbar__chip--serviceCall {
+  background: var(--task-category-serviceCall-bg);
+  border-color: var(--task-category-serviceCall-border);
+}
+
+.workPlanToolbar__chip--unscheduled {
+  background: var(--color-neutral-100);
+  border-color: var(--color-neutral-400);
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 2px,
+    color-mix(in srgb, var(--color-neutral-400) 35%, transparent) 2px,
+    color-mix(in srgb, var(--color-neutral-400) 35%, transparent) 4px
+  );
+}
+
 .workPlanToolbar__chip--locked {
   background: color-mix(in srgb, var(--color-danger-500) 14%, white);
   border-color: var(--color-danger-500);

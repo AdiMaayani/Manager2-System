@@ -1,20 +1,12 @@
 import { useCallback, useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { isLocalDataMode } from '@/config/appConfig';
 import { getCustomersAsync } from '@features/customers/api/customersApiClient';
-import { resolveDataAsync } from '@shared/data/resolveDataAsync';
 import {
-  delayMock,
-  mockCustomers,
-  mockProjectLifecycle,
-  mockProjectMilestones,
-  mockSites,
-} from '@shared/mock';
-import {
-  cancelMilestoneAsync,
+  reorderProjectMilestonesAsync,
   createMilestoneAsync,
   createProjectAsync,
   createSiteAsync,
+  deactivateMilestoneAsync,
   getProjectEmployeesAsync,
   getProjectLifecycleAsync,
   getProjectMilestonesAsync,
@@ -68,16 +60,13 @@ function buildProjectTeamAssignments(
 
 export function useProjectLifecycle(projectId: number | null, enabled = true) {
   return useQuery({
-    queryKey: ['projectLifecycle', projectId, isLocalDataMode],
+    queryKey: ['projectLifecycle', projectId],
     queryFn: () => {
       if (projectId == null) {
         throw new Error('Project id is required.');
       }
 
-      return resolveDataAsync(
-        () => getProjectLifecycleAsync(projectId),
-        () => delayMock(mockProjectLifecycle(projectId)),
-      );
+      return getProjectLifecycleAsync(projectId);
     },
     enabled: enabled && projectId != null && projectId > 0,
   });
@@ -85,16 +74,13 @@ export function useProjectLifecycle(projectId: number | null, enabled = true) {
 
 export function useProjectMilestones(projectId: number | null, enabled = true) {
   return useQuery({
-    queryKey: ['projectMilestones', projectId, isLocalDataMode],
+    queryKey: ['projectMilestones', projectId],
     queryFn: () => {
       if (projectId == null) {
         throw new Error('Project id is required.');
       }
 
-      return resolveDataAsync(
-        () => getProjectMilestonesAsync(projectId),
-        () => delayMock(mockProjectMilestones(projectId)),
-      );
+      return getProjectMilestonesAsync(projectId);
     },
     enabled: enabled && projectId != null && projectId > 0,
   });
@@ -102,19 +88,18 @@ export function useProjectMilestones(projectId: number | null, enabled = true) {
 
 export function useProjectLookups() {
   const customersQuery = useQuery({
-    queryKey: ['projectLookups', 'customers', isLocalDataMode],
-    queryFn: () =>
-      resolveDataAsync(getCustomersAsync, () => delayMock(mockCustomers)),
+    queryKey: ['projectLookups', 'customers'],
+    queryFn: getCustomersAsync,
   });
 
   const sitesQuery = useQuery({
-    queryKey: ['projectLookups', 'sites', isLocalDataMode],
-    queryFn: () => resolveDataAsync(getSitesAsync, () => delayMock(mockSites)),
+    queryKey: ['projectLookups', 'sites'],
+    queryFn: getSitesAsync,
   });
 
   const employeesQuery = useQuery({
-    queryKey: ['projectLookups', 'employees', isLocalDataMode],
-    queryFn: () => resolveDataAsync(getProjectEmployeesAsync, () => delayMock([])),
+    queryKey: ['projectLookups', 'employees'],
+    queryFn: getProjectEmployeesAsync,
   });
   const refetchCustomers = customersQuery.refetch;
   const refetchSites = sitesQuery.refetch;
@@ -210,16 +195,30 @@ export function useMilestoneMutations(projectId: number | null) {
     }: {
       milestoneId: number;
       body: UpdateMilestoneRequest;
-    }) => updateMilestoneAsync(milestoneId, body),
+    }) => {
+      if (projectId == null) throw new Error('Project id is required.');
+      return updateMilestoneAsync(projectId, milestoneId, body);
+    },
     onSuccess: invalidate,
   });
 
-  const cancelMutation = useMutation({
-    mutationFn: (milestoneId: number) => cancelMilestoneAsync(milestoneId),
+  const deactivateMutation = useMutation({
+    mutationFn: (milestoneId: number) => {
+      if (projectId == null) throw new Error('Project id is required.');
+      return deactivateMilestoneAsync(projectId, milestoneId);
+    },
     onSuccess: invalidate,
   });
 
-  return { createMutation, updateMutation, cancelMutation };
+  const reorderMutation = useMutation({
+    mutationFn: (items: { projectMilestoneId: number; sortOrder: number }[]) => {
+      if (projectId == null) throw new Error('Project id is required.');
+      return reorderProjectMilestonesAsync(projectId, items);
+    },
+    onSuccess: invalidate,
+  });
+
+  return { createMutation, updateMutation, deactivateMutation, reorderMutation };
 }
 
 export function useCreateSite() {

@@ -45,7 +45,9 @@ namespace ManageR2.Infrastructure.Repositories.SmartAssignment
             using var connection = _db.CreateConnection();
             using var command = new SqlCommand("Rec_GetDraftTaskRecommendationInput", connection);
             command.CommandType = CommandType.StoredProcedure;
-            command.Parameters.AddWithValue("@ProjectId", context.ProjectId);
+            command.Parameters.AddWithValue("@TaskCategory", context.TaskCategory);
+            command.Parameters.AddWithValue("@ProjectId", (object?)context.ProjectId ?? DBNull.Value);
+            command.Parameters.AddWithValue("@CustomerId", (object?)context.CustomerId ?? DBNull.Value);
             command.Parameters.AddWithValue("@PlannedStart", context.PlannedStart);
             command.Parameters.AddWithValue("@PlannedEnd", context.PlannedEnd);
             command.Parameters.AddWithValue("@EstimatedHours", (object?)context.EstimatedHours ?? DBNull.Value);

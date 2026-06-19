@@ -1,16 +1,20 @@
 import { useMemo } from 'react';
-import type { MappedWorkPlan, WorkPlanTaskSelection } from '../../types';
+import type { WorkPlanSchedule, WorkPlanTaskSelection } from '../../types';
 import {
   getWorkPlanStatusDisplay,
   isWorkPlanStatusDone,
   isWorkPlanStatusInProgress,
+  matchesWorkPlanStatusFilter,
 } from '../../constants';
 import {
   buildTaskSearchFields,
   buildWorkPlanTaskSelection,
   matchesWorkPlanSearch,
-  resolveAssignment,
+  resolveFlatAssignment,
 } from '../../lib/workPlanScheduling';
+import { toLocalDateKey } from '@shared/utils/utcDateTime';
+import { getTaskCategoryLabel } from '@shared/constants/taskCategories';
+import { taskCategoryModifierClass } from '@shared/constants/taskCategoryStyles';
 import './WorkPlanMonthlyView.css';
 
 function monthlyTaskStatusClass(status?: string | null): string {
@@ -20,110 +24,108 @@ function monthlyTaskStatusClass(status?: string | null): string {
 }
 
 interface WorkPlanMonthlyViewProps {
-  workPlans: MappedWorkPlan[];
+  schedule: WorkPlanSchedule;
+  statusFilter: string;
+  taskCategoryFilter: string;
   searchQuery: string;
   periodAnchor: Date;
   onTaskClick?: (task: WorkPlanTaskSelection) => void;
 }
 
 export function WorkPlanMonthlyView({
-  workPlans,
+  schedule,
+  statusFilter,
+  taskCategoryFilter,
   searchQuery,
   periodAnchor,
   onTaskClick,
 }: WorkPlanMonthlyViewProps) {
   const monthLabel = periodAnchor.toLocaleDateString('he-IL', { month: 'long', year: 'numeric' });
+  const localDayKey = toLocalDateKey(periodAnchor);
 
-  const projects = useMemo(
-    () =>
-      workPlans
-        .map((workPlan) => {
-          const tasks = workPlan.tasks.filter((task) => {
-            const assignment = resolveAssignment(task, workPlan);
-            return matchesWorkPlanSearch(
-              buildTaskSearchFields(task, workPlan, assignment),
-              searchQuery,
-            );
-          });
+  const groups = useMemo(() => {
+    const map = new Map<string, WorkPlanTaskSelection[]>();
 
-          const doneCount = tasks.filter((task) => isWorkPlanStatusDone(task.status)).length;
-          const progressCount = tasks.filter((task) =>
-            isWorkPlanStatusInProgress(task.status),
-          ).length;
-          const plannedCount = tasks.length - doneCount - progressCount;
+    for (const task of [...schedule.scheduledTasks, ...schedule.unscheduledTasks]) {
+      if (!matchesWorkPlanStatusFilter(task.status, statusFilter)) continue;
+      if (taskCategoryFilter !== 'all' && task.taskCategory !== taskCategoryFilter) continue;
 
-          return { workPlan, tasks, doneCount, progressCount, plannedCount };
-        })
-        .filter((entry) => entry.tasks.length > 0 || !searchQuery.trim()),
-    [workPlans, searchQuery],
-  );
+      const assignment = resolveFlatAssignment(task, schedule.assignments);
+      if (!matchesWorkPlanSearch(buildTaskSearchFields(task, assignment), searchQuery)) continue;
+
+      const groupKey = task.projectTitle ?? task.customerName ?? 'ללא פרויקט';
+      if (!map.has(groupKey)) map.set(groupKey, []);
+      map.get(groupKey)!.push(
+        buildWorkPlanTaskSelection(
+          task,
+          assignment,
+          localDayKey,
+          !task.plannedStart || !task.plannedEnd,
+        ),
+      );
+    }
+
+    return Array.from(map.entries())
+      .map(([title, tasks]) => {
+        const doneCount = tasks.filter((t) => isWorkPlanStatusDone(t.status)).length;
+        const progressCount = tasks.filter((t) => isWorkPlanStatusInProgress(t.status)).length;
+        return {
+          title,
+          tasks,
+          doneCount,
+          progressCount,
+          plannedCount: tasks.length - doneCount - progressCount,
+        };
+      })
+      .filter((entry) => entry.tasks.length > 0 || !searchQuery.trim());
+  }, [schedule, statusFilter, taskCategoryFilter, searchQuery, localDayKey]);
 
   return (
     <div className="workPlanMonthlyView card">
       <h3 className="workPlanMonthlyView__title">תצוגה חודשית · {monthLabel}</h3>
       <div className="workPlanMonthlyView__list">
-        {projects.length === 0 ? (
-          <p className="workPlanMonthlyView__empty">אין פרויקטים להצגה</p>
+        {groups.length === 0 ? (
+          <p className="workPlanMonthlyView__empty">אין משימות להצגה</p>
         ) : (
-          projects.map(({ workPlan, tasks, doneCount, progressCount, plannedCount }) => (
-            <section key={workPlan.project.id} className="workPlanMonthlyView__project">
+          groups.map(({ title, tasks, doneCount, progressCount, plannedCount }) => (
+            <section key={title} className="workPlanMonthlyView__project">
               <header className="workPlanMonthlyView__projectHeader">
                 <div className="workPlanMonthlyView__projectTitle">
-                  <h4>{workPlan.project.title}</h4>
-                  <span className="workPlanMonthlyView__badge">
-                    {getWorkPlanStatusDisplay(workPlan.project.status)}
-                  </span>
+                  <h4>{title}</h4>
                 </div>
                 <div className="workPlanMonthlyView__counts">
                   <span className="workPlanMonthlyView__countChip workPlanMonthlyView__countChip--total">
                     {tasks.length} משימות
                   </span>
-                  {plannedCount > 0 && (
-                    <span className="workPlanMonthlyView__countChip workPlanMonthlyView__countChip--planned">
-                      {plannedCount} מתוכננות
-                    </span>
-                  )}
-                  {progressCount > 0 && (
-                    <span className="workPlanMonthlyView__countChip workPlanMonthlyView__countChip--progress">
-                      {progressCount} בביצוע
-                    </span>
-                  )}
-                  {doneCount > 0 && (
-                    <span className="workPlanMonthlyView__countChip workPlanMonthlyView__countChip--done">
-                      {doneCount} הושלמו
-                    </span>
-                  )}
+                  <span className="workPlanMonthlyView__countChip workPlanMonthlyView__countChip--planned">
+                    {plannedCount} מתוכננות
+                  </span>
+                  <span className="workPlanMonthlyView__countChip workPlanMonthlyView__countChip--progress">
+                    {progressCount} בביצוע
+                  </span>
+                  <span className="workPlanMonthlyView__countChip workPlanMonthlyView__countChip--done">
+                    {doneCount} הושלמו
+                  </span>
                 </div>
               </header>
-              {tasks.length === 0 ? (
-                <p className="workPlanMonthlyView__noTasks">אין משימות בפרויקט זה</p>
-              ) : (
-                <ul className="workPlanMonthlyView__tasks">
-                  {tasks.map((task, taskIndex) => (
-                    <li key={task.workItemId}>
-                      <button
-                        type="button"
-                        className={`workPlanMonthlyView__taskButton ${monthlyTaskStatusClass(task.status)}`}
-                        onClick={() =>
-                          onTaskClick?.(buildWorkPlanTaskSelection(workPlan, task, taskIndex))
-                        }
-                        title={`${task.title} · ${getWorkPlanStatusDisplay(task.status)}`}
-                      >
-                        <span className="workPlanMonthlyView__taskDot" aria-hidden />
-                        <strong className="workPlanMonthlyView__taskTitle">{task.title}</strong>
-                        <span className="workPlanMonthlyView__taskStatus">
-                          {getWorkPlanStatusDisplay(task.status)}
-                        </span>
-                        {task.plannedStart && (
-                          <span className="workPlanMonthlyView__date">
-                            {new Date(task.plannedStart).toLocaleDateString('he-IL')}
-                          </span>
-                        )}
-                      </button>
-                    </li>
-                  ))}
-                </ul>
-              )}
+              <ul className="workPlanMonthlyView__tasks">
+                {tasks.map((task) => (
+                  <li key={task.taskId}>
+                    <button
+                      type="button"
+                      className={`${taskCategoryModifierClass('workPlanMonthlyView__taskButton', task.taskCategory)} ${monthlyTaskStatusClass(task.status)}`}
+                      onClick={() => onTaskClick?.(task)}
+                    >
+                      <span className="workPlanMonthlyView__taskTitle">{task.title}</span>
+                      <span className="workPlanMonthlyView__taskMeta">
+                        {getTaskCategoryLabel(task.taskCategory)} ·{' '}
+                        {getWorkPlanStatusDisplay(task.status)}
+                        {task.isUnscheduled ? ' · לא מתוזמנת' : ''}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
             </section>
           ))
         )}
