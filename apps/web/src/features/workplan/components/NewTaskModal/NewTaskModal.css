@@ -1,0 +1,374 @@
+.newTaskModal {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.newTaskModal__header {
+  flex-shrink: 0;
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-bottom: 1px solid var(--color-neutral-200);
+  background: var(--color-neutral-50);
+}
+
+.newTaskModal__steps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.newTaskModal__step {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-xs) var(--spacing-md);
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-full);
+  color: var(--color-neutral-600);
+  background: #fff;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.newTaskModal__stepIndex {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-full);
+  background: var(--color-neutral-200);
+  color: var(--color-neutral-700);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.newTaskModal__step--active {
+  border-color: var(--color-primary-500);
+  color: var(--color-primary-700);
+  background: var(--color-primary-50);
+}
+
+.newTaskModal__step--active .newTaskModal__stepIndex {
+  background: var(--color-primary-600);
+  color: #fff;
+}
+
+.newTaskModal__step--complete {
+  border-color: var(--color-success-100);
+  color: var(--color-success-700);
+  background: var(--color-success-50);
+}
+
+.newTaskModal__step--complete .newTaskModal__stepIndex {
+  background: var(--color-success-600);
+  color: #fff;
+}
+
+.newTaskModal__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--spacing-lg);
+}
+
+.newTaskModal__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.newTaskModal__sectionTitle {
+  margin: 0;
+  font-size: var(--font-size-lg);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-900);
+}
+
+.newTaskModal__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.newTaskModal__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-neutral-700);
+}
+
+.newTaskModal__select,
+.newTaskModal__textarea {
+  width: 100%;
+  border: 1px solid var(--color-neutral-300);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font: inherit;
+  color: var(--color-neutral-900);
+  background: #fff;
+}
+
+.newTaskModal__select:focus,
+.newTaskModal__textarea:focus {
+  outline: none;
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 3px var(--color-primary-100);
+}
+
+.newTaskModal__textarea {
+  resize: vertical;
+}
+
+.newTaskModal__kindToggle {
+  display: flex;
+  gap: var(--spacing-sm);
+}
+
+.newTaskModal__kindOption {
+  flex: 1;
+  border: 1px solid var(--color-neutral-300);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font: inherit;
+  font-weight: var(--font-weight-medium);
+  color: var(--color-neutral-700);
+  background: #fff;
+  cursor: pointer;
+}
+
+.newTaskModal__kindOption:hover {
+  border-color: var(--color-primary-400);
+}
+
+.newTaskModal__kindOption--active {
+  border-color: var(--color-primary-500);
+  color: var(--color-primary-700);
+  background: var(--color-primary-50);
+}
+
+.newTaskModal__kindOption:focus-visible {
+  outline: none;
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 3px var(--color-primary-100);
+}
+
+/* ── Smart assignment ───────────────────────────────── */
+.newTaskModal__smartHead {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.newTaskModal__smartLoading {
+  display: flex;
+  justify-content: center;
+  padding: var(--spacing-lg) 0;
+}
+
+.newTaskModal__smartSummary {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-md);
+  background: var(--color-neutral-50);
+}
+
+.newTaskModal__smartMessage {
+  color: var(--color-neutral-900);
+}
+
+.newTaskModal__smartStats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.newTaskModal__stat {
+  display: inline-flex;
+  align-items: baseline;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-radius: var(--radius-full);
+  background: #fff;
+  border: 1px solid var(--color-neutral-200);
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-600);
+}
+
+.newTaskModal__stat strong {
+  color: var(--color-neutral-900);
+}
+
+.newTaskModal__recommendation {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-primary-200);
+  border-radius: var(--radius-md);
+  background: var(--color-primary-50);
+}
+
+.newTaskModal__recommendationHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+}
+
+.newTaskModal__recommendationWho {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.newTaskModal__recommendationLabel {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-primary-700);
+}
+
+.newTaskModal__recommendationName {
+  font-size: var(--font-size-lg);
+  color: var(--color-neutral-900);
+}
+
+.newTaskModal__score {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-radius: var(--radius-full);
+  background: var(--color-primary-600);
+  color: #fff;
+  font-weight: var(--font-weight-semibold);
+}
+
+.newTaskModal__reasons {
+  margin: 0;
+  padding-inline-start: var(--spacing-lg);
+  list-style: disc;
+  color: var(--color-neutral-700);
+  font-size: var(--font-size-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.newTaskModal__warning {
+  margin: 0;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  background: var(--color-warning-50);
+  color: var(--color-warning-600);
+  font-size: var(--font-size-sm);
+}
+
+.newTaskModal__smartRun {
+  display: flex;
+}
+
+.newTaskModal__hint {
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-600);
+  margin: 0;
+}
+
+.newTaskModal__fieldHint {
+  margin: 0;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-inline-start: 3px solid var(--color-primary-300);
+  border-radius: var(--radius-sm);
+  background: var(--color-primary-50);
+  color: var(--color-neutral-700);
+  font-size: var(--font-size-xs);
+  line-height: var(--line-height-normal);
+}
+
+.newTaskModal__assignedNote {
+  margin: 0;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-success-100);
+  border-inline-start: 3px solid var(--color-success-600);
+  border-radius: var(--radius-md);
+  background: var(--color-success-50);
+  color: var(--color-success-700);
+  font-size: var(--font-size-sm);
+  line-height: var(--line-height-normal);
+}
+
+/* ── Footer ─────────────────────────────────────────── */
+.newTaskModal__footer {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md) var(--spacing-lg);
+  border-top: 1px solid var(--color-neutral-200);
+  background: var(--color-neutral-50);
+}
+
+.newTaskModal__error {
+  color: var(--color-danger-600);
+  margin: 0;
+}
+
+.newTaskModal__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+/* Smart Assignment explainability — per-factor breakdown */
+.newTaskModal__factors {
+  list-style: none;
+  margin: var(--spacing-sm) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.newTaskModal__factor {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-neutral-100);
+  border-radius: var(--radius-md);
+  background: var(--color-neutral-50);
+}
+
+.newTaskModal__factorHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-sm);
+}
+
+.newTaskModal__factorLabel {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-800);
+}
+
+.newTaskModal__factorScore {
+  font-family: monospace;
+  color: var(--color-primary-700);
+}
+
+.newTaskModal__factorExplain {
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-700);
+}
+
+.newTaskModal__factorSource {
+  font-size: var(--font-size-xs);
+  color: var(--color-neutral-500);
+}

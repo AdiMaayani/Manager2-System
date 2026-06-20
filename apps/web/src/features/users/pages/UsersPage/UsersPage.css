@@ -1,0 +1,17 @@
+/* Multi-value cells inside the shared DataTable. */
+.usersPage__primaryCell {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.usersPage__primaryCell small {
+  color: var(--color-neutral-500);
+  font-size: var(--font-size-xs);
+}
+
+.usersPage__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+}

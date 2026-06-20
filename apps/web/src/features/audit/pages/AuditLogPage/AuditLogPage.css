@@ -1,0 +1,2 @@
+/* AuditLogPage now composes shared FilterBar/FilterField, Input/Select, and
+   DataTable; no page-specific styles are required. */

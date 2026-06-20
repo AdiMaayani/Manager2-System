@@ -1,0 +1,87 @@
+.inventoryProductCard {
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+  text-align: start;
+  background-color: var(--color-surface);
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  cursor: pointer;
+  box-shadow: var(--shadow-sm);
+  transition:
+    transform var(--transition-fast),
+    box-shadow var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.inventoryProductCard:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--color-primary-300);
+}
+
+.inventoryProductCard:focus-visible {
+  outline: none;
+  border-color: var(--color-primary-500);
+  box-shadow: var(--focus-ring);
+}
+
+.inventoryProductCard:active {
+  transform: translateY(0);
+}
+
+.inventoryProductCard--selected {
+  border-color: var(--color-primary-500);
+  box-shadow: var(--focus-ring);
+}
+
+.inventoryProductCard__body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+}
+
+.inventoryProductCard__header {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.inventoryProductCard__name {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-900);
+  line-height: var(--line-height-tight);
+}
+
+.inventoryProductCard__sku {
+  font-size: var(--font-size-xs);
+  font-family: ui-monospace, 'SFMono-Regular', 'Cascadia Code', monospace;
+  direction: ltr;
+  text-align: start;
+  color: var(--color-neutral-500);
+}
+
+.inventoryProductCard__category {
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-600);
+}
+
+.inventoryProductCard__stock {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-neutral-700);
+}
+
+.inventoryProductCard__quantity--low {
+  color: var(--color-warning-700);
+  font-weight: var(--font-weight-semibold);
+}
+
+.inventoryProductCard__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+}

@@ -1,0 +1,399 @@
+export interface ProjectListItem {
+  workItemId: number;
+  projectNumber: string;
+  title: string;
+  customerName: string;
+  projectManagerName: string;
+  status: string;
+  createdAt: string;
+  siteName: string;
+  billingType: string;
+  dealCloseDate?: string;
+  financeProjectNumber?: string;
+  invoiceNumber?: string;
+}
+
+export interface ProjectLifecycleProject {
+  workItemId: number;
+  title: string;
+  description?: string;
+  status: string;
+  billingType?: string;
+  customerId: number;
+  customerName?: string;
+  siteId?: number;
+  siteName?: string;
+  createdAt: string;
+  closedAt?: string;
+  dealCloseDate?: string;
+  financeProjectNumber?: string;
+  invoiceNumber?: string;
+}
+
+export interface ProjectLifecycleMilestone {
+  workItemId: number;
+  milestoneId?: number;
+  projectMilestoneId?: number;
+  title: string;
+  description?: string;
+  status: string;
+  billingType?: string;
+  createdAt: string;
+  plannedStart?: string;
+  plannedEnd?: string;
+  closedAt?: string;
+  estimatedHours?: number;
+  priority?: string;
+  requiredRole?: string;
+  isLocked: boolean;
+  sortOrder?: number;
+  progressPercent?: number | null;
+}
+
+export interface ProjectLifecycleAssignment {
+  workItemId: number;
+  employeeId?: number;
+  contractorId?: number;
+  assignmentType: string;
+  assignmentRole?: string;
+  assignedHours?: number;
+  isManualAssignment: boolean;
+  employeeName?: string;
+  contractorName?: string;
+}
+
+export interface ProjectLifecycleReport {
+  workReportId: number;
+  workItemId?: number;
+  reportType?: string;
+  reportDate?: string;
+  summary?: string;
+  notes?: string;
+  reporterName?: string;
+  status?: string;
+  followUpRequired: boolean;
+}
+
+export interface ProjectLifecycleSummary {
+  totalMilestones: number;
+  openMilestones: number;
+  closedMilestones: number;
+  lockedMilestones: number;
+  cancelledMilestones: number;
+  delayedMilestones: number;
+  invalidScheduleMilestones: number;
+  upcomingMilestones: number;
+  riskLevel: string;
+  healthStatus: string;
+  riskReason: string;
+  progressPercent: number;
+  totalReports: number;
+  hasFollowUps: boolean;
+}
+
+export interface ProjectLifecycle {
+  project: ProjectLifecycleProject;
+  milestones: ProjectLifecycleMilestone[];
+  assignments: ProjectLifecycleAssignment[];
+  reports: ProjectLifecycleReport[];
+  summary: ProjectLifecycleSummary;
+}
+
+export interface ProjectMilestoneEmployee {
+  employeeId: number;
+  employeeName: string;
+  assignmentRole?: string;
+}
+
+export interface ProjectMilestoneContractor {
+  contractorId: number;
+  contractorName: string;
+  assignmentRole?: string;
+}
+
+export interface ProjectMilestone {
+  milestoneId?: number;
+  projectMilestoneId?: number;
+  workItemId?: number;
+  projectId?: number;
+  title: string;
+  description?: string;
+  status: string;
+  sortOrder?: number;
+  progressPercent?: number | null;
+  isActive?: boolean;
+  managerEmployeeId?: number;
+  managerEmployeeName?: string;
+  createdAt?: string;
+  updatedAt?: string | null;
+  plannedStart?: string;
+  plannedEnd?: string;
+  actualStart?: string;
+  actualEnd?: string;
+}
+
+export interface CreateProjectRequest {
+  title: string;
+  description?: string;
+  status: string;
+  billingType: string;
+  customerId: number;
+  siteId: number;
+  dealCloseDate?: string;
+  financeProjectNumber?: string;
+  invoiceNumber?: string;
+}
+
+export interface UpdateProjectRequest {
+  workItemId: number;
+  title: string;
+  description?: string;
+  workType: string;
+  billingType: string;
+  status: string;
+  customerId: number;
+  siteId: number;
+  createdAt: string;
+  closedAt?: string | null;
+  parentWorkItemId?: number | null;
+  dealCloseDate?: string | null;
+  financeProjectNumber?: string;
+  invoiceNumber?: string;
+}
+
+export interface CreateMilestoneEmployeeAssignment {
+  employeeId: number;
+  assignmentRole: string;
+}
+
+export interface CreateMilestoneContractorAssignment {
+  contractorId: number;
+  assignmentRole: string;
+}
+
+export interface CreateMilestoneRequest {
+  title: string;
+  description?: string;
+  status: string;
+  managerEmployeeId: number;
+  plannedStart?: string;
+  plannedEnd?: string;
+  sortOrder?: number;
+}
+
+export interface UpdateMilestoneRequest {
+  title: string;
+  description?: string;
+  status: string;
+  managerEmployeeId?: number;
+  plannedStart?: string;
+  plannedEnd?: string;
+  actualStart?: string;
+  actualEnd?: string;
+  progressPercent?: number;
+  sortOrder?: number;
+}
+
+export interface Site {
+  siteId: number;
+  customerId: number;
+  siteName: string;
+  addressLine?: string;
+  city?: string;
+  isPrimary: boolean;
+  notes?: string;
+  createdAt: string;
+  updatedAt?: string;
+}
+
+export interface CreateSiteRequest {
+  customerId: number;
+  siteName: string;
+  addressLine?: string;
+  city?: string;
+  isPrimary?: boolean;
+  notes?: string;
+}
+
+export type UpdateSiteRequest = CreateSiteRequest;
+
+export interface ProjectBoqItem {
+  projectBoqItemId: number;
+  projectId: number;
+  systemName?: string;
+  inventoryItemId?: number;
+  inventorySkuCode?: string;
+  inventoryItemName?: string;
+  inventoryCategory?: string;
+  itemDescription: string;
+  quantity: number;
+  unit: string;
+  unitPrice?: number;
+  sortOrder: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateProjectBoqItemRequest {
+  systemName?: string;
+  inventoryItemId?: number;
+  itemDescription: string;
+  quantity: number;
+  unit: string;
+  unitPrice?: number;
+  sortOrder?: number;
+}
+
+export interface UpdateProjectBoqItemRequest {
+  systemName?: string;
+  inventoryItemId?: number;
+  itemDescription: string;
+  quantity: number;
+  unit: string;
+  unitPrice?: number;
+  sortOrder: number;
+}
+
+export interface ReorderProjectBoqItemRequest {
+  projectBoqItemId: number;
+  sortOrder: number;
+}
+
+export interface ReorderProjectBoqRequest {
+  items: ReorderProjectBoqItemRequest[];
+}
+
+export interface ProjectDrawing {
+  projectDrawingId: number;
+  projectId: number;
+  name: string;
+  type: 'PDF' | 'DWG';
+  date: string;
+  note?: string;
+  originalFileName?: string;
+  storedFileName?: string;
+  filePath?: string;
+  contentType?: string;
+  fileSizeBytes?: number;
+  sortOrder: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateProjectDrawingRequest {
+  name: string;
+  type: 'PDF' | 'DWG';
+  drawingDate: string;
+  note?: string;
+  sortOrder?: number;
+}
+
+export interface UploadProjectDrawingRequest extends CreateProjectDrawingRequest {
+  file: File;
+}
+
+export interface UpdateProjectDrawingRequest {
+  name: string;
+  type: 'PDF' | 'DWG';
+  drawingDate: string;
+  note?: string;
+  sortOrder: number;
+}
+
+export interface ProjectEquipmentItem {
+  projectEquipmentItemId: number;
+  projectId: number;
+  inventoryItemId?: number;
+  inventorySkuCode?: string;
+  inventoryItemName?: string;
+  inventoryCategory?: string;
+  name: string;
+  status: string;
+  location: string;
+  sortOrder: number;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface CreateProjectEquipmentItemRequest {
+  equipmentName: string;
+  inventoryItemId?: number;
+  status: string;
+  location?: string;
+  sortOrder?: number;
+}
+
+export interface UpdateProjectEquipmentItemRequest {
+  equipmentName: string;
+  inventoryItemId?: number;
+  status: string;
+  location?: string;
+  sortOrder: number;
+}
+
+export interface ReorderProjectEquipmentItemRequest {
+  projectEquipmentItemId: number;
+  sortOrder: number;
+}
+
+export interface ReorderProjectEquipmentRequest {
+  items: ReorderProjectEquipmentItemRequest[];
+}
+
+export interface ProjectOverviewForm {
+  title: string;
+  description: string;
+  status: string;
+  billingType: string;
+  customerId: number;
+  siteId: number;
+  createdAt: string;
+  dealCloseDate: string;
+  financeProjectNumber: string;
+  invoiceNumber: string;
+}
+
+export interface ProjectMilestoneForm {
+  title: string;
+  description: string;
+  status: string;
+  managerEmployeeId: number | null;
+  plannedStart: string;
+  plannedEnd: string;
+  actualStart: string;
+  actualEnd: string;
+  progressPercent: string;
+  sortOrder: number | null;
+}
+
+export interface ProjectTeamForm {
+  projectManagerEmployeeId: number | null;
+  teamEmployeeIds: number[];
+}
+
+export interface SyncProjectEmployeeAssignmentsRequest {
+  employees: CreateMilestoneEmployeeAssignment[];
+}
+
+export interface ProjectEmployeeOption {
+  employeeId: number;
+  fullName: string;
+  primaryRole?: string;
+  isActive?: boolean;
+}
+
+export type ProjectDrawerMode = 'view' | 'create';
+
+export type ProjectDrawerTabId =
+  | 'overview'
+  | 'milestones'
+  | 'quote'
+  | 'boq'
+  | 'drawings'
+  | 'equipment';
+
+export interface ProjectDrawerState {
+  projectId: number | null;
+  mode: ProjectDrawerMode;
+  initialTab?: ProjectDrawerTabId;
+}

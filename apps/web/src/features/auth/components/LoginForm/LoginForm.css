@@ -1,0 +1,11 @@
+.loginForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+/* Full-width primary submit; colour/focus come from the shared Button. */
+.loginForm__submit {
+  width: 100%;
+  margin-top: var(--spacing-xs);
+}

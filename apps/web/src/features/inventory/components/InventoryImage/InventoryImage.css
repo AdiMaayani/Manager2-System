@@ -1,0 +1,44 @@
+.inventoryImage {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  background-color: var(--color-neutral-100);
+  border-radius: var(--radius-md);
+}
+
+/* Fixed aspect ratios reserve space before the image loads, preventing layout shift. */
+.inventoryImage--category {
+  aspect-ratio: 16 / 10;
+}
+
+.inventoryImage--card {
+  aspect-ratio: 4 / 3;
+}
+
+.inventoryImage--drawer {
+  aspect-ratio: 16 / 9;
+}
+
+.inventoryImage__img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+}
+
+/* Explicit product missing-image state: a neutral, in-frame indicator. Never a category photo. */
+.inventoryImage__missing {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-md);
+  text-align: center;
+  color: var(--color-neutral-500);
+  background-color: var(--color-neutral-100);
+  font-size: var(--font-size-sm);
+}

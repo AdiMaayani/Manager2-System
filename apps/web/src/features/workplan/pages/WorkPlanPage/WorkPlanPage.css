@@ -1,0 +1,80 @@
+.workPlanPage {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+}
+
+.workPlanPage__scopeBanner {
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  border-inline-start: 4px solid var(--color-neutral-400);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.workPlanPage__scopeBanner--info {
+  background: var(--color-primary-50);
+  border-inline-start-color: var(--color-primary-500);
+  color: var(--color-primary-800);
+}
+
+.workPlanPage__scopeBanner--warning {
+  background: var(--color-warning-50);
+  border-inline-start-color: var(--color-warning-500);
+  color: var(--color-warning-600);
+}
+
+/*
+ * Shared surface for WorkPlan card containers (toolbar + weekly/monthly/yearly
+ * views). The `card` class was previously referenced in markup but never
+ * defined, leaving these containers without a surface. Provides surface only
+ * (no padding) so each container keeps its own internal spacing.
+ */
+.card {
+  background: #fff;
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+}
+
+/*
+ * Print support for "הדפסת התצוגה הנוכחית". The `workPlanPrint` body class is
+ * toggled only by the WorkPlan print action, so these rules never affect
+ * printing from other pages. Interactive chrome is hidden and scroll
+ * containers are expanded so the full view prints without clipping.
+ */
+@media print {
+  body.workPlanPrint .appLayout__sidebar,
+  body.workPlanPrint .pageShell__modeBanner,
+  body.workPlanPrint .workPlanToolbar__actions,
+  body.workPlanPrint .workPlanToolbar__nav,
+  body.workPlanPrint .workPlanToolbar__search,
+  body.workPlanPrint .workPlanDailyGrid__controls {
+    display: none !important;
+  }
+
+  body.workPlanPrint .appLayout__main {
+    margin-right: 0 !important;
+    width: 100% !important;
+  }
+
+  body.workPlanPrint .topBar {
+    position: static !important;
+    box-shadow: none !important;
+  }
+
+  body.workPlanPrint .workPlanShell,
+  body.workPlanPrint .workPlanWeeklyView__scroll {
+    overflow: visible !important;
+  }
+
+  body.workPlanPrint .workPlanDailyGrid__grid {
+    min-width: 0 !important;
+    box-shadow: none !important;
+  }
+
+  body.workPlanPrint .card {
+    box-shadow: none !important;
+    border-color: var(--color-neutral-300) !important;
+  }
+}

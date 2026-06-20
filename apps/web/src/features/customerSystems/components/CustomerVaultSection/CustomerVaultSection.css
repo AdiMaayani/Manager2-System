@@ -1,0 +1,205 @@
+.vault {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.vault__hint {
+  margin: 0;
+  color: var(--color-neutral-600);
+  font-size: var(--font-size-sm);
+}
+
+.vault__hint--error {
+  color: var(--color-danger-600, #b91c1c);
+}
+
+.vault__notice {
+  margin: 0;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-primary-200);
+  border-radius: var(--radius-md);
+  background: var(--color-primary-100);
+  color: var(--color-primary-700);
+  font-size: var(--font-size-xs);
+}
+
+.vault__systemList,
+.vault__secretList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.vault__system {
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.vault__systemHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.vault__systemToggle {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  text-align: start;
+}
+
+.vault__systemName {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-900);
+}
+
+.vault__systemMeta,
+.vault__secretMeta {
+  color: var(--color-neutral-600);
+  font-size: var(--font-size-sm);
+}
+
+.vault__secrets {
+  border-top: 1px dashed var(--color-neutral-200);
+  padding-top: var(--spacing-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.vault__secret {
+  border: 1px solid var(--color-neutral-100);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.vault__secretMain {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.vault__secretType {
+  font-weight: var(--font-weight-semibold);
+}
+
+.vault__secretMask {
+  font-family: monospace;
+  letter-spacing: 0.15em;
+  color: var(--color-neutral-500);
+}
+
+.vault__secretNotes {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-600);
+}
+
+.vault__secretActions,
+.vault__formActions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-sm);
+}
+
+.vault__reveal,
+.vault__revealed {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-md);
+  background: var(--color-neutral-50);
+}
+
+.vault__revealWarning {
+  margin: 0;
+  font-size: var(--font-size-xs);
+  color: var(--color-danger-600, #b91c1c);
+}
+
+.vault__revealed {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.vault__revealedValue {
+  font-family: monospace;
+  font-size: var(--font-size-sm);
+  word-break: break-all;
+  background: var(--color-neutral-100);
+  padding: 2px 6px;
+  border-radius: var(--radius-sm);
+}
+
+.vault__form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  border: 1px dashed var(--color-neutral-300);
+  border-radius: var(--radius-md);
+}
+
+.vault__formGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--spacing-sm);
+}
+
+.vault__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: var(--font-size-sm);
+}
+
+.vault__select {
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-neutral-300);
+  border-radius: var(--radius-md);
+  background: #fff;
+}
+
+.vault__checkboxRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-sm);
+}
+
+.vault__confirmText {
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-700);
+}
+
+.vault__error {
+  margin: 0;
+  color: var(--color-danger-600, #b91c1c);
+  font-size: var(--font-size-sm);
+}
+
+.vault__addSystem,
+.vault__addSecret {
+  margin-top: var(--spacing-xs);
+}

@@ -1,0 +1,46 @@
+.validatedAddressField {
+  position: relative;
+}
+
+.validatedAddressField__input {
+  width: 100%;
+}
+
+.validatedAddressField__status {
+  margin: var(--space-1) 0 0;
+  font-size: var(--font-size-sm);
+  color: var(--color-text-secondary);
+}
+
+.validatedAddressField__status--success {
+  color: var(--color-success-text, var(--color-text-primary));
+}
+
+.validatedAddressField__status--error {
+  color: var(--color-danger-text, var(--color-text-secondary));
+}
+
+.validatedAddressField__menu {
+  position: absolute;
+  z-index: var(--z-index-dropdown, 1200);
+  margin: 0;
+  padding: var(--space-1);
+  list-style: none;
+  background: var(--color-surface-elevated, #fff);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-md);
+  max-height: 240px;
+  overflow-y: auto;
+}
+
+.validatedAddressField__option {
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+}
+
+.validatedAddressField__option--active,
+.validatedAddressField__option:hover {
+  background: var(--color-surface-muted, rgba(0, 0, 0, 0.05));
+}

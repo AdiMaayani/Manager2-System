@@ -1,0 +1,75 @@
+---
+description: ManageR2 React frontend folder structure, component placement, and CSS co-location rules
+globs: apps/web/src/**
+alwaysApply: false
+---
+
+# Frontend Structure Rules
+
+## Feature folder layout
+
+```
+apps/web/src/features/<domain>/
+  components/
+    <ComponentName>/        ← one folder per component
+      <ComponentName>.tsx
+      <ComponentName>.css
+      index.ts
+  hooks/                    ← useXxx.ts files
+  pages/
+    <PageName>/
+      <PageName>.tsx
+      <PageName>.css
+      index.ts
+  api/
+    <domain>ApiClient.ts    ← typed HTTP functions only
+  types.ts                  ← TS types/interfaces for this domain
+  index.ts                  ← public exports only
+```
+
+## Shared component placement decision
+
+| Condition | Location |
+|---|---|
+| Used by 2+ features OR has no domain knowledge | `shared/components/<Name>/` |
+| Domain-specific (imports from a feature type) | `features/<domain>/components/<Name>/` |
+| Internal to one component (e.g. DrawerTabBar inside ProjectDrawer) | `features/<domain>/components/<Parent>/components/<Name>/` |
+
+## Component folder checklist
+
+Every new component folder must contain:
+- [ ] `<Name>.tsx` — component logic and JSX
+- [ ] `<Name>.css` — scoped styles with camelCase BEM
+- [ ] `index.ts` — single line: `export { Name } from './Name';`
+
+## Styles rules
+
+- Import `tokens.css` only in `main.tsx` (once, at app root).
+- Each component CSS imports nothing; it uses `var(--token)` variables.
+- Class names: camelCase BEM — `.projectRow__status`, `.projectRow--selected`.
+- No inline `style={{}}` for layout or color; use CSS classes.
+
+## Imports
+
+```ts
+// ✅ Use path aliases
+import { Spinner } from '@shared/components/Spinner';
+import { useProjects } from '@features/projects/hooks/useProjects';
+import { apiRequest } from '@api/client';
+
+// ❌ Never relative cross-feature imports
+import { useProjects } from '../../projects/hooks/useProjects';
+```
+
+## Adding a new feature — checklist
+
+```
+- [ ] Create features/<domain>/ folder
+- [ ] Add types.ts with domain types
+- [ ] Add api/<domain>ApiClient.ts with typed API functions
+- [ ] Add hooks/use<Domain>.ts
+- [ ] Add components/ with component folders
+- [ ] Add pages/<Page>/ entry point
+- [ ] Export public surface in features/<domain>/index.ts
+- [ ] Add route to apps/web/src/app/router.tsx
+```

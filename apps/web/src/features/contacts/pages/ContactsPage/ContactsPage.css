@@ -1,0 +1,2 @@
+/* ContactsPage now composes shared FilterBar/FilterField, SegmentedControl, and
+   DataTable; no page-specific styles are required. */

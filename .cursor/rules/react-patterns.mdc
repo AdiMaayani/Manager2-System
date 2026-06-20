@@ -1,0 +1,84 @@
+---
+description: React and TypeScript UI patterns for ManageR2 frontend
+globs: apps/web/src/**/*.{tsx,ts,jsx,js}
+alwaysApply: false
+---
+
+# React Patterns
+
+## Component folder (required)
+
+Every non-trivial component is a folder:
+
+```
+ComponentName/
+  ComponentName.tsx    ← component logic
+  ComponentName.css    ← scoped styles
+  index.ts             ← export { ComponentName } from './ComponentName';
+```
+
+## Components
+
+- Functional only; no class components.
+- Explicit `interface FooProps`; no `any`.
+- Pages orchestrate; child components render.
+- Handle loading, error, and empty states — always.
+
+```tsx
+// ❌ BAD — no states, fetch in render
+export function ProjectsPage() {
+  const [rows, setRows] = useState([]);
+  fetch('/api/projects').then(r => r.json()).then(setRows);
+  return <Table data={rows} />;
+}
+
+// ✅ GOOD
+export function ProjectsPage() {
+  const { projects, isLoading, error } = useProjects();
+  if (isLoading) return <PageSpinner />;
+  if (error) return <ErrorState message={error.message} />;
+  return <ProjectsTable rows={projects} />;
+}
+```
+
+## Hooks
+
+- Prefix `use`; one concern per hook.
+- Async hooks return `{ data, isLoading, error, refetch? }`.
+- Clean up effects (return cleanup from `useEffect`).
+
+## API
+
+- All HTTP through `@api/client.ts → apiRequest<T>()`.
+- No hardcoded `localhost` anywhere in `apps/web/src/`.
+- Async API functions end with `Async`.
+- Handle `ApiError`; surface `err.message` to users in Hebrew.
+
+## CSS — camelCase BEM
+
+```css
+.projectDrawer { }           /* block */
+.projectDrawer__header { }   /* element */
+.projectDrawer--open { }     /* modifier */
+```
+
+- CSS variables only; no magic numbers.
+- No global selectors inside component CSS.
+- Co-locate with component: `ProjectDrawer.css` next to `ProjectDrawer.tsx`.
+
+## State
+
+- Local UI → `useState`
+- Auth/session → `api/auth.ts` (sessionStorage, never React state)
+- Avoid prop drilling 3+ levels — use context or composition
+
+## Naming quick reference
+
+| Item | Pattern | Example |
+|---|---|---|
+| Component file | PascalCase | `ProjectDrawer.tsx` |
+| Hook file | camelCase | `useProjects.ts` |
+| API function | verb + entity + `Async` | `getProjectLifecycleAsync` |
+| Props type | Component + `Props` | `ProjectDrawerProps` |
+| Handler | `handle` + action | `handleSaveProject` |
+| Boolean state | `is`/`has`/`can` prefix | `isEditMode` |

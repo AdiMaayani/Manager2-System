@@ -1,0 +1,108 @@
+.editTaskDrawer {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+}
+
+.editTaskDrawer__body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-lg);
+  padding: var(--spacing-lg);
+}
+
+.editTaskDrawer__section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.editTaskDrawer__sectionTitle {
+  margin: 0;
+  padding-bottom: var(--spacing-sm);
+  border-bottom: 1px solid var(--color-neutral-200);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-900);
+}
+
+.editTaskDrawer__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--spacing-md);
+}
+
+.editTaskDrawer__field {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  color: var(--color-neutral-700);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.editTaskDrawer__select,
+.editTaskDrawer__textarea {
+  width: 100%;
+  border: 1px solid var(--color-neutral-300);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-sm) var(--spacing-md);
+  font: inherit;
+  background: #fff;
+}
+
+.editTaskDrawer__select:focus,
+.editTaskDrawer__textarea:focus {
+  outline: none;
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 3px var(--color-primary-100);
+}
+
+.editTaskDrawer__textarea {
+  resize: vertical;
+}
+
+/* Footer content rendered inside the shared Drawer footer slot. */
+.editTaskDrawer__footerContent {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+  width: 100%;
+}
+
+.editTaskDrawer__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  align-items: center;
+}
+
+.editTaskDrawer__error {
+  margin: 0;
+  color: var(--color-danger-600);
+  font-size: var(--font-size-sm);
+}
+
+.editTaskDrawer__hint {
+  margin: 0;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  background: var(--color-primary-50);
+  color: var(--color-primary-800);
+  font-size: var(--font-size-sm);
+}
+
+.editTaskDrawer__notice {
+  margin: 0;
+  padding: var(--spacing-md);
+  border-radius: var(--radius-md);
+  border-inline-start: 4px solid var(--color-warning-500);
+  background: var(--color-warning-50);
+  color: var(--color-warning-600);
+  font-size: var(--font-size-sm);
+  line-height: 1.6;
+}

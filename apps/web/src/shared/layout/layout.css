@@ -1,0 +1,278 @@
+.appLayout {
+  display: flex;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.appLayout__sidebar {
+  width: var(--sidebar-width);
+  background-color: var(--color-neutral-900);
+  color: var(--color-neutral-100);
+  padding: var(--spacing-lg);
+  position: fixed;
+  right: 0;
+  top: 0;
+  height: 100vh;
+  overflow-y: auto;
+  z-index: 100;
+}
+
+.appLayout__main {
+  margin-right: var(--sidebar-width);
+  flex: 1;
+  width: calc(100% - var(--sidebar-width));
+  min-height: 100vh;
+  overflow-y: auto;
+}
+
+.appLayout__content {
+  padding: var(--spacing-xl);
+  max-width: var(--content-max-width);
+  margin: 0 auto;
+}
+
+.appLayout__contentWide {
+  padding: var(--spacing-xl);
+}
+
+.topBar {
+  display: flex;
+  align-items: center;
+  height: var(--topbar-height);
+  padding: 0 var(--spacing-xl);
+  background-color: #fff;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  border-bottom: 1px solid var(--color-neutral-200);
+  box-shadow: var(--shadow-sm);
+}
+
+.topBar__brand {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  position: relative;
+}
+
+/* The logo asset carries large internal whitespace, so the wordmark looks
+   small at its natural size. The wrapper clips that whitespace to a band the
+   height of the top bar, letting the scaled image show a much larger wordmark
+   without overflowing into the page content. The wrapper is sized to the full
+   top-bar height and vertically centered, since its positioned ancestor only
+   stretches to the title height. */
+.topBar__logoWrap {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  transform: translateY(-50%);
+  height: var(--topbar-height);
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.topBar__logo {
+  height: 168px;
+  width: auto;
+  object-fit: contain;
+}
+
+.topBar__titleWrap {
+  flex-grow: 1;
+  display: flex;
+  justify-content: flex-start;
+}
+
+.topBar__title {
+  font-size: var(--font-size-2xl);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-900);
+  margin: 0;
+}
+
+.sidebar__user {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-lg);
+  padding-bottom: var(--spacing-lg);
+  border-bottom: 1px solid var(--color-neutral-700);
+}
+
+.sidebar__userName {
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+}
+
+.sidebar__userRole {
+  font-size: var(--font-size-xs);
+  color: var(--color-neutral-300);
+}
+
+.sidebar__userStatus {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  font-size: var(--font-size-xs);
+  color: var(--color-success-500);
+}
+
+.sidebar__statusDot {
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background-color: var(--color-success-500);
+}
+
+.sidebar__nav {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: var(--spacing-lg);
+}
+
+.sidebar__navMain {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.sidebar__navBottom {
+  margin-top: auto;
+  padding-top: var(--spacing-lg);
+  border-top: 1px solid var(--color-neutral-700);
+}
+
+.sidebar__link {
+  display: flex;
+  align-items: center;
+  padding: var(--spacing-md);
+  color: var(--color-neutral-300);
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+  gap: var(--spacing-md);
+  font-size: var(--font-size-sm);
+  text-decoration: none;
+}
+
+.sidebar__link:hover {
+  background-color: var(--color-neutral-800);
+  color: var(--color-neutral-100);
+}
+
+.sidebar__link--active {
+  background-color: var(--color-primary-600);
+  color: #fff;
+}
+
+.sidebar__logout {
+  margin-top: var(--spacing-sm);
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  background: transparent;
+  border: 1px solid var(--color-neutral-600);
+  color: var(--color-neutral-300);
+  border-radius: var(--radius-md);
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+}
+
+.sidebar__logout:hover {
+  background: var(--color-neutral-800);
+  color: #fff;
+}
+
+/* ── Off-canvas navigation (tablet & mobile) ─────────────────────────────────
+   On desktop the sidebar is a fixed rail and the toggle/backdrop are hidden.
+   Below 1024px (the whole tablet range and down) the rail collapses to an
+   off-canvas panel so field users get the full screen width for content. */
+.topBar__navToggle {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  width: 42px;
+  height: 42px;
+  flex-shrink: 0;
+  margin-inline-end: var(--spacing-sm);
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-md);
+  background: #fff;
+  color: var(--color-neutral-700);
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.topBar__navToggle:hover {
+  background: var(--color-neutral-50);
+  border-color: var(--color-neutral-300);
+}
+
+.appLayout__navBackdrop {
+  display: none;
+}
+
+@media (max-width: 1024px) {
+  .appLayout__sidebar {
+    width: min(300px, 86vw);
+    transform: translateX(100%);
+    transition: transform var(--transition-base);
+  }
+
+  .appLayout__sidebar--open {
+    transform: translateX(0);
+    box-shadow: var(--shadow-xl);
+  }
+
+  .appLayout__main {
+    margin-right: 0;
+    width: 100%;
+  }
+
+  .appLayout__navBackdrop {
+    display: block;
+    position: fixed;
+    inset: 0;
+    z-index: 90;
+    background: rgba(17, 24, 39, 0.45);
+  }
+
+  .topBar__navToggle {
+    display: inline-flex;
+  }
+
+  .topBar__brand {
+    width: auto;
+    flex: 1;
+    min-width: 0;
+  }
+}
+
+/* ── Compact app bar & content padding (phones) ──────────────────────────── */
+@media (max-width: 640px) {
+  :root {
+    --topbar-height: 64px;
+  }
+
+  .topBar {
+    padding: 0 var(--spacing-md);
+  }
+
+  /* The decorative wordmark overlaps the title on narrow widths; the page
+     title and nav toggle are enough chrome for a phone-sized app bar. */
+  .topBar__logoWrap {
+    display: none;
+  }
+
+  .topBar__title {
+    font-size: var(--font-size-lg);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .appLayout__content,
+  .appLayout__contentWide {
+    padding: var(--spacing-md);
+  }
+}

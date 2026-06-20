@@ -1,0 +1,1 @@
+export { InventoryDrawer } from './InventoryDrawer';

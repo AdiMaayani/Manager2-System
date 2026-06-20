@@ -1,27 +1,48 @@
-# Build folders
+# ── Node ──────────────────────────────────────────
+node_modules/
+dist/
+dist-ssr/
+.cache/
+*.local
+
+# ── Dotnet ────────────────────────────────────────
 bin/
 obj/
-
-# Visual Studio / Rider
-.vs/
-*.user
-*.suo
-
-# Logs
-*.log
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Dotnet
 *.dll
 *.exe
 *.pdb
-
-# NuGet
 *.nupkg
 packages/
 
-# Local settings
+# ── Visual Studio / Rider ─────────────────────────
+.vs/
+*.user
+*.suo
+.idea/
+
+# ── Environment / secrets ─────────────────────────
+.env
+.env.*
+!.env.example
 appsettings.Development.json
+appsettings.Production.json
+appsettings.*.local.json
+
+# ── Logs ──────────────────────────────────────────
+*.log
+logs/
+
+# ── OS ────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ── Vite / build artefacts ────────────────────────
+apps/web/dist/
+apps/web/.vite/
+
+# ── Uploaded runtime assets (keep folders, ignore uploaded files) ──
+apps/api/ManageR2.Api/wwwroot/uploads/inventory/*
+!apps/api/ManageR2.Api/wwwroot/uploads/inventory/.gitkeep
+
+# ── Legacy reference clone (read-only, not part of monorepo) ──
+_temp/

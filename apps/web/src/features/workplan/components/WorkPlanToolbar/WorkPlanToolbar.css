@@ -1,0 +1,366 @@
+.workPlanToolbar {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  padding: var(--spacing-lg);
+}
+
+.workPlanToolbar__main {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--spacing-lg);
+}
+
+.workPlanToolbar__selectors {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-md);
+}
+
+.workPlanToolbar__actions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--spacing-sm);
+}
+
+.workPlanToolbar__iconActions {
+  display: inline-flex;
+  gap: var(--spacing-xs);
+}
+
+.workPlanToolbar__iconBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-neutral-300);
+  background: #fff;
+  color: var(--color-neutral-600);
+  cursor: pointer;
+  transition: background var(--transition-fast), color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.workPlanToolbar__iconBtn:hover:not(:disabled) {
+  background: var(--color-neutral-50);
+  color: var(--color-neutral-900);
+  border-color: var(--color-neutral-400);
+}
+
+.workPlanToolbar__iconBtn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.workPlanToolbar__group {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-xs);
+}
+
+.workPlanToolbar__groupLabel {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-500);
+}
+
+.workPlanToolbar__scopeRow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+}
+
+.workPlanToolbar__scopeSelect {
+  flex: 1 1 280px;
+  min-width: 280px;
+  max-width: min(420px, 100%);
+}
+
+.workPlanToolbar__scopeListSelect {
+  min-width: 280px;
+}
+
+.workPlanToolbar__select {
+  min-width: 200px;
+  height: 38px;
+  padding: var(--spacing-xs) var(--spacing-md);
+  border: 1px solid var(--color-neutral-300);
+  border-radius: var(--radius-md);
+  background: #fff;
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-900);
+}
+
+.workPlanToolbar__select:focus {
+  outline: none;
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 3px var(--color-primary-100);
+}
+
+.workPlanToolbar__segment {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs);
+  background-color: var(--color-neutral-100);
+  border-radius: var(--radius-full);
+  border: 1px solid var(--color-neutral-200);
+}
+
+.workPlanToolbar__segBtn {
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-radius: var(--radius-full);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-neutral-600);
+  background: transparent;
+  border: 1px solid transparent;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.workPlanToolbar__segBtn:hover:not(.workPlanToolbar__segBtn--active) {
+  background: #fff;
+  color: var(--color-neutral-900);
+}
+
+.workPlanToolbar__segBtn--active {
+  background-color: var(--color-primary-600);
+  color: #fff;
+  font-weight: var(--font-weight-semibold);
+  box-shadow: var(--shadow-sm);
+}
+
+.workPlanToolbar__tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--color-neutral-100);
+}
+
+.workPlanToolbar__nav {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.workPlanToolbar__navBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-neutral-300);
+  background: #fff;
+  color: var(--color-neutral-700);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.workPlanToolbar__navBtn:hover {
+  background: var(--color-neutral-50);
+  border-color: var(--color-neutral-400);
+}
+
+.workPlanToolbar__todayBtn {
+  height: 36px;
+  padding: 0 var(--spacing-md);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--color-neutral-300);
+  background: #fff;
+  color: var(--color-neutral-700);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+  cursor: pointer;
+  transition: background var(--transition-fast), border-color var(--transition-fast);
+}
+
+.workPlanToolbar__todayBtn:hover {
+  background: var(--color-neutral-50);
+  border-color: var(--color-neutral-400);
+}
+
+.workPlanToolbar__periodLabel {
+  margin-inline-start: var(--spacing-sm);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-800);
+}
+
+.workPlanToolbar__search {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  flex: 1 1 280px;
+  max-width: 420px;
+}
+
+.workPlanToolbar__searchIcon {
+  position: absolute;
+  inset-inline-start: var(--spacing-sm);
+  color: var(--color-neutral-400);
+  pointer-events: none;
+}
+
+.workPlanToolbar__searchInput {
+  width: 100%;
+  height: 38px;
+  padding-inline: calc(var(--spacing-sm) + 22px) calc(var(--spacing-sm) + 22px);
+  border: 1px solid var(--color-neutral-300);
+  border-radius: var(--radius-md);
+  background: #fff;
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-900);
+}
+
+.workPlanToolbar__searchInput:focus {
+  outline: none;
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 3px var(--color-primary-100);
+}
+
+.workPlanToolbar__searchClear {
+  position: absolute;
+  inset-inline-end: var(--spacing-sm);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border: none;
+  border-radius: var(--radius-full);
+  background: var(--color-neutral-200);
+  color: var(--color-neutral-700);
+  cursor: pointer;
+}
+
+.workPlanToolbar__searchClear:hover {
+  background: var(--color-neutral-300);
+}
+
+.workPlanToolbar__legend {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--spacing-md);
+  padding-top: var(--spacing-sm);
+  border-top: 1px solid var(--color-neutral-100);
+  font-size: var(--font-size-xs);
+  color: var(--color-neutral-500);
+}
+
+.workPlanToolbar__legendItem {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+}
+
+.workPlanToolbar__chip {
+  width: 12px;
+  height: 12px;
+  border-radius: var(--radius-sm);
+  display: inline-block;
+  border: 1px solid transparent;
+}
+
+.workPlanToolbar__chip--regular {
+  background: var(--task-category-regular-bg);
+  border-color: var(--task-category-regular-border);
+}
+
+.workPlanToolbar__chip--project {
+  background: var(--task-category-project-bg);
+  border-color: var(--task-category-project-border);
+}
+
+.workPlanToolbar__chip--serviceCall {
+  background: var(--task-category-serviceCall-bg);
+  border-color: var(--task-category-serviceCall-border);
+}
+
+.workPlanToolbar__chip--unscheduled {
+  background: var(--color-neutral-100);
+  border-color: var(--color-neutral-400);
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 2px,
+    color-mix(in srgb, var(--color-neutral-400) 35%, transparent) 2px,
+    color-mix(in srgb, var(--color-neutral-400) 35%, transparent) 4px
+  );
+}
+
+.workPlanToolbar__chip--locked {
+  background: color-mix(in srgb, var(--color-danger-500) 14%, white);
+  border-color: var(--color-danger-500);
+}
+
+.workPlanToolbar__chip--normal {
+  background: color-mix(in srgb, var(--color-success-500) 16%, white);
+  border-color: var(--color-success-500);
+}
+
+.workPlanToolbar__chip--warning {
+  background: #fff;
+  box-shadow: 0 0 0 2px var(--color-warning-500, #f59e0b);
+}
+
+.workPlanToolbar__chip--violation {
+  background: var(--color-danger-500);
+  border-radius: var(--radius-full);
+}
+
+.workPlanToolbar__chip--urgent {
+  background: var(--color-danger-600);
+  border-radius: 2px;
+  position: relative;
+}
+
+.workPlanToolbar__chip--urgent::after {
+  content: '';
+  position: absolute;
+  inset: 2px 4px;
+  background: #fff;
+  clip-path: polygon(50% 0, 100% 100%, 0 100%);
+}
+
+@media (max-width: 640px) {
+  .workPlanToolbar__main {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .workPlanToolbar__actions {
+    align-items: stretch;
+  }
+
+  .workPlanToolbar__iconActions {
+    justify-content: flex-end;
+  }
+
+  .workPlanToolbar__tools {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .workPlanToolbar__search {
+    max-width: none;
+  }
+
+  .workPlanToolbar__select {
+    min-width: 100%;
+  }
+}

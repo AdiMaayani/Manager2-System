@@ -1,0 +1,17 @@
+.quotesTable__number {
+  font-family: monospace;
+  direction: ltr;
+  text-align: left;
+  font-weight: var(--font-weight-semibold);
+}
+
+.quotesTable__total {
+  font-weight: var(--font-weight-semibold);
+  white-space: nowrap;
+}
+
+.quotesTable__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+}

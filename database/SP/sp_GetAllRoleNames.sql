@@ -1,0 +1,16 @@
+﻿SET ANSI_NULLS ON
+GO
+SET QUOTED_IDENTIFIER ON
+GO
+
+CREATE OR ALTER PROCEDURE [dbo].[sp_GetAllRoleNames]
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT RoleName
+    FROM dbo.Roles
+    WHERE IsActive = 1
+    ORDER BY RoleName;
+END;
+GO

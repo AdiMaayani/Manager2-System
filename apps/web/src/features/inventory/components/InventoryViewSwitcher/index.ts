@@ -1,0 +1,1 @@
+export { InventoryViewSwitcher } from './InventoryViewSwitcher';
