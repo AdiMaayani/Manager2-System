@@ -18,6 +18,11 @@ import { AdminRoute } from './AdminRoute';
 import { ProtectedRoute } from './ProtectedRoute';
 import { RequirePermission } from './RequirePermission';
 
+const routerBasename =
+  import.meta.env.BASE_URL === '/'
+    ? '/'
+    : import.meta.env.BASE_URL.replace(/\/$/, '');
+
 export const router = createBrowserRouter([
   { path: '/Users/login', element: <Navigate to="/login" replace /> },
   { path: '/login', element: <LoginPage /> },
@@ -129,4 +134,6 @@ export const router = createBrowserRouter([
       { path: '*', element: <Navigate to="/" replace /> },
     ],
   },
-]);
+], {
+  basename: routerBasename,
+});
