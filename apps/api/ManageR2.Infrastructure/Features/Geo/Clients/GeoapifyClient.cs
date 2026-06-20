@@ -1,175 +1,241 @@
+using System.Diagnostics;
+using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json.Serialization;
-using Microsoft.Extensions.Configuration;
+using ManageR2.Domain.Exceptions;
+using ManageR2.Domain.Features.Geo;
 using ManageR2.Infrastructure.Features.Geo.Models;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 
 namespace ManageR2.Infrastructure.Features.Geo.Clients;
 
 public class GeoapifyClient
 {
-	private readonly HttpClient _httpClient;
-	private readonly string _apiKey;
+    private readonly HttpClient _httpClient;
+    private readonly string _apiKey;
+    private readonly ILogger<GeoapifyClient> _logger;
 
-	public GeoapifyClient(HttpClient httpClient, IConfiguration configuration)
-	{
-		_httpClient = httpClient;
-		_apiKey = configuration["Geoapify:ApiKey"]
-			?? throw new InvalidOperationException("Geoapify API key is missing.");
-	}
+    public GeoapifyClient(HttpClient httpClient, IConfiguration configuration, ILogger<GeoapifyClient> logger)
+    {
+        _httpClient = httpClient;
+        _logger = logger;
+        _apiKey = configuration["Geoapify:ApiKey"]
+            ?? throw new InvalidOperationException("Geoapify API key is missing.");
+    }
 
-	public async Task<List<AddressSuggestionModel>> AutocompleteAsync(string text)
-	{
-		if (string.IsNullOrWhiteSpace(text))
-			return new List<AddressSuggestionModel>();
+    public async Task<List<AddressSuggestionModel>> AutocompleteAsync(string text, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(text) || text.Trim().Length < AddressValidationConstants.MinAutocompleteLength)
+        {
+            return [];
+        }
 
-		var url =
-			$"https://api.geoapify.com/v1/geocode/autocomplete?text={Uri.EscapeDataString(text)}&filter=countrycode:il&limit=5&apiKey={_apiKey}";
+        var encodedText = Uri.EscapeDataString(text.Trim());
+        var path = $"v1/geocode/autocomplete?text={encodedText}&filter=countrycode:il&lang=he&limit=5&apiKey={_apiKey}";
 
-		var response = await _httpClient.GetFromJsonAsync<GeoapifyResponse>(url);
+        var response = await SendGeoapifyRequestAsync(path, "autocomplete", cancellationToken);
+        var payload = await response.Content.ReadFromJsonAsync<GeoapifyResponse>(cancellationToken: cancellationToken);
 
-		return response?.Features?
-			.Select(feature => new AddressSuggestionModel
-			{
-				FormattedAddress = feature.Properties.Formatted ?? string.Empty,
-				City = feature.Properties.City,
-				Country = feature.Properties.Country,
-				Postcode = feature.Properties.Postcode,
-				PlaceId = feature.Properties.PlaceId,
-				Latitude = feature.Properties.Lat,
-				Longitude = feature.Properties.Lon
-			})
-			.ToList()
-			?? new List<AddressSuggestionModel>();
-	}
+        return payload?.Features?
+            .Select(feature => new AddressSuggestionModel
+            {
+                FormattedAddress = feature.Properties.Formatted ?? string.Empty,
+                City = feature.Properties.City,
+                Country = feature.Properties.Country,
+                Postcode = feature.Properties.Postcode,
+                PlaceId = feature.Properties.PlaceId,
+                Latitude = feature.Properties.Lat,
+                Longitude = feature.Properties.Lon
+            })
+            .ToList()
+            ?? [];
+    }
 
-	public async Task<ValidatedAddressModel> ValidateAddressAsync(string text)
-	{
-		if (string.IsNullOrWhiteSpace(text))
-			return Invalid("לא הוזנה כתובת.");
+    public async Task<ValidatedAddressModel> ValidateAddressAsync(string text, CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(text))
+        {
+            return Invalid("לא הוזנה כתובת.");
+        }
 
-		var url =
-			$"https://api.geoapify.com/v1/geocode/search?text={Uri.EscapeDataString(text)}&filter=countrycode:il&limit=5&apiKey={_apiKey}";
+        var encodedText = Uri.EscapeDataString(text.Trim());
+        var path = $"v1/geocode/search?text={encodedText}&filter=countrycode:il&lang=he&limit=5&apiKey={_apiKey}";
 
-		var response = await _httpClient.GetFromJsonAsync<GeoapifyResponse>(url);
-		var features = response?.Features ?? new List<GeoapifyFeature>();
+        var response = await SendGeoapifyRequestAsync(path, "validate", cancellationToken);
+        var payload = await response.Content.ReadFromJsonAsync<GeoapifyResponse>(cancellationToken: cancellationToken);
+        var features = payload?.Features ?? [];
 
-		if (features.Count == 0)
-			return Invalid("לא נמצאה כתובת מתאימה.");
+        if (features.Count == 0)
+        {
+            return Invalid("לא נמצאה כתובת מתאימה.");
+        }
 
-		var userTypedHouseNumber = ContainsDigit(text);
+        var userTypedHouseNumber = ContainsDigit(text);
+        var bestMatch = features
+            .OrderByDescending(feature => ScoreFeature(feature.Properties, userTypedHouseNumber))
+            .First();
 
-		var bestMatch = features
-			.OrderByDescending(f => ScoreFeature(f.Properties, userTypedHouseNumber))
-			.First();
+        return BuildValidatedAddress(bestMatch.Properties, userTypedHouseNumber);
+    }
 
-		return BuildValidatedAddress(bestMatch.Properties, userTypedHouseNumber);
-	}
+    private async Task<HttpResponseMessage> SendGeoapifyRequestAsync(
+        string relativePath,
+        string operation,
+        CancellationToken cancellationToken)
+    {
+        var stopwatch = Stopwatch.StartNew();
 
-	private static ValidatedAddressModel BuildValidatedAddress(
-		GeoapifyProperties p,
-		bool userTypedHouseNumber)
-	{
-		var score = ScoreFeature(p, userTypedHouseNumber);
-		var messages = new List<string>();
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, relativePath);
+            var response = await _httpClient.SendAsync(request, cancellationToken);
+            stopwatch.Stop();
 
-		if (string.IsNullOrWhiteSpace(p.City))
-			messages.Add("לא זוהתה עיר.");
+            _logger.LogInformation(
+                "Geoapify {Operation} completed in {ElapsedMs}ms with status {StatusCode}",
+                operation,
+                stopwatch.ElapsedMilliseconds,
+                (int)response.StatusCode);
 
-		if (string.IsNullOrWhiteSpace(p.Street))
-			messages.Add("לא זוהה רחוב.");
+            if (response.StatusCode == HttpStatusCode.TooManyRequests)
+            {
+                throw new GeoProviderUnavailableException("Geoapify rate limit reached.");
+            }
 
-		if (userTypedHouseNumber && string.IsNullOrWhiteSpace(p.HouseNumber))
-			messages.Add("הוזן מספר בית, אך Geoapify לא זיהה מספר בית תקני.");
+            if (!response.IsSuccessStatusCode)
+            {
+                throw new GeoProviderUnavailableException($"Geoapify returned status {(int)response.StatusCode}.");
+            }
 
-		return new ValidatedAddressModel
-		{
-			IsValid = score >= 70,
-			FormattedAddress = p.Formatted ?? string.Empty,
-			City = p.City,
-			Street = p.Street,
-			HouseNumber = p.HouseNumber,
-			Country = p.Country,
-			Postcode = p.Postcode,
-			PlaceId = p.PlaceId,
-			Latitude = p.Lat,
-			Longitude = p.Lon,
-			ValidationScore = score,
-			ValidationMessage = messages.Count == 0
-				? "הכתובת אומתה בהצלחה."
-				: string.Join(" ", messages)
-		};
-	}
+            return response;
+        }
+        catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+        {
+            stopwatch.Stop();
+            _logger.LogWarning(ex, "Geoapify {Operation} timed out after {ElapsedMs}ms", operation, stopwatch.ElapsedMilliseconds);
+            throw new GeoProviderUnavailableException("Geoapify request timed out.", ex);
+        }
+        catch (HttpRequestException ex)
+        {
+            stopwatch.Stop();
+            _logger.LogWarning(ex, "Geoapify {Operation} failed after {ElapsedMs}ms", operation, stopwatch.ElapsedMilliseconds);
+            throw new GeoProviderUnavailableException("Geoapify is unavailable.", ex);
+        }
+    }
 
-	private static int ScoreFeature(GeoapifyProperties p, bool userTypedHouseNumber)
-	{
-		var score = 100;
+    private static ValidatedAddressModel BuildValidatedAddress(GeoapifyProperties properties, bool userTypedHouseNumber)
+    {
+        var score = ScoreFeature(properties, userTypedHouseNumber);
+        var messages = new List<string>();
 
-		if (string.IsNullOrWhiteSpace(p.City))
-			score -= 20;
+        if (string.IsNullOrWhiteSpace(properties.City))
+        {
+            messages.Add("לא זוהתה עיר.");
+        }
 
-		if (string.IsNullOrWhiteSpace(p.Street))
-			score -= 30;
+        if (string.IsNullOrWhiteSpace(properties.Street))
+        {
+            messages.Add("לא זוהה רחוב.");
+        }
 
-		if (userTypedHouseNumber && string.IsNullOrWhiteSpace(p.HouseNumber))
-			score -= 40;
+        if (userTypedHouseNumber && string.IsNullOrWhiteSpace(properties.HouseNumber))
+        {
+            messages.Add("הוזן מספר בית, אך Geoapify לא זיהה מספר בית תקני.");
+        }
 
-		return Math.Clamp(score, 0, 100);
-	}
+        return new ValidatedAddressModel
+        {
+            IsValid = score >= AddressValidationConstants.MinValidatedScore,
+            FormattedAddress = properties.Formatted ?? string.Empty,
+            City = properties.City,
+            Street = properties.Street,
+            HouseNumber = properties.HouseNumber,
+            Country = properties.Country,
+            Postcode = properties.Postcode,
+            PlaceId = properties.PlaceId,
+            Latitude = properties.Lat,
+            Longitude = properties.Lon,
+            ValidationScore = score,
+            ValidationMessage = messages.Count == 0
+                ? "הכתובת אומתה בהצלחה."
+                : string.Join(" ", messages)
+        };
+    }
 
-	private static bool ContainsDigit(string value)
-	{
-		return value.Any(char.IsDigit);
-	}
+    private static int ScoreFeature(GeoapifyProperties properties, bool userTypedHouseNumber)
+    {
+        var score = 100;
 
-	private static ValidatedAddressModel Invalid(string message)
-	{
-		return new ValidatedAddressModel
-		{
-			IsValid = false,
-			ValidationScore = 0,
-			ValidationMessage = message
-		};
-	}
+        if (string.IsNullOrWhiteSpace(properties.City))
+        {
+            score -= 20;
+        }
 
-	private class GeoapifyResponse
-	{
-		[JsonPropertyName("features")]
-		public List<GeoapifyFeature>? Features { get; set; }
-	}
+        if (string.IsNullOrWhiteSpace(properties.Street))
+        {
+            score -= 30;
+        }
 
-	private class GeoapifyFeature
-	{
-		[JsonPropertyName("properties")]
-		public GeoapifyProperties Properties { get; set; } = new();
-	}
+        if (userTypedHouseNumber && string.IsNullOrWhiteSpace(properties.HouseNumber))
+        {
+            score -= 40;
+        }
 
-	private class GeoapifyProperties
-	{
-		[JsonPropertyName("formatted")]
-		public string? Formatted { get; set; }
+        return Math.Clamp(score, 0, 100);
+    }
 
-		[JsonPropertyName("city")]
-		public string? City { get; set; }
+    private static bool ContainsDigit(string value) => value.Any(char.IsDigit);
 
-		[JsonPropertyName("street")]
-		public string? Street { get; set; }
+    private static ValidatedAddressModel Invalid(string message)
+    {
+        return new ValidatedAddressModel
+        {
+            IsValid = false,
+            ValidationScore = 0,
+            ValidationMessage = message
+        };
+    }
 
-		[JsonPropertyName("housenumber")]
-		public string? HouseNumber { get; set; }
+    private class GeoapifyResponse
+    {
+        [JsonPropertyName("features")]
+        public List<GeoapifyFeature>? Features { get; set; }
+    }
 
-		[JsonPropertyName("country")]
-		public string? Country { get; set; }
+    private class GeoapifyFeature
+    {
+        [JsonPropertyName("properties")]
+        public GeoapifyProperties Properties { get; set; } = new();
+    }
 
-		[JsonPropertyName("postcode")]
-		public string? Postcode { get; set; }
+    private class GeoapifyProperties
+    {
+        [JsonPropertyName("formatted")]
+        public string? Formatted { get; set; }
 
-		[JsonPropertyName("place_id")]
-		public string? PlaceId { get; set; }
+        [JsonPropertyName("city")]
+        public string? City { get; set; }
 
-		[JsonPropertyName("lat")]
-		public double Lat { get; set; }
+        [JsonPropertyName("street")]
+        public string? Street { get; set; }
 
-		[JsonPropertyName("lon")]
-		public double Lon { get; set; }
-	}
+        [JsonPropertyName("housenumber")]
+        public string? HouseNumber { get; set; }
+
+        [JsonPropertyName("country")]
+        public string? Country { get; set; }
+
+        [JsonPropertyName("postcode")]
+        public string? Postcode { get; set; }
+
+        [JsonPropertyName("place_id")]
+        public string? PlaceId { get; set; }
+
+        [JsonPropertyName("lat")]
+        public double Lat { get; set; }
+
+        [JsonPropertyName("lon")]
+        public double Lon { get; set; }
+    }
 }

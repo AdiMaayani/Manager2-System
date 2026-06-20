@@ -22,6 +22,8 @@ using AdvancedSmartAssignmentRepository = ManageR2.Infrastructure.Repositories.S
 using ManageR2.Infrastructure.Services.SmartAssignment;
 using ManageR2.Infrastructure.Features.Geo.Clients;
 using ManageR2.Infrastructure.Features.Geo.Services;
+using ManageR2.Infrastructure.Features.AddressProfiles.Repositories;
+using ManageR2.Infrastructure.Features.AddressProfiles.Services;
 
 
 
@@ -212,8 +214,15 @@ builder.Services.AddScoped<ISmartAssignmentService, SmartAssignmentBatchService>
 // Advanced ranked recommendations: concrete repository + service from SmartAssignment module (aliased at top of file).
 builder.Services.AddScoped<AdvancedSmartAssignmentRepository>();
 builder.Services.AddScoped<IAdvancedSmartAssignmentService, AdvancedSmartAssignmentService>();
-builder.Services.AddHttpClient<GeoapifyClient>();
+builder.Services.AddHttpClient<GeoapifyClient>(client =>
+{
+    client.BaseAddress = new Uri("https://api.geoapify.com/");
+    client.Timeout = TimeSpan.FromSeconds(20);
+});
 builder.Services.AddScoped<IGeoService, GeoService>();
+builder.Services.AddScoped<IEmployeeBaseAddressRepository, EmployeeBaseAddressRepository>();
+builder.Services.AddScoped<ISiteAddressProfileRepository, SiteAddressProfileRepository>();
+builder.Services.AddScoped<IAddressProfileService, AddressProfileService>();
 
 var app = builder.Build();
 

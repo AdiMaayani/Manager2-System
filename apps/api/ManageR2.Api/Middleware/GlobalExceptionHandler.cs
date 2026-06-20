@@ -33,6 +33,8 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
                 BuildValidationProblemDetails(httpContext, validationException, traceId),
             UserValidationException userValidationException =>
                 BuildBadRequestProblemDetails(httpContext, userValidationException.Message, traceId),
+            GeoProviderUnavailableException geoProviderUnavailableException =>
+                BuildServiceUnavailableProblemDetails(httpContext, geoProviderUnavailableException.Message, traceId),
             _ => BuildServerErrorProblemDetails(httpContext, exception, traceId)
         };
 
@@ -92,6 +94,29 @@ public sealed class GlobalExceptionHandler : IExceptionHandler
             Status = StatusCodes.Status400BadRequest,
             Title = "The request could not be completed.",
             Type = "https://datatracker.ietf.org/doc/html/rfc7231#section-6.5.1",
+            Instance = httpContext.Request.Path,
+            Detail = message
+        };
+        problemDetails.Extensions["traceId"] = traceId;
+        problemDetails.Extensions["message"] = message;
+
+        return problemDetails;
+    }
+
+    private ProblemDetails BuildServiceUnavailableProblemDetails(HttpContext httpContext, string message, string traceId)
+    {
+        _logger.LogWarning(
+            "Geo provider unavailable for {Method} {Path}. TraceId={TraceId}. Message={Message}",
+            httpContext.Request.Method,
+            httpContext.Request.Path,
+            traceId,
+            message);
+
+        var problemDetails = new ProblemDetails
+        {
+            Status = StatusCodes.Status503ServiceUnavailable,
+            Title = "Address provider is temporarily unavailable.",
+            Type = "https://datatracker.ietf.org/doc/html/rfc7231#section-6.6.4",
             Instance = httpContext.Request.Path,
             Detail = message
         };
