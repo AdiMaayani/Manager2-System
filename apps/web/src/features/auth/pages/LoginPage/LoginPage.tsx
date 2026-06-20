@@ -34,7 +34,7 @@ export function LoginPage() {
     <div className="loginPage">
       <div className="loginPage__card">
         <div className="loginPage__logo">
-          <img src="/manage-r2-logo-cropped.png" alt="ManageR²" className="loginPage__logoImg" />
+          <img src={`${import.meta.env.BASE_URL}manage-r2-logo-cropped.png`} alt="ManageR²" className="loginPage__logoImg" />
         </div>
         <div className="loginPage__body">
           <h1 className="loginPage__title">התחברות למערכת</h1>
