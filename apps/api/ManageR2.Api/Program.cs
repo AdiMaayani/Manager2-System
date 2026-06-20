@@ -18,6 +18,8 @@ using Microsoft.OpenApi.Models;
 using AdvancedSmartAssignmentService = ManageR2.Infrastructure.Services.SmartAssignment.SmartAssignmentService;
 using AdvancedSmartAssignmentRepository = ManageR2.Infrastructure.Repositories.SmartAssignment.SmartAssignmentRepository;
 using ManageR2.Infrastructure.Services.SmartAssignment;
+using ManageR2.Infrastructure.Features.Geo.Clients;
+using ManageR2.Infrastructure.Features.Geo.Services;
 
 
 
@@ -205,6 +207,8 @@ builder.Services.AddScoped<ISmartAssignmentService, SmartAssignmentBatchService>
 // Advanced ranked recommendations: concrete repository + service from SmartAssignment module (aliased at top of file).
 builder.Services.AddScoped<AdvancedSmartAssignmentRepository>();
 builder.Services.AddScoped<IAdvancedSmartAssignmentService, AdvancedSmartAssignmentService>();
+builder.Services.AddHttpClient<GeoapifyClient>();
+builder.Services.AddScoped<IGeoService, GeoService>();
 
 var app = builder.Build();
 
