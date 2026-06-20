@@ -43,7 +43,7 @@ namespace ManageR2.Infrastructure.Models.SmartAssignment
         /*
          * שדות אלה לא מגיעים מה-DB
          * אלא יחושבו בתוך האלגוריתם (Service)
-         * 
+         *
          * כרגע הם כאן כהכנה לשלב הבא
          */
 

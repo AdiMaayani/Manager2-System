@@ -14,6 +14,7 @@ BEGIN
         FROM dbo.WorkItems
         WHERE WorkItemId = @ProjectId
           AND WorkType = 'Project'
+          AND IsArchived = 0
     )
     BEGIN
         RETURN;
@@ -31,7 +32,9 @@ BEGIN
     SELECT wi.WorkItemId
     FROM dbo.WorkItems wi
     WHERE wi.ParentWorkItemId = @ProjectId
-      AND wi.WorkType = 'Task';
+      AND wi.WorkType = 'Task'
+      AND wi.TaskCategory = N'Project'
+      AND wi.IsArchived = 0;
 
     SELECT TOP 1
         wi.WorkItemId,
@@ -55,26 +58,27 @@ BEGIN
       AND wi.WorkType = 'Project';
 
     SELECT
-        wi.WorkItemId,
-        wi.Title,
-        wi.Description,
-        wi.Status,
-        wi.BillingType,
-        wi.CreatedAt,
-        wi.PlannedStart,
-        wi.PlannedEnd,
-        wi.ClosedAt,
-        wi.EstimatedHours,
-        wi.Priority,
-        wi.RequiredRole,
-        wi.IsLocked
-    FROM dbo.WorkItems wi
-    WHERE wi.ParentWorkItemId = @ProjectId
-      AND wi.WorkType = 'Task'
+        pm.ProjectMilestoneId AS WorkItemId,
+        pm.ProjectMilestoneId,
+        pm.Title,
+        pm.Description,
+        pm.Status,
+        CAST(NULL AS NVARCHAR(50)) AS BillingType,
+        pm.CreatedAt,
+        pm.PlannedStart,
+        pm.PlannedEnd,
+        pm.ActualEnd AS ClosedAt,
+        CAST(NULL AS DECIMAL(5,2)) AS EstimatedHours,
+        CAST(NULL AS NVARCHAR(20)) AS Priority,
+        CAST(NULL AS NVARCHAR(100)) AS RequiredRole,
+        CAST(0 AS BIT) AS IsLocked
+    FROM dbo.ProjectMilestones pm
+    WHERE pm.ProjectId = @ProjectId
+      AND pm.IsActive = 1
     ORDER BY
-        CASE WHEN wi.PlannedStart IS NULL THEN 1 ELSE 0 END,
-        wi.PlannedStart ASC,
-        wi.CreatedAt ASC;
+        CASE WHEN pm.PlannedStart IS NULL THEN 1 ELSE 0 END,
+        pm.PlannedStart ASC,
+        pm.SortOrder ASC;
 
     SELECT
         wea.WorkItemId,
@@ -115,7 +119,8 @@ BEGIN
         wr.Notes,
         wr.ReporterName,
         wr.Status,
-        ISNULL(wr.FollowUpRequired, 0) AS FollowUpRequired
+        ISNULL(wr.FollowUpRequired, 0) AS FollowUpRequired,
+        wr.LifecycleStatus
     FROM dbo.WorkReports wr
     INNER JOIN @RelatedWorkItems r ON r.WorkItemId = wr.WorkItemId
     ORDER BY wr.ReportDate DESC, wr.WorkReportId DESC;
@@ -131,13 +136,13 @@ BEGIN
 
             SUM(CASE WHEN Status = 'Cancelled' THEN 1 ELSE 0 END) AS CancelledMilestones,
 
-            SUM(CASE WHEN IsLocked = 1 THEN 1 ELSE 0 END) AS LockedMilestones,
+            CAST(0 AS INT) AS LockedMilestones,
 
             SUM(
                 CASE
                     WHEN Status NOT IN ('Closed', 'Cancelled')
                          AND PlannedEnd IS NOT NULL
-                         AND PlannedEnd < GETDATE()
+                         AND PlannedEnd < SYSUTCDATETIME()
                     THEN 1 ELSE 0
                 END
             ) AS DelayedMilestones,
@@ -155,13 +160,13 @@ BEGIN
                 CASE
                     WHEN Status NOT IN ('Closed', 'Cancelled')
                          AND PlannedStart IS NOT NULL
-                         AND PlannedStart >= GETDATE()
+                         AND PlannedStart >= SYSUTCDATETIME()
                     THEN 1 ELSE 0
                 END
             ) AS UpcomingMilestones
-        FROM dbo.WorkItems
-        WHERE ParentWorkItemId = @ProjectId
-          AND WorkType = 'Task'
+        FROM dbo.ProjectMilestones
+        WHERE ProjectId = @ProjectId
+          AND IsActive = 1
     ),
     ReportStats AS
     (

@@ -421,9 +421,9 @@ function InventoryDrawerContent({
       <div className="inventoryDrawer__dangerActions">
         {inventoryItem.isActive ? (
           <ConfirmInline
-            triggerLabel="מחיקה"
-            message="למחוק את הפריט מהמלאי?"
-            confirmLabel="אישור מחיקה"
+            triggerLabel="בטל פעילות"
+            message="לבטל את פעילות פריט המלאי?"
+            confirmLabel="אישור"
             onConfirm={handleDeactivate}
             isPending={isSaving}
           />

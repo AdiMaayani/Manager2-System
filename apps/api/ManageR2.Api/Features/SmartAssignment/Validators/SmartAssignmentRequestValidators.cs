@@ -1,5 +1,6 @@
 using FluentValidation;
 using ManageR2.Api.DTOs;
+using ManageR2.Domain.Features.WorkItems;
 
 namespace ManageR2.Api.Features.SmartAssignment.Validators;
 
@@ -20,8 +21,17 @@ public sealed class DraftTaskRecommendationRequestDtoValidator
 {
     public DraftTaskRecommendationRequestDtoValidator()
     {
+        RuleFor(request => request.TaskCategory)
+            .NotEmpty().WithMessage("TaskCategory is required.")
+            .Must(category => category is WorkItemTaskCategories.Regular
+                or WorkItemTaskCategories.Project
+                or WorkItemTaskCategories.ServiceCall)
+            .WithMessage("TaskCategory must be Regular, Project, or ServiceCall.");
+
         RuleFor(request => request.ProjectId)
-            .GreaterThan(0).WithMessage("ProjectId is required.");
+            .NotNull().GreaterThan(0)
+            .When(request => request.TaskCategory == WorkItemTaskCategories.Project)
+            .WithMessage("ProjectId is required for Project tasks.");
 
         RuleFor(request => request)
             .Must(request => request.PlannedEnd > request.PlannedStart)

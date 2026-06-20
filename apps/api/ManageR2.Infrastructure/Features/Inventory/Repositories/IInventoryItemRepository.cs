@@ -31,4 +31,6 @@ public interface IInventoryItemRepository
     // Clears the stored image metadata. Reports whether a row was cleared and the previously stored
     // relative path (if any) so the caller can delete the file.
     Task<InventoryImageMutationResult> ClearImageAsync(int inventoryItemId);
+
+    Task<InventoryItem?> GetBySkuAsync(string skuCode);
 }

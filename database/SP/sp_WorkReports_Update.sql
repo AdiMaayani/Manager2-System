@@ -21,10 +21,14 @@ CREATE OR ALTER PROCEDURE dbo.sp_WorkReports_Update
     @WorkersCount INT = NULL,
     @Status NVARCHAR(50) = N'טיוטה',
     @FollowUpRequired BIT = NULL,
-    @FollowUpReason NVARCHAR(1000) = NULL
+    @FollowUpReason NVARCHAR(1000) = NULL,
+    @UpdatedByUserId INT = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
+
+    IF EXISTS (SELECT 1 FROM dbo.WorkReports WHERE WorkReportId=@WorkReportId AND LifecycleStatus=N'Reversed')
+        THROW 51360, 'Reversed reports are read-only.', 1;
 
     UPDATE dbo.WorkReports
     SET
@@ -44,8 +48,11 @@ BEGIN
         WorkersCount = @WorkersCount,
         Status = @Status,
         FollowUpRequired = @FollowUpRequired,
-        FollowUpReason = @FollowUpReason
-    WHERE WorkReportId = @WorkReportId;
+        FollowUpReason = @FollowUpReason,
+        UpdatedAt = SYSUTCDATETIME(),
+        UpdatedByUserId = @UpdatedByUserId
+    WHERE WorkReportId = @WorkReportId
+      AND LifecycleStatus IN (N'Draft', N'Finalized');
 
     SELECT @@ROWCOUNT AS RowsAffected;
 END

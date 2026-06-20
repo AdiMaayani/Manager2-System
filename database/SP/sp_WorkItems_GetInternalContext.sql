@@ -32,6 +32,9 @@ BEGIN
     DECLARE @SiteId INT;
     DECLARE @ContainerProjectId INT;
 
+    IF EXISTS (SELECT 1 FROM dbo.WorkItems WHERE WorkType=N'Project' AND FinanceProjectNumber=N'INTERNAL' AND IsArchived=1)
+        THROW 51430, 'The legacy INTERNAL container is archived; create a project-less Regular task instead.', 1;
+
     BEGIN TRANSACTION;
 
     -- Internal/Office customer (reserved by CustomerType = 'Internal').

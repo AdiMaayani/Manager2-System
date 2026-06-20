@@ -24,7 +24,17 @@ public class WorkReportDetailsModel
     public string? Status { get; set; }
     public bool Followup { get; set; }
     public string? FollowupReason { get; set; }
-    // Populated from child tables after the main WorkReports row is loaded.
+    public string? LifecycleStatus { get; set; }
+    public DateTime? FinalizedAt { get; set; }
+    public int? FinalizedByUserId { get; set; }
+    public DateTime? ReversedAt { get; set; }
+    public int? ReversedByUserId { get; set; }
+    public string? ReversalReason { get; set; }
+    public int? AmendsWorkReportId { get; set; }
+    public DateTime? UpdatedAt { get; set; }
+    public int? UpdatedByUserId { get; set; }
     public List<string> Systems { get; set; } = new();
     public List<WorkReportRelatedWorkerModel> RelatedWorkers { get; set; } = new();
+    public List<WorkReportInventoryLineModel> InventoryLines { get; set; } = new();
+    public List<WorkReportAttachmentModel> Attachments { get; set; } = new();
 }

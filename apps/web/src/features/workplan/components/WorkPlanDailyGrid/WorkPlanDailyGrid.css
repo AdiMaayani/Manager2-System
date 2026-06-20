@@ -130,7 +130,7 @@
   min-width: 84px;
   box-sizing: border-box;
   border-radius: var(--radius-md);
-  border: 1px solid var(--color-neutral-200);
+  border: 1px solid var(--color-neutral-300);
   box-shadow: var(--shadow-sm);
   padding: var(--spacing-xs) var(--spacing-sm);
   text-align: right;
@@ -142,6 +142,35 @@
   overflow: hidden;
   z-index: 10;
   transition: box-shadow var(--transition-fast), transform var(--transition-fast);
+  color: var(--color-neutral-900);
+}
+
+.workPlanDailyGrid__task--regular {
+  background: var(--task-category-regular-bg);
+  border-color: var(--task-category-regular-border);
+  color: var(--task-category-regular-text);
+}
+
+.workPlanDailyGrid__task--project {
+  background: var(--task-category-project-bg);
+  border-color: var(--task-category-project-border);
+  color: var(--task-category-project-text);
+}
+
+.workPlanDailyGrid__task--serviceCall {
+  background: var(--task-category-serviceCall-bg);
+  border-color: var(--task-category-serviceCall-border);
+  color: var(--task-category-serviceCall-text);
+}
+
+.workPlanDailyGrid__task--unscheduled {
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 4px,
+    color-mix(in srgb, var(--color-neutral-400) 25%, transparent) 4px,
+    color-mix(in srgb, var(--color-neutral-400) 25%, transparent) 8px
+  );
 }
 
 .workPlanDailyGrid__task:hover {
@@ -150,13 +179,7 @@
 }
 
 .workPlanDailyGrid__task--locked {
-  background: color-mix(in srgb, var(--color-danger-500) 12%, white);
-  border-color: var(--color-danger-300, #fca5a5);
-}
-
-.workPlanDailyGrid__task--normal {
-  background: color-mix(in srgb, var(--color-success-500) 12%, white);
-  border-color: var(--color-success-300, #86efac);
+  box-shadow: inset 0 0 0 2px var(--color-danger-500);
 }
 
 .workPlanDailyGrid__task--warning {

@@ -20,10 +20,16 @@ CREATE OR ALTER PROCEDURE [dbo].[sp_CreateWorkReport]
     @WorkersCount INT = NULL,
 	@Status NVARCHAR(50) = N'טיוטה',
     @FollowUpRequired BIT = NULL,
-    @FollowUpReason NVARCHAR(1000) = NULL
+    @FollowUpReason NVARCHAR(1000) = NULL,
+    @AmendsWorkReportId INT = NULL,
+    @UpdatedByUserId INT = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
+
+    IF @AmendsWorkReportId IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM dbo.WorkReports WHERE WorkReportId=@AmendsWorkReportId AND LifecycleStatus=N'Reversed')
+        THROW 51361, 'An amendment must reference a reversed work report.', 1;
 
     INSERT INTO dbo.WorkReports
     (
@@ -44,7 +50,11 @@ BEGIN
 		Status,
         FollowUpRequired,
         FollowUpReason,
-        CreatedAt
+        CreatedAt,
+        LifecycleStatus,
+        AmendsWorkReportId,
+        UpdatedAt,
+        UpdatedByUserId
     )
     VALUES
     (
@@ -65,7 +75,11 @@ BEGIN
 		@Status,
         @FollowUpRequired,
         @FollowUpReason,
-        GETDATE()
+        SYSUTCDATETIME(),
+        N'Draft',
+        @AmendsWorkReportId,
+        SYSUTCDATETIME(),
+        @UpdatedByUserId
     );
 
     SELECT CAST(SCOPE_IDENTITY() AS INT) AS NewWorkReportId;

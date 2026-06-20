@@ -1,7 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { isLocalDataMode } from '@/config/appConfig';
-import { resolveDataAsync } from '@shared/data/resolveDataAsync';
-import { delayMock } from '@shared/mock';
 import {
   createProjectBoqItemAsync,
   deleteProjectBoqItemAsync,
@@ -15,26 +12,16 @@ import type {
   ReorderProjectBoqRequest,
   UpdateProjectBoqItemRequest,
 } from '../types';
-import { DEFAULT_BOQ_ROWS } from '../utils/projectDisplayUtils';
 
 export function useProjectBoq(projectId: number | null, enabled = true) {
   return useQuery({
-    queryKey: ['projectBoq', projectId, isLocalDataMode],
+    queryKey: ['projectBoq', projectId],
     queryFn: () => {
       if (projectId == null) {
         throw new Error('Project id is required.');
       }
 
-      return resolveDataAsync(
-        () => getProjectBoqAsync(projectId),
-        () =>
-          delayMock(
-            DEFAULT_BOQ_ROWS.map((boqItem) => ({
-              ...boqItem,
-              projectId,
-            })),
-          ),
-      );
+      return getProjectBoqAsync(projectId);
     },
     enabled: enabled && projectId != null && projectId > 0,
   });

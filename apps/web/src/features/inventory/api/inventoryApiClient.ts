@@ -21,6 +21,11 @@ export function getInventoryItemByIdAsync(id: number): Promise<InventoryItem> {
   return apiRequest<InventoryItem>(`/Inventory/${id}`);
 }
 
+export function getInventoryBySkuAsync(sku: string): Promise<InventoryItem> {
+  const normalized = encodeURIComponent(sku.trim());
+  return apiRequest<InventoryItem>(`/Inventory/by-sku/${normalized}`);
+}
+
 // Atomic create: the item and its (required) image are created in a single multipart request,
 // so a new active item can never be persisted without an image and a retry cannot duplicate it.
 export function createInventoryItemWithImageAsync(

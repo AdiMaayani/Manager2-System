@@ -2,11 +2,19 @@
 
 interface ImportMetaEnv {
   readonly VITE_API_BASE_URL: string;
-  readonly VITE_APP_DATA_MODE: 'local' | 'mock';
 }
 
 interface ImportMeta {
   readonly env: ImportMetaEnv;
+}
+
+interface BarcodeDetectorOptions {
+  formats?: string[];
+}
+
+declare class BarcodeDetector {
+  constructor(options?: BarcodeDetectorOptions);
+  detect(source: ImageBitmapSource): Promise<Array<{ rawValue?: string }>>;
 }
 
 declare module 'frappe-gantt' {

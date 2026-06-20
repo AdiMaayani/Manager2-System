@@ -11,9 +11,9 @@ import { Input } from '@shared/components/Input';
 import { Checkbox } from '@shared/components/Checkbox';
 import { InlineAlert } from '@shared/components/InlineAlert';
 import { ConfirmInline } from '@shared/components/ConfirmInline';
-import { isLocalDataMode } from '@/config/appConfig';
 import { getUsersAsync } from '@features/users/api/usersApiClient';
-import { getAllWorkPlansAsync } from '@features/workplan/api/workplanApiClient';
+import { getWorkPlanScheduleAsync } from '@features/workplan/api/workplanApiClient';
+import { periodToUtcBounds } from '@features/workplan/lib/workPlanPeriod';
 import { useEmployeeMutations } from '../../hooks/useEmployees';
 import type { Employee, UpsertEmployeeRequest } from '../../types';
 import './EmployeeDrawer.css';
@@ -349,10 +349,7 @@ interface AssignedTaskContext {
 }
 
 function EmployeeReviewDetails({ employee, canViewLinkedUser }: EmployeeReviewDetailsProps) {
-  // Related operational data is read through existing feature API clients.
-  // In mock mode these endpoints are unavailable, so the queries stay
-  // disabled and each section explains that instead of inventing data.
-  const areRelatedQueriesEnabled = isLocalDataMode;
+  const areRelatedQueriesEnabled = true;
 
   const usersQuery = useQuery({
     queryKey: ['employees', 'related', 'users'],
@@ -363,30 +360,42 @@ function EmployeeReviewDetails({ employee, canViewLinkedUser }: EmployeeReviewDe
 
   const workPlansQuery = useQuery({
     queryKey: ['employees', 'related', 'workPlans'],
-    queryFn: getAllWorkPlansAsync,
+    queryFn: async () => {
+      const anchor = new Date();
+      const { fromUtc, toUtc } = periodToUtcBounds(anchor, 'yearly');
+      return getWorkPlanScheduleAsync({
+        scope: 'company',
+        fromUtc,
+        toUtc,
+        includeUnscheduled: true,
+        taskCategory: 'all',
+      });
+    },
     enabled: areRelatedQueriesEnabled,
   });
+
+  const schedule = workPlansQuery.data;
 
   const linkedUser = (usersQuery.data ?? []).find(
     (user) => user.employeeId === employee.employeeId,
   );
 
-  const assignedTasks: AssignedTaskContext[] = (workPlansQuery.data ?? []).flatMap((workPlan) =>
-    workPlan.assignments
-      .filter((assignment) => assignment.employeeId === employee.employeeId)
-      .map((assignment) => {
-        const task = workPlan.tasks.find((planTask) => planTask.workItemId === assignment.workItemId);
-        return {
-          workItemId: assignment.workItemId,
-          taskTitle: task?.title ?? `משימה #${assignment.workItemId}`,
-          taskStatus: task?.status,
-          projectId: workPlan.project.id,
-          projectTitle: workPlan.project.title,
-          assignmentRole: assignment.assignmentRole,
-          assignedHours: assignment.assignedHours,
-        };
-      }),
-  );
+  const assignedTasks: AssignedTaskContext[] = (schedule?.assignments ?? [])
+    .filter((assignment) => assignment.employeeId === employee.employeeId)
+    .map((assignment) => {
+      const task =
+        schedule?.scheduledTasks.find((t) => t.workItemId === assignment.workItemId) ??
+        schedule?.unscheduledTasks.find((t) => t.workItemId === assignment.workItemId);
+      return {
+        workItemId: assignment.workItemId,
+        taskTitle: task?.title ?? `משימה #${assignment.workItemId}`,
+        taskStatus: task?.status,
+        projectId: task?.projectId ?? 0,
+        projectTitle: task?.projectTitle ?? task?.customerName ?? '—',
+        assignmentRole: assignment.assignmentRole,
+        assignedHours: assignment.assignedHours,
+      };
+    });
 
   return (
     <div className="employeeDrawer employeeDrawer--review">

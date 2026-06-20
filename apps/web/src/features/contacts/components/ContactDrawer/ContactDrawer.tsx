@@ -14,7 +14,6 @@ import { Checkbox } from '@shared/components/Checkbox';
 import { InlineAlert } from '@shared/components/InlineAlert';
 import { ConfirmInline } from '@shared/components/ConfirmInline';
 import { usePermissions } from '@shared/auth/usePermissions';
-import { isLocalDataMode } from '@/config/appConfig';
 import { getCustomersAsync } from '@features/customers';
 import { getProjectsListAsync, getSitesAsync } from '@features/projects/api/projectsApiClient';
 import { useContactMutations } from '../../hooks/useContacts';
@@ -281,9 +280,9 @@ function ContactDrawerContent({ contact, onClose, onSaved }: ContactDrawerConten
         <div className="contactDrawer__dangerActions">
           {contact.isActive ? (
             <ConfirmInline
-              triggerLabel="מחיקה"
-              message="למחוק את איש הקשר?"
-              confirmLabel="אישור מחיקה"
+              triggerLabel="בטל פעילות"
+              message="לבטל את פעילות איש הקשר?"
+              confirmLabel="אישור"
               onConfirm={handleDelete}
               isPending={isSaving}
             />
@@ -450,11 +449,8 @@ interface ContactReviewDetailsProps {
 }
 
 function ContactReviewDetails({ contact }: ContactReviewDetailsProps) {
-  // Related operational data is read through existing feature API clients.
-  // In mock mode these endpoints are unavailable, so the queries stay
-  // disabled and each section explains that instead of inventing data.
   const hasLinkedCustomer = contact.customerId != null;
-  const areRelatedQueriesEnabled = isLocalDataMode && hasLinkedCustomer;
+  const areRelatedQueriesEnabled = hasLinkedCustomer;
 
   const customersQuery = useQuery({
     queryKey: ['contacts', 'related', 'customers'],
@@ -491,11 +487,9 @@ function ContactReviewDetails({ contact }: ContactReviewDetailsProps) {
     (site) => site.customerId === contact.customerId,
   );
 
-  const linkedCustomerDisplayName = !isLocalDataMode
-    ? `לקוח #${contact.customerId}`
-    : customersQuery.isLoading
-      ? 'טוען…'
-      : (linkedCustomer?.customerName ?? `לקוח #${contact.customerId}`);
+  const linkedCustomerDisplayName = customersQuery.isLoading
+    ? 'טוען…'
+    : (linkedCustomer?.customerName ?? `לקוח #${contact.customerId}`);
 
   const linkedCustomerValue = !hasLinkedCustomer ? undefined : (
     <Link

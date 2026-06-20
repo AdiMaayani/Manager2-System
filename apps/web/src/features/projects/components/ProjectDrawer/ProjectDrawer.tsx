@@ -137,7 +137,7 @@ export function ProjectDrawer({
   const createSiteAsync = createSite.mutateAsync;
   const createMilestoneAsync = milestoneMutations.createMutation.mutateAsync;
   const updateMilestoneAsync = milestoneMutations.updateMutation.mutateAsync;
-  const cancelMilestoneAsync = milestoneMutations.cancelMutation.mutateAsync;
+  const deactivateMilestoneAsync = milestoneMutations.deactivateMutation.mutateAsync;
   const boqQuery = useProjectBoq(isCreateMode ? null : projectId, isOpen);
   const boqMutations = useProjectBoqMutations(projectId);
   const drawingsQuery = useProjectDrawings(isCreateMode ? null : projectId, isOpen);
@@ -295,9 +295,16 @@ export function ProjectDrawer({
 
   const handleCancelMilestone = useCallback(
     async (milestoneId: number) => {
-      await cancelMilestoneAsync(milestoneId);
+      await deactivateMilestoneAsync(milestoneId);
     },
-    [cancelMilestoneAsync],
+    [deactivateMilestoneAsync],
+  );
+
+  const handleReorderMilestones = useCallback(
+    async (items: { projectMilestoneId: number; sortOrder: number }[]) => {
+      await milestoneMutations.reorderMutation.mutateAsync(items);
+    },
+    [milestoneMutations.reorderMutation],
   );
 
   const handleCreateBoqItem = useCallback(
@@ -576,17 +583,17 @@ export function ProjectDrawer({
           <ProjectMilestonesTab
             projectId={projectId}
             lifecycle={lifecycle}
-            customerId={overviewForm.customerId || lifecycle?.project.customerId || 0}
-            siteId={overviewForm.siteId || lifecycle?.project.siteId || 0}
             employees={lookups.employees}
             onCreateMilestone={handleCreateMilestone}
             onUpdateMilestone={handleUpdateMilestone}
             onCancelMilestone={handleCancelMilestone}
+            onReorderMilestones={handleReorderMilestones}
             isSaving={
               milestoneMutations.createMutation.isPending ||
               milestoneMutations.updateMutation.isPending ||
-              milestoneMutations.cancelMutation.isPending
+              milestoneMutations.deactivateMutation.isPending
             }
+            isReordering={milestoneMutations.reorderMutation.isPending}
           />
         );
       case 'quote':

@@ -50,6 +50,17 @@
   --color-warning-700: #b45309;
   --color-danger-700: #b91c1c;
 
+  /* WorkPlan task category surfaces (visible on white backgrounds) */
+  --task-category-regular-bg: #e8eeff;
+  --task-category-regular-border: var(--color-primary-400);
+  --task-category-regular-text: var(--color-primary-900);
+  --task-category-project-bg: #e7f8ee;
+  --task-category-project-border: var(--color-success-500);
+  --task-category-project-text: var(--color-success-800);
+  --task-category-serviceCall-bg: #fff4e5;
+  --task-category-serviceCall-border: var(--color-warning-500);
+  --task-category-serviceCall-text: #92400e;
+
   /* Surfaces: use these instead of bare #fff / neutral-50 so every card,
      control, and panel shares one background vocabulary. */
   --color-surface: #fff;
@@ -118,6 +129,9 @@
   --sidebar-width: 280px;
   --topbar-height: 96px;
   --content-max-width: 1400px;
+
+  /* Stacking: popovers/menus above drawers (200) and modals (200). */
+  --z-index-popover: 1300;
 
   /* Standard breakpoints (reference values for @media queries; CSS custom
      properties cannot be used inside media conditions, so these document the

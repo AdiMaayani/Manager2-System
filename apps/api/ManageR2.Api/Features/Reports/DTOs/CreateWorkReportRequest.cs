@@ -6,6 +6,7 @@ public class CreateWorkReportRequest
 {
     public string? ReportType { get; set; }
     public string? Date { get; set; }
+    public int? WorkItemId { get; set; }
     public int? ProjectId { get; set; }
     public string? ProjectName { get; set; }
     public string? CustomerName { get; set; }

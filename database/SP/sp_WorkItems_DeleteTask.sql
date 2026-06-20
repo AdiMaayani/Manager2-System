@@ -12,6 +12,8 @@ BEGIN
 
     DECLARE @WorkType NVARCHAR(50);
     DECLARE @IsLocked BIT;
+    DECLARE @TaskCategory NVARCHAR(20);
+    DECLARE @IsArchived BIT;
     DECLARE @RowsAffected INT = 0;
 
     BEGIN TRY
@@ -19,7 +21,9 @@ BEGIN
 
         SELECT
             @WorkType = WorkType,
-            @IsLocked = IsLocked
+            @IsLocked = IsLocked,
+            @TaskCategory = TaskCategory,
+            @IsArchived = IsArchived
         FROM dbo.WorkItems WITH (XLOCK, HOLDLOCK)
         WHERE WorkItemId = @WorkItemId;
 
@@ -49,6 +53,15 @@ BEGIN
             SELECT
                 CAST(3 AS INT) AS ResultCode,
                 N'ניתן למחוק דרך פעולה זו רק משימות תוכנית עבודה.' AS [Message],
+                CAST(0 AS INT) AS RowsAffected;
+            RETURN;
+        END;
+
+        IF @IsArchived = 1 OR @TaskCategory NOT IN (N'Regular', N'Project')
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT CAST(8 AS INT) AS ResultCode,
+                N'לא ניתן למחוק רשומת מורשת או משימה ללא קטגוריה תקינה.' AS [Message],
                 CAST(0 AS INT) AS RowsAffected;
             RETURN;
         END;

@@ -348,5 +348,3 @@ SELECT
     (SELECT COUNT(*) FROM dbo.Rec_WorkItemAlgorithmProfile)AS WorkItemAlgoProfiles_total;
 
 RAISERROR(N'== 08_seed_smart_assignment_inputs: done. ==', 0, 1) WITH NOWAIT;
-
-

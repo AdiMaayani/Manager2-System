@@ -402,6 +402,3 @@ SELECT
     (SELECT COUNT(*) FROM dbo.InventoryItems WHERE IsActive = 1) AS Inventory_active;
 
 RAISERROR(N'== 03_seed_core: done. ==', 0, 1) WITH NOWAIT;
-
-
-

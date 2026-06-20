@@ -12,9 +12,6 @@ public abstract class ServiceCallRequestValidator<TRequest> : AbstractValidator<
         RuleFor(request => request.Title)
             .NotEmpty().WithMessage("Title is required.");
 
-        RuleFor(request => request.Status)
-            .NotEmpty().WithMessage("Status is required.");
-
         RuleFor(request => request.BillingType)
             .NotEmpty().WithMessage("BillingType is required.");
 
@@ -22,7 +19,13 @@ public abstract class ServiceCallRequestValidator<TRequest> : AbstractValidator<
             .GreaterThan(0).WithMessage("CustomerId must be greater than 0.");
 
         RuleFor(request => request.SiteId)
-            .GreaterThan(0).WithMessage("SiteId must be greater than 0.");
+            .Must(siteId => !siteId.HasValue || siteId.Value > 0)
+            .WithMessage("SiteId must be greater than 0 when supplied.");
+
+        RuleFor(request => request)
+            .Must(request => !request.PlannedStart.HasValue || !request.PlannedEnd.HasValue || request.PlannedEnd > request.PlannedStart)
+            .WithName(nameof(CreateServiceCallRequestDto.PlannedEnd))
+            .WithMessage("PlannedEnd must be after PlannedStart.");
     }
 }
 

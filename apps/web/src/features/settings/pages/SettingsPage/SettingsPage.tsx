@@ -6,7 +6,7 @@ import { ComingSoonPanel } from '@shared/components/ComingSoonPanel';
 import { Badge } from '@shared/components/Badge';
 import { InlineAlert } from '@shared/components/InlineAlert';
 import { getCurrentUser, getRoleDisplayLabel } from '@api/auth';
-import { apiBaseUrl, appDataMode, appEnvironment, isMockDataMode } from '@/config/appConfig';
+import { apiBaseUrl } from '@/config/appConfig';
 import {
   WORKPLAN_PRIORITY_OPTIONS,
   WORKPLAN_STATUS_OPTIONS,
@@ -64,11 +64,7 @@ export function SettingsPage() {
             </div>
             <div className="settingsPage__infoTile">
               <span>סביבה</span>
-              <strong>{appEnvironment}</strong>
-            </div>
-            <div className="settingsPage__infoTile">
-              <span>מצב נתונים</span>
-              <strong>{appDataMode === 'mock' ? 'mock - נתוני דמו' : 'local - API אמיתי'}</strong>
+              <strong>{import.meta.env.MODE}</strong>
             </div>
             <div className="settingsPage__infoTile">
               <span>כתובת API</span>
@@ -282,11 +278,6 @@ export function SettingsPage() {
           description="בדיקות תפעוליות מהירות למנהל מערכת."
         >
           <div className="settingsPage__warningList">
-            {isMockDataMode && (
-              <InlineAlert variant="danger">
-                מצב mock פעיל. זה מתאים לעבודת UI מקומית בלבד ואינו מוכן לפרודקשן.
-              </InlineAlert>
-            )}
             <InlineAlert variant="info">
               חיבור API, מחרוזת חיבור למסד נתונים ומפתח JWT מוגדרים לפי סביבת הרצה ולא מתוך מסך זה.
             </InlineAlert>

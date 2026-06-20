@@ -1,66 +1,63 @@
+import type { TaskCategory } from '@shared/constants/taskCategories';
+
 export type WorkPlanScope = 'company' | 'personal' | 'employee' | 'project';
 export type WorkPlanRange = 'daily' | 'weekly' | 'monthly' | 'yearly';
 export type WorkPlanProjectFilter = number | 'all';
 export type WorkPlanStatusCode = 'Planned' | 'Execution' | 'Done' | 'Closed' | 'Blocked';
 export type WorkPlanPriorityCode = 'Low' | 'Medium' | 'High' | 'Urgent';
+export type WorkPlanTaskCategoryFilter = TaskCategory | 'all';
 
-export interface WorkPlanProjectSummary {
-  workItemId: number;
-  title: string;
-  description?: string | null;
-  status: string;
-  workType?: string;
+export interface WorkPlanScheduleFilters {
+  scope: WorkPlanScope;
+  projectId?: number | null;
+  employeeId?: number | null;
+  status?: string | null;
+  taskCategory?: string | null;
+  fromUtc: string;
+  toUtc: string;
+  includeUnscheduled?: boolean;
 }
 
-export interface WorkPlanTaskSummary {
+export interface WorkPlanScheduledTask {
   workItemId: number;
   title: string;
   description?: string | null;
-  status: string;
+  taskCategory?: string | null;
   workType?: string | null;
-  estimatedHours?: number | null;
+  status: string;
   priority?: string | null;
   plannedStart?: string | null;
   plannedEnd?: string | null;
-  requiredRole?: string | null;
+  derivedDurationMinutes?: number | null;
+  estimatedHours?: number | null;
   isLocked: boolean;
-  parentWorkItemId?: number | null;
+  customerId?: number | null;
+  customerName?: string | null;
+  siteId?: number | null;
+  siteName?: string | null;
+  projectId?: number | null;
+  projectTitle?: string | null;
+  milestoneId?: number | null;
+  milestoneTitle?: string | null;
+  requiredRole?: string | null;
+  isServiceCall: boolean;
 }
 
-export interface WorkPlanAssignment {
+export interface WorkPlanScheduleAssignment {
   workItemId: number;
   employeeId?: number | null;
-  contractorId?: number | null;
-  assignmentType: string;
+  employeeName?: string | null;
   assignmentRole?: string | null;
   assignedHours?: number | null;
   isManualAssignment: boolean;
-  employeeName?: string | null;
-  contractorName?: string | null;
+  assignmentSource: 'Task' | 'Project';
 }
 
-export interface MappedWorkPlan {
-  project: {
-    id: number;
-    title: string;
-    status: string;
-  };
-  tasks: Array<{
-    id: number;
-    workItemId: number;
-    title: string;
-    description?: string | null;
-    status: string;
-    workType?: string | null;
-    estimatedHours?: number | null;
-    priority?: string | null;
-    plannedStart?: string | null;
-    plannedEnd?: string | null;
-    requiredRole?: string | null;
-    isLocked: boolean;
-    parentWorkItemId?: number | null;
-  }>;
-  assignments: WorkPlanAssignment[];
+export interface WorkPlanSchedule {
+  scheduledTasks: WorkPlanScheduledTask[];
+  unscheduledTasks: WorkPlanScheduledTask[];
+  employees: WorkPlanEmployee[];
+  assignments: WorkPlanScheduleAssignment[];
 }
 
 export interface WorkPlanEmployee {
@@ -87,19 +84,25 @@ export interface ScheduledTaskBar {
   description?: string | null;
   status: string;
   workType?: string | null;
-  projectId: number;
+  taskCategory?: string | null;
+  projectId: number | null;
   projectTitle: string;
+  customerName?: string | null;
+  siteName?: string | null;
+  milestoneTitle?: string | null;
   assigneeName: string;
   employeeId: string;
   startHour: number;
   endHour: number;
   plannedStart?: string | null;
   plannedEnd?: string | null;
+  derivedDurationMinutes?: number | null;
   estimatedHours?: number | null;
   priority?: string | null;
   requiredRole?: string | null;
   isLocked: boolean;
   isUrgent: boolean;
+  isUnscheduled: boolean;
   assignmentSource: ResolvedAssignment['source'];
   violationCount: number;
   warningCount: number;
@@ -112,17 +115,22 @@ export interface WorkPlanTaskSelection {
   description?: string | null;
   status: string;
   workType?: string | null;
-  projectId: number;
+  taskCategory?: string | null;
+  projectId: number | null;
   projectTitle: string;
+  customerName?: string | null;
+  siteName?: string | null;
+  milestoneId?: number | null;
+  milestoneTitle?: string | null;
   assigneeName: string;
-  // Employee id of the resolved assignee, used for ownership checks
-  // (e.g. allowing personal-scope users to edit only their own tasks).
   assigneeEmployeeId: string | null;
   startHour: number;
   endHour: number;
   plannedStart?: string | null;
   plannedEnd?: string | null;
+  derivedDurationMinutes?: number | null;
   isLocked: boolean;
+  isUnscheduled: boolean;
   estimatedHours?: number | null;
   priority?: string | null;
   requiredRole?: string | null;
@@ -144,7 +152,6 @@ export interface SmartAssignmentRequest {
   saveRun?: boolean;
 }
 
-// One explainability factor behind a candidate's score.
 export interface RecommendationFactor {
   key: string;
   label: string;
@@ -169,15 +176,15 @@ export interface SmartAssignmentTaskResult {
   factors?: RecommendationFactor[];
 }
 
-// New Task draft recommendation (scored for the not-yet-saved task context).
 export interface DraftRecommendationRequest {
-  projectId: number;
+  taskCategory: TaskCategory;
+  projectId?: number | null;
+  customerId?: number | null;
+  siteId?: number | null;
   plannedStart: string;
   plannedEnd: string;
-  estimatedHours?: number | null;
   priority?: string | null;
   requiredRole?: string | null;
-  siteId?: number | null;
 }
 
 export interface DraftRecommendationCandidate {
@@ -218,25 +225,18 @@ export interface SmartAssignmentResponse {
   }>;
 }
 
-export type NewTaskKind = 'project' | 'internal';
-
-export interface InternalWorkContext {
-  customerId: number;
-  siteId: number;
-  containerProjectId: number;
-}
-
 export interface CreateTaskRequest {
   title: string;
   description?: string;
-  status: string;
+  status?: string;
   billingType: string;
-  customerId?: number;
-  siteId?: number;
+  taskCategory: TaskCategory;
+  customerId?: number | null;
+  siteId?: number | null;
   parentWorkItemId?: number | null;
+  milestoneId?: number | null;
   plannedStart?: string | null;
   plannedEnd?: string | null;
-  estimatedHours?: number | null;
   priority?: string | null;
   requiredRole?: string | null;
 }
@@ -251,6 +251,7 @@ export interface WorkItemResponse {
   title: string;
   description?: string | null;
   workType?: string | null;
+  taskCategory?: string | null;
   billingType?: string | null;
   status?: string | null;
   estimatedHours?: number | null;
@@ -259,9 +260,10 @@ export interface WorkItemResponse {
   plannedEnd?: string | null;
   requiredRole?: string | null;
   isLocked: boolean;
-  customerId: number;
-  siteId: number;
+  customerId?: number | null;
+  siteId?: number | null;
   parentWorkItemId?: number | null;
+  milestoneId?: number | null;
   dealCloseDate?: string | null;
   financeProjectNumber?: string | null;
   invoiceNumber?: string | null;
@@ -273,19 +275,19 @@ export interface WorkItemResponse {
 export interface UpdateTaskRequest {
   title: string;
   description?: string | null;
-  status: string;
+  status?: string;
   billingType: string;
   workType?: string | null;
-  customerId: number;
-  siteId: number;
+  taskCategory?: string | null;
+  customerId?: number | null;
+  siteId?: number | null;
+  parentWorkItemId?: number | null;
+  milestoneId?: number | null;
   plannedStart?: string | null;
   plannedEnd?: string | null;
-  estimatedHours?: number | null;
   priority?: string | null;
   requiredRole?: string | null;
   isLocked: boolean;
-  // The backend PUT replaces every column via sp_UpdateWorkItem, so these
-  // fields must be echoed from the loaded work item or they get wiped to NULL.
   dealCloseDate?: string | null;
   financeProjectNumber?: string | null;
   invoiceNumber?: string | null;
@@ -298,4 +300,36 @@ export interface TaskInsightCounts {
   violationCount: number;
   warningCount: number;
   suggestionCount: number;
+}
+
+/** @deprecated Legacy project-centric shape — mock adapter only. */
+export interface MappedWorkPlan {
+  project: { id: number; title: string; status: string };
+  tasks: Array<{
+    id: number;
+    workItemId: number;
+    title: string;
+    description?: string | null;
+    status: string;
+    workType?: string | null;
+    taskCategory?: string | null;
+    estimatedHours?: number | null;
+    priority?: string | null;
+    plannedStart?: string | null;
+    plannedEnd?: string | null;
+    requiredRole?: string | null;
+    isLocked: boolean;
+    parentWorkItemId?: number | null;
+  }>;
+  assignments: Array<{
+    workItemId: number;
+    employeeId?: number | null;
+    contractorId?: number | null;
+    assignmentType: string;
+    assignmentRole?: string | null;
+    assignedHours?: number | null;
+    isManualAssignment: boolean;
+    employeeName?: string | null;
+    contractorName?: string | null;
+  }>;
 }

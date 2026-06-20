@@ -6,15 +6,18 @@ import {
   matchesWorkPlanStatusFilter,
   WEEKDAY_LABELS,
 } from '../../constants';
-import type { MappedWorkPlan, WorkPlanTaskSelection } from '../../types';
+import type { WorkPlanSchedule, WorkPlanTaskSelection } from '../../types';
 import {
   buildTaskSearchFields,
   buildWorkPlanTaskSelection,
   formatHourAsTime,
   matchesWorkPlanSearch,
-  resolveAssignment,
+  resolveFlatAssignment,
+  taskMatchesSelectedLocalDate,
 } from '../../lib/workPlanScheduling';
 import { isSameDay, startOfWeek } from '../../lib/workPlanPeriod';
+import { localDateKeyFromUtc, toLocalDateKey } from '@shared/utils/utcDateTime';
+import { taskCategoryModifierClass } from '@shared/constants/taskCategoryStyles';
 import './WorkPlanWeeklyView.css';
 
 function weeklyTaskStatusClass(status?: string | null): string {
@@ -24,8 +27,9 @@ function weeklyTaskStatusClass(status?: string | null): string {
 }
 
 interface WorkPlanWeeklyViewProps {
-  workPlans: MappedWorkPlan[];
+  schedule: WorkPlanSchedule;
   statusFilter: string;
+  taskCategoryFilter: string;
   searchQuery: string;
   periodAnchor: Date;
   onTaskClick?: (task: WorkPlanTaskSelection) => void;
@@ -36,8 +40,9 @@ interface WeeklyTask extends WorkPlanTaskSelection {
 }
 
 export function WorkPlanWeeklyView({
-  workPlans,
+  schedule,
   statusFilter,
+  taskCategoryFilter,
   searchQuery,
   periodAnchor,
   onTaskClick,
@@ -51,42 +56,38 @@ export function WorkPlanWeeklyView({
     });
   }, [periodAnchor]);
 
-  const { rows, hiddenCount } = useMemo(() => {
+  const { rows } = useMemo(() => {
     const assigneeMap = new Map<string, WeeklyTask[]>();
-    const weekStart = weekDays[0].date;
-    const weekEnd = new Date(weekDays[6].date);
-    weekEnd.setHours(23, 59, 59, 999);
-    let hidden = 0;
 
-    for (const workPlan of workPlans) {
-      for (const [taskIndex, task] of workPlan.tasks.entries()) {
-        if (!matchesWorkPlanStatusFilter(task.status, statusFilter)) continue;
-        const assignment = resolveAssignment(task, workPlan);
-        if (!matchesWorkPlanSearch(buildTaskSearchFields(task, workPlan, assignment), searchQuery)) {
-          continue;
+    for (const task of schedule.scheduledTasks) {
+      if (!matchesWorkPlanStatusFilter(task.status, statusFilter)) continue;
+      if (taskCategoryFilter !== 'all' && task.taskCategory !== taskCategoryFilter) continue;
+
+      const assignment = resolveFlatAssignment(task, schedule.assignments);
+      if (!matchesWorkPlanSearch(buildTaskSearchFields(task, assignment), searchQuery)) continue;
+
+      if (!task.plannedStart || !task.plannedEnd) continue;
+
+      let matchedDayIndex = -1;
+      for (let index = 0; index < weekDays.length; index += 1) {
+        if (taskMatchesSelectedLocalDate(task.plannedStart, task.plannedEnd, weekDays[index].date)) {
+          matchedDayIndex = index;
+          break;
         }
+      }
+      if (matchedDayIndex < 0) continue;
 
-        const plannedDate = task.plannedStart ? new Date(task.plannedStart) : null;
-        const isInWeek =
-          plannedDate &&
-          !Number.isNaN(plannedDate.getTime()) &&
-          plannedDate >= weekStart &&
-          plannedDate <= weekEnd;
-
-        if (!isInWeek) {
-          hidden += 1;
-          continue;
-        }
-
-        const assignee = assignment.displayName && assignment.displayName !== '—'
+      const assignee =
+        assignment.displayName && assignment.displayName !== '—'
           ? assignment.displayName
           : 'לא משויך';
-        if (!assigneeMap.has(assignee)) assigneeMap.set(assignee, []);
-        assigneeMap.get(assignee)!.push({
-          ...buildWorkPlanTaskSelection(workPlan, task, taskIndex),
-          dayIndex: plannedDate!.getDay(),
-        });
-      }
+      if (!assigneeMap.has(assignee)) assigneeMap.set(assignee, []);
+
+      const dayKey = toLocalDateKey(weekDays[matchedDayIndex].date);
+      assigneeMap.get(assignee)!.push({
+        ...buildWorkPlanTaskSelection(task, assignment, dayKey, false),
+        dayIndex: matchedDayIndex,
+      });
     }
 
     const builtRows = Array.from(assigneeMap.entries())
@@ -96,8 +97,8 @@ export function WorkPlanWeeklyView({
       }))
       .sort((left, right) => left.assignee.localeCompare(right.assignee, 'he'));
 
-    return { rows: builtRows, hiddenCount: hidden };
-  }, [workPlans, statusFilter, searchQuery, weekDays]);
+    return { rows: builtRows };
+  }, [schedule, statusFilter, taskCategoryFilter, searchQuery, weekDays]);
 
   const today = new Date();
 
@@ -105,11 +106,6 @@ export function WorkPlanWeeklyView({
     <div className="workPlanWeeklyView card">
       <div className="workPlanWeeklyView__head">
         <h3 className="workPlanWeeklyView__title">תצוגה שבועית</h3>
-        {hiddenCount > 0 && (
-          <span className="workPlanWeeklyView__note">
-            {hiddenCount} משימות אינן בשבוע זה (תאריך אחר או ללא תאריך מתוכנן)
-          </span>
-        )}
       </div>
 
       <div className="workPlanWeeklyView__scroll">
@@ -160,9 +156,9 @@ export function WorkPlanWeeklyView({
                           <button
                             key={task.taskId}
                             type="button"
-                            className={`workPlanWeeklyView__task ${weeklyTaskStatusClass(task.status)}`}
+                            className={`${taskCategoryModifierClass('workPlanWeeklyView__task', task.taskCategory)} ${weeklyTaskStatusClass(task.status)}`}
                             onClick={() => onTaskClick?.(task)}
-                            title={`${task.title} · ${getWorkPlanStatusDisplay(task.status)}`}
+                            title={`${task.title} · ${getWorkPlanStatusDisplay(task.status)} · ${localDateKeyFromUtc(task.plannedStart ?? '')}`}
                           >
                             <span className="workPlanWeeklyView__taskDot" aria-hidden />
                             <span className="workPlanWeeklyView__taskBody">

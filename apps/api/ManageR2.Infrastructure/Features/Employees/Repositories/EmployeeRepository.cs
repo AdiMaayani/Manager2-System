@@ -108,6 +108,30 @@ public class EmployeeRepository : IEmployeeRepository
         return rowsAffected > 0;
     }
 
+    public async Task<List<string>> GetDistinctPrimaryRolesAsync()
+    {
+        var roles = new List<string>();
+
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand("dbo.sp_Employees_GetDistinctPrimaryRoles", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+
+        await connection.OpenAsync();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            var role = reader["PrimaryRole"]?.ToString();
+            if (!string.IsNullOrWhiteSpace(role))
+            {
+                roles.Add(role.Trim());
+            }
+        }
+
+        return roles;
+    }
+
     private static void AddEditableEmployeeParameters(SqlCommand command, Employee employee)
     {
         command.Parameters.AddWithValue("@FullName", employee.FullName);

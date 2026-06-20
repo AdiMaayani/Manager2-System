@@ -15,7 +15,6 @@ import { ConfirmInline } from '@shared/components/ConfirmInline';
 import { StatusBadge } from '@shared/components/StatusBadge';
 import { PageSpinner } from '@shared/components/PageSpinner';
 import { usePermissions } from '@shared/auth/usePermissions';
-import { isLocalDataMode } from '@/config/appConfig';
 import { getServiceCallByIdAsync } from '../../api/serviceCallsApiClient';
 import { useServiceCallMutations } from '../../hooks/useServiceCalls';
 import type {
@@ -177,9 +176,9 @@ function ServiceCallDrawerContent({
 }: ServiceCallDrawerContentProps) {
   const isExistingServiceCall = serviceCall != null;
   const serviceCallDetailsQuery = useQuery({
-    queryKey: ['serviceCalls', 'detail', serviceCall?.workItemId, isLocalDataMode],
+    queryKey: ['serviceCalls', 'detail', serviceCall?.workItemId],
     queryFn: () => getServiceCallByIdAsync(serviceCall!.workItemId),
-    enabled: isExistingServiceCall && isLocalDataMode,
+    enabled: isExistingServiceCall,
   });
   const currentServiceCall = serviceCallDetailsQuery.data ?? serviceCall;
   const { can } = usePermissions();

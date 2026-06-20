@@ -78,7 +78,12 @@ public class WorkReportRepository : IWorkReportRepository
                 CustomerName = GetStringValue(reader, "CustomerName"),
                 ReporterName = GetStringValue(reader, "ReporterName"),
                 Status = GetStringValue(reader, "Status"),
-                FollowUpRequired = GetBoolValue(reader, "FollowUpRequired")
+                FollowUpRequired = GetBoolValue(reader, "FollowUpRequired"),
+                LifecycleStatus = GetStringValue(reader, "LifecycleStatus"),
+                FinalizedAt = GetDateTimeValue(reader, "FinalizedAt"),
+                ReversedAt = GetDateTimeValue(reader, "ReversedAt"),
+                AmendsWorkReportId = GetNullableIntValue(reader, "AmendsWorkReportId"),
+                UpdatedAt = GetDateTimeValue(reader, "UpdatedAt")
             });
         }
 
@@ -112,6 +117,8 @@ public class WorkReportRepository : IWorkReportRepository
 
         await LoadSystemsAsync(connection, report);
         await LoadRelatedWorkersAsync(connection, report);
+        await LoadInventoryLinesAsync(connection, report);
+        await LoadAttachmentsAsync(connection, report);
 
         return report;
     }
@@ -173,6 +180,272 @@ public class WorkReportRepository : IWorkReportRepository
             : 0;
 
         return rowsAffected > 0;
+    }
+
+    public async Task<WorkReportLifecycleResultModel?> FinalizeAsync(int workReportId, int? finalizedByUserId)
+    {
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand("dbo.sp_WorkReports_Finalize", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+        command.Parameters.AddWithValue("@WorkReportId", workReportId);
+        command.Parameters.AddWithValue("@FinalizedByUserId", (object?)finalizedByUserId ?? DBNull.Value);
+
+        await connection.OpenAsync();
+        await using var reader = await command.ExecuteReaderAsync();
+        return await reader.ReadAsync() ? MapLifecycleResult(reader) : null;
+    }
+
+    public async Task<WorkReportLifecycleResultModel?> ReverseAsync(
+        int workReportId,
+        string reversalReason,
+        int? reversedByUserId)
+    {
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand("dbo.sp_WorkReports_Reverse", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+        command.Parameters.AddWithValue("@WorkReportId", workReportId);
+        command.Parameters.AddWithValue("@ReversalReason", reversalReason);
+        command.Parameters.AddWithValue("@ReversedByUserId", (object?)reversedByUserId ?? DBNull.Value);
+
+        await connection.OpenAsync();
+        await using var reader = await command.ExecuteReaderAsync();
+        return await reader.ReadAsync() ? MapLifecycleResult(reader) : null;
+    }
+
+    public async Task<int> AmendAsync(int reversedWorkReportId, WorkReportCreateModel request)
+    {
+        request.AmendsWorkReportId = reversedWorkReportId;
+        return await CreateAsync(request);
+    }
+
+    public async Task<WorkReportInventoryLineModel?> AddInventoryLineAsync(
+        int workReportId,
+        int inventoryItemId,
+        decimal quantity,
+        string usageType,
+        int? createdByUserId)
+    {
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand("dbo.sp_WorkReportInventory_Add", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+        command.Parameters.AddWithValue("@WorkReportId", workReportId);
+        command.Parameters.AddWithValue("@InventoryItemId", inventoryItemId);
+        command.Parameters.AddWithValue("@Quantity", quantity);
+        command.Parameters.AddWithValue("@UsageType", usageType);
+        command.Parameters.AddWithValue("@CreatedByUserId", (object?)createdByUserId ?? DBNull.Value);
+
+        await connection.OpenAsync();
+        await using var reader = await command.ExecuteReaderAsync();
+        return await reader.ReadAsync() ? MapInventoryLine(reader) : null;
+    }
+
+    public async Task<bool> DeleteInventoryLineAsync(int workReportId, int workReportInventoryItemId)
+    {
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand("dbo.sp_WorkReportInventory_Delete", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+        command.Parameters.AddWithValue("@WorkReportId", workReportId);
+        command.Parameters.AddWithValue("@WorkReportInventoryItemId", workReportInventoryItemId);
+
+        await connection.OpenAsync();
+        var result = await command.ExecuteScalarAsync();
+        return result != null && result != DBNull.Value && Convert.ToInt32(result) > 0;
+    }
+
+    public async Task<List<WorkReportInventoryLineModel>> GetInventoryLinesAsync(int workReportId)
+    {
+        var lines = new List<WorkReportInventoryLineModel>();
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand("dbo.sp_WorkReportInventory_GetByReport", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+        command.Parameters.AddWithValue("@WorkReportId", workReportId);
+
+        await connection.OpenAsync();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            lines.Add(MapInventoryLine(reader));
+        }
+
+        return lines;
+    }
+
+    public async Task<WorkReportAttachmentModel?> AddAttachmentAsync(
+        int workReportId,
+        string mediaType,
+        string originalFileName,
+        string storedFileName,
+        string filePath,
+        string contentType,
+        long fileSizeBytes,
+        int? uploadedByUserId)
+    {
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand("dbo.sp_WorkReportAttachments_Add", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+        command.Parameters.AddWithValue("@WorkReportId", workReportId);
+        command.Parameters.AddWithValue("@MediaType", mediaType);
+        command.Parameters.AddWithValue("@OriginalFileName", originalFileName);
+        command.Parameters.AddWithValue("@StoredFileName", storedFileName);
+        command.Parameters.AddWithValue("@FilePath", filePath);
+        command.Parameters.AddWithValue("@ContentType", contentType);
+        command.Parameters.AddWithValue("@FileSizeBytes", fileSizeBytes);
+        command.Parameters.AddWithValue("@UploadedByUserId", (object?)uploadedByUserId ?? DBNull.Value);
+
+        await connection.OpenAsync();
+        var result = await command.ExecuteScalarAsync();
+        var attachmentId = result != null && result != DBNull.Value ? Convert.ToInt32(result) : 0;
+        if (attachmentId <= 0)
+        {
+            return null;
+        }
+
+        return await GetAttachmentAsync(workReportId, attachmentId);
+    }
+
+    public async Task<WorkReportAttachmentDeleteResultModel?> DeleteAttachmentAsync(
+        int workReportId,
+        int workReportAttachmentId)
+    {
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand("dbo.sp_WorkReportAttachments_Delete", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+        command.Parameters.AddWithValue("@WorkReportId", workReportId);
+        command.Parameters.AddWithValue("@WorkReportAttachmentId", workReportAttachmentId);
+
+        await connection.OpenAsync();
+        await using var reader = await command.ExecuteReaderAsync();
+        if (!await reader.ReadAsync())
+        {
+            return null;
+        }
+
+        return new WorkReportAttachmentDeleteResultModel
+        {
+            WorkReportAttachmentId = GetIntValue(reader, "WorkReportAttachmentId"),
+            StoredFileName = GetStringValue(reader, "StoredFileName"),
+            FilePath = GetStringValue(reader, "FilePath"),
+            ContentType = GetStringValue(reader, "ContentType"),
+            FileSizeBytes = reader["FileSizeBytes"] == DBNull.Value ? null : Convert.ToInt64(reader["FileSizeBytes"])
+        };
+    }
+
+    public async Task<List<WorkReportAttachmentModel>> GetAttachmentsAsync(int workReportId)
+    {
+        var attachments = new List<WorkReportAttachmentModel>();
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand("dbo.sp_WorkReportAttachments_GetByReport", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+        command.Parameters.AddWithValue("@WorkReportId", workReportId);
+
+        await connection.OpenAsync();
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            attachments.Add(MapAttachment(reader));
+        }
+
+        return attachments;
+    }
+
+    public async Task<WorkReportAttachmentModel?> GetAttachmentAsync(int workReportId, int workReportAttachmentId)
+    {
+        var attachments = await GetAttachmentsAsync(workReportId);
+        return attachments.FirstOrDefault(attachment => attachment.WorkReportAttachmentId == workReportAttachmentId);
+    }
+
+    private static async Task LoadInventoryLinesAsync(SqlConnection connection, WorkReportDetailsModel report)
+    {
+        await using var command = new SqlCommand("dbo.sp_WorkReportInventory_GetByReport", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+        command.Parameters.AddWithValue("@WorkReportId", report.WorkReportId);
+
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            report.InventoryLines.Add(MapInventoryLine(reader));
+        }
+    }
+
+    private static async Task LoadAttachmentsAsync(SqlConnection connection, WorkReportDetailsModel report)
+    {
+        await using var command = new SqlCommand("dbo.sp_WorkReportAttachments_GetByReport", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+        command.Parameters.AddWithValue("@WorkReportId", report.WorkReportId);
+
+        await using var reader = await command.ExecuteReaderAsync();
+        while (await reader.ReadAsync())
+        {
+            report.Attachments.Add(MapAttachment(reader));
+        }
+    }
+
+    private static WorkReportInventoryLineModel MapInventoryLine(SqlDataReader reader)
+    {
+        return new WorkReportInventoryLineModel
+        {
+            WorkReportInventoryItemId = GetIntValue(reader, "WorkReportInventoryItemId"),
+            WorkReportId = GetIntValue(reader, "WorkReportId"),
+            InventoryItemId = GetIntValue(reader, "InventoryItemId"),
+            Quantity = reader["Quantity"] == DBNull.Value ? 0m : Convert.ToDecimal(reader["Quantity"]),
+            UsageType = GetStringValue(reader, "UsageType") ?? string.Empty,
+            SkuSnapshot = GetStringValue(reader, "SkuSnapshot"),
+            ItemNameSnapshot = GetStringValue(reader, "ItemNameSnapshot"),
+            CreatedAt = GetDateTimeValue(reader, "CreatedAt"),
+            CreatedByUserId = GetNullableIntValue(reader, "CreatedByUserId")
+        };
+    }
+
+    private static WorkReportAttachmentModel MapAttachment(SqlDataReader reader)
+    {
+        return new WorkReportAttachmentModel
+        {
+            WorkReportAttachmentId = GetIntValue(reader, "WorkReportAttachmentId"),
+            WorkReportId = GetIntValue(reader, "WorkReportId"),
+            MediaType = GetStringValue(reader, "MediaType") ?? string.Empty,
+            OriginalFileName = GetStringValue(reader, "OriginalFileName") ?? string.Empty,
+            StoredFileName = GetStringValue(reader, "StoredFileName") ?? string.Empty,
+            FilePath = GetStringValue(reader, "FilePath") ?? string.Empty,
+            ContentType = GetStringValue(reader, "ContentType"),
+            FileSizeBytes = reader["FileSizeBytes"] == DBNull.Value ? 0L : Convert.ToInt64(reader["FileSizeBytes"]),
+            UploadedAt = GetDateTimeValue(reader, "UploadedAt"),
+            UploadedByUserId = GetNullableIntValue(reader, "UploadedByUserId")
+        };
+    }
+
+    private static WorkReportLifecycleResultModel MapLifecycleResult(SqlDataReader reader)
+    {
+        return new WorkReportLifecycleResultModel
+        {
+            WorkReportId = GetIntValue(reader, "WorkReportId"),
+            Status = GetStringValue(reader, "Status"),
+            LifecycleStatus = GetStringValue(reader, "LifecycleStatus") ?? string.Empty,
+            FinalizedAt = GetDateTimeValue(reader, "FinalizedAt"),
+            FinalizedByUserId = GetNullableIntValue(reader, "FinalizedByUserId"),
+            ReversedAt = GetDateTimeValue(reader, "ReversedAt"),
+            ReversedByUserId = GetNullableIntValue(reader, "ReversedByUserId"),
+            ReversalReason = GetStringValue(reader, "ReversalReason")
+        };
     }
 
     private static async Task InsertChildRowsAsync(
@@ -287,9 +560,8 @@ public class WorkReportRepository : IWorkReportRepository
     {
         var parsedReportDate = ParseReportDate(request.Date);
         var isServiceCallReport = string.Equals(request.ReportType, "service_call", StringComparison.OrdinalIgnoreCase);
-        var linkedWorkItemId = isServiceCallReport
-            ? request.ServiceCallId ?? request.ProjectId
-            : request.ProjectId;
+        var linkedWorkItemId = request.WorkItemId
+            ?? (isServiceCallReport ? request.ServiceCallId ?? request.ProjectId : request.ProjectId);
         var projectName = isServiceCallReport
             ? request.ServiceCallTitle ?? request.ProjectName
             : request.ProjectName;
@@ -311,6 +583,8 @@ public class WorkReportRepository : IWorkReportRepository
         command.Parameters.AddWithValue("@WorkersCount", request.RelatedWorkers?.Count ?? 0);
         command.Parameters.AddWithValue("@FollowUpRequired", request.Followup);
         command.Parameters.AddWithValue("@FollowUpReason", (object?)request.FollowupReason ?? DBNull.Value);
+        command.Parameters.AddWithValue("@AmendsWorkReportId", (object?)request.AmendsWorkReportId ?? DBNull.Value);
+        command.Parameters.AddWithValue("@UpdatedByUserId", (object?)request.UpdatedByUserId ?? DBNull.Value);
     }
 
     private static WorkReportDetailsModel MapDetails(SqlDataReader reader)
@@ -340,7 +614,16 @@ public class WorkReportRepository : IWorkReportRepository
             Role = GetStringValue(reader, "ReporterRole"),
             Status = GetStringValue(reader, "Status"),
             Followup = GetBoolValue(reader, "FollowUpRequired"),
-            FollowupReason = GetStringValue(reader, "FollowUpReason")
+            FollowupReason = GetStringValue(reader, "FollowUpReason"),
+            LifecycleStatus = GetStringValue(reader, "LifecycleStatus"),
+            FinalizedAt = GetDateTimeValue(reader, "FinalizedAt"),
+            FinalizedByUserId = GetNullableIntValue(reader, "FinalizedByUserId"),
+            ReversedAt = GetDateTimeValue(reader, "ReversedAt"),
+            ReversedByUserId = GetNullableIntValue(reader, "ReversedByUserId"),
+            ReversalReason = GetStringValue(reader, "ReversalReason"),
+            AmendsWorkReportId = GetNullableIntValue(reader, "AmendsWorkReportId"),
+            UpdatedAt = GetDateTimeValue(reader, "UpdatedAt"),
+            UpdatedByUserId = GetNullableIntValue(reader, "UpdatedByUserId")
         };
     }
 
