@@ -1,6 +1,15 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { ApiError } from '@api/client';
+import {
+  ValidatedAddressField,
+  ValidatedAddressDisplay,
+  buildAddressProfilePayload,
+  getEmployeeBaseAddressOptionalAsync,
+  mapAddressProfileToFieldState,
+  type ValidatedAddressFieldState,
+} from '@features/geo';
 import { Drawer, useDrawerMaximize } from '@shared/components/Drawer';
 import { Badge } from '@shared/components/Badge';
 import { Button } from '@shared/components/Button';
@@ -15,6 +24,11 @@ import { getUsersAsync } from '@features/users/api/usersApiClient';
 import { getWorkPlanScheduleAsync } from '@features/workplan/api/workplanApiClient';
 import { periodToUtcBounds } from '@features/workplan/lib/workPlanPeriod';
 import { useEmployeeMutations } from '../../hooks/useEmployees';
+import {
+  employeeBaseAddressQueryKey,
+  formatPartialAddressSaveErrorMessage,
+  upsertEmployeeBaseAddressWithCacheAsync,
+} from '../../lib/employeeBaseAddressCache';
 import type { Employee, UpsertEmployeeRequest } from '../../types';
 import './EmployeeDrawer.css';
 
@@ -92,12 +106,30 @@ interface EmployeeDrawerContentProps {
 
 function EmployeeDrawerContent({ employee, canEdit, onClose, onSaved }: EmployeeDrawerContentProps) {
   const isExistingEmployee = employee != null;
+  const queryClient = useQueryClient();
   const { createMutation, updateMutation, activeStatusMutation } = useEmployeeMutations();
 
   // Existing employees open in read-only review mode; create opens editable
   // (create is only reachable for users with manage permission).
   const [isEditing, setIsEditing] = useState(!isExistingEmployee && canEdit);
   const [form, setForm] = useState<EmployeeFormState>(() => buildInitialState(employee));
+  const baseAddressQuery = useQuery({
+    queryKey: employeeBaseAddressQueryKey(employee?.employeeId ?? 0),
+    queryFn: () => getEmployeeBaseAddressOptionalAsync(employee!.employeeId),
+    enabled: isExistingEmployee,
+    retry: false,
+  });
+
+  function buildInitialAddressState(): ValidatedAddressFieldState {
+    if (baseAddressQuery.data) {
+      return mapAddressProfileToFieldState(baseAddressQuery.data);
+    }
+    return { inputAddress: '', validationStatus: null };
+  }
+
+  const [addressState, setAddressState] = useState<ValidatedAddressFieldState>(() => buildInitialAddressState());
+  const [partialAddressError, setPartialAddressError] = useState<string | null>(null);
+  const [lastSavedEmployeeId, setLastSavedEmployeeId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
   const { isMaximized, toggleMaximize } = useDrawerMaximize(true);
 
@@ -108,7 +140,13 @@ function EmployeeDrawerContent({ employee, canEdit, onClose, onSaved }: Employee
   function handleStartEdit() {
     if (!canEdit) return;
     setForm(buildInitialState(employee));
+    if (baseAddressQuery.data) {
+      setAddressState(mapAddressProfileToFieldState(baseAddressQuery.data));
+    } else {
+      setAddressState({ inputAddress: '', validationStatus: null });
+    }
     setError(null);
+    setPartialAddressError(null);
     setIsEditing(true);
   }
 
@@ -152,6 +190,35 @@ function EmployeeDrawerContent({ employee, canEdit, onClose, onSaved }: Employee
     };
   }
 
+  async function saveEmployeeAddress(employeeId: number): Promise<void> {
+    const payload = buildAddressProfilePayload(addressState);
+    if (!payload) {
+      return;
+    }
+
+    await upsertEmployeeBaseAddressWithCacheAsync(queryClient, employeeId, payload);
+    setPartialAddressError(null);
+  }
+
+  async function handleRetryAddressSave() {
+    const employeeId = employee?.employeeId ?? lastSavedEmployeeId;
+    if (!employeeId) {
+      return;
+    }
+
+    setError(null);
+    try {
+      await saveEmployeeAddress(employeeId);
+      setPartialAddressError(null);
+      if (isExistingEmployee) {
+        setIsEditing(false);
+        onSaved(employee, 'כתובת הבסיס נשמרה בהצלחה.');
+      }
+    } catch (err) {
+      setPartialAddressError(formatPartialAddressSaveErrorMessage(err));
+    }
+  }
+
   async function handleSave() {
     const validationError = validate();
     if (validationError) {
@@ -174,6 +241,21 @@ function EmployeeDrawerContent({ employee, canEdit, onClose, onSaved }: Employee
       } else {
         savedEmployee = await createMutation.mutateAsync(buildRequest());
         message = 'העובד נוצר בהצלחה.';
+      }
+
+      setLastSavedEmployeeId(savedEmployee.employeeId);
+
+      try {
+        await saveEmployeeAddress(savedEmployee.employeeId);
+      } catch (addressErr) {
+        const addressMessage =
+          addressErr instanceof ApiError
+            ? addressErr.message
+            : formatPartialAddressSaveErrorMessage(addressErr);
+        setPartialAddressError(`העובד נשמר, אך שמירת כתובת הבסיס נכשלה: ${addressMessage}`);
+        setIsEditing(false);
+        onSaved(savedEmployee, 'העובד נשמר, אך שמירת כתובת הבסיס נכשלה.');
+        return;
       }
 
       setIsEditing(false);
@@ -216,6 +298,16 @@ function EmployeeDrawerContent({ employee, canEdit, onClose, onSaved }: Employee
   const editFooter = (
     <div className="employeeDrawer__footerContent">
       {error && <InlineAlert variant="danger">{error}</InlineAlert>}
+      {partialAddressError && (
+        <InlineAlert variant="warning">
+          {partialAddressError}
+          <div className="employeeDrawer__actions">
+            <Button type="button" variant="secondary" onClick={() => void handleRetryAddressSave()}>
+              נסה שוב לשמור כתובת
+            </Button>
+          </div>
+        </InlineAlert>
+      )}
       <div className="employeeDrawer__actions">
         <Button onClick={handleSave} isLoading={isSaving}>
           שמור
@@ -326,6 +418,14 @@ function EmployeeDrawerContent({ employee, canEdit, onClose, onSaved }: Employee
               onChange={(event) => setField('isAssignable', event.target.checked)}
             />
           </DetailsSection>
+
+          <DetailsSection title="כתובת בסיס">
+            <ValidatedAddressField
+              value={addressState}
+              onChange={setAddressState}
+              helpText="כתובת הבסיס אופצionalית. בחרו הצעה מהרשימה לאימות."
+            />
+          </DetailsSection>
         </div>
       )}
     </Drawer>
@@ -350,6 +450,12 @@ interface AssignedTaskContext {
 
 function EmployeeReviewDetails({ employee, canViewLinkedUser }: EmployeeReviewDetailsProps) {
   const areRelatedQueriesEnabled = true;
+
+  const baseAddressQuery = useQuery({
+    queryKey: employeeBaseAddressQueryKey(employee.employeeId),
+    queryFn: () => getEmployeeBaseAddressOptionalAsync(employee.employeeId),
+    retry: false,
+  });
 
   const usersQuery = useQuery({
     queryKey: ['employees', 'related', 'users'],
@@ -441,6 +547,13 @@ function EmployeeReviewDetails({ employee, canViewLinkedUser }: EmployeeReviewDe
             }
           />
         </div>
+      </DetailsSection>
+
+      <DetailsSection title="כתובת בסיס">
+        <ValidatedAddressDisplay
+          formattedAddress={baseAddressQuery.data?.formattedAddress ?? baseAddressQuery.data?.inputAddress}
+          validationStatus={baseAddressQuery.data?.validationStatus}
+        />
       </DetailsSection>
 
       {canViewLinkedUser && (

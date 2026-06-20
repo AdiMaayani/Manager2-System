@@ -1,4 +1,5 @@
 import { memo, useCallback, useMemo, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Button } from '@shared/components/Button';
 import { Input } from '@shared/components/Input';
 import { Select } from '@shared/components/Select';
@@ -6,6 +7,15 @@ import { Textarea } from '@shared/components/Textarea';
 import { InlineAlert } from '@shared/components/InlineAlert';
 import { ConfirmInline } from '@shared/components/ConfirmInline';
 import { CustomerDrawer, type Customer } from '@features/customers';
+import {
+  ValidatedAddressField,
+  ValidatedAddressDisplay,
+  buildAddressProfilePayload,
+  getSiteAddressProfileOptionalAsync,
+  mapAddressProfileToFieldState,
+  type ValidatedAddressFieldState,
+  type UpsertAddressProfileRequest,
+} from '@features/geo';
 import { ProjectReportsCard } from '../ProjectReportsCard';
 import type {
   ProjectEmployeeOption,
@@ -23,6 +33,10 @@ import {
   getProjectNumber,
   getProjectStatusMeta,
 } from '../../../../utils/projectDisplayUtils';
+import {
+  getProjectSiteToggleLabel,
+  hasAssociatedProjectSite,
+} from '../../../../utils/projectSiteButtonState';
 import './ProjectOverviewTab.css';
 
 interface ProjectOverviewTabProps {
@@ -40,20 +54,18 @@ interface ProjectOverviewTabProps {
   onCreateSite: (payload: {
     customerId: number;
     siteName: string;
-    addressLine?: string;
-    city?: string;
     notes?: string;
     isPrimary?: boolean;
+    addressProfile?: UpsertAddressProfileRequest;
   }) => Promise<void>;
   onUpdateSite: (
     siteId: number,
     payload: {
       customerId: number;
       siteName: string;
-      addressLine?: string;
-      city?: string;
       notes?: string;
       isPrimary?: boolean;
+      addressProfile?: UpsertAddressProfileRequest;
     },
   ) => Promise<void>;
   onDeactivateSite: (siteId: number) => Promise<void>;
@@ -79,12 +91,16 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
   const [showEditSiteForm, setShowEditSiteForm] = useState(false);
   const [showCustomerDrawer, setShowCustomerDrawer] = useState(false);
   const [newSiteName, setNewSiteName] = useState('');
-  const [newSiteCity, setNewSiteCity] = useState('');
-  const [newSiteAddress, setNewSiteAddress] = useState('');
+  const [newSiteAddressState, setNewSiteAddressState] = useState<ValidatedAddressFieldState>({
+    inputAddress: '',
+    validationStatus: null,
+  });
   const [newSiteNotes, setNewSiteNotes] = useState('');
   const [editSiteName, setEditSiteName] = useState('');
-  const [editSiteCity, setEditSiteCity] = useState('');
-  const [editSiteAddress, setEditSiteAddress] = useState('');
+  const [editSiteAddressState, setEditSiteAddressState] = useState<ValidatedAddressFieldState>({
+    inputAddress: '',
+    validationStatus: null,
+  });
   const [editSiteNotes, setEditSiteNotes] = useState('');
   const [siteError, setSiteError] = useState<string | null>(null);
   const [employeeToAddId, setEmployeeToAddId] = useState('');
@@ -95,14 +111,39 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
     () => sites.filter((site) => site.customerId === form.customerId),
     [form.customerId, sites],
   );
+  const resolvedSiteId = form.siteId > 0 ? form.siteId : (project?.siteId ?? 0);
   const selectedSite = useMemo(
-    () => filteredSites.find((site) => site.siteId === form.siteId) ?? null,
-    [filteredSites, form.siteId],
+    () => filteredSites.find((site) => site.siteId === resolvedSiteId) ?? null,
+    [filteredSites, resolvedSiteId],
   );
   const selectedCustomer = useMemo(
     () => customers.find((customer) => customer.customerId === form.customerId) ?? null,
     [customers, form.customerId],
   );
+  const hasProjectSite = useMemo(
+    () =>
+      hasAssociatedProjectSite({
+        siteId: form.siteId,
+        projectSiteId: project?.siteId,
+      }),
+    [form.siteId, project?.siteId],
+  );
+  const isSiteEditorOpen = showSiteForm || showEditSiteForm;
+  const siteActionLabel = useMemo(
+    () =>
+      getProjectSiteToggleLabel(
+        { siteId: form.siteId, projectSiteId: project?.siteId },
+        isSiteEditorOpen,
+      ),
+    [form.siteId, isSiteEditorOpen, project?.siteId],
+  );
+
+  const selectedSiteProfileQuery = useQuery({
+    queryKey: ['sites', selectedSite?.siteId, 'address-profile'],
+    queryFn: () => getSiteAddressProfileOptionalAsync(selectedSite!.siteId),
+    enabled: Boolean(selectedSite?.siteId),
+    retry: false,
+  });
   const aggregatedTeam = useMemo(
     () => aggregateProjectTeamFromLifecycle(lifecycle),
     [lifecycle],
@@ -170,16 +211,14 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
       await onCreateSite({
         customerId: form.customerId,
         siteName: newSiteName.trim(),
-        addressLine: newSiteAddress.trim() || undefined,
-        city: newSiteCity.trim() || undefined,
         notes: newSiteNotes.trim() || undefined,
+        addressProfile: buildAddressProfilePayload(newSiteAddressState) ?? undefined,
       });
 
       setSiteError(null);
       setShowSiteForm(false);
       setNewSiteName('');
-      setNewSiteCity('');
-      setNewSiteAddress('');
+      setNewSiteAddressState({ inputAddress: '', validationStatus: null });
       setNewSiteNotes('');
     } catch (err) {
       const message =
@@ -188,18 +227,33 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
           : 'יצירת האתר נכשלה. נסה שוב.';
       setSiteError(message);
     }
-  }, [form.customerId, newSiteAddress, newSiteCity, newSiteName, newSiteNotes, onCreateSite]);
+  }, [form.customerId, newSiteAddressState, newSiteName, newSiteNotes, onCreateSite]);
 
-  const openEditSiteForm = useCallback(() => {
+  const openEditSiteForm = useCallback(async () => {
     if (!selectedSite) return;
 
     setSiteError(null);
     setShowSiteForm(false);
     setShowEditSiteForm(true);
     setEditSiteName(selectedSite.siteName);
-    setEditSiteCity(selectedSite.city ?? '');
-    setEditSiteAddress(selectedSite.addressLine ?? '');
     setEditSiteNotes(selectedSite.notes ?? '');
+
+    try {
+      const profile = await getSiteAddressProfileOptionalAsync(selectedSite.siteId);
+      setEditSiteAddressState(
+        profile
+          ? mapAddressProfileToFieldState(profile)
+          : {
+              inputAddress: [selectedSite.addressLine, selectedSite.city].filter(Boolean).join(', '),
+              validationStatus: null,
+            },
+      );
+    } catch {
+      setEditSiteAddressState({
+        inputAddress: [selectedSite.addressLine, selectedSite.city].filter(Boolean).join(', '),
+        validationStatus: null,
+      });
+    }
   }, [selectedSite]);
 
   const handleUpdateSite = useCallback(async () => {
@@ -219,10 +273,9 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
       await onUpdateSite(selectedSite.siteId, {
         customerId: selectedSite.customerId,
         siteName: editSiteName.trim(),
-        addressLine: editSiteAddress.trim() || undefined,
-        city: editSiteCity.trim() || undefined,
         notes: editSiteNotes.trim() || undefined,
         isPrimary: selectedSite.isPrimary,
+        addressProfile: buildAddressProfilePayload(editSiteAddressState) ?? undefined,
       });
 
       setSiteError(null);
@@ -235,8 +288,7 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
       setSiteError(message);
     }
   }, [
-    editSiteAddress,
-    editSiteCity,
+    editSiteAddressState,
     editSiteName,
     editSiteNotes,
     onUpdateSite,
@@ -304,6 +356,24 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
       ),
     });
   }, [onTeamChange, teamForm]);
+
+  const handleProjectSiteAction = useCallback(() => {
+    setSiteError(null);
+
+    if (hasProjectSite) {
+      if (showEditSiteForm) {
+        setShowEditSiteForm(false);
+        return;
+      }
+
+      setShowSiteForm(false);
+      void openEditSiteForm();
+      return;
+    }
+
+    setShowEditSiteForm(false);
+    setShowSiteForm((value) => !value);
+  }, [hasProjectSite, openEditSiteForm, showEditSiteForm]);
 
   const statusMeta = useMemo(
     () => getProjectStatusMeta(isEditMode ? form.status : project?.status),
@@ -470,21 +540,10 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
                 <Button
                   type="button"
                   variant="secondary"
-                  onClick={() => {
-                    setShowEditSiteForm(false);
-                    setShowSiteForm((value) => !value);
-                  }}
+                  onClick={handleProjectSiteAction}
                   disabled={!form.customerId}
                 >
-                  {showSiteForm ? 'ביטול הוספת אתר' : 'הוסף אתר'}
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={openEditSiteForm}
-                  disabled={!selectedSite}
-                >
-                  ערוך אתר נבחר
+                  {siteActionLabel}
                 </Button>
               </div>
             )}
@@ -521,9 +580,13 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
           {selectedSite && (
             <div className="projectOverviewTab__sitePreview">
               <strong>{selectedSite.siteName}</strong>
-              <span>
-                {[selectedSite.city, selectedSite.addressLine].filter(Boolean).join(' · ') || 'ללא כתובת'}
-              </span>
+              <ValidatedAddressDisplay
+                formattedAddress={
+                  selectedSiteProfileQuery.data?.formattedAddress
+                  ?? [selectedSite.city, selectedSite.addressLine].filter(Boolean).join(' · ')
+                }
+                validationStatus={selectedSiteProfileQuery.data?.validationStatus}
+              />
               {selectedSite.notes && <span>{selectedSite.notes}</span>}
               <div className="projectOverviewTab__siteDangerAction">
                 <ConfirmInline
@@ -546,15 +609,10 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
                 value={newSiteName}
                 onChange={(event) => setNewSiteName(event.target.value)}
               />
-              <Input
-                label="עיר"
-                value={newSiteCity}
-                onChange={(event) => setNewSiteCity(event.target.value)}
-              />
-              <Input
-                label="כתובת"
-                value={newSiteAddress}
-                onChange={(event) => setNewSiteAddress(event.target.value)}
+              <ValidatedAddressField
+                label="כתובת אתר"
+                value={newSiteAddressState}
+                onChange={setNewSiteAddressState}
               />
               <Input
                 label="הערות"
@@ -576,15 +634,10 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
                 value={editSiteName}
                 onChange={(event) => setEditSiteName(event.target.value)}
               />
-              <Input
-                label="עיר"
-                value={editSiteCity}
-                onChange={(event) => setEditSiteCity(event.target.value)}
-              />
-              <Input
-                label="כתובת"
-                value={editSiteAddress}
-                onChange={(event) => setEditSiteAddress(event.target.value)}
+              <ValidatedAddressField
+                label="כתובת אתר"
+                value={editSiteAddressState}
+                onChange={setEditSiteAddressState}
               />
               <Input
                 label="הערות"

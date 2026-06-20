@@ -3,8 +3,12 @@
 ## Source of truth
 
 - Inspect the CURRENT repository before modifying code.
-- The approved implementation plan is:
-  `.cursor/plans/workplan_reports_overhaul_1c463576.plan.md`
+
+* Plans under `.cursor/plans/` are task-specific. A completed plan is historical reference only unless the current user request explicitly names it as active.
+* For every new task, inspect the CURRENT local repository and create or use a task-specific plan for the current branch.
+* Never continue, update, or execute a completed historical plan as the active plan for a different task.
+* The current local repository workspace is the source of truth. If a prompt, previous conversation, PR description, uploaded snapshot, or historical plan conflicts with the current repository, the current repository wins.
+
 - Do not rely on old source snapshots, previous conversations, or assumptions.
 - `igroup30_prod.sql` is read-only reference material. Never execute it.
 
@@ -71,4 +75,3 @@ Return only:
 5. Remaining work for the next phase.
 
 Keep the report concise.
-
