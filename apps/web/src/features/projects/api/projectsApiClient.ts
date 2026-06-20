@@ -148,7 +148,21 @@ export function getProjectLifecycleAsync(projectId: number): Promise<ProjectLife
 }
 
 export function getProjectMilestonesAsync(projectId: number): Promise<ProjectMilestone[]> {
-  return apiRequest<ProjectMilestone[]>(`/WorkItems/${projectId}/milestones`);
+  return apiRequest<ProjectMilestone[]>(`/Projects/${projectId}/milestones`).then((milestones) =>
+    milestones.map((milestone) => ({
+      ...milestone,
+      milestoneId:
+        milestone.milestoneId ??
+        milestone.projectMilestoneId ??
+        milestone.workItemId ??
+        0,
+      projectMilestoneId:
+        milestone.projectMilestoneId ??
+        milestone.milestoneId ??
+        milestone.workItemId ??
+        0,
+    })),
+  );
 }
 
 export function getProjectEquipmentAsync(projectId: number): Promise<ProjectEquipmentItem[]> {
@@ -186,32 +200,77 @@ export function updateProjectAsync(
   });
 }
 
+function mapCreateMilestoneBody(body: CreateMilestoneRequest) {
+  return {
+    title: body.title,
+    description: body.description,
+    status: body.status,
+    managerEmployeeId: body.managerEmployeeId,
+    plannedStart: body.plannedStart,
+    plannedEnd: body.plannedEnd,
+    sortOrder: body.sortOrder,
+  };
+}
+
+function mapUpdateMilestoneBody(body: UpdateMilestoneRequest) {
+  return {
+    title: body.title,
+    description: body.description,
+    status: body.status,
+    managerEmployeeId: body.managerEmployeeId,
+    plannedStart: body.plannedStart,
+    plannedEnd: body.plannedEnd,
+    actualStart: body.actualStart,
+    actualEnd: body.actualEnd,
+    progressPercent: body.progressPercent,
+    sortOrder: body.sortOrder,
+  };
+}
+
 export function createMilestoneAsync(
   projectId: number,
   body: CreateMilestoneRequest,
-): Promise<{ workItemId: number }> {
-  return apiRequest<{ workItemId: number; message: string }>(
-    `/WorkItems/${projectId}/milestones`,
+): Promise<{ milestoneId: number }> {
+  return apiRequest<{ milestoneId: number; message: string }>(
+    `/Projects/${projectId}/milestones`,
     {
       method: 'POST',
-      body: JSON.stringify(body),
+      body: JSON.stringify(mapCreateMilestoneBody(body)),
     },
   );
 }
 
 export function updateMilestoneAsync(
+  projectId: number,
   milestoneId: number,
   body: UpdateMilestoneRequest,
 ): Promise<{ message: string }> {
-  return apiRequest<{ message: string }>(`/WorkItems/milestones/${milestoneId}`, {
-    method: 'PUT',
-    body: JSON.stringify(body),
-  });
+  return apiRequest<{ message: string }>(
+    `/Projects/${projectId}/milestones/${milestoneId}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify(mapUpdateMilestoneBody(body)),
+    },
+  );
 }
 
-export function cancelMilestoneAsync(milestoneId: number): Promise<{ message: string }> {
-  return apiRequest<{ message: string }>(`/WorkItems/milestones/${milestoneId}/cancel`, {
+export function deactivateMilestoneAsync(
+  projectId: number,
+  milestoneId: number,
+): Promise<{ message: string }> {
+  return apiRequest<{ message: string }>(
+    `/Projects/${projectId}/milestones/${milestoneId}/deactivate`,
+    { method: 'PUT' },
+  );
+}
+
+export function reorderProjectMilestonesAsync(
+  projectId: number,
+  items: { projectMilestoneId: number; sortOrder: number }[],
+): Promise<void> {
+  return apiRequest<void>(`/Projects/${projectId}/milestones/reorder`, {
     method: 'PUT',
+    body: JSON.stringify({ items }),
   });
 }
 

@@ -6,6 +6,7 @@ public class WorkReportCreateModel
 {
     public string? ReportType { get; set; }
     public string? Date { get; set; }
+    public int? WorkItemId { get; set; }
     // WorkItem link for project/service-call context.
     public int? ProjectId { get; set; }
     public string? ProjectName { get; set; }
@@ -25,4 +26,6 @@ public class WorkReportCreateModel
     public List<WorkReportRelatedWorkerModel> RelatedWorkers { get; set; } = new();
     public bool Followup { get; set; }
     public string? FollowupReason { get; set; }
+    public int? AmendsWorkReportId { get; set; }
+    public int? UpdatedByUserId { get; set; }
 }

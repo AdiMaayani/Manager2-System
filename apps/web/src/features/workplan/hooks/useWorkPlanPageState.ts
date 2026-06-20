@@ -7,7 +7,12 @@ import {
   parseAnchorDate,
   toAnchorParam,
 } from '../lib/workPlanPeriod';
-import type { WorkPlanProjectFilter, WorkPlanRange, WorkPlanScope } from '../types';
+import type {
+  WorkPlanProjectFilter,
+  WorkPlanRange,
+  WorkPlanScope,
+  WorkPlanTaskCategoryFilter,
+} from '../types';
 
 export function useWorkPlanPageState() {
   const [searchParams, setSearchParams] = useSearchParams();
@@ -15,6 +20,8 @@ export function useWorkPlanPageState() {
   const scope = (searchParams.get('scope') as WorkPlanScope) || WORKPLAN_DEFAULTS.SCOPE;
   const range = (searchParams.get('range') as WorkPlanRange) || WORKPLAN_DEFAULTS.RANGE;
   const statusFilter = searchParams.get('status') ?? 'all';
+  const taskCategoryFilter =
+    (searchParams.get('taskCategory') as WorkPlanTaskCategoryFilter) ?? 'all';
   const employeeFilterId = searchParams.get('employeeId') ?? '';
   const searchQuery = searchParams.get(WORKPLAN_QUERY.SEARCH) ?? '';
 
@@ -52,6 +59,9 @@ export function useWorkPlanPageState() {
         if (nextScope !== 'project') {
           next.delete(WORKPLAN_QUERY.PROJECT_ID);
         }
+        if (nextScope !== 'employee') {
+          next.delete('employeeId');
+        }
         return next;
       });
     },
@@ -74,8 +84,9 @@ export function useWorkPlanPageState() {
       setSearchParams((prev) => {
         const next = new URLSearchParams(prev);
         if (projectId === 'all') {
-          next.set(WORKPLAN_QUERY.PROJECT_ID, 'all');
+          next.delete(WORKPLAN_QUERY.PROJECT_ID);
         } else {
+          next.set('scope', 'project');
           next.set(WORKPLAN_QUERY.PROJECT_ID, String(projectId));
         }
         return next;
@@ -88,8 +99,12 @@ export function useWorkPlanPageState() {
     (employeeId: string) => {
       setSearchParams((prev) => {
         const next = new URLSearchParams(prev);
-        if (employeeId) next.set('employeeId', employeeId);
-        else next.delete('employeeId');
+        if (employeeId) {
+          next.set('scope', 'employee');
+          next.set('employeeId', employeeId);
+        } else {
+          next.delete('employeeId');
+        }
         return next;
       });
     },
@@ -101,6 +116,18 @@ export function useWorkPlanPageState() {
       setSearchParams((prev) => {
         const next = new URLSearchParams(prev);
         next.set('status', status);
+        return next;
+      });
+    },
+    [setSearchParams],
+  );
+
+  const setTaskCategoryFilter = useCallback(
+    (category: WorkPlanTaskCategoryFilter) => {
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        if (category === 'all') next.delete('taskCategory');
+        else next.set('taskCategory', category);
         return next;
       });
     },
@@ -155,6 +182,7 @@ export function useWorkPlanPageState() {
     scope,
     range,
     statusFilter,
+    taskCategoryFilter,
     employeeFilterId,
     projectFilter,
     isAllProjectsMode,
@@ -167,6 +195,7 @@ export function useWorkPlanPageState() {
     setProjectFilter,
     setEmployeeFilterId,
     setStatusFilter,
+    setTaskCategoryFilter,
     setSearchQuery,
     goToPreviousPeriod,
     goToNextPeriod,

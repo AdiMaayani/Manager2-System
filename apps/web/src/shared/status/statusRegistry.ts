@@ -19,6 +19,7 @@ export type StatusDomain =
   | 'serviceCallPriority'
   | 'workPlanTask'
   | 'report'
+  | 'reportLifecycle'
   | 'severity';
 
 type StatusMap = Record<string, StatusMeta>;
@@ -76,6 +77,13 @@ const WORK_PLAN_TASK: StatusMap = {
   planned: { label: 'מתוכנן', variant: 'neutral' },
 };
 
+/** Report LifecycleStatus badge domain (stock/editability). */
+const REPORT_LIFECYCLE: StatusMap = {
+  Draft: { label: 'טיוטת מלאי', variant: 'neutral' },
+  Finalized: { label: 'מסופק', variant: 'success' },
+  Reversed: { label: 'הוחזר', variant: 'danger' },
+};
+
 /** Report status arrives as Hebrew display text from the backend. */
 const REPORT: StatusMap = {
   'טיוטה': { label: 'טיוטה', variant: 'neutral' },
@@ -98,6 +106,7 @@ const REGISTRY: Record<StatusDomain, StatusMap> = {
   serviceCallPriority: SERVICE_CALL_PRIORITY,
   workPlanTask: WORK_PLAN_TASK,
   report: REPORT,
+  reportLifecycle: REPORT_LIFECYCLE,
   severity: SEVERITY,
 };
 

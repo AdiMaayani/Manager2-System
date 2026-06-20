@@ -1,7 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { isLocalDataMode } from '@/config/appConfig';
-import { resolveDataAsync } from '@shared/data/resolveDataAsync';
-import { delayMock, mockCustomers, mockEmployees, mockServiceCalls, mockSites } from '@shared/mock';
 import {
   assignEmployeeToServiceCallAsync,
   closeServiceCallAsync,
@@ -16,8 +13,8 @@ import type { AssignServiceCallEmployeeRequest, UpsertServiceCallRequest } from 
 
 export function useServiceCalls(options?: { enabled?: boolean }) {
   return useQuery({
-    queryKey: ['serviceCalls', isLocalDataMode],
-    queryFn: () => resolveDataAsync(getServiceCallsAsync, () => delayMock(mockServiceCalls)),
+    queryKey: ['serviceCalls'],
+    queryFn: getServiceCallsAsync,
     enabled: options?.enabled ?? true,
   });
 }
@@ -29,22 +26,20 @@ export function useServiceCallLookups(options?: { enabled?: boolean }) {
   const isEnabled = options?.enabled ?? true;
 
   const customersQuery = useQuery({
-    queryKey: ['serviceCalls', 'customers', isLocalDataMode],
-    queryFn: () =>
-      resolveDataAsync(getServiceCallCustomersAsync, () => delayMock(mockCustomers)),
+    queryKey: ['serviceCalls', 'customers'],
+    queryFn: getServiceCallCustomersAsync,
     enabled: isEnabled,
   });
 
   const sitesQuery = useQuery({
-    queryKey: ['serviceCalls', 'sites', isLocalDataMode],
-    queryFn: () => resolveDataAsync(getServiceCallSitesAsync, () => delayMock(mockSites)),
+    queryKey: ['serviceCalls', 'sites'],
+    queryFn: getServiceCallSitesAsync,
     enabled: isEnabled,
   });
 
   const employeesQuery = useQuery({
-    queryKey: ['serviceCalls', 'employees', isLocalDataMode],
-    queryFn: () =>
-      resolveDataAsync(getServiceCallEmployeesAsync, () => delayMock(mockEmployees)),
+    queryKey: ['serviceCalls', 'employees'],
+    queryFn: getServiceCallEmployeesAsync,
     enabled: isEnabled,
   });
 

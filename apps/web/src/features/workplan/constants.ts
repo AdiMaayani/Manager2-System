@@ -1,4 +1,12 @@
-import type { WorkPlanPriorityCode, WorkPlanRange, WorkPlanScope, WorkPlanStatusCode } from './types';
+import { TASK_CATEGORY_FILTER_OPTIONS } from '@shared/constants/taskCategories';
+import type {
+  WorkPlanPriorityCode,
+  WorkPlanRange,
+  WorkPlanScope,
+  WorkPlanStatusCode,
+} from './types';
+
+export { TASK_CATEGORY_FILTER_OPTIONS };
 
 export const WORKPLAN_QUERY = {
   PROJECT_ID: 'projectId',

@@ -48,6 +48,23 @@ public class InventoryController : ControllerBase
         return Ok(inventoryItems.Select(MapToDto).ToList());
     }
 
+    [HttpGet("by-sku/{sku}")]
+    public async Task<IActionResult> GetBySku(string sku)
+    {
+        if (string.IsNullOrWhiteSpace(sku))
+        {
+            return BadRequest(new { message = "SKU is required." });
+        }
+
+        var inventoryItem = await _repository.GetBySkuAsync(sku.Trim());
+        if (inventoryItem == null)
+        {
+            return NotFound(new { message = $"No active inventory item found for SKU '{sku.Trim()}'." });
+        }
+
+        return Ok(MapToDto(inventoryItem));
+    }
+
     [HttpGet("{id:int}")]
     public async Task<IActionResult> GetById(int id)
     {

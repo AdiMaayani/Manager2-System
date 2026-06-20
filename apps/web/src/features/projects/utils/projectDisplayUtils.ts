@@ -157,18 +157,13 @@ export function createEmptyMilestoneForm(): ProjectMilestoneForm {
     title: '',
     description: '',
     status: 'Planned',
-    billingType: 'Internal',
+    managerEmployeeId: null,
     plannedStart: '',
     plannedEnd: '',
-    estimatedHours: '',
     actualStart: '',
     actualEnd: '',
-    actualHours: '',
-    priority: 'Medium',
-    requiredRole: '',
-    isLocked: false,
-    employees: [],
-    contractors: [],
+    progressPercent: '',
+    sortOrder: null,
   };
 }
 

@@ -74,8 +74,18 @@
 .workPlanToolbar__scopeRow {
   display: flex;
   flex-wrap: wrap;
-  align-items: center;
+  align-items: flex-start;
   gap: var(--spacing-sm);
+}
+
+.workPlanToolbar__scopeSelect {
+  flex: 1 1 280px;
+  min-width: 280px;
+  max-width: min(420px, 100%);
+}
+
+.workPlanToolbar__scopeListSelect {
+  min-width: 280px;
 }
 
 .workPlanToolbar__select {
@@ -264,6 +274,33 @@
   border-radius: var(--radius-sm);
   display: inline-block;
   border: 1px solid transparent;
+}
+
+.workPlanToolbar__chip--regular {
+  background: var(--task-category-regular-bg);
+  border-color: var(--task-category-regular-border);
+}
+
+.workPlanToolbar__chip--project {
+  background: var(--task-category-project-bg);
+  border-color: var(--task-category-project-border);
+}
+
+.workPlanToolbar__chip--serviceCall {
+  background: var(--task-category-serviceCall-bg);
+  border-color: var(--task-category-serviceCall-border);
+}
+
+.workPlanToolbar__chip--unscheduled {
+  background: var(--color-neutral-100);
+  border-color: var(--color-neutral-400);
+  background-image: repeating-linear-gradient(
+    -45deg,
+    transparent,
+    transparent 2px,
+    color-mix(in srgb, var(--color-neutral-400) 35%, transparent) 2px,
+    color-mix(in srgb, var(--color-neutral-400) 35%, transparent) 4px
+  );
 }
 
 .workPlanToolbar__chip--locked {

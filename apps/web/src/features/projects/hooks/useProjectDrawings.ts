@@ -1,7 +1,4 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { isLocalDataMode } from '@/config/appConfig';
-import { resolveDataAsync } from '@shared/data/resolveDataAsync';
-import { delayMock } from '@shared/mock';
 import {
   createProjectDrawingAsync,
   deleteProjectDrawingAsync,
@@ -17,16 +14,13 @@ import type {
 
 export function useProjectDrawings(projectId: number | null, enabled = true) {
   return useQuery({
-    queryKey: ['projectDrawings', projectId, isLocalDataMode],
+    queryKey: ['projectDrawings', projectId],
     queryFn: () => {
       if (projectId == null) {
         throw new Error('Project id is required.');
       }
 
-      return resolveDataAsync(
-        () => getProjectDrawingsAsync(projectId),
-        () => delayMock([]),
-      );
+      return getProjectDrawingsAsync(projectId);
     },
     enabled: enabled && projectId != null && projectId > 0,
   });

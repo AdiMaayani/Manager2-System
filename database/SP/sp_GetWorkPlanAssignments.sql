@@ -21,7 +21,7 @@ BEGIN
         FROM dbo.WorkItems
         WHERE ParentWorkItemId = @ProjectId
     )
-    SELECT 
+    SELECT
         wea.WorkItemId,
         wea.EmployeeId,
         CAST(NULL AS INT) AS ContractorId,
@@ -39,7 +39,7 @@ BEGIN
 
     UNION ALL
 
-    SELECT 
+    SELECT
         wca.WorkItemId,
         CAST(NULL AS INT) AS EmployeeId,
         wca.ContractorId,

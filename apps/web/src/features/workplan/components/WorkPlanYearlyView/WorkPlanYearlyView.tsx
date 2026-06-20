@@ -1,67 +1,74 @@
 import { useMemo } from 'react';
-import type { MappedWorkPlan } from '../../types';
+import type { WorkPlanSchedule } from '../../types';
 import {
-  getWorkPlanStatusDisplay,
   isWorkPlanStatusDone,
   isWorkPlanStatusInProgress,
 } from '../../constants';
 import {
   buildTaskSearchFields,
   matchesWorkPlanSearch,
-  resolveAssignment,
+  resolveFlatAssignment,
 } from '../../lib/workPlanScheduling';
+import { getTaskCategoryLabel } from '@shared/constants/taskCategories';
+import { taskCategoryModifierClass } from '@shared/constants/taskCategoryStyles';
 import './WorkPlanYearlyView.css';
 
 interface WorkPlanYearlyViewProps {
-  workPlans: MappedWorkPlan[];
+  schedule: WorkPlanSchedule;
+  taskCategoryFilter: string;
   searchQuery: string;
   periodAnchor: Date;
 }
 
 export function WorkPlanYearlyView({
-  workPlans,
+  schedule,
+  taskCategoryFilter,
   searchQuery,
   periodAnchor,
 }: WorkPlanYearlyViewProps) {
   const year = periodAnchor.getFullYear();
 
-  const cards = useMemo(
-    () =>
-      workPlans
-        .map((workPlan) => {
-          const tasks = workPlan.tasks.filter((task) => {
-            const assignment = resolveAssignment(task, workPlan);
-            return matchesWorkPlanSearch(
-              buildTaskSearchFields(task, workPlan, assignment),
-              searchQuery,
-            );
-          });
+  const cards = useMemo(() => {
+    const map = new Map<
+      string,
+      {
+        title: string;
+        tasks: typeof schedule.scheduledTasks;
+      }
+    >();
 
-          const completed = tasks.filter((task) => isWorkPlanStatusDone(task.status)).length;
-          const inProgress = tasks.filter((task) =>
-            isWorkPlanStatusInProgress(task.status),
-          ).length;
-          const planned = tasks.length - completed - inProgress;
-          const totalHours = tasks.reduce((sum, task) => sum + (task.estimatedHours ?? 0), 0);
-          const completionPct =
-            tasks.length > 0 ? Math.round((completed / tasks.length) * 100) : 0;
-          const progressPct =
-            tasks.length > 0 ? Math.round((inProgress / tasks.length) * 100) : 0;
+    for (const task of [...schedule.scheduledTasks, ...schedule.unscheduledTasks]) {
+      if (taskCategoryFilter !== 'all' && task.taskCategory !== taskCategoryFilter) continue;
+      const assignment = resolveFlatAssignment(task, schedule.assignments);
+      if (!matchesWorkPlanSearch(buildTaskSearchFields(task, assignment), searchQuery)) continue;
 
-          return {
-            workPlan,
-            taskCount: tasks.length,
-            completed,
-            inProgress,
-            planned,
-            totalHours,
-            completionPct,
-            progressPct,
-          };
-        })
-        .filter((card) => card.taskCount > 0 || !searchQuery.trim()),
-    [workPlans, searchQuery],
-  );
+      const title = task.projectTitle ?? task.customerName ?? 'ללא פרויקט';
+      if (!map.has(title)) map.set(title, { title, tasks: [] });
+      map.get(title)!.tasks.push(task);
+    }
+
+    return Array.from(map.values())
+      .map(({ title, tasks }) => {
+        const completed = tasks.filter((t) => isWorkPlanStatusDone(t.status)).length;
+        const inProgress = tasks.filter((t) => isWorkPlanStatusInProgress(t.status)).length;
+        const planned = tasks.length - completed - inProgress;
+        const totalHours = tasks.reduce((sum, t) => sum + (t.estimatedHours ?? 0), 0);
+        const categories = [...new Set(tasks.map((t) => t.taskCategory).filter(Boolean))];
+
+        return {
+          title,
+          taskCount: tasks.length,
+          completed,
+          inProgress,
+          planned,
+          totalHours,
+          categories,
+          completionPct: tasks.length > 0 ? Math.round((completed / tasks.length) * 100) : 0,
+          progressPct: tasks.length > 0 ? Math.round((inProgress / tasks.length) * 100) : 0,
+        };
+      })
+      .filter((card) => card.taskCount > 0 || !searchQuery.trim());
+  }, [schedule, taskCategoryFilter, searchQuery]);
 
   return (
     <div className="workPlanYearlyView card">
@@ -71,64 +78,57 @@ export function WorkPlanYearlyView({
           <p className="workPlanYearlyView__empty">אין נתונים לשנה הנוכחית</p>
         ) : (
           cards.map((card) => (
-            <article key={card.workPlan.project.id} className="workPlanYearlyView__card">
+            <article key={card.title} className="workPlanYearlyView__card">
               <header className="workPlanYearlyView__cardHead">
-                <h4>{card.workPlan.project.title}</h4>
-                <span className="workPlanYearlyView__status">
-                  {getWorkPlanStatusDisplay(card.workPlan.project.status)}
-                </span>
+                <h4>{card.title}</h4>
+                <div className="workPlanYearlyView__categories">
+                  {card.categories.map((category) => (
+                    <span
+                      key={category}
+                      className={taskCategoryModifierClass(
+                        'workPlanYearlyView__categoryChip',
+                        category,
+                      )}
+                    >
+                      {getTaskCategoryLabel(category)}
+                    </span>
+                  ))}
+                </div>
               </header>
-
-              <div
-                className="workPlanYearlyView__progress"
-                title={`${card.completed}/${card.taskCount} הושלמו`}
-                role="img"
-                aria-label={`${card.completionPct}% הושלמו`}
-              >
-                <div
-                  className="workPlanYearlyView__progressBar workPlanYearlyView__progressBar--done"
-                  style={{ width: `${card.completionPct}%` }}
-                />
-                <div
-                  className="workPlanYearlyView__progressBar workPlanYearlyView__progressBar--progress"
-                  style={{ width: `${card.progressPct}%` }}
-                />
-              </div>
-              <span className="workPlanYearlyView__progressLabel">
-                {card.completionPct}% הושלמו
-              </span>
-
-              <dl>
+              <dl className="workPlanYearlyView__stats">
                 <div>
                   <dt>משימות</dt>
                   <dd>{card.taskCount}</dd>
                 </div>
                 <div>
-                  <dt>
-                    <span className="workPlanYearlyView__dot workPlanYearlyView__dot--planned" />
-                    מתוכננות
-                  </dt>
-                  <dd>{card.planned}</dd>
-                </div>
-                <div>
-                  <dt>
-                    <span className="workPlanYearlyView__dot workPlanYearlyView__dot--progress" />
-                    בביצוע
-                  </dt>
-                  <dd>{card.inProgress}</dd>
-                </div>
-                <div>
-                  <dt>
-                    <span className="workPlanYearlyView__dot workPlanYearlyView__dot--done" />
-                    הושלמו
-                  </dt>
+                  <dt>הושלמו</dt>
                   <dd>{card.completed}</dd>
                 </div>
                 <div>
+                  <dt>בביצוע</dt>
+                  <dd>{card.inProgress}</dd>
+                </div>
+                <div>
+                  <dt>מתוכננות</dt>
+                  <dd>{card.planned}</dd>
+                </div>
+                <div>
                   <dt>שעות משוערות</dt>
-                  <dd>{card.totalHours}</dd>
+                  <dd>{card.totalHours.toFixed(1)}</dd>
                 </div>
               </dl>
+              <div className="workPlanYearlyView__bars">
+                <div
+                  className="workPlanYearlyView__bar workPlanYearlyView__bar--done"
+                  style={{ width: `${card.completionPct}%` }}
+                  title={`${card.completionPct}% הושלמו`}
+                />
+                <div
+                  className="workPlanYearlyView__bar workPlanYearlyView__bar--progress"
+                  style={{ width: `${card.progressPct}%` }}
+                  title={`${card.progressPct}% בביצוע`}
+                />
+              </div>
             </article>
           ))
         )}

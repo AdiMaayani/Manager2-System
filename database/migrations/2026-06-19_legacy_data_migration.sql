@@ -28,12 +28,31 @@ SELECT p.CustomerId,p.SiteId,
  (SELECT COUNT(*) FROM dbo.Rec_EmployeePlannedStops x WHERE x.SiteId=p.SiteId) PlannedStops
 FROM dbo.WorkItems p WHERE p.WorkType=N'Project' AND p.FinanceProjectNumber=N'INTERNAL';
 
-/* No heuristic milestone classification: this lists all eligible rows for human mapping. */
-SELECT wi.WorkItemId,wi.ParentWorkItemId AS CandidateProjectId,wi.Title,wi.Status,wi.PlannedStart,wi.PlannedEnd,
- (SELECT COUNT(*) FROM dbo.WorkEmployeeAssignments a WHERE a.WorkItemId=wi.WorkItemId) EmployeeAssignments,
- (SELECT COUNT(*) FROM dbo.WorkContractorAssignments a WHERE a.WorkItemId=wi.WorkItemId) ContractorAssignments,
- (SELECT COUNT(*) FROM dbo.WorkReports r WHERE r.WorkItemId=wi.WorkItemId) Reports
-FROM dbo.WorkItems wi JOIN dbo.WorkItems p ON p.WorkItemId=wi.ParentWorkItemId AND p.WorkType=N'Project'
-WHERE wi.WorkType=N'Task' AND wi.IsArchived=0 ORDER BY wi.ParentWorkItemId,wi.WorkItemId;
+/* Review candidates only — not classified as milestones. Operator mapping via _MilestoneMigrationMap is required. */
+SELECT
+    p.WorkItemId AS ProjectId,
+    p.Title AS ProjectTitle,
+    child.WorkItemId AS CandidateWorkItemId,
+    child.Title AS CandidateTitle,
+    child.WorkType,
+    child.TaskCategory,
+    child.ParentWorkItemId,
+    child.PlannedStart,
+    child.PlannedEnd,
+    child.IsArchived,
+    CASE
+        WHEN map.WorkItemId IS NOT NULL THEN 1
+        ELSE 0
+    END AS IsExplicitlyMapped
+FROM dbo.WorkItems p
+JOIN dbo.WorkItems child
+    ON child.ParentWorkItemId = p.WorkItemId
+LEFT JOIN dbo._MilestoneMigrationMap map
+    ON map.WorkItemId = child.WorkItemId
+WHERE p.WorkType = N'Project'
+  AND p.IsArchived = 0
+  AND child.WorkType = N'Task'
+  AND child.IsArchived = 0
+ORDER BY p.Title, child.WorkItemId;
 SELECT * FROM dbo._MilestoneMigrationMap ORDER BY WorkItemId;
 GO

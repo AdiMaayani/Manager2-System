@@ -401,6 +401,20 @@ public class InventoryItemRepository : IInventoryItemRepository
         command.Parameters.AddWithValue("@IsActive", inventoryItem.IsActive);
     }
 
+    public async Task<InventoryItem?> GetBySkuAsync(string skuCode)
+    {
+        await using var connection = _dbServices.CreateConnection();
+        await using var command = new SqlCommand("dbo.sp_Inventory_GetBySku", connection)
+        {
+            CommandType = CommandType.StoredProcedure
+        };
+        command.Parameters.AddWithValue("@SkuCode", skuCode);
+
+        await connection.OpenAsync();
+        await using var reader = await command.ExecuteReaderAsync();
+        return await reader.ReadAsync() ? MapInventoryItem(reader) : null;
+    }
+
     private static InventoryItem MapInventoryItem(SqlDataReader reader)
     {
         return new InventoryItem

@@ -1,3 +1,6 @@
+import type { InventoryUsageType } from '@shared/constants/inventoryUsageTypes';
+import type { ReportLifecycleStatus } from '@shared/constants/reportLifecycle';
+
 export interface WorkReportListItemResponse {
   workReportId: number;
   reportDate?: string;
@@ -5,6 +8,7 @@ export interface WorkReportListItemResponse {
   customerName?: string;
   reporterName?: string;
   status?: string;
+  lifecycleStatus?: string;
   followUpRequired?: boolean;
 }
 
@@ -14,10 +18,25 @@ export interface WorkReportListItem {
   projectTitle?: string;
   reportDate?: string;
   status?: string;
+  lifecycleStatus?: ReportLifecycleStatus | string;
   reportedByName?: string;
   customerName?: string;
   followUpRequired?: boolean;
   [key: string]: unknown;
+}
+
+export interface WorkItemReportTarget {
+  workItemId: number;
+  title: string;
+  taskCategory: string;
+  customerId?: number | null;
+  siteId?: number | null;
+  projectId?: number | null;
+  plannedStart?: string | null;
+  assigneeName?: string | null;
+  customerName?: string | null;
+  siteName?: string | null;
+  projectTitle?: string | null;
 }
 
 export interface ReportProjectOption {
@@ -47,9 +66,28 @@ export interface WorkReportRelatedWorker {
   name?: string | null;
 }
 
+export interface WorkReportInventoryLine {
+  workReportInventoryItemId: number;
+  inventoryItemId: number;
+  quantity: number;
+  usageType: InventoryUsageType;
+  skuSnapshot?: string | null;
+  itemNameSnapshot?: string | null;
+}
+
+export interface WorkReportAttachment {
+  workReportAttachmentId: number;
+  mediaType: string;
+  originalFileName: string;
+  contentType?: string | null;
+  fileSizeBytes?: number | null;
+  uploadedAt?: string | null;
+}
+
 export interface CreateWorkReportRequest {
   reportType?: string | null;
   date?: string | null;
+  workItemId?: number | null;
   projectId?: number | null;
   projectName?: string | null;
   customerName?: string | null;
@@ -68,6 +106,11 @@ export interface CreateWorkReportRequest {
   relatedWorkers: WorkReportRelatedWorker[];
   followup: boolean;
   followupReason?: string | null;
+  inventoryLines?: Array<{
+    inventoryItemId: number;
+    quantity: number;
+    usageType: InventoryUsageType;
+  }>;
 }
 
 export interface CreateWorkReportResponse {
@@ -93,10 +136,17 @@ export interface WorkReportDetailsResponse {
   reporterName?: string | null;
   role?: string | null;
   status?: string | null;
+  lifecycleStatus?: string | null;
+  finalizedAt?: string | null;
+  reversedAt?: string | null;
+  reversalReason?: string | null;
+  amendsWorkReportId?: number | null;
   followup?: boolean;
   followupReason?: string | null;
   systems?: string[];
   relatedWorkers?: WorkReportRelatedWorker[];
+  inventoryLines?: WorkReportInventoryLine[];
+  attachments?: WorkReportAttachment[];
 }
 
 export interface WorkReportDetails {
@@ -117,8 +167,28 @@ export interface WorkReportDetails {
   reportedByName?: string | null;
   role?: string | null;
   status?: string | null;
+  lifecycleStatus?: ReportLifecycleStatus | string | null;
+  finalizedAt?: string | null;
+  reversedAt?: string | null;
+  reversalReason?: string | null;
+  amendsWorkReportId?: number | null;
   followUpRequired?: boolean;
   followUpReason?: string | null;
   systems: string[];
   relatedWorkers: WorkReportRelatedWorker[];
+  inventoryLines: WorkReportInventoryLine[];
+  attachments: WorkReportAttachment[];
+}
+
+export interface InventorySkuLookupResult {
+  inventoryItemId: number;
+  skuCode: string;
+  itemName: string;
+  quantityOnHand: number;
+  unit: string;
+  category?: string | null;
+}
+
+export interface ReverseWorkReportRequest {
+  reason: string;
 }

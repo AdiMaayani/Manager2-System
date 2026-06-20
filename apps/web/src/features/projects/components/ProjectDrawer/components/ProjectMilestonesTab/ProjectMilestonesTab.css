@@ -112,9 +112,29 @@
   margin-top: var(--spacing-md);
 }
 
-.projectMilestonesTab__empty {
-  color: var(--color-neutral-500);
+.projectMilestonesTab__error {
+  margin: 0;
+  color: var(--color-danger-600);
+  font-size: var(--font-size-sm);
 }
+
+.projectMilestonesTab__emptyState {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.projectMilestonesTab__empty {
+  margin: 0;
+  color: var(--color-neutral-600);
+}
+
+.projectMilestonesTab__legacyHint {
+  margin: 0;
+  color: var(--color-neutral-500);
+  font-size: var(--font-size-sm);
+}
+
 
 .projectMilestonesTab__assignments {
   display: flex;

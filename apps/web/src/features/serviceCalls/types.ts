@@ -27,7 +27,7 @@ export type ServiceCallDetails = ServiceCallListItem;
 export interface UpsertServiceCallRequest {
   title: string;
   description?: string | null;
-  status: string;
+  status?: string;
   billingType: string;
   customerId: number;
   siteId: number;
