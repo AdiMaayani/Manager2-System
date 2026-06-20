@@ -9,7 +9,6 @@ import { PageSpinner } from '@shared/components/PageSpinner';
 import {
   useAssignProjectTeam,
   useCreateProject,
-  useCreateSite,
   useMilestoneMutations,
   useProjectLifecycle,
   useProjectLookups,
@@ -49,8 +48,12 @@ import type {
 import {
   deactivateSiteAsync,
   syncProjectEmployeeAssignmentsAsync,
-  updateSiteAsync,
 } from '../../api/projectsApiClient';
+import {
+  createSiteWithAddressProfileAsync,
+  updateSiteWithAddressProfileAsync,
+  type UpsertAddressProfileRequest,
+} from '@features/geo';
 import {
   createEmptyOverviewForm,
   overviewFormFromLifecycle,
@@ -131,10 +134,8 @@ export function ProjectDrawer({
   const lookups = useProjectLookups();
   const createProject = useCreateProject();
   const updateProject = useUpdateProject();
-  const createSite = useCreateSite();
   const milestoneMutations = useMilestoneMutations(projectId);
   const assignProjectTeam = useAssignProjectTeam(projectId);
-  const createSiteAsync = createSite.mutateAsync;
   const createMilestoneAsync = milestoneMutations.createMutation.mutateAsync;
   const updateMilestoneAsync = milestoneMutations.updateMutation.mutateAsync;
   const deactivateMilestoneAsync = milestoneMutations.deactivateMutation.mutateAsync;
@@ -235,16 +236,21 @@ export function ProjectDrawer({
     async (payload: {
       customerId: number;
       siteName: string;
-      addressLine?: string;
-      city?: string;
       notes?: string;
       isPrimary?: boolean;
+      addressProfile?: UpsertAddressProfileRequest;
     }) => {
-      const site = await createSiteAsync(payload);
-      setOverviewForm((current) => ({ ...current, siteId: site.siteId }));
+      const saved = await createSiteWithAddressProfileAsync({
+        customerId: payload.customerId,
+        siteName: payload.siteName,
+        isPrimary: payload.isPrimary ?? false,
+        notes: payload.notes,
+        addressProfile: payload.addressProfile,
+      });
+      setOverviewForm((current) => ({ ...current, siteId: saved.siteId }));
       await refetchLookups();
     },
-    [createSiteAsync, refetchLookups],
+    [refetchLookups],
   );
 
   const handleUpdateProjectSite = useCallback(
@@ -253,13 +259,19 @@ export function ProjectDrawer({
       payload: {
         customerId: number;
         siteName: string;
-        addressLine?: string;
-        city?: string;
         notes?: string;
         isPrimary?: boolean;
+        addressProfile?: UpsertAddressProfileRequest;
       },
     ) => {
-      await updateSiteAsync(siteId, payload);
+      await updateSiteWithAddressProfileAsync(siteId, {
+        siteId,
+        customerId: payload.customerId,
+        siteName: payload.siteName,
+        isPrimary: payload.isPrimary ?? false,
+        notes: payload.notes,
+        addressProfile: payload.addressProfile,
+      });
       await refetchLookups();
     },
     [refetchLookups],

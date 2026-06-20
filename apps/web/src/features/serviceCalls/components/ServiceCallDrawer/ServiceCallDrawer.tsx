@@ -1,6 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
+import {
+  ValidatedAddressDisplay,
+  getSiteAddressProfileOptionalAsync,
+} from '@features/geo';
 import { Drawer, useDrawerMaximize } from '@shared/components/Drawer';
 import { Badge } from '@shared/components/Badge';
 import { Button } from '@shared/components/Button';
@@ -665,6 +669,12 @@ function ServiceCallReviewDetails({ serviceCall, customers, sites }: ServiceCall
   const site = sites.find((siteOption) => siteOption.siteId === serviceCall.siteId);
   const siteName = serviceCall.siteName ?? site?.siteName;
 
+  const siteProfileQuery = useQuery({
+    queryKey: ['sites', serviceCall.siteId, 'address-profile'],
+    queryFn: () => getSiteAddressProfileOptionalAsync(serviceCall.siteId),
+    retry: false,
+  });
+
   return (
     <div className="serviceCallDrawer serviceCallDrawer--review">
       <DetailsSection title="פרטי קריאה">
@@ -712,9 +722,10 @@ function ServiceCallReviewDetails({ serviceCall, customers, sites }: ServiceCall
               )
             }
           />
-          <DetailsField
-            label="אתר"
-            value={siteName ? `${siteName}${site?.city ? ` — ${site.city}` : ''}` : undefined}
+          <DetailsField label="אתר" value={siteName} />
+          <ValidatedAddressDisplay
+            formattedAddress={siteProfileQuery.data?.formattedAddress ?? site?.city ?? undefined}
+            validationStatus={siteProfileQuery.data?.validationStatus}
           />
         </div>
       </DetailsSection>
