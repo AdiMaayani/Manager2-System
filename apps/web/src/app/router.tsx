@@ -1,4 +1,4 @@
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter, createHashRouter, Navigate } from 'react-router-dom';
 import { LoginPage } from '@features/auth';
 import { DashboardPage } from '@features/dashboard';
 import { WorkPlanPage } from '@features/workplan';
@@ -18,7 +18,12 @@ import { AdminRoute } from './AdminRoute';
 import { ProtectedRoute } from './ProtectedRoute';
 import { RequirePermission } from './RequirePermission';
 
-export const router = createBrowserRouter([
+const createRouter =
+  import.meta.env.BASE_URL === '/'
+    ? createBrowserRouter
+    : createHashRouter;
+
+export const router = createRouter([
   { path: '/Users/login', element: <Navigate to="/login" replace /> },
   { path: '/login', element: <LoginPage /> },
   {

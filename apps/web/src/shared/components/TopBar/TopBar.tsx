@@ -22,7 +22,7 @@ export function TopBar({ title }: TopBarProps) {
       </button>
       <div className="topBar__brand">
         <span className="topBar__logoWrap" aria-hidden="true">
-          <img src="/logo.png" alt="ManageR²" className="topBar__logo" />
+          <img src={`${import.meta.env.BASE_URL}logo.png`} alt="ManageR²" className="topBar__logo" />
         </span>
         <div className="topBar__titleWrap">
           <h1 className="topBar__title">{title}</h1>

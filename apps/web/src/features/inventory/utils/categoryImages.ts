@@ -3,7 +3,7 @@
 // source of truth for category imagery. Names are normalized before matching so minor
 // spacing/quote differences still resolve, and unknown categories fall back to a generic image.
 
-const CATEGORY_IMAGE_BASE = '/inventory-categories';
+const CATEGORY_IMAGE_BASE = `${import.meta.env.BASE_URL}inventory-categories`;
 
 export const FALLBACK_CATEGORY_IMAGE = `${CATEGORY_IMAGE_BASE}/fallback.webp`;
 
