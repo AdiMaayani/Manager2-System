@@ -224,6 +224,9 @@ builder.Services.AddScoped<IEmployeeBaseAddressRepository, EmployeeBaseAddressRe
 builder.Services.AddScoped<ISiteAddressProfileRepository, SiteAddressProfileRepository>();
 builder.Services.AddScoped<IAddressProfileService, AddressProfileService>();
 
+var httpsRedirectionEnabled =
+    builder.Configuration.GetValue<bool?>("HttpsRedirection:Enabled") ?? true;
+
 var app = builder.Build();
 
 // Catch-all: converts unhandled exceptions into ProblemDetails. Registered first so it wraps the whole pipeline.
@@ -240,7 +243,10 @@ if (app.Environment.IsDevelopment())
 
 app.UseCors("AllowFrontend");
 
-app.UseHttpsRedirection();
+if (httpsRedirectionEnabled)
+{
+    app.UseHttpsRedirection();
+}
 
 // Serves publicly readable static assets from wwwroot (e.g. uploaded product images under /uploads/inventory).
 // Registered before authentication so image URLs returned in DTOs load directly in <img> without a bearer token.
