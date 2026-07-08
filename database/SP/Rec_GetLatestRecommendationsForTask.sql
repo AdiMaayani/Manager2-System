@@ -11,12 +11,13 @@ BEGIN
     DECLARE @LatestRunId INT;
 
     SELECT TOP 1
-        @LatestRunId = rr.RecommendationRunId
-    FROM dbo.Rec_RecommendationRuns rr
-    WHERE rr.TaskId = @TaskId
-      AND rr.ScopeType = N'Task'
+        @LatestRunId = r.RecommendationRunId
+    FROM dbo.Rec_TaskAssignmentRecommendations r
+    INNER JOIN dbo.Rec_RecommendationRuns rr
+        ON rr.RecommendationRunId = r.RecommendationRunId
+    WHERE r.TaskId = @TaskId
       AND rr.RunStatus = N'Completed'
-    ORDER BY rr.CreatedAt DESC;
+    ORDER BY rr.CreatedAt DESC, r.RecommendationRunId DESC;
 
     SELECT
         r.RecommendationId,

@@ -93,7 +93,8 @@ programmability (`functions/`, `SP/`) + dated `migrations/` that add the newer o
 A fresh rebuild that matches the current database therefore needs **baseline + the required recent
 migrations + the required seeds** (full ordered list in [§4](#4-database-build-fresh-database)).
 
-The 4 tables and 17 procedures that exist **only in migrations** (not in `schema/`/`SP/`):
+The 4 tables and (originally) 17 procedures that were first delivered **only in migrations** (not in
+`schema/`/`SP/`):
 
 - **Customer Systems Vault** (migration `2026-06-15_customer_systems_vault.sql`):
   tables `CustomerSystems`, `CustomerSystemSecrets`, `CustomerSystemSecretAccessLog`;
@@ -107,10 +108,19 @@ The 4 tables and 17 procedures that exist **only in migrations** (not in `schema
   table `AuditLog` (append-only security/operational trail); SPs `sp_AuditLog_Create` (server-side
   write path) and `sp_AuditLog_GetList` (read path for the Admin/SeniorManagement audit screen).
 
-117 + 17 = 134 SPs, 38 + 4 = 42 tables — the pre-overhaul repo + required migrations reproduce
-the dump exactly. The 2026-06-19 foundation then adds 8 tables and 16 canonical procedures, so the
-expected post-foundation totals are **50 tables / 150 procedures**. An approved timezone conversion
-later adds 2 audit tables (52 total); its default diagnostics-only run adds nothing.
+> **Canonicalized (SP canonicalization batch):** the 22 code-required procedures that were previously
+> migration-only — the 11 Customer Systems Vault procedures, the 3 login-lockout procedures,
+> `sp_AuditLog_Create`, `sp_AuditLog_GetList` (the 2026-06-18 search version), and the 6 `sp_Dashboard_*`
+> procedures — now also have standalone canonical files under `database/SP`. Their **migrations remain
+> required** for the tables, columns, and indexes they create; the canonical `SP/` files own the final
+> procedure bodies and are (re-)deployed **after** all migrations (see
+> [§4](#4-database-build-fresh-database)).
+
+The pre-overhaul repo + required migrations reproduce the earlier dump, and the 2026-06-19 foundation
+plus the 2026-06-20 geo migrations add the remaining tables and canonical procedures, so the expected
+post-foundation totals are **50 tables / 170 procedures** (verified against the schema snapshot). An
+approved timezone conversion later adds 2 audit tables (52 total); its default diagnostics-only run
+adds nothing.
 
 ---
 
@@ -175,7 +185,10 @@ Run every file in `database/functions/` (order irrelevant). → `funcParseTaskPr
 
 ### Step 4 — Stored procedures (idempotent)
 Run every `database/SP/*.sql` **except** the two `2026-04-20_*` files. Order irrelevant
-(`CREATE OR ALTER` does not require referenced objects to exist at create time). → 117 procs.
+(`CREATE OR ALTER` does not require referenced objects to exist at create time). This now includes the
+22 formerly migration-only procedures (11 Vault, 3 login-lockout, 2 AuditLog, 6 Dashboard) that have
+canonical `SP/` files. These same files are **re-deployed after the migrations in Step 5.5**, which is
+the deployment that determines the final procedure bodies.
 
 ### Step 5 — Required recent migrations (idempotent, **order-sensitive**)
 Run these seven, **in this order**:
@@ -202,11 +215,25 @@ Run these seven, **in this order**:
 >
 > **Verify #4 won:** the SSMS query in [§7](#7-final-verification--ssms-queries) checks that
 > `Rec_GetDraftTaskRecommendationInput`'s definition contains the `13. CURRENT LOAD` / `14. CONTINUITY` blocks.
+>
+> **Definitive fix:** Step 5.5 re-deploys the canonical `SP/Rec_GetDraftTaskRecommendationInput.sql`
+> (and `SP/Rec_GetTaskRecommendationInput.sql`) **after** the migrations, so the canonical `SP/` body is
+> always the final one regardless of migration filename ordering. The explicit order above still matters
+> for any run that stops before Step 5.5.
 
 > The other `migrations/2026-06-0x_*.sql` files (company settings, reports lifecycle, employees CRUD,
 > service calls, project equipment/BOQ/drawings, sites deactivate, inventory, quotes, internal work
 > context, project file refs) are **already folded into `schema/tables.sql` + `SP/`** and are **not
 > needed** for a fresh build. They remain for upgrading older databases and are idempotent.
+
+### Step 5.5 — Re-deploy the canonical stored-procedure folder (idempotent, **required**)
+Run every `database/SP/*.sql` again (still **excluding** the two `2026-04-20_*` files) **after** all of
+the Step 5 migrations. This guarantees the final installed body of every procedure comes from the
+canonical `database/SP` files, so no migration that also `CREATE OR ALTER`s a procedure can leave an
+older final body behind (for example the smart-assignment draft procedure, or any of the 22 formerly
+migration-only procedures now canonicalized under `SP/`). The migrations are still required for the
+tables, columns, indexes, constraints, and data transformations they perform — re-deploying the SP
+folder does **not** replace them.
 
 ### Step 6 — Required seeds (idempotent)
 1. `seed/2026-06-14_permission_roles.sql` — inserts roles `SeniorManagement`, `ProjectManager`,
@@ -256,12 +283,32 @@ $migrations = @(
 )
 $migrations | ForEach-Object { sqlcmd -S $server -d $db -b -i $_ }
 
+# 4.5) re-deploy the canonical SP folder AFTER the migrations so the canonical bodies are the final ones
+Get-ChildItem "$root\SP\*.sql" -Exclude '2026-*' | ForEach-Object { sqlcmd -S $server -d $db -b -i $_.FullName }
+
 # 5) required seeds
 sqlcmd -S $server -d $db -b -i "$root\seed\2026-06-14_permission_roles.sql"
 sqlcmd -S $server -d $db -b -i "$root\seed\initial_admin\00_seed_initial_admin.sql"
 ```
 > `-b` makes `sqlcmd` stop on the first error so a broken deploy fails loudly.
 > Hebrew seed files are UTF-8 **with BOM**; `sqlcmd` auto-detects the BOM (force with `-f 65001` if needed).
+
+### Existing-database upgrade (not a fresh build)
+
+For a database that already exists (for example one matching the reviewed schema snapshot), do **not**
+re-run `schema/tables.sql`. Instead:
+
+1. Run only the migrations required to move that database to the current state, in their documented
+   dependency order (see [§3](#3-script-taxonomy-what-each-folder-is) and the in-place phase at the top
+   of this runbook). Migrations are what create/alter tables, columns, indexes, constraints, and
+   transform data.
+2. Re-deploy the affected canonical `database/SP/*.sql` files (idempotent `CREATE OR ALTER`) so the
+   final procedure bodies match the repository.
+3. Run any explicitly approved data/seed fixes and the post-deployment validation.
+
+Adding a canonical `SP/` file does **not** remove or replace the migration that also creates the
+supporting tables/columns/indexes — an existing database still needs those structural migrations. The
+canonical `SP/` file only owns the final procedure body; it does not reproduce schema changes.
 
 ---
 
@@ -339,14 +386,14 @@ npm run build      # production build of apps/web
 Run these against the target database after [§4](#4-database-build-fresh-database).
 
 ```sql
--- (a) Object counts after the 2026-06-19 foundation — expect 50 / 150 / 2 / 0.
+-- (a) Object counts after the 2026-06-19 foundation — expect 50 / 170 / 2 / 0.
 -- After an approved timezone conversion, USER_TABLE becomes 52.
 SELECT type_desc, COUNT(*) AS Cnt
 FROM sys.objects
 WHERE is_ms_shipped = 0 AND schema_id = SCHEMA_ID('dbo')
   AND type_desc IN ('USER_TABLE','SQL_STORED_PROCEDURE','SQL_SCALAR_FUNCTION','VIEW')
 GROUP BY type_desc ORDER BY type_desc;
--- USER_TABLE = 50, SQL_STORED_PROCEDURE = 150, SQL_SCALAR_FUNCTION = 2, VIEW = 0
+-- USER_TABLE = 50, SQL_STORED_PROCEDURE = 170, SQL_SCALAR_FUNCTION = 2, VIEW = 0
 
 -- (b) Customer Systems Vault tables exist (expect 3 rows)
 SELECT name FROM sys.tables
@@ -402,7 +449,7 @@ ORDER BY OccurredAtUtc DESC, AuditLogId DESC;
 
 ### Final verification checklist
 - [ ] **Tables exist** — query (a) returns `USER_TABLE = 50` after foundation (`52` after approved timezone conversion).
-- [ ] **Important SPs exist** — query (d) returns all 9; query (a) returns `SQL_STORED_PROCEDURE = 150`.
+- [ ] **Important SPs exist** — query (d) returns all 9; query (a) returns `SQL_STORED_PROCEDURE = 170`.
 - [ ] **Vault tables + lockout columns** — queries (b) = 3 rows, (c) = 2 rows.
 - [ ] **Smart Assignment SPs exist & factor activation applied** — query (e) = `PASS`.
 - [ ] **Audit log objects exist** — query (i) = 1 row (`AuditLog`); query (j) = 2 rows (`sp_AuditLog_Create`, `sp_AuditLog_GetList`).
@@ -490,6 +537,7 @@ migration-delivered objects above, which the ordered build applies.
      2026-06-15_audit_log_core.sql
      2026-06-15_smart_assignment_persistence_explainability.sql
      2026-06-15_smart_assignment_factor_activation.sql      (must be last of the SA pair)
+5b. Re-run SP/*.sql        (exclude SP/2026-*)  <- AFTER migrations, so canonical bodies win
 6. Run  seed/2026-06-14_permission_roles.sql
         seed/initial_admin/00_seed_initial_admin.sql
 7. Set secrets: ConnectionStrings:DefaultConnection, Jwt:Key (>=32), CustomerSystemsVault:EncryptionKey (base64 32B)
