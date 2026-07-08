@@ -814,6 +814,7 @@ CREATE OR ALTER PROCEDURE dbo.sp_WorkReports_Update
     @Status NVARCHAR(50) = N'טיוטה',
     @FollowUpRequired BIT = NULL,
     @FollowUpReason NVARCHAR(1000) = NULL,
+    @AmendsWorkReportId INT = NULL,
     @UpdatedByUserId INT = NULL
 AS
 BEGIN
@@ -841,6 +842,7 @@ BEGIN
         Status = @Status,
         FollowUpRequired = @FollowUpRequired,
         FollowUpReason = @FollowUpReason,
+        AmendsWorkReportId = @AmendsWorkReportId,
         UpdatedAt = SYSUTCDATETIME(),
         UpdatedByUserId = @UpdatedByUserId
     WHERE WorkReportId = @WorkReportId
