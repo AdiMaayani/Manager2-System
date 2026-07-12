@@ -46,3 +46,5 @@ apps/api/ManageR2.Api/wwwroot/uploads/inventory/*
 
 # ── Legacy reference clone (read-only, not part of monorepo) ──
 _temp/
+# Runtime application data
+apps/api/ManageR2.Api/App_Data/

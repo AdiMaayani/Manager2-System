@@ -10,7 +10,8 @@ namespace ManageR2.Infrastructure.Repositories.SmartAssignment
     // כאן לא מחשבים ציונים
     // כאן לא מדרגים עובדים
     // כאן רק קוראים ל-Stored Procedure וממפים תוצאות לאובייקטים
-    public class SmartAssignmentRepository
+    // Wave 5: this is the SQL Server baseline behind ISmartAssignmentRepository (behavior unchanged).
+    public class SmartAssignmentRepository : ISmartAssignmentRepository
     {
         // DBServices היא המחלקה הקיימת אצלכם שיודעת ליצור חיבור ל-DB
         private readonly DBServices _db;

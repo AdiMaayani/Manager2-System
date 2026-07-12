@@ -6,6 +6,17 @@ using ManageR2.Api.Authorization;
 using ManageR2.Api.Middleware;
 using ManageR2.Api.Validation;
 using ManageR2.Infrastructure.DAL;
+using ManageR2.Infrastructure.DAL.Providers;
+using ManageR2.Infrastructure.Features.Contacts.Repositories;
+using ManageR2.Infrastructure.Features.Customers.Repositories;
+using ManageR2.Infrastructure.Features.Employees.Repositories;
+using ManageR2.Infrastructure.Features.Inventory.Repositories;
+using ManageR2.Infrastructure.Features.Reports.Repositories;
+using ManageR2.Infrastructure.Features.Settings.Repositories;
+using ManageR2.Infrastructure.Features.Sites.Repositories;
+using ManageR2.Infrastructure.Features.Quotes.Repositories;
+using ManageR2.Infrastructure.Features.Users.Repositories;
+using ManageR2.Infrastructure.Features.WorkItems.Repositories;
 using ManageR2.Infrastructure.Features.WorkItems.Services;
 using ManageR2.Infrastructure.Interfaces;
 using ManageR2.Infrastructure.Repositories;
@@ -19,6 +30,7 @@ using Microsoft.IdentityModel.Tokens;
 using Microsoft.OpenApi.Models;
 using AdvancedSmartAssignmentService = ManageR2.Infrastructure.Services.SmartAssignment.SmartAssignmentService;
 using AdvancedSmartAssignmentRepository = ManageR2.Infrastructure.Repositories.SmartAssignment.SmartAssignmentRepository;
+using ManageR2.Infrastructure.Repositories.SmartAssignment;
 using ManageR2.Infrastructure.Services.SmartAssignment;
 using ManageR2.Infrastructure.Features.Geo.Clients;
 using ManageR2.Infrastructure.Features.Geo.Services;
@@ -180,26 +192,64 @@ builder.Services.AddManageR2AuthorizationPolicies();
 // DI: scoped lifetime ties one DBServices + repositories per HTTP request (safe for SqlConnection usage).
 // DI
 builder.Services.AddScoped<DBServices>();
-builder.Services.AddScoped<IWorkItemRepository, WorkItemRepository>();
+// Postgres migration data layer (additive): provider factories, role resolver, drift/observability,
+// and exception translators. Defaults keep the SQL Server baseline until DataProvider flags are set.
+builder.Services.AddManageR2DataProviders(builder.Configuration);
+// WorkItems / work-plan / assignments dual-run (Wave 3): self-referencing hierarchy, milestones and
+// multi-result-set schedule. Both provider repositories + router; default flags delegate to SQL Server.
+builder.Services.AddScoped<WorkItemRepository>();
+builder.Services.AddScoped<PostgresWorkItemRepository>();
+builder.Services.AddScoped<IWorkItemRepository, WorkItemRepositoryRouter>();
 builder.Services.AddScoped<IWorkItemTaskService, WorkItemTaskService>();
 builder.Services.AddScoped<IProjectMilestoneRepository, ProjectMilestoneRepository>();
 builder.Services.AddScoped<IWorkReportAttachmentStorageService, WorkReportAttachmentStorageService>();
-builder.Services.AddScoped<IUserRepository, UserRepository>();
-builder.Services.AddScoped<ICustomerRepository, CustomerRepository>();
-builder.Services.AddScoped<IContactRepository, ContactRepository>();
-builder.Services.AddScoped<ISiteRepository, SiteRepository>();
+// Users dual-run (Wave 2, high risk).
+builder.Services.AddScoped<UserRepository>();
+builder.Services.AddScoped<PostgresUserRepository>();
+builder.Services.AddScoped<IUserRepository, UserRepositoryRouter>();
+// Customers dual-run (Wave 2): both provider repositories + router, following the CompanySettings pattern.
+builder.Services.AddScoped<CustomerRepository>();
+builder.Services.AddScoped<PostgresCustomerRepository>();
+builder.Services.AddScoped<ICustomerRepository, CustomerRepositoryRouter>();
+// Contacts dual-run (Wave 2).
+builder.Services.AddScoped<ContactRepository>();
+builder.Services.AddScoped<PostgresContactRepository>();
+builder.Services.AddScoped<IContactRepository, ContactRepositoryRouter>();
+// Sites dual-run (Wave 2).
+builder.Services.AddScoped<SiteRepository>();
+builder.Services.AddScoped<PostgresSiteRepository>();
+builder.Services.AddScoped<ISiteRepository, SiteRepositoryRouter>();
 builder.Services.AddScoped<IJwtTokenService, JwtTokenService>();
 builder.Services.AddScoped<IPasswordService, PasswordService>();
 builder.Services.AddScoped<IUserAuthorizationService, UserAuthorizationService>();
-builder.Services.AddScoped<IWorkReportRepository, WorkReportRepository>();
+// WorkReports dual-run (Wave 4): report lifecycle + the transactional inventory finalize/reverse
+// orchestration (service-refactor of sp_InventoryStockMovements_ApplyForReport). Both provider
+// repositories + router; default flags delegate to SQL Server.
+builder.Services.AddScoped<WorkReportRepository>();
+builder.Services.AddScoped<PostgresWorkReportRepository>();
+builder.Services.AddScoped<IWorkReportRepository, WorkReportRepositoryRouter>();
 builder.Services.AddScoped<IProjectLifecycleRepository, ProjectLifecycleRepository>();
 builder.Services.AddScoped<IProjectEquipmentRepository, ProjectEquipmentRepository>();
 builder.Services.AddScoped<IProjectBoqRepository, ProjectBoqRepository>();
 builder.Services.AddScoped<IProjectDrawingRepository, ProjectDrawingRepository>();
-builder.Services.AddScoped<IInventoryItemRepository, InventoryItemRepository>();
-builder.Services.AddScoped<IQuoteRepository, QuoteRepository>();
-builder.Services.AddScoped<IEmployeeRepository, EmployeeRepository>();
-builder.Services.AddScoped<ICompanySettingsRepository, CompanySettingsRepository>();
+// Inventory dual-run (Wave 4): both provider repositories + router; default flags delegate to SQL Server.
+builder.Services.AddScoped<InventoryItemRepository>();
+builder.Services.AddScoped<PostgresInventoryItemRepository>();
+builder.Services.AddScoped<IInventoryItemRepository, InventoryItemRepositoryRouter>();
+// Quotes dual-run (Wave 3): transactional header + line replacement + totals recalculation.
+builder.Services.AddScoped<QuoteRepository>();
+builder.Services.AddScoped<PostgresQuoteRepository>();
+builder.Services.AddScoped<IQuoteRepository, QuoteRepositoryRouter>();
+// Employees dual-run (Wave 2).
+builder.Services.AddScoped<EmployeeRepository>();
+builder.Services.AddScoped<PostgresEmployeeRepository>();
+builder.Services.AddScoped<IEmployeeRepository, EmployeeRepositoryRouter>();
+// CompanySettings is the Wave-1 dual-run reference: both provider repositories are registered as
+// concretes and the router (registered as the interface) selects/compares them per DataProvider flags.
+// With default flags the router delegates purely to the SQL Server repository.
+builder.Services.AddScoped<CompanySettingsRepository>();
+builder.Services.AddScoped<PostgresCompanySettingsRepository>();
+builder.Services.AddScoped<ICompanySettingsRepository, CompanySettingsRepositoryRouter>();
 builder.Services.AddScoped<ICustomerSystemRepository, CustomerSystemRepository>();
 // Core audit trail: append-only repository + best-effort logging service used by security/operational endpoints.
 builder.Services.AddScoped<IAuditLogRepository, AuditLogRepository>();
@@ -211,8 +261,12 @@ builder.Services.AddSingleton<ISecretProtector, AesGcmSecretProtector>();
 builder.Services.AddScoped<IDashboardRepository, DashboardRepository>();
 builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<ISmartAssignmentService, SmartAssignmentBatchService>();
-// Advanced ranked recommendations: concrete repository + service from SmartAssignment module (aliased at top of file).
+// SmartAssignment dual-run (Wave 5): both provider repositories + router behind the provider-neutral
+// ISmartAssignmentRepository. Default flags delegate reads/writes to SQL Server; Postgres is only used
+// for shadow reads / best-effort dual writes when the migration flags are enabled.
 builder.Services.AddScoped<AdvancedSmartAssignmentRepository>();
+builder.Services.AddScoped<PostgresSmartAssignmentRepository>();
+builder.Services.AddScoped<ISmartAssignmentRepository, SmartAssignmentRepositoryRouter>();
 builder.Services.AddScoped<IAdvancedSmartAssignmentService, AdvancedSmartAssignmentService>();
 builder.Services.AddHttpClient<GeoapifyClient>(client =>
 {

@@ -1,0 +1,37 @@
+# Local PostgreSQL for the SQL Server -> Postgres migration (dual-run).
+# Dev-only credentials; do not use in production.
+#
+# Usage (from database/postgres/):
+#   docker compose up -d            # start Postgres; schema/*.sql auto-applied on first init
+#   docker compose ps              # check health
+#   docker compose logs -f postgres
+#   docker compose down            # stop (keeps data volume)
+#   docker compose down -v         # stop and wipe data (forces schema re-apply next up)
+#
+# The schema/ folder is mounted into the image's init directory. The official postgres image runs
+# every *.sql there in alphabetical order (01_core_identity -> ... -> 05_smartassignment) ONLY on a
+# fresh data volume. To re-apply after editing schema files, run `docker compose down -v` first.
+services:
+  postgres:
+    image: postgres:16
+    container_name: manager2-postgres
+    environment:
+      POSTGRES_DB: manager2_dev
+      POSTGRES_USER: manager2
+      POSTGRES_PASSWORD: manager2
+      # Keep timestamps predictable for local dev / parity comparisons.
+      TZ: UTC
+      PGTZ: UTC
+    ports:
+      - "5432:5432"
+    volumes:
+      - manager2_pgdata:/var/lib/postgresql/data
+      - ./schema:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U manager2 -d manager2_dev"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  manager2_pgdata:

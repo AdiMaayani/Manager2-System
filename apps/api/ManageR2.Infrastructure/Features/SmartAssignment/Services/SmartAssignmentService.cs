@@ -16,11 +16,12 @@ namespace ManageR2.Infrastructure.Services.SmartAssignment
     {
         // Repository הוא האובייקט שמדבר עם ה-DB.
         // השירות לא פונה ישירות ל-SQL אלא מבקש מה-Repository להביא לו נתונים.
-        private readonly SmartAssignmentRepository _repository;
+        // Wave 5: depends on the provider-neutral interface so the dual-run router can be injected.
+        private readonly ISmartAssignmentRepository _repository;
 
         // Constructor = פעולה שרצה כשנוצר SmartAssignmentService.
         // היא מקבלת Repository ושומרת אותו במשתנה הפרטי _repository.
-        public SmartAssignmentService(SmartAssignmentRepository repository)
+        public SmartAssignmentService(ISmartAssignmentRepository repository)
         {
             _repository = repository; // שמירת ה-Repository לשימוש בהמשך
         }

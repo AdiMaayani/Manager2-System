@@ -18,12 +18,13 @@ public class SmartAssignmentBatchService : ISmartAssignmentService
 
     private readonly IWorkItemRepository _workItemRepository;
     private readonly IAdvancedSmartAssignmentService _advancedSmartAssignmentService;
-    private readonly SmartAssignmentRepository _smartAssignmentRepository;
+    // Wave 5: provider-neutral interface (SQL Server baseline behind the dual-run router by default).
+    private readonly ISmartAssignmentRepository _smartAssignmentRepository;
 
     public SmartAssignmentBatchService(
         IWorkItemRepository workItemRepository,
         IAdvancedSmartAssignmentService advancedSmartAssignmentService,
-        SmartAssignmentRepository smartAssignmentRepository)
+        ISmartAssignmentRepository smartAssignmentRepository)
     {
         _workItemRepository = workItemRepository;
         _advancedSmartAssignmentService = advancedSmartAssignmentService;
