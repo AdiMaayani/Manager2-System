@@ -9,7 +9,7 @@ public sealed class ReverseWorkReportRequestDtoValidator : AbstractValidator<Rev
     public ReverseWorkReportRequestDtoValidator()
     {
         RuleFor(request => request.ReversalReason)
-            .NotEmpty().WithMessage("Reversal reason is required.");
+            .NotEmpty().WithMessage("יש להזין סיבה להחזרת הדיווח לטיוטה.");
     }
 }
 

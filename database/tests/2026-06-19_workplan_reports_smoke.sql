@@ -44,16 +44,45 @@ BEGIN TRY
  DECLARE @ReportId INT=SCOPE_IDENTITY();
  EXEC dbo.sp_WorkReportInventory_Add @ReportId,@InventoryItemId,2,N'Used',@UserId;
  EXEC dbo.sp_WorkReportInventory_Add @ReportId,@InventoryItemId,3,N'Installed',@UserId;
- EXEC dbo.sp_WorkReports_Finalize @ReportId,@UserId;
- EXEC dbo.sp_WorkReports_Finalize @ReportId,@UserId;
+ DECLARE @LifecycleResults TABLE(
+  WorkReportId INT,Status NVARCHAR(50),LifecycleStatus NVARCHAR(20),
+  FinalizedAt DATETIME2(7),FinalizedByUserId INT,
+  ReversedAt DATETIME2(7),ReversedByUserId INT,ReversalReason NVARCHAR(500));
+ DECLARE @OutputStatus NVARCHAR(50),@OutputLifecycleStatus NVARCHAR(20),
+  @OutputFinalizedAt DATETIME2(7),@OutputFinalizedByUserId INT,
+  @OutputReversedAt DATETIME2(7),@OutputReversedByUserId INT,@OutputReversalReason NVARCHAR(500);
+ EXEC dbo.sp_WorkReports_Finalize @ReportId,@UserId,
+  @OutputStatus OUTPUT,@OutputLifecycleStatus OUTPUT,@OutputFinalizedAt OUTPUT,
+  @OutputFinalizedByUserId OUTPUT,@OutputReversedAt OUTPUT,@OutputReversedByUserId OUTPUT,
+  @OutputReversalReason OUTPUT;
+ INSERT @LifecycleResults VALUES(@ReportId,@OutputStatus,@OutputLifecycleStatus,@OutputFinalizedAt,
+  @OutputFinalizedByUserId,@OutputReversedAt,@OutputReversedByUserId,@OutputReversalReason);
+ EXEC dbo.sp_WorkReports_Finalize @ReportId,@UserId,
+  @OutputStatus OUTPUT,@OutputLifecycleStatus OUTPUT,@OutputFinalizedAt OUTPUT,
+  @OutputFinalizedByUserId OUTPUT,@OutputReversedAt OUTPUT,@OutputReversedByUserId OUTPUT,
+  @OutputReversalReason OUTPUT;
+ INSERT @LifecycleResults VALUES(@ReportId,@OutputStatus,@OutputLifecycleStatus,@OutputFinalizedAt,
+  @OutputFinalizedByUserId,@OutputReversedAt,@OutputReversedByUserId,@OutputReversalReason);
  IF (SELECT QuantityOnHand FROM dbo.InventoryItems WHERE InventoryItemId=@InventoryItemId)<>5 THROW 51608,'Finalize aggregation/idempotency failed.',1;
  IF (SELECT COUNT(*) FROM dbo.InventoryStockMovements m JOIN dbo.WorkReportInventoryItems l ON l.WorkReportInventoryItemId=m.WorkReportInventoryItemId WHERE l.WorkReportId=@ReportId AND m.MovementType=N'ReportUsage')<>2 THROW 51609,'Finalize movement count failed.',1;
+ IF (SELECT COUNT(*) FROM @LifecycleResults WHERE WorkReportId=@ReportId AND LifecycleStatus=N'Finalized' AND FinalizedAt IS NOT NULL AND ReversedAt IS NULL)<>2 THROW 51613,'Finalize result-set contract failed.',1;
  IF (SELECT Status FROM dbo.WorkReports WHERE WorkReportId=@ReportId)<>N'הוגש' THROW 51610,'Finalize changed workflow Status.',1;
  EXEC dbo.sp_WorkReports_Update @WorkReportId=@ReportId,@Status=N'הועבר להנה״ח';
  IF (SELECT QuantityOnHand FROM dbo.InventoryItems WHERE InventoryItemId=@InventoryItemId)<>5 THROW 51611,'Workflow transition changed stock.',1;
- EXEC dbo.sp_WorkReports_Reverse @ReportId,N'Smoke reversal',@UserId;
- EXEC dbo.sp_WorkReports_Reverse @ReportId,N'Smoke reversal repeat',@UserId;
+ EXEC dbo.sp_WorkReports_Reverse @ReportId,N'Smoke reversal',@UserId,
+  @OutputStatus OUTPUT,@OutputLifecycleStatus OUTPUT,@OutputFinalizedAt OUTPUT,
+  @OutputFinalizedByUserId OUTPUT,@OutputReversedAt OUTPUT,@OutputReversedByUserId OUTPUT,
+  @OutputReversalReason OUTPUT;
+ INSERT @LifecycleResults VALUES(@ReportId,@OutputStatus,@OutputLifecycleStatus,@OutputFinalizedAt,
+  @OutputFinalizedByUserId,@OutputReversedAt,@OutputReversedByUserId,@OutputReversalReason);
+ EXEC dbo.sp_WorkReports_Reverse @ReportId,N'Smoke reversal repeat',@UserId,
+  @OutputStatus OUTPUT,@OutputLifecycleStatus OUTPUT,@OutputFinalizedAt OUTPUT,
+  @OutputFinalizedByUserId OUTPUT,@OutputReversedAt OUTPUT,@OutputReversedByUserId OUTPUT,
+  @OutputReversalReason OUTPUT;
+ INSERT @LifecycleResults VALUES(@ReportId,@OutputStatus,@OutputLifecycleStatus,@OutputFinalizedAt,
+  @OutputFinalizedByUserId,@OutputReversedAt,@OutputReversedByUserId,@OutputReversalReason);
  IF (SELECT QuantityOnHand FROM dbo.InventoryItems WHERE InventoryItemId=@InventoryItemId)<>10 THROW 51612,'Reverse idempotency failed.',1;
+ IF (SELECT COUNT(*) FROM @LifecycleResults WHERE WorkReportId=@ReportId AND LifecycleStatus=N'Reversed' AND FinalizedAt IS NOT NULL AND ReversedAt IS NOT NULL)<>2 THROW 51614,'Reverse result-set contract failed.',1;
  SELECT N'PASS' Result,N'Matrix, duration, milestone exclusion/ownership, exact SKU, lifecycle, aggregation and workflow independence.' Coverage;
  ROLLBACK;
 END TRY BEGIN CATCH IF @@TRANCOUNT>0 ROLLBACK; THROW; END CATCH;

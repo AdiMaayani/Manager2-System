@@ -149,6 +149,15 @@ export interface WorkReportDetailsResponse {
   attachments?: WorkReportAttachment[];
 }
 
+export interface WorkReportLifecycleResponse {
+  workReportId: number;
+  status?: string | null;
+  lifecycleStatus: string;
+  finalizedAt?: string | null;
+  reversedAt?: string | null;
+  reversalReason?: string | null;
+}
+
 export interface WorkReportDetails {
   reportId: number;
   reportType?: string | null;
@@ -190,5 +199,5 @@ export interface InventorySkuLookupResult {
 }
 
 export interface ReverseWorkReportRequest {
-  reason: string;
+  reversalReason: string;
 }

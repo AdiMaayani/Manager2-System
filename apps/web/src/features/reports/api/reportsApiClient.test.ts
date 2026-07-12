@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildReverseWorkReportRequest,
   buildReportTargetListOption,
   formatReportTargetDescription,
 } from './reportsApiClient';
@@ -36,5 +37,11 @@ describe('report target list options', () => {
     });
     expect(formatReportTargetDescription(project)).toBe('פרויקט אלפא');
     expect(buildReportTargetListOption(serviceCall).description).toBe('לקוח א · סניף תל אביב');
+  });
+
+  it('uses the API reversalReason field for reverse requests', () => {
+    expect(buildReverseWorkReportRequest('Reason')).toEqual({
+      reversalReason: 'Reason',
+    });
   });
 });
