@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Plus } from 'lucide-react';
@@ -55,10 +55,12 @@ import './ReportsPage.css';
 
 import {
   QUICK_REPORT_STORAGE_KEY,
+  enrichQuickReportPrefill,
   readQuickReportPrefill,
   taskCategoryToReportTargetType,
   type QuickReportPrefill,
 } from '../../quickReportPrefill';
+import { shouldApplyQuickReportAsyncResult } from '../../quickReportWorkers';
 import { getWorkItemByIdAsync } from '@features/workplan/api/workplanApiClient';
 
 const LIST_STATUS_OPTIONS = ['הוגש', 'טיוטה'];
@@ -158,7 +160,7 @@ function createInitialFormState(prefill?: QuickReportPrefill | null): ReportForm
     notes: '',
     followup: false,
     followupReason: '',
-    relatedWorkerIds: [],
+    relatedWorkerIds: (prefill?.relatedWorkerIds ?? []).map(String),
   };
 }
 
@@ -194,24 +196,6 @@ function parseNullableInt(value: string): number | null {
   return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
 }
 
-function enrichQuickReportPrefill(
-  prefill: QuickReportPrefill,
-  targets: WorkItemReportTarget[],
-): QuickReportPrefill {
-  const target = targets.find((row) => row.workItemId === prefill.workItemId);
-  if (!target) return prefill;
-
-  return {
-    ...prefill,
-    title: prefill.title || target.title,
-    taskCategory: target.taskCategory,
-    projectId: target.projectId ?? prefill.projectId ?? null,
-    projectTitle: prefill.projectTitle || target.projectTitle || undefined,
-    customerName: prefill.customerName || target.customerName || undefined,
-    site: prefill.site || target.siteName || undefined,
-  };
-}
-
 function formatReportDate(value?: string | null) {
   if (!value) return '';
   return value.split('T')[0];
@@ -227,6 +211,8 @@ function applyTargetToForm(
       targetTitle: '',
       reportType: reportTargetType,
       projectId: '',
+      customerName: '',
+      site: '',
     };
   }
 
@@ -237,8 +223,8 @@ function applyTargetToForm(
     reportType,
     projectId:
       reportType === 'project' && target.projectId != null ? String(target.projectId) : '',
-    customerName: target.customerName || undefined,
-    site: target.siteName || undefined,
+    customerName: target.customerName || '',
+    site: target.siteName || '',
   };
 }
 
@@ -262,6 +248,8 @@ export function ReportsPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [pageMessage, setPageMessage] = useState<string | null>(null);
   const [workerToAddId, setWorkerToAddId] = useState('');
+  const hasHandledQuickReportPrefill = useRef(false);
+  const hasUserEditedReportForm = useRef(false);
 
   const [filterSearch, setFilterSearch] = useState('');
   const [filterCustomer, setFilterCustomer] = useState('');
@@ -374,13 +362,24 @@ export function ReportsPage() {
   };
 
   useEffect(() => {
-    if (!quickParam && !requestedWorkItemId) return;
+    if (
+      (!quickParam && !requestedWorkItemId) ||
+      reportTargets == null ||
+      hasHandledQuickReportPrefill.current
+    ) {
+      return;
+    }
+    hasHandledQuickReportPrefill.current = true;
+    const availableReportTargets = reportTargets;
 
     async function applyQuickReportPrefill() {
       const rawPrefill = sessionStorage.getItem(QUICK_REPORT_STORAGE_KEY);
       let prefill = readQuickReportPrefill(rawPrefill);
 
       const parsedWorkItemId = requestedWorkItemId ? Number(requestedWorkItemId) : null;
+      if (prefill && parsedWorkItemId != null && prefill.workItemId !== parsedWorkItemId) {
+        prefill = null;
+      }
       if (!prefill && parsedWorkItemId != null && Number.isInteger(parsedWorkItemId) && parsedWorkItemId > 0) {
         try {
           const workItem = await getWorkItemByIdAsync(parsedWorkItemId);
@@ -403,10 +402,8 @@ export function ReportsPage() {
         return;
       }
 
-      if (reportTargets == null) return;
-
-      const enrichedPrefill = enrichQuickReportPrefill(prefill, reportTargets);
-      const target = reportTargets.find((row) => row.workItemId === enrichedPrefill.workItemId) ?? null;
+      const target =
+        availableReportTargets.find((row) => row.workItemId === prefill.workItemId) ?? null;
 
       if (!target) {
         setQuickReportError('המשימה המבוקשת אינה זמינה לדיווח.');
@@ -415,10 +412,16 @@ export function ReportsPage() {
         return;
       }
 
+      const enrichedPrefill = enrichQuickReportPrefill(prefill, target);
+      if (!shouldApplyQuickReportAsyncResult(hasUserEditedReportForm.current)) {
+        return;
+      }
       const initial = createInitialFormState(enrichedPrefill);
       setForm({
         ...initial,
         ...applyTargetToForm(target, initial.reportTargetType),
+        customerName: enrichedPrefill.customerName || '',
+        site: enrichedPrefill.site || '',
       });
       setPendingInventoryLines([]);
       setPendingAttachments([]);
@@ -435,6 +438,7 @@ export function ReportsPage() {
   }, [navigate, quickParam, reportTargets, requestedWorkItemId]);
 
   function resetFormState() {
+    hasUserEditedReportForm.current = false;
     setForm(createInitialFormState());
     setPendingInventoryLines([]);
     setPendingAttachments([]);
@@ -459,6 +463,7 @@ export function ReportsPage() {
   }
 
   function openEditModal(report: WorkReportDetails) {
+    hasUserEditedReportForm.current = false;
     setSelectedReportId(null);
     setForm(createFormStateFromReport(report));
     setPendingInventoryLines([]);
@@ -472,6 +477,7 @@ export function ReportsPage() {
   }
 
   function updateForm(patch: Partial<ReportFormState>) {
+    hasUserEditedReportForm.current = true;
     setForm((current) => ({ ...current, ...patch }));
   }
 
@@ -537,9 +543,11 @@ export function ReportsPage() {
         workItemId,
         projectId: form.reportType === 'regular' ? null : parentProjectId,
         projectName:
-          form.reportType === 'service_call'
-            ? null
-            : selectedTarget?.title || null,
+          form.reportType === 'project'
+            ? selectedTarget?.projectTitle || null
+            : form.reportType === 'regular'
+              ? selectedTarget?.title || null
+              : null,
         customerName: form.customerName || null,
         serviceCallId: form.reportType === 'service_call' ? workItemId : null,
         serviceCallTitle:

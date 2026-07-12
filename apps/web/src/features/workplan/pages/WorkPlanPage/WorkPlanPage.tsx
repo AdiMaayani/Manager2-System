@@ -368,6 +368,8 @@ export function WorkPlanPage() {
           onClose={closeTaskPanel}
           canEdit={canEditTask}
           canDeleteTask={canDeleteTask}
+          assignments={scheduling.schedule.assignments}
+          employees={scheduling.schedule.employees}
           onTaskUpdated={closeTaskPanel}
         />
 
