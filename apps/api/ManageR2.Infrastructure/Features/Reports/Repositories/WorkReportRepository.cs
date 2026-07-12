@@ -1,4 +1,5 @@
 using System.Data;
+using ManageR2.Domain.Features.Reports;
 using ManageR2.Infrastructure.DAL;
 using ManageR2.Infrastructure.Models;
 using Microsoft.Data.SqlClient;
@@ -191,10 +192,14 @@ public class WorkReportRepository : IWorkReportRepository
         };
         command.Parameters.AddWithValue("@WorkReportId", workReportId);
         command.Parameters.AddWithValue("@FinalizedByUserId", (object?)finalizedByUserId ?? DBNull.Value);
+        WorkReportLifecycleOutputContract.AddOutputParameters(command);
 
         await connection.OpenAsync();
-        await using var reader = await command.ExecuteReaderAsync();
-        return await reader.ReadAsync() ? MapLifecycleResult(reader) : null;
+        await command.ExecuteNonQueryAsync();
+        return WorkReportLifecycleOutputContract.ReadResult(
+            command,
+            workReportId,
+            WorkReportLifecycleStatuses.Finalized);
     }
 
     public async Task<WorkReportLifecycleResultModel?> ReverseAsync(
@@ -210,10 +215,14 @@ public class WorkReportRepository : IWorkReportRepository
         command.Parameters.AddWithValue("@WorkReportId", workReportId);
         command.Parameters.AddWithValue("@ReversalReason", reversalReason);
         command.Parameters.AddWithValue("@ReversedByUserId", (object?)reversedByUserId ?? DBNull.Value);
+        WorkReportLifecycleOutputContract.AddOutputParameters(command);
 
         await connection.OpenAsync();
-        await using var reader = await command.ExecuteReaderAsync();
-        return await reader.ReadAsync() ? MapLifecycleResult(reader) : null;
+        await command.ExecuteNonQueryAsync();
+        return WorkReportLifecycleOutputContract.ReadResult(
+            command,
+            workReportId,
+            WorkReportLifecycleStatuses.Reversed);
     }
 
     public async Task<int> AmendAsync(int reversedWorkReportId, WorkReportCreateModel request)
@@ -430,21 +439,6 @@ public class WorkReportRepository : IWorkReportRepository
             FileSizeBytes = reader["FileSizeBytes"] == DBNull.Value ? 0L : Convert.ToInt64(reader["FileSizeBytes"]),
             UploadedAt = GetDateTimeValue(reader, "UploadedAt"),
             UploadedByUserId = GetNullableIntValue(reader, "UploadedByUserId")
-        };
-    }
-
-    private static WorkReportLifecycleResultModel MapLifecycleResult(SqlDataReader reader)
-    {
-        return new WorkReportLifecycleResultModel
-        {
-            WorkReportId = GetIntValue(reader, "WorkReportId"),
-            Status = GetStringValue(reader, "Status"),
-            LifecycleStatus = GetStringValue(reader, "LifecycleStatus") ?? string.Empty,
-            FinalizedAt = GetDateTimeValue(reader, "FinalizedAt"),
-            FinalizedByUserId = GetNullableIntValue(reader, "FinalizedByUserId"),
-            ReversedAt = GetDateTimeValue(reader, "ReversedAt"),
-            ReversedByUserId = GetNullableIntValue(reader, "ReversedByUserId"),
-            ReversalReason = GetStringValue(reader, "ReversalReason")
         };
     }
 
