@@ -24,6 +24,40 @@ public class ProjectMilestoneRequestValidatorTests
     }
 
     [Fact]
+    public void Create_AllowsSameDayPlannedRange()
+    {
+        var request = new CreateProjectMilestoneRequestDto
+        {
+            Title = "Phase 1",
+            Status = "Planned",
+            ManagerEmployeeId = 3,
+            PlannedStart = new DateTime(2026, 6, 20),
+            PlannedEnd = new DateTime(2026, 6, 20),
+        };
+
+        var result = _createValidator.Validate(request);
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
+    public void Create_AllowsPlannedEndAfterPlannedStart()
+    {
+        var request = new CreateProjectMilestoneRequestDto
+        {
+            Title = "Phase 1",
+            Status = "Planned",
+            ManagerEmployeeId = 3,
+            PlannedStart = new DateTime(2026, 6, 20),
+            PlannedEnd = new DateTime(2026, 6, 21),
+        };
+
+        var result = _createValidator.Validate(request);
+
+        Assert.True(result.IsValid);
+    }
+
+    [Fact]
     public void Create_RejectsPlannedEndBeforePlannedStart()
     {
         var request = new CreateProjectMilestoneRequestDto
@@ -38,6 +72,44 @@ public class ProjectMilestoneRequestValidatorTests
         var result = _createValidator.Validate(request);
 
         Assert.False(result.IsValid);
+    }
+
+    [Fact]
+    public void Create_RejectsIncompletePlannedRange()
+    {
+        var request = new CreateProjectMilestoneRequestDto
+        {
+            Title = "Phase 1",
+            Status = "Planned",
+            ManagerEmployeeId = 3,
+            PlannedStart = new DateTime(2026, 6, 20),
+            PlannedEnd = null,
+        };
+
+        var result = _createValidator.Validate(request);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(
+            result.Errors,
+            failure => failure.ErrorMessage.Contains("must both be supplied", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Update_AllowsSameDayPlannedRange()
+    {
+        var request = new UpdateProjectMilestoneRequestDto
+        {
+            Title = "Phase 1",
+            Status = "Planned",
+            SortOrder = 0,
+            ProgressPercent = 10,
+            PlannedStart = new DateTime(2026, 6, 20),
+            PlannedEnd = new DateTime(2026, 6, 20),
+        };
+
+        var result = _updateValidator.Validate(request);
+
+        Assert.True(result.IsValid);
     }
 
     [Fact]
@@ -56,5 +128,26 @@ public class ProjectMilestoneRequestValidatorTests
         var result = _updateValidator.Validate(request);
 
         Assert.False(result.IsValid);
+    }
+
+    [Fact]
+    public void Update_RejectsIncompleteActualRange()
+    {
+        var request = new UpdateProjectMilestoneRequestDto
+        {
+            Title = "Phase 1",
+            Status = "Planned",
+            SortOrder = 0,
+            ProgressPercent = 10,
+            ActualStart = new DateTime(2026, 6, 20),
+            ActualEnd = null,
+        };
+
+        var result = _updateValidator.Validate(request);
+
+        Assert.False(result.IsValid);
+        Assert.Contains(
+            result.Errors,
+            failure => failure.ErrorMessage.Contains("must both be supplied", StringComparison.Ordinal));
     }
 }
