@@ -112,4 +112,3 @@ Return only:
 5. Remaining work for the next phase.
 
 Keep the report concise.
-
