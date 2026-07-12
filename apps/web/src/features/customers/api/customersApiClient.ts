@@ -1,5 +1,5 @@
 import { apiRequest } from '@api/client';
-import type { Customer, CreateCustomerRequest } from '../types';
+import type { Customer, CustomerSite, CreateCustomerRequest } from '../types';
 
 export function getCustomersAsync(): Promise<Customer[]> {
   return apiRequest<Customer[]>('/Customers');
@@ -25,4 +25,10 @@ export function updateCustomerAsync(id: number, request: CreateCustomerRequest):
 
 export function deactivateCustomerAsync(id: number): Promise<void> {
   return apiRequest<void>(`/Customers/${id}`, { method: 'DELETE' });
+}
+
+export function getCustomerSitesAsync(customerId: number): Promise<CustomerSite[]> {
+  return apiRequest<CustomerSite[]>(
+    `/Sites?customerId=${encodeURIComponent(customerId)}`,
+  );
 }

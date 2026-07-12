@@ -24,3 +24,15 @@ export interface CreateCustomerRequest {
   notes?: string;
   isActive: boolean;
 }
+
+export interface CustomerSite {
+  siteId: number;
+  customerId: number;
+  siteName: string;
+  addressLine?: string | null;
+  city?: string | null;
+  isPrimary: boolean;
+  notes?: string | null;
+  createdAt?: string;
+  updatedAt?: string | null;
+}

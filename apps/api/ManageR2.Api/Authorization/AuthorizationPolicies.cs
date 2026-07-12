@@ -23,6 +23,7 @@ public static class Policies
     public const string CanManageSettings = "CanManageSettings";
     public const string CanManageInventory = "CanManageInventory";
     public const string CanManageCustomers = "CanManageCustomers";
+    public const string CanManageSites = "CanManageSites";
     public const string CanManageProjects = "CanManageProjects";
     public const string CanManageWorkPlan = "CanManageWorkPlan";
     public const string CanEditReports = "CanEditReports";
@@ -72,6 +73,13 @@ public static class AuthorizationPolicyRegistration
 
             options.AddPolicy(Policies.CanManageCustomers, policy =>
                 policy.RequireRole(Roles.Admin, Roles.SeniorManagement, Roles.Office));
+
+            options.AddPolicy(Policies.CanManageSites, policy =>
+                policy.RequireRole(
+                    Roles.Admin,
+                    Roles.SeniorManagement,
+                    Roles.Office,
+                    Roles.ProjectManager));
 
             options.AddPolicy(Policies.CanManageProjects, policy =>
                 policy.RequireRole(Roles.Admin, Roles.SeniorManagement, Roles.ProjectManager));

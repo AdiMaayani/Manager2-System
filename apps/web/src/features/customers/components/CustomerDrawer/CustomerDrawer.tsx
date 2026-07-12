@@ -14,7 +14,7 @@ import { Checkbox } from '@shared/components/Checkbox';
 import { InlineAlert } from '@shared/components/InlineAlert';
 import { ConfirmInline } from '@shared/components/ConfirmInline';
 import { usePermissions } from '@shared/auth/usePermissions';
-import { getProjectsListAsync, getSitesAsync } from '@features/projects/api/projectsApiClient';
+import { getProjectsListAsync } from '@features/projects/api/projectsApiClient';
 import { getQuotesAsync } from '@features/quotes/api/quotesApiClient';
 import {
   getQuoteStatusBadgeVariant,
@@ -25,6 +25,7 @@ import { getContactsAsync } from '@features/contacts/api/contactsApiClient';
 import { CustomerVaultSection } from '@features/customerSystems';
 import { useCustomerMutations } from '../../hooks/useCustomers';
 import type { Customer, CreateCustomerRequest } from '../../types';
+import { CustomerSitesSection } from '../CustomerSitesSection';
 import './CustomerDrawer.css';
 
 const CUSTOMER_TYPE_OPTIONS = ['עסקי', 'פרטי', 'גוף ציבורי', 'תאגיד'];
@@ -317,7 +318,7 @@ function CustomerDrawerContent({ customer, onClose, onSaved }: CustomerDrawerCon
       footer={isEditing ? editFooter : reviewFooter}
     >
       {!isEditing && isExistingCustomer ? (
-        <CustomerReviewDetails customer={customer} />
+        <CustomerReviewDetails customer={customer} canManage={canManage} />
       ) : (
         <div className="customerDrawer customerDrawer--edit">
           <DetailsSection title="פרטים כלליים">
@@ -402,9 +403,10 @@ function CustomerDrawerContent({ customer, onClose, onSaved }: CustomerDrawerCon
 
 interface CustomerReviewDetailsProps {
   customer: Customer;
+  canManage: boolean;
 }
 
-function CustomerReviewDetails({ customer }: CustomerReviewDetailsProps) {
+function CustomerReviewDetails({ customer, canManage }: CustomerReviewDetailsProps) {
   const areRelatedQueriesEnabled = true;
 
   const projectsQuery = useQuery({
@@ -431,12 +433,6 @@ function CustomerReviewDetails({ customer }: CustomerReviewDetailsProps) {
     enabled: areRelatedQueriesEnabled,
   });
 
-  const sitesQuery = useQuery({
-    queryKey: ['customers', 'related', 'sites'],
-    queryFn: getSitesAsync,
-    enabled: areRelatedQueriesEnabled,
-  });
-
   // ProjectListItem carries customerName only (no customerId), so projects are
   // matched by the customer's exact name.
   const customerName = customer.customerName.trim();
@@ -449,9 +445,6 @@ function CustomerReviewDetails({ customer }: CustomerReviewDetailsProps) {
   );
   const relatedContacts = (contactsQuery.data ?? []).filter(
     (contact) => contact.customerId === customer.customerId,
-  );
-  const relatedSites = (sitesQuery.data ?? []).filter(
-    (site) => site.customerId === customer.customerId,
   );
 
   return (
@@ -615,27 +608,7 @@ function CustomerReviewDetails({ customer }: CustomerReviewDetailsProps) {
         <RelatedOverflowNote total={relatedContacts.length} />
       </RelatedSection>
 
-      <RelatedSection
-        title="אתרים"
-        count={sitesQuery.data ? relatedSites.length : null}
-        isLoading={sitesQuery.isLoading}
-        isError={sitesQuery.isError}
-        isUnavailable={!areRelatedQueriesEnabled}
-        emptyText="אין אתרים מקושרים ללקוח זה."
-      >
-        <ul className="customerDrawer__relatedList">
-          {relatedSites.slice(0, MAX_RELATED_ITEMS).map((site) => (
-            <li key={site.siteId} className="customerDrawer__relatedItem">
-              <span className="customerDrawer__relatedPrimary">{site.siteName}</span>
-              <span className="customerDrawer__relatedMeta">
-                {[site.city, site.addressLine].filter(Boolean).join(' · ')}
-              </span>
-              {site.isPrimary && <Badge variant="primary">ראשי</Badge>}
-            </li>
-          ))}
-        </ul>
-        <RelatedOverflowNote total={relatedSites.length} />
-      </RelatedSection>
+      <CustomerSitesSection customerId={customer.customerId} canManage={canManage} />
     </div>
   );
 }

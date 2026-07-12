@@ -53,6 +53,37 @@ public class SiteRepository : ISiteRepository
         }
     }
 
+    public async Task<IEnumerable<Site>> GetByCustomerIdAsync(int customerId)
+    {
+        var sites = new List<Site>();
+        try
+        {
+            await using var connection = _dbServices.CreateConnection();
+            await using var command = new SqlCommand("dbo.sp_GetSitesByCustomerId", connection)
+            {
+                CommandType = CommandType.StoredProcedure
+            };
+            command.Parameters.AddWithValue("@CustomerId", customerId);
+
+            await connection.OpenAsync();
+            await using var reader = await command.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                sites.Add(MapSite(reader));
+            }
+
+            return sites;
+        }
+        catch (SqlException ex)
+        {
+            _logger.LogError(
+                ex,
+                "GetByCustomerIdAsync failed with SQL error for CustomerId={CustomerId}.",
+                customerId);
+            throw new UserValidationException("Failed to retrieve sites for the selected customer.", ex);
+        }
+    }
+
     // sp_GetSiteById: single-site read.
     public async Task<Site?> GetByIdAsync(int siteId)
     {
