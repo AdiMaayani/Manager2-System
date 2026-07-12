@@ -10,15 +10,19 @@ namespace ManageR2.UnitTests;
 public class GeoapifyClientTests
 {
     [Fact]
-    public void Constructor_Throws_WhenApiKeyMissing()
+    public async Task AutocompleteAsync_ThrowsProviderUnavailable_WhenApiKeyMissing()
     {
         var httpClient = new HttpClient { BaseAddress = new Uri("https://api.geoapify.com/") };
         var configuration = new ConfigurationBuilder().Build();
+        var client = new GeoapifyClient(
+            httpClient,
+            configuration,
+            NullLogger<GeoapifyClient>.Instance);
 
-        var exception = Assert.Throws<InvalidOperationException>(() =>
-            new GeoapifyClient(httpClient, configuration, NullLogger<GeoapifyClient>.Instance));
+        var exception = await Assert.ThrowsAsync<GeoProviderUnavailableException>(() =>
+            client.AutocompleteAsync("Tel Aviv", CancellationToken.None));
 
-        Assert.Contains("API key", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("not configured", exception.Message, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("test-key", exception.Message);
     }
 

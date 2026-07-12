@@ -272,7 +272,10 @@ builder.Services.AddHttpClient<GeoapifyClient>(client =>
 {
     client.BaseAddress = new Uri("https://api.geoapify.com/");
     client.Timeout = TimeSpan.FromSeconds(20);
-});
+})
+// Geoapify authenticates through a query parameter. Disable the default HttpClient
+// URI logger so the server-side key cannot appear in application logs.
+.RemoveAllLoggers();
 builder.Services.AddScoped<IGeoService, GeoService>();
 builder.Services.AddScoped<IEmployeeBaseAddressRepository, EmployeeBaseAddressRepository>();
 builder.Services.AddScoped<ISiteAddressProfileRepository, SiteAddressProfileRepository>();

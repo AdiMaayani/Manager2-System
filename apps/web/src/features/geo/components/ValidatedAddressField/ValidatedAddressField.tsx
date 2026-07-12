@@ -72,9 +72,9 @@ export function ValidatedAddressField({
 
   const autocompleteProviderError =
     canAutocomplete && suggestionsQuery.error instanceof ApiError && suggestionsQuery.error.status === 503
-      ? 'שירות האימות אינו זמין כרגע. נסו שוב מאוחר יותר.'
+      ? 'שירות הצעות הכתובת אינו זמין כרגע. אפשר להמשיך בהקלדה ידנית ולשמור.'
       : canAutocomplete && suggestionsQuery.error
-        ? 'אירעה שגיאה בטעינת הצעות הכתובת.'
+        ? 'טעינת הצעות הכתובת נכשלה. אפשר להמשיך בהקלדה ידנית ולשמור.'
         : null;
 
   const providerError = validateProviderError ?? autocompleteProviderError;
@@ -121,9 +121,11 @@ export function ValidatedAddressField({
       if (controller.signal.aborted) return;
       if (requestVersion !== requestVersionRef.current) return;
       if (err instanceof ApiError && err.status === 503) {
-        setValidateProviderError('שירות האימות אינו זמין כרגע. הכתובת לא נשמרה כמאומתת.');
+        setValidateProviderError(
+          'שירות אימות הכתובת אינו זמין כרגע. הכתובת תישמר כפי שהוקלדה.',
+        );
       } else {
-        setValidateProviderError('אימות הכתובת נכשל.');
+        setValidateProviderError('אימות הכתובת נכשל. הכתובת תישמר כפי שהוקלדה.');
       }
       onChange({
         ...clearValidationState(value, selectedText),
