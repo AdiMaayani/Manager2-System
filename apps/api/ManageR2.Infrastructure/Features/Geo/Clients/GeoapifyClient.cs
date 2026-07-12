@@ -20,8 +20,7 @@ public class GeoapifyClient
     {
         _httpClient = httpClient;
         _logger = logger;
-        _apiKey = configuration["Geoapify:ApiKey"]
-            ?? throw new InvalidOperationException("Geoapify API key is missing.");
+        _apiKey = configuration["Geoapify:ApiKey"]?.Trim() ?? string.Empty;
     }
 
     public async Task<List<AddressSuggestionModel>> AutocompleteAsync(string text, CancellationToken cancellationToken)
@@ -30,6 +29,7 @@ public class GeoapifyClient
         {
             return [];
         }
+        EnsureConfigured();
 
         var encodedText = Uri.EscapeDataString(text.Trim());
         var path = $"v1/geocode/autocomplete?text={encodedText}&filter=countrycode:il&lang=he&limit=5&apiKey={_apiKey}";
@@ -58,6 +58,7 @@ public class GeoapifyClient
         {
             return Invalid("לא הוזנה כתובת.");
         }
+        EnsureConfigured();
 
         var encodedText = Uri.EscapeDataString(text.Trim());
         var path = $"v1/geocode/search?text={encodedText}&filter=countrycode:il&lang=he&limit=5&apiKey={_apiKey}";
@@ -186,6 +187,15 @@ public class GeoapifyClient
     }
 
     private static bool ContainsDigit(string value) => value.Any(char.IsDigit);
+
+    private void EnsureConfigured()
+    {
+        if (string.IsNullOrWhiteSpace(_apiKey))
+        {
+            _logger.LogWarning("Geoapify request skipped because the provider is not configured");
+            throw new GeoProviderUnavailableException("Address autocomplete is not configured.");
+        }
+    }
 
     private static ValidatedAddressModel Invalid(string message)
     {
