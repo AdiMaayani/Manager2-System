@@ -424,6 +424,12 @@ export function getSitesAsync(): Promise<Site[]> {
   return apiRequest<Site[]>('/Sites');
 }
 
+export function getSitesByCustomerIdAsync(customerId: number): Promise<Site[]> {
+  return apiRequest<Site[]>(
+    `/Sites?customerId=${encodeURIComponent(customerId)}`,
+  );
+}
+
 export function createSiteAsync(body: CreateSiteRequest): Promise<Site> {
   return apiRequest<Site>('/Sites', {
     method: 'POST',

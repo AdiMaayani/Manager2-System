@@ -15,6 +15,16 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
+    IF EXISTS
+    (
+        SELECT 1
+        FROM dbo.Sites
+        WHERE SiteId = @SiteId
+          AND IsActive = 1
+          AND CustomerId <> @CustomerId
+    )
+        THROW 51450, 'Reassigning a site to another customer is not allowed.', 1;
+
     UPDATE dbo.Sites
     SET
         CustomerId = @CustomerId,

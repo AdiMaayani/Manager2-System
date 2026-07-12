@@ -23,10 +23,47 @@
 
 ## Git
 
-- Do not run Git commands.
-- Do not commit, push, branch, merge, reset, restore, or stash.
-- The user performs all Git operations.
+Agents may run read-only Git commands, including:
 
+- `git status`
+- `git diff`
+- `git log`
+- `git show`
+- `git branch --show-current`
+- `git ls-files`
+- `git check-ignore`
+
+Agents may run `git add` and `git commit` only when the user explicitly requests Git staging or commit creation in the current conversation.
+
+Before every commit, the agent must:
+
+1. Confirm the current branch.
+2. Inspect `git diff --cached`.
+3. Verify that only the intended files and hunks are staged.
+4. Verify that no secrets, generated files, unrelated changes, or prohibited provider/migration code are staged.
+5. Use small, atomic commits.
+6. Preserve unrelated local changes.
+
+Unless the user explicitly authorizes the specific operation in the current conversation, agents must not run:
+
+- `git push`
+- `git pull`
+- `git fetch`
+- `git merge`
+- `git rebase`
+- `git switch`
+- `git checkout`
+- `git reset`
+- `git restore`
+- `git clean`
+- `git stash`
+- `git tag`
+- `git cherry-pick`
+- commit amendment
+- branch creation or deletion
+- force operations
+
+Agents must never bypass hooks or use `--force` or `--no-verify` without explicit user authorization.
 ## Database safety
 
 - Do not execute migrations or stored procedures unless explicitly instructed.

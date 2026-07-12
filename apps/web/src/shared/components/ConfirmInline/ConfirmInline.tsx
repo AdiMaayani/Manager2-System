@@ -12,6 +12,7 @@ interface ConfirmInlineProps {
   cancelLabel?: string;
   onConfirm: () => void;
   isPending?: boolean;
+  isDisabled?: boolean;
   /** Visual tone of the action (defaults to destructive). */
   variant?: 'danger' | 'primary';
 }
@@ -27,13 +28,19 @@ export function ConfirmInline({
   cancelLabel = 'חזור',
   onConfirm,
   isPending = false,
+  isDisabled = false,
   variant = 'danger',
 }: ConfirmInlineProps) {
   const [isConfirming, setIsConfirming] = useState(false);
 
   if (!isConfirming) {
     return (
-      <Button type="button" variant={variant} onClick={() => setIsConfirming(true)}>
+      <Button
+        type="button"
+        variant={variant}
+        onClick={() => setIsConfirming(true)}
+        disabled={isDisabled}
+      >
         {triggerLabel}
       </Button>
     );

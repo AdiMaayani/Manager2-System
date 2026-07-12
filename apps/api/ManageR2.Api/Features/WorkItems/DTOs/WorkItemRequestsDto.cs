@@ -138,6 +138,24 @@ public class WorkItemReportTargetDto
     public string Title { get; set; } = string.Empty;
     public string TaskCategory { get; set; } = string.Empty;
     public int? CustomerId { get; set; }
+    public string? CustomerName { get; set; }
     public int? SiteId { get; set; }
+    public string? SiteName { get; set; }
     public int? ProjectId { get; set; }
+    public string? ProjectTitle { get; set; }
+    public DateTime? PlannedStart { get; set; }
+    public DateTime? PlannedEnd { get; set; }
+    public string? RequiredRole { get; set; }
+    public List<WorkItemReportAssignmentDto> Assignments { get; set; } = new();
+}
+
+public class WorkItemReportAssignmentDto
+{
+    public int EmployeeId { get; set; }
+    public string EmployeeName { get; set; } = string.Empty;
+    public string? AssignmentRole { get; set; }
+    public bool IsManualAssignment { get; set; }
+    public string AssignmentSource { get; set; } = string.Empty;
+    public bool IsActive { get; set; }
+    public bool IsAssignable { get; set; }
 }

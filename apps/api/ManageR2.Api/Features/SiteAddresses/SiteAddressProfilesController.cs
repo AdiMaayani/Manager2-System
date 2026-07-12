@@ -32,7 +32,7 @@ public class SiteAddressProfilesController : ControllerBase
         return Ok(AddressProfileMapping.ToDto(profile));
     }
 
-    [Authorize(Policy = Policies.CanManageProjects)]
+    [Authorize(Policy = Policies.CanManageSites)]
     [HttpPost("with-address-profile")]
     public async Task<ActionResult<SiteWithAddressProfileResponseDto>> CreateWithAddressProfile(
         [FromBody] SaveSiteWithAddressProfileRequestDto request)
@@ -44,7 +44,7 @@ public class SiteAddressProfilesController : ControllerBase
             AddressProfileMapping.ToSiteResponse(saved));
     }
 
-    [Authorize(Policy = Policies.CanManageProjects)]
+    [Authorize(Policy = Policies.CanManageSites)]
     [HttpPut("{siteId:int}/with-address-profile")]
     public async Task<ActionResult<SiteWithAddressProfileResponseDto>> UpdateWithAddressProfile(
         int siteId,

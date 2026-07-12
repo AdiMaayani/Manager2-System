@@ -17,7 +17,11 @@ import {
   isWorkPlanStatusInProgress,
 } from '../../constants';
 import { formatHourAsTime } from '../../lib/workPlanScheduling';
-import type { WorkPlanTaskSelection } from '../../types';
+import type {
+  WorkPlanEmployee,
+  WorkPlanScheduleAssignment,
+  WorkPlanTaskSelection,
+} from '../../types';
 import { getTaskCategoryLabel } from '@shared/constants/taskCategories';
 import {
   taskCategoryModifierClass,
@@ -30,6 +34,7 @@ import {
   writeQuickReportPrefill,
   type QuickReportPrefill,
 } from '@features/reports/quickReportPrefill';
+import { resolveQuickReportWorkers } from '@features/reports/quickReportWorkers';
 
 type BadgeVariant = ComponentProps<typeof Badge>['variant'];
 
@@ -51,6 +56,8 @@ interface WorkPlanTaskPanelProps {
   onClose: () => void;
   canEdit: boolean;
   canDeleteTask: boolean;
+  assignments: WorkPlanScheduleAssignment[];
+  employees: WorkPlanEmployee[];
   onTaskUpdated: () => void;
 }
 
@@ -59,6 +66,8 @@ export function WorkPlanTaskPanel({
   onClose,
   canEdit,
   canDeleteTask,
+  assignments,
+  employees,
   onTaskUpdated,
 }: WorkPlanTaskPanelProps) {
   const navigate = useNavigate();
@@ -90,6 +99,27 @@ export function WorkPlanTaskPanel({
     const reportDate = task.plannedStart
       ? localDateKeyFromUtc(task.plannedStart)
       : new Date().toISOString().slice(0, 10);
+    const employeesById = new Map(employees.map((employee) => [employee.employeeId, employee]));
+    const workerSelection = resolveQuickReportWorkers(
+      assignments
+        .filter((assignment) => assignment.workItemId === task.taskId)
+        .map((assignment) => {
+          const employee =
+            assignment.employeeId != null
+              ? employeesById.get(assignment.employeeId)
+              : undefined;
+          return {
+            employeeId: assignment.employeeId,
+            employeeName: assignment.employeeName,
+            assignmentRole: assignment.assignmentRole,
+            isManualAssignment: assignment.isManualAssignment,
+            assignmentSource: assignment.assignmentSource,
+            isActive: employee?.isActive === true,
+            isAssignable: employee?.isAssignable === true,
+          };
+        }),
+      task.assigneeEmployeeId ? Number(task.assigneeEmployeeId) : null,
+    );
     const prefill: QuickReportPrefill = {
       workItemId: task.taskId,
       taskCategory: task.taskCategory ?? 'Regular',
@@ -97,9 +127,11 @@ export function WorkPlanTaskPanel({
       date: reportDate,
       start: task.plannedStart ? localTimeFromUtc(task.plannedStart) : formatHourAsTime(task.startHour),
       end: task.plannedEnd ? localTimeFromUtc(task.plannedEnd) : formatHourAsTime(task.endHour),
-      reporterId: task.assigneeEmployeeId ? Number(task.assigneeEmployeeId) : null,
-      reporterName: task.assigneeName !== '—' ? task.assigneeName : '',
-      reporterRole: task.requiredRole || '',
+      reporterId: workerSelection.reporterId,
+      reporterName:
+        workerSelection.reporterName || (task.assigneeName !== '—' ? task.assigneeName : ''),
+      reporterRole: workerSelection.reporterRole || task.requiredRole || '',
+      relatedWorkerIds: workerSelection.relatedWorkerIds,
       customerName: task.customerName ?? undefined,
       site: task.siteName ?? undefined,
       projectId: task.projectId,

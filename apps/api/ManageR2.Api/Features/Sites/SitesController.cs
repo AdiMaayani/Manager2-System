@@ -24,9 +24,16 @@ public class SitesController : ControllerBase
 
     // List all sites for dropdowns and site management pages.
     [HttpGet]
-    public async Task<IActionResult> GetAll()
+    public async Task<IActionResult> GetAll([FromQuery] int? customerId = null)
     {
-        var sites = await _repository.GetAllAsync();
+        if (customerId.HasValue && customerId.Value <= 0)
+        {
+            return BadRequest(new { message = "CustomerId must be greater than zero." });
+        }
+
+        var sites = customerId.HasValue
+            ? await _repository.GetByCustomerIdAsync(customerId.Value)
+            : await _repository.GetAllAsync();
 
         var result = sites.Select(site => new SiteDto
         {
@@ -70,7 +77,7 @@ public class SitesController : ControllerBase
     }
 
     // Create site under a valid customer; repository assigns timestamps and enforces referential rules.
-    [Authorize(Policy = Policies.CanManageProjects)]
+    [Authorize(Policy = Policies.CanManageSites)]
     [HttpPost]
     public async Task<IActionResult> Create([FromBody] SiteDto dto)
     {
@@ -107,7 +114,7 @@ public class SitesController : ControllerBase
     }
 
     // Update site fields; full replace pattern on entity loaded from repository before save.
-    [Authorize(Policy = Policies.CanManageProjects)]
+    [Authorize(Policy = Policies.CanManageSites)]
     [HttpPut("{id:int}")]
     public async Task<IActionResult> Update(int id, [FromBody] SiteDto dto)
     {
@@ -117,7 +124,14 @@ public class SitesController : ControllerBase
             return NotFound(new { message = $"Site with id {id} was not found." });
         }
 
-        existing.CustomerId = dto.CustomerId;
+        if (existing.CustomerId != dto.CustomerId)
+        {
+            return BadRequest(new
+            {
+                message = "A site cannot be moved to another customer. Create a new site for that customer."
+            });
+        }
+
         existing.SiteName = dto.SiteName;
         existing.AddressLine = dto.AddressLine;
         existing.City = dto.City;
@@ -151,7 +165,7 @@ public class SitesController : ControllerBase
         });
     }
 
-    [Authorize(Policy = Policies.CanManageProjects)]
+    [Authorize(Policy = Policies.CanManageSites)]
     [HttpDelete("{id:int}")]
     public async Task<IActionResult> Deactivate(int id)
     {

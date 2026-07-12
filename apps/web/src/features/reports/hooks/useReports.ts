@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   amendWorkReportAsync,
+  buildReverseWorkReportRequest,
   finalizeWorkReportAsync,
   getReportByIdAsync,
   getReportsAsync,
@@ -42,7 +43,7 @@ export function useReverseReport() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: ({ reportId, reason }: { reportId: number; reason: string }) =>
-      reverseWorkReportAsync(reportId, { reason }),
+      reverseWorkReportAsync(reportId, buildReverseWorkReportRequest(reason)),
     onSuccess: async (_data, { reportId }) => {
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: REPORTS_INVALIDATION.list }),

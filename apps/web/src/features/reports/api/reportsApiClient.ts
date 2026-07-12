@@ -13,6 +13,7 @@ import type {
   WorkReportDetails,
   WorkReportDetailsResponse,
   WorkReportInventoryLine,
+  WorkReportLifecycleResponse,
   WorkReportListItem,
   WorkReportListItemResponse,
 } from '../types';
@@ -215,20 +216,26 @@ export function deleteWorkReportAsync(id: number): Promise<void> {
   return apiRequest<void>(`/Reports/${id}`, { method: 'DELETE' });
 }
 
-export function finalizeWorkReportAsync(id: number): Promise<WorkReportDetails> {
-  return apiRequest<WorkReportDetailsResponse>(`/Reports/${id}/finalize`, {
+export function finalizeWorkReportAsync(id: number): Promise<WorkReportLifecycleResponse> {
+  return apiRequest<WorkReportLifecycleResponse>(`/Reports/${id}/finalize`, {
     method: 'POST',
-  }).then(mapWorkReportDetails);
+  });
+}
+
+export function buildReverseWorkReportRequest(
+  reversalReason: string,
+): ReverseWorkReportRequest {
+  return { reversalReason };
 }
 
 export function reverseWorkReportAsync(
   id: number,
   request: ReverseWorkReportRequest,
-): Promise<WorkReportDetails> {
-  return apiRequest<WorkReportDetailsResponse>(`/Reports/${id}/reverse`, {
+): Promise<WorkReportLifecycleResponse> {
+  return apiRequest<WorkReportLifecycleResponse>(`/Reports/${id}/reverse`, {
     method: 'POST',
     body: JSON.stringify(request),
-  }).then(mapWorkReportDetails);
+  });
 }
 
 export function amendWorkReportAsync(id: number): Promise<WorkReportDetails> {

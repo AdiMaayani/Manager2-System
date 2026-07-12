@@ -178,22 +178,35 @@
   background: var(--color-neutral-50);
 }
 
-.reportsPage__quickTargetLabel {
+.reportsPage__quickTargetTitle {
   margin: 0;
-  font-size: var(--font-size-sm);
-  color: var(--color-neutral-600);
-}
-
-.reportsPage__quickTargetValue {
-  margin: 0;
-  font-weight: var(--font-weight-semibold);
   font-size: var(--font-size-md);
+  color: var(--color-neutral-900);
 }
 
-.reportsPage__quickTargetMeta {
+.reportsPage__quickTargetContext {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: var(--spacing-sm) var(--spacing-lg);
   margin: 0;
-  font-size: var(--font-size-sm);
+}
+
+.reportsPage__quickTargetContext div {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.reportsPage__quickTargetContext dt {
   color: var(--color-neutral-600);
+  font-size: var(--font-size-xs);
+}
+
+.reportsPage__quickTargetContext dd {
+  margin: 0;
+  color: var(--color-neutral-900);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
 }
 
 .reportsPage__targetType {

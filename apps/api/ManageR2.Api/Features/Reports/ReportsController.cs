@@ -82,7 +82,7 @@ public class ReportsController : ControllerBase
 
         if (WorkReportLifecyclePolicy.IsReadOnly(existingReport.LifecycleStatus))
         {
-            return BadRequest(new { message = "Reversed reports are read-only." });
+            return BadRequest(new { message = "לא ניתן לערוך דיווח שהוחזר לטיוטה." });
         }
 
         var model = MapToUpdateModel(id, request);
@@ -132,7 +132,23 @@ public class ReportsController : ControllerBase
         }
         catch (Exception ex) when (ex.Message.Contains("51341") || ex.Message.Contains("cannot be finalized"))
         {
-            return BadRequest(new { message = ex.Message });
+            return BadRequest(new { message = "לא ניתן לסיים דיווח שהוחזר לטיוטה." });
+        }
+        catch (Exception ex) when (ex.Message.Contains("51340") || ex.Message.Contains("Work report not found"))
+        {
+            return NotFound(new { message = $"דיווח מספר {id} לא נמצא." });
+        }
+        catch (Exception ex) when (
+            ex.Message.Contains("51332") ||
+            ex.Message.Contains("51334") ||
+            ex.Message.Contains("Insufficient or inactive inventory") ||
+            ex.Message.Contains("already has usage movements"))
+        {
+            var message = ex.Message.Contains("51332") ||
+                          ex.Message.Contains("Insufficient or inactive inventory")
+                ? "לא ניתן לסיים את הדיווח: המלאי אינו מספיק או שאחד מפריטי המלאי אינו פעיל."
+                : "לא ניתן לסיים את הדיווח משום שכבר קיימות עבורו תנועות מלאי לא תקינות.";
+            return BadRequest(new { message });
         }
     }
 
@@ -152,7 +168,26 @@ public class ReportsController : ControllerBase
         }
         catch (Exception ex) when (ex.Message.Contains("51350") || ex.Message.Contains("51352"))
         {
-            return BadRequest(new { message = ex.Message });
+            var message = ex.Message.Contains("51352") || ex.Message.Contains("Draft")
+                ? "לא ניתן להחזיר לטיוטה דיווח שכבר נמצא בטיוטה."
+                : "יש להזין סיבה להחזרת הדיווח לטיוטה.";
+            return BadRequest(new { message });
+        }
+        catch (Exception ex) when (ex.Message.Contains("51351") || ex.Message.Contains("Work report not found"))
+        {
+            return NotFound(new { message = $"דיווח מספר {id} לא נמצא." });
+        }
+        catch (Exception ex) when (
+            ex.Message.Contains("51333") ||
+            ex.Message.Contains("51335") ||
+            ex.Message.Contains("51336") ||
+            ex.Message.Contains("during reversal") ||
+            ex.Message.Contains("Cannot reverse"))
+        {
+            return BadRequest(new
+            {
+                message = "לא ניתן להחזיר את הדיווח לטיוטה משום שתנועות המלאי שלו אינן תקינות."
+            });
         }
     }
 
@@ -168,7 +203,7 @@ public class ReportsController : ControllerBase
 
         if (!string.Equals(reversedReport.LifecycleStatus, WorkReportLifecycleStatuses.Reversed, StringComparison.Ordinal))
         {
-            return BadRequest(new { message = "Only reversed reports can be amended." });
+            return BadRequest(new { message = "ניתן ליצור דיווח מתקן רק מדיווח שהוחזר לטיוטה." });
         }
 
         var model = new WorkReportCreateModel
@@ -223,7 +258,7 @@ public class ReportsController : ControllerBase
         }
         catch (Exception ex) when (ex.Message.Contains("51300") || ex.Message.Contains("Draft"))
         {
-            return BadRequest(new { message = "Inventory lines are editable only on Draft reports." });
+            return BadRequest(new { message = "ניתן לערוך שורות מלאי רק בדיווח שנמצא בטיוטה." });
         }
     }
 
@@ -243,7 +278,7 @@ public class ReportsController : ControllerBase
         }
         catch (Exception ex) when (ex.Message.Contains("51310"))
         {
-            return BadRequest(new { message = "Inventory lines are editable only on Draft reports." });
+            return BadRequest(new { message = "ניתן לערוך שורות מלאי רק בדיווח שנמצא בטיוטה." });
         }
     }
 
@@ -260,7 +295,7 @@ public class ReportsController : ControllerBase
 
         if (!WorkReportLifecyclePolicy.CanEditAttachments(existingReport.LifecycleStatus))
         {
-            return BadRequest(new { message = "Attachments cannot be changed on reversed reports." });
+            return BadRequest(new { message = "לא ניתן לשנות קבצים בדיווח שהוחזר לטיוטה." });
         }
 
         var validationError = _attachmentStorageService.ValidateAttachmentFile(file);
@@ -318,7 +353,7 @@ public class ReportsController : ControllerBase
 
         if (!WorkReportLifecyclePolicy.CanEditAttachments(existingReport.LifecycleStatus))
         {
-            return BadRequest(new { message = "Attachments cannot be changed on reversed reports." });
+            return BadRequest(new { message = "לא ניתן לשנות קבצים בדיווח שהוחזר לטיוטה." });
         }
 
         var deleted = await _workReportRepository.DeleteAttachmentAsync(id, attachmentId);

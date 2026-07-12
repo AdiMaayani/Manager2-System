@@ -27,7 +27,7 @@ export const mainNavItems: NavItem[] = [
   { path: '/', label: 'לוח בקרה', icon: LayoutDashboard },
   { path: '/workplan', label: 'תוכנית עבודה', icon: CalendarDays, requiredPermission: 'viewWorkPlan' },
   { path: '/projects', label: 'פרויקטים', icon: FolderKanban, requiredPermission: 'viewProjects' },
-  { path: '/service-calls', label: 'שירות', icon: Wrench, requiredPermission: 'viewServiceCalls' },
+  { path: '/service-calls', label: 'קריאות שירות', icon: Wrench, requiredPermission: 'viewServiceCalls' },
   { path: '/customers', label: 'לקוחות', icon: Users, requiredPermission: 'viewCustomers' },
   { path: '/contacts', label: 'אנשי קשר', icon: Contact, requiredPermission: 'viewContacts' },
   { path: '/quotes', label: 'הצעות מחיר', icon: FileText, requiredPermission: 'viewQuotes' },
