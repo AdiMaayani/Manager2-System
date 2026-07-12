@@ -18,9 +18,14 @@ public sealed class CreateProjectMilestoneRequestDtoValidator
             .GreaterThan(0).WithMessage("ManagerEmployeeId is required.");
 
         RuleFor(request => request)
-            .Must(request => !request.PlannedStart.HasValue || !request.PlannedEnd.HasValue || request.PlannedEnd > request.PlannedStart)
+            .Must(request => request.PlannedStart.HasValue == request.PlannedEnd.HasValue)
             .WithName(nameof(CreateProjectMilestoneRequestDto.PlannedEnd))
-            .WithMessage("PlannedEnd must be after PlannedStart.");
+            .WithMessage("PlannedStart and PlannedEnd must both be supplied or both be null.");
+
+        RuleFor(request => request)
+            .Must(request => !request.PlannedStart.HasValue || !request.PlannedEnd.HasValue || request.PlannedEnd >= request.PlannedStart)
+            .WithName(nameof(CreateProjectMilestoneRequestDto.PlannedEnd))
+            .WithMessage("PlannedEnd must be on or after PlannedStart.");
     }
 }
 
@@ -43,9 +48,19 @@ public sealed class UpdateProjectMilestoneRequestDtoValidator
             .WithMessage("ManagerEmployeeId must be greater than 0 when supplied.");
 
         RuleFor(request => request)
-            .Must(request => !request.PlannedStart.HasValue || !request.PlannedEnd.HasValue || request.PlannedEnd > request.PlannedStart)
+            .Must(request => request.PlannedStart.HasValue == request.PlannedEnd.HasValue)
             .WithName(nameof(UpdateProjectMilestoneRequestDto.PlannedEnd))
-            .WithMessage("PlannedEnd must be after PlannedStart.");
+            .WithMessage("PlannedStart and PlannedEnd must both be supplied or both be null.");
+
+        RuleFor(request => request)
+            .Must(request => !request.PlannedStart.HasValue || !request.PlannedEnd.HasValue || request.PlannedEnd >= request.PlannedStart)
+            .WithName(nameof(UpdateProjectMilestoneRequestDto.PlannedEnd))
+            .WithMessage("PlannedEnd must be on or after PlannedStart.");
+
+        RuleFor(request => request)
+            .Must(request => request.ActualStart.HasValue == request.ActualEnd.HasValue)
+            .WithName(nameof(UpdateProjectMilestoneRequestDto.ActualEnd))
+            .WithMessage("ActualStart and ActualEnd must both be supplied or both be null.");
 
         RuleFor(request => request)
             .Must(request => !request.ActualStart.HasValue || !request.ActualEnd.HasValue || request.ActualEnd > request.ActualStart)

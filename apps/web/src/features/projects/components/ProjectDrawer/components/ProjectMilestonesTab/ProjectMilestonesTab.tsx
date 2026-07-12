@@ -24,6 +24,7 @@ import {
   formatProjectDate,
   toDateInputValue,
 } from '../../../../utils/projectDisplayUtils';
+import { validateProjectMilestoneDateRange } from '../../../../utils/projectMilestoneDateRange';
 import './ProjectMilestonesTab.css';
 
 interface ProjectMilestonesTabProps {
@@ -95,14 +96,6 @@ function buildUpdateMilestoneRequest(form: ProjectMilestoneForm): UpdateMileston
   };
 }
 
-function validateDateRange(start: string, end: string): string | undefined {
-  if (!start || !end) return undefined;
-  if (end < start) {
-    return 'תאריך הסיום חייב להיות אחרי או שווה לתאריך ההתחלה.';
-  }
-  return undefined;
-}
-
 export function ProjectMilestonesTab({
   projectId,
   lifecycle,
@@ -141,8 +134,16 @@ export function ProjectMilestonesTab({
     });
   }, [lifecycle?.milestones, milestonesQuery.data]);
 
-  const plannedDateError = validateDateRange(form.plannedStart, form.plannedEnd);
-  const actualDateError = validateDateRange(form.actualStart, form.actualEnd);
+  const plannedDateError = validateProjectMilestoneDateRange(
+    form.plannedStart,
+    form.plannedEnd,
+    true,
+  );
+  const actualDateError = validateProjectMilestoneDateRange(
+    form.actualStart,
+    form.actualEnd,
+    false,
+  );
   const hasDateValidationError = Boolean(plannedDateError || actualDateError);
 
   const handleMoveMilestone = async (milestoneId: number, direction: 'up' | 'down') => {
