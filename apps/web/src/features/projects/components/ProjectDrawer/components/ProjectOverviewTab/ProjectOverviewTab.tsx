@@ -103,7 +103,6 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
   });
   const [editSiteNotes, setEditSiteNotes] = useState('');
   const [siteError, setSiteError] = useState<string | null>(null);
-  const [employeeToAddId, setEmployeeToAddId] = useState('');
 
   const project = lifecycle?.project;
   const projectId = project?.workItemId;
@@ -335,8 +334,8 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
     [onCustomerCreated],
   );
 
-  const handleAddTeamMember = useCallback(() => {
-    const employeeId = Number(employeeToAddId);
+  const handleAddTeamMember = useCallback((value: string) => {
+    const employeeId = Number(value);
     if (!Number.isInteger(employeeId) || employeeId <= 0) return;
     if (employeeId === teamForm.projectManagerEmployeeId) return;
     if (selectedTeamEmployeeIds.has(employeeId)) return;
@@ -345,8 +344,7 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
       ...teamForm,
       teamEmployeeIds: [...teamForm.teamEmployeeIds, employeeId],
     });
-    setEmployeeToAddId('');
-  }, [employeeToAddId, onTeamChange, selectedTeamEmployeeIds, teamForm]);
+  }, [onTeamChange, selectedTeamEmployeeIds, teamForm]);
 
   const handleRemoveTeamMember = useCallback((employeeId: number) => {
     onTeamChange({
@@ -708,8 +706,8 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
               <div className="projectOverviewTab__teamEditor">
                 <div className="projectOverviewTab__teamAdd">
                   <Select
-                    value={employeeToAddId}
-                    onChange={(event) => setEmployeeToAddId(event.target.value)}
+                    value=""
+                    onChange={(event) => handleAddTeamMember(event.target.value)}
                     aria-label="בחר עובד להוספה לצוות"
                   >
                     <option value="">בחר עובד להוספה</option>
@@ -720,14 +718,6 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
                       </option>
                     ))}
                   </Select>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={handleAddTeamMember}
-                    disabled={!employeeToAddId}
-                  >
-                    הוסף עובד
-                  </Button>
                 </div>
 
                 {selectedTeamMembers.length > 0 ? (
@@ -750,7 +740,9 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
                     ))}
                   </div>
                 ) : (
-                  <p className="projectOverviewTab__hint">לא נבחרו עובדים לצוות.</p>
+                  <p className="projectOverviewTab__hint">
+                    לא נוספו חברי צוות. מנהל הפרויקט נשמר בנפרד.
+                  </p>
                 )}
               </div>
             ) : (
@@ -761,9 +753,10 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
               </span>
             )}
           </div>
-          {isEditMode && !isCreateMode && (
+          {isEditMode && (
             <p className="projectOverviewTab__hint">
-              שיוך צוות נשמר עם הפרויקט ומחליף את שיוכי העובדים ברמת הפרויקט בלבד.
+              מנהל הפרויקט וחברי הצוות הם שיוכים נפרדים. בחירת חבר צוות מוסיפה
+              אותו מיד לרשימה, ושמירת הפרויקט שולחת את שני סוגי השיוך ללא כפילויות.
               שיוכי משימות וקבלנים אינם משתנים.
             </p>
           )}
