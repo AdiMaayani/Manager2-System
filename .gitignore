@@ -46,3 +46,15 @@ apps/api/ManageR2.Api/wwwroot/uploads/inventory/*
 
 # ── Legacy reference clone (read-only, not part of monorepo) ──
 _temp/
+
+# ── Required reviewed SQL deployment patches ─────
+# Local .git/info/exclude may ignore deployment/ broadly. Keep only the
+# approved shared-blocker patches visible without exposing other artifacts.
+!database/deployment/
+database/deployment/*
+!database/deployment/patches/
+database/deployment/patches/*
+!database/deployment/patches/2026-07-12_allow_same_day_project_milestones.sql
+!database/deployment/patches/2026-07-12_fix_workreport_lifecycle_result_contract.sql
+!database/deployment/patches/2026-07-12_prevent_site_customer_reassignment.sql
+!database/deployment/patches/2026-07-12_add_customer_scoped_sites.sql
