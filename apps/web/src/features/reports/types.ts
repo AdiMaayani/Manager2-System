@@ -33,10 +33,23 @@ export interface WorkItemReportTarget {
   siteId?: number | null;
   projectId?: number | null;
   plannedStart?: string | null;
+  plannedEnd?: string | null;
+  requiredRole?: string | null;
   assigneeName?: string | null;
   customerName?: string | null;
   siteName?: string | null;
   projectTitle?: string | null;
+  assignments?: WorkItemReportAssignment[];
+}
+
+export interface WorkItemReportAssignment {
+  employeeId: number;
+  employeeName: string;
+  assignmentRole?: string | null;
+  isManualAssignment: boolean;
+  assignmentSource: string;
+  isActive: boolean;
+  isAssignable: boolean;
 }
 
 export interface ReportProjectOption {

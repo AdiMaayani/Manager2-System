@@ -80,19 +80,60 @@ public class WorkItemsController : ControllerBase
     {
         var tasks = await _workItemRepository.GetByTypeAsync(WorkItemWorkTypes.Task);
         var serviceCalls = await _workItemRepository.GetByTypeAsync(WorkItemWorkTypes.ServiceCall);
+        var projects = await _workItemRepository.GetByTypeAsync(WorkItemWorkTypes.Project);
+        var projectsById = projects.ToDictionary(project => project.WorkItemId);
+        var schedule = await _workItemRepository.GetWorkPlanScheduleAsync(new WorkPlanScheduleQuery
+        {
+            Scope = "company",
+            IncludeUnscheduled = true
+        });
+        var employeesById = schedule.Employees.ToDictionary(employee => employee.EmployeeId);
+        var assignmentsByWorkItemId = schedule.Assignments
+            .Where(assignment => assignment.EmployeeId.HasValue)
+            .GroupBy(assignment => assignment.WorkItemId)
+            .ToDictionary(
+                assignments => assignments.Key,
+                assignments => assignments.Select(assignment =>
+                {
+                    var employee = employeesById.GetValueOrDefault(assignment.EmployeeId!.Value);
+                    return new WorkItemReportAssignmentDto
+                    {
+                        EmployeeId = assignment.EmployeeId.Value,
+                        EmployeeName = assignment.EmployeeName ?? employee?.FullName ?? string.Empty,
+                        AssignmentRole = assignment.AssignmentRole,
+                        IsManualAssignment = assignment.IsManualAssignment,
+                        AssignmentSource = assignment.AssignmentSource ?? "Task",
+                        IsActive = employee?.IsActive == true,
+                        IsAssignable = employee?.IsAssignable == true
+                    };
+                }).ToList());
 
         var targets = tasks
             .Where(task => !task.IsArchived &&
                            (task.TaskCategory == WorkItemTaskCategories.Regular ||
                             task.TaskCategory == WorkItemTaskCategories.Project))
-            .Select(task => new WorkItemReportTargetDto
+            .Select(task =>
             {
-                WorkItemId = task.WorkItemId,
-                Title = task.Title,
-                TaskCategory = task.TaskCategory ?? WorkItemTaskCategories.Regular,
-                CustomerId = task.CustomerId,
-                SiteId = task.SiteId,
-                ProjectId = task.ParentWorkItemId
+                var parentProject = task.ParentWorkItemId.HasValue
+                    ? projectsById.GetValueOrDefault(task.ParentWorkItemId.Value)
+                    : null;
+
+                return new WorkItemReportTargetDto
+                {
+                    WorkItemId = task.WorkItemId,
+                    Title = task.Title,
+                    TaskCategory = task.TaskCategory ?? WorkItemTaskCategories.Regular,
+                    CustomerId = task.CustomerId ?? parentProject?.CustomerId,
+                    CustomerName = task.CustomerName ?? parentProject?.CustomerName,
+                    SiteId = task.SiteId ?? parentProject?.SiteId,
+                    SiteName = task.SiteName ?? parentProject?.SiteName,
+                    ProjectId = task.ParentWorkItemId,
+                    ProjectTitle = parentProject?.Title,
+                    PlannedStart = task.PlannedStart,
+                    PlannedEnd = task.PlannedEnd,
+                    RequiredRole = task.RequiredRole,
+                    Assignments = assignmentsByWorkItemId.GetValueOrDefault(task.WorkItemId) ?? []
+                };
             })
             .Concat(serviceCalls
                 .Where(call => !call.IsArchived)
@@ -102,8 +143,14 @@ public class WorkItemsController : ControllerBase
                     Title = call.Title,
                     TaskCategory = WorkItemTaskCategories.ServiceCall,
                     CustomerId = call.CustomerId,
+                    CustomerName = call.CustomerName,
                     SiteId = call.SiteId,
-                    ProjectId = null
+                    SiteName = call.SiteName,
+                    ProjectId = null,
+                    PlannedStart = call.PlannedStart,
+                    PlannedEnd = call.PlannedEnd,
+                    RequiredRole = call.RequiredRole,
+                    Assignments = assignmentsByWorkItemId.GetValueOrDefault(call.WorkItemId) ?? []
                 }))
             .OrderBy(target => target.Title, StringComparer.OrdinalIgnoreCase)
             .ToList();

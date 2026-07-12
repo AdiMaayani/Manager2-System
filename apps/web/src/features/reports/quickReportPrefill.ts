@@ -1,3 +1,7 @@
+import { localDateKeyFromUtc, localTimeFromUtc } from '@shared/utils/utcDateTime';
+import type { WorkItemReportTarget } from './types';
+import { resolveQuickReportWorkers } from './quickReportWorkers';
+
 export const QUICK_REPORT_STORAGE_KEY = 'manager2_quick_report_prefill';
 
 export interface QuickReportPrefill {
@@ -10,6 +14,7 @@ export interface QuickReportPrefill {
   reporterId?: number | null;
   reporterName?: string;
   reporterRole?: string;
+  relatedWorkerIds?: number[];
   customerName?: string;
   site?: string;
   projectId?: number | null;
@@ -41,6 +46,13 @@ export function readQuickReportPrefill(raw: string | null): QuickReportPrefill |
       reporterId: parsed.reporterId ?? null,
       reporterName: parsed.reporterName,
       reporterRole: parsed.reporterRole,
+      relatedWorkerIds: Array.from(
+        new Set(
+          (parsed.relatedWorkerIds ?? [])
+            .map(Number)
+            .filter((employeeId) => Number.isInteger(employeeId) && employeeId > 0),
+        ),
+      ),
       customerName: parsed.customerName,
       site: parsed.site,
       projectId: parsed.projectId ?? null,
@@ -53,4 +65,46 @@ export function readQuickReportPrefill(raw: string | null): QuickReportPrefill |
 
 export function writeQuickReportPrefill(prefill: QuickReportPrefill): void {
   sessionStorage.setItem(QUICK_REPORT_STORAGE_KEY, JSON.stringify(prefill));
+}
+
+export function enrichQuickReportPrefill(
+  prefill: QuickReportPrefill,
+  target: WorkItemReportTarget,
+): QuickReportPrefill {
+  const targetAssignments = target.assignments;
+  const hasAssignmentContract = targetAssignments !== undefined;
+  const targetWorkers = targetAssignments
+    ? resolveQuickReportWorkers(targetAssignments, prefill.reporterId)
+    : null;
+
+  return {
+    ...prefill,
+    taskCategory: target.taskCategory,
+    title: prefill.title || target.title,
+    date:
+      prefill.date ||
+      (target.plannedStart ? localDateKeyFromUtc(target.plannedStart) : undefined),
+    start:
+      prefill.start ||
+      (target.plannedStart ? localTimeFromUtc(target.plannedStart) : undefined),
+    end:
+      prefill.end ||
+      (target.plannedEnd ? localTimeFromUtc(target.plannedEnd) : undefined),
+    reporterId: hasAssignmentContract
+      ? targetWorkers?.reporterId ?? null
+      : prefill.reporterId ?? null,
+    reporterName:
+      (hasAssignmentContract ? targetWorkers?.reporterName : prefill.reporterName) ||
+      target.assigneeName ||
+      undefined,
+    reporterRole:
+      targetWorkers?.reporterRole || prefill.reporterRole || target.requiredRole || undefined,
+    relatedWorkerIds: hasAssignmentContract
+      ? targetWorkers?.relatedWorkerIds ?? []
+      : prefill.relatedWorkerIds ?? [],
+    customerName: prefill.customerName || target.customerName || undefined,
+    site: prefill.site || target.siteName || undefined,
+    projectId: target.projectId ?? prefill.projectId ?? null,
+    projectTitle: prefill.projectTitle || target.projectTitle || undefined,
+  };
 }
