@@ -7,6 +7,8 @@ public interface ISiteRepository
 {
     Task<IEnumerable<Site>> GetAllAsync();
 
+    Task<IEnumerable<Site>> GetByCustomerIdAsync(int customerId);
+
     Task<Site?> GetByIdAsync(int siteId);
 
     Task<int> CreateAsync(Site site);

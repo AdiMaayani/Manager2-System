@@ -58,6 +58,7 @@ import {
   createEmptyOverviewForm,
   overviewFormFromLifecycle,
 } from '../../utils/projectDisplayUtils';
+import { getCreatedProjectSiteSelection } from '../../utils/projectSiteSelection';
 import { ProjectBoqTab } from './components/ProjectBoqTab';
 import { ProjectDrawingsTab } from './components/ProjectDrawingsTab';
 import { ProjectEquipmentTab } from './components/ProjectEquipmentTab';
@@ -131,7 +132,7 @@ export function ProjectDrawer({
     isCreateMode ? null : projectId,
     !isEditMode,
   );
-  const lookups = useProjectLookups();
+  const lookups = useProjectLookups(overviewForm.customerId || null);
   const createProject = useCreateProject();
   const updateProject = useUpdateProject();
   const milestoneMutations = useMilestoneMutations(projectId);
@@ -247,7 +248,10 @@ export function ProjectDrawer({
         notes: payload.notes,
         addressProfile: payload.addressProfile,
       });
-      setOverviewForm((current) => ({ ...current, siteId: saved.siteId }));
+      setOverviewForm((current) => ({
+        ...current,
+        siteId: getCreatedProjectSiteSelection(payload.customerId, saved),
+      }));
       await refetchLookups();
     },
     [refetchLookups],

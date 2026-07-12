@@ -10,7 +10,7 @@ import {
   getProjectEmployeesAsync,
   getProjectLifecycleAsync,
   getProjectMilestonesAsync,
-  getSitesAsync,
+  getSitesByCustomerIdAsync,
   syncProjectEmployeeAssignmentsAsync,
   updateMilestoneAsync,
   updateProjectAsync,
@@ -86,15 +86,19 @@ export function useProjectMilestones(projectId: number | null, enabled = true) {
   });
 }
 
-export function useProjectLookups() {
+export function useProjectLookups(customerId?: number | null) {
   const customersQuery = useQuery({
     queryKey: ['projectLookups', 'customers'],
     queryFn: getCustomersAsync,
   });
 
   const sitesQuery = useQuery({
-    queryKey: ['projectLookups', 'sites'],
-    queryFn: getSitesAsync,
+    queryKey: ['projectLookups', 'sites', customerId ?? null],
+    queryFn: () =>
+      customerId != null && customerId > 0
+        ? getSitesByCustomerIdAsync(customerId)
+        : Promise.resolve([]),
+    enabled: customerId != null && customerId > 0,
   });
 
   const employeesQuery = useQuery({
