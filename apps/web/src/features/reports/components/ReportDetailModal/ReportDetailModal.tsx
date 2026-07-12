@@ -190,6 +190,7 @@ export function ReportDetailModal({
   function handleClose() {
     setDeleteError(null);
     setActionError(null);
+    setReverseReason('');
     setIsMaximized(false);
     onClose();
   }
@@ -311,7 +312,7 @@ export function ReportDetailModal({
               </ul>
             )}
             {!canEditInventory && report.lifecycleStatus === 'Finalized' && (
-              <p className="reportDetailModal__hint">שורות המלאי נעולות לאחר סופק.</p>
+              <p className="reportDetailModal__hint">שורות המלאי נעולות לאחר סיום הדיווח.</p>
             )}
           </section>
 
@@ -360,26 +361,31 @@ export function ReportDetailModal({
 
           {canReverseReport(report.lifecycleStatus) && (
             <section className="reportDetailModal__section">
-              <h3>החזרת מלאי (Reverse)</h3>
+              <h3>החזרת הדיווח לטיוטה</h3>
               <Textarea
-                label="סיבת החזרה"
+                label="סיבת ההחזרה לטיוטה"
                 value={reverseReason}
                 onChange={(e) => setReverseReason(e.target.value)}
                 rows={2}
               />
-              <Button
-                type="button"
-                variant="secondary"
-                disabled={!reverseReason.trim() || reverseReport.isPending}
-                onClick={() =>
+              <ConfirmInline
+                triggerLabel="החזר לטיוטה"
+                message="החזרת הדיווח לטיוטה תבטל את תנועות המלאי שנוצרו עבורו. להמשיך?"
+                confirmLabel="אישור החזרה לטיוטה"
+                isDisabled={!reverseReason.trim()}
+                isPending={reverseReport.isPending}
+                onConfirm={() =>
                   reverseReport.mutate(
                     { reportId: report.reportId, reason: reverseReason.trim() },
-                    { onError: (err) => setActionError(err instanceof Error ? err.message : 'ההחזרה נכשלה') },
+                    {
+                      onError: (err) =>
+                        setActionError(
+                          err instanceof Error ? err.message : 'החזרת הדיווח לטיוטה נכשלה',
+                        ),
+                    },
                   )
                 }
-              >
-                החזר מלאי
-              </Button>
+              />
             </section>
           )}
 
@@ -394,18 +400,21 @@ export function ReportDetailModal({
                 </Button>
               )}
               {canFinalizeReport(report.lifecycleStatus) && (
-                <Button
-                  type="button"
-                  onClick={() =>
+                <ConfirmInline
+                  triggerLabel="סיים דיווח"
+                  message="סיום הדיווח יעדכן את תנועות המלאי ויגביל את עריכת פרטי הדיווח. להמשיך?"
+                  confirmLabel="אישור סיום דיווח"
+                  variant="primary"
+                  onConfirm={() =>
                     finalizeReport.mutate(report.reportId, {
                       onError: (err) =>
-                        setActionError(err instanceof Error ? err.message : 'סופק נכשל'),
+                        setActionError(
+                          err instanceof Error ? err.message : 'סיום הדיווח נכשל',
+                        ),
                     })
                   }
-                  isLoading={finalizeReport.isPending}
-                >
-                  סופק (Finalize)
-                </Button>
+                  isPending={finalizeReport.isPending}
+                />
               )}
               {canAmendReport(report.lifecycleStatus) && (
                 <Button
@@ -414,7 +423,7 @@ export function ReportDetailModal({
                   onClick={() => amendReport.mutate(report.reportId)}
                   isLoading={amendReport.isPending}
                 >
-                  תיקון (Amend)
+                  צור דיווח מתקן
                 </Button>
               )}
               {canEditText && (

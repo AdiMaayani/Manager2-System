@@ -27,7 +27,6 @@ import {
   buildReportTargetListOption,
   createWorkReportAsync,
   filterReportTargetsByType,
-  formatReportTargetDescription,
   getReportEmployeesAsync,
   getReportTargetsAsync,
   REPORT_TARGETS_QUERY_KEY,
@@ -79,12 +78,6 @@ const REPORT_TARGET_SEARCH_LABELS: Record<ReportTypeValue, string> = {
   regular: 'חפש ובחר משימה כללית',
   project: 'חפש ובחר משימת פרויקט',
   service_call: 'חפש ובחר קריאת שירות',
-};
-
-const QUICK_REPORT_TARGET_LABELS: Record<ReportTypeValue, string> = {
-  regular: 'משימה לדיווח',
-  project: 'משימת פרויקט לדיווח',
-  service_call: 'קריאת שירות לדיווח',
 };
 
 const REPORT_TARGET_EMPTY_MESSAGES: Record<ReportTypeValue, string> = {
@@ -739,15 +732,34 @@ export function ReportsPage() {
                 <div className="reportsPage__targetSelection">
                   {isQuickReportPrefill && selectedTarget ? (
                     <div className="reportsPage__quickTarget">
-                      <p className="reportsPage__quickTargetLabel">
-                        {QUICK_REPORT_TARGET_LABELS[form.reportTargetType]}
-                      </p>
-                      <p className="reportsPage__quickTargetValue">{selectedTarget.title}</p>
-                      {formatReportTargetDescription(selectedTarget) && (
-                        <p className="reportsPage__quickTargetMeta">
-                          {formatReportTargetDescription(selectedTarget)}
-                        </p>
-                      )}
+                      <h4 className="reportsPage__quickTargetTitle">מקור הדיווח</h4>
+                      <dl className="reportsPage__quickTargetContext">
+                        {selectedTarget.customerName && (
+                          <div>
+                            <dt>לקוח</dt>
+                            <dd>{selectedTarget.customerName}</dd>
+                          </div>
+                        )}
+                        {selectedTarget.siteName && (
+                          <div>
+                            <dt>אתר</dt>
+                            <dd>{selectedTarget.siteName}</dd>
+                          </div>
+                        )}
+                        {(selectedTarget.projectTitle || selectedTarget.projectId != null) && (
+                          <div>
+                            <dt>פרויקט</dt>
+                            <dd>
+                              {selectedTarget.projectTitle ||
+                                `פרויקט #${selectedTarget.projectId}`}
+                            </dd>
+                          </div>
+                        )}
+                        <div>
+                          <dt>משימה</dt>
+                          <dd>{selectedTarget.title}</dd>
+                        </div>
+                      </dl>
                       <Button
                         type="button"
                         variant="ghost"
