@@ -1,4 +1,5 @@
 using ManageR2.Domain.Entities;
+using ManageR2.Domain.Exceptions;
 using ManageR2.Infrastructure.DAL.Providers;
 using ManageR2.Infrastructure.Repositories;
 using Microsoft.Extensions.Logging;
@@ -48,6 +49,23 @@ public sealed class SiteRepositoryRouter : ISiteRepository
         return result;
     }
 
+    public async Task<IEnumerable<Site>> GetByCustomerIdAsync(int customerId)
+    {
+        var result = await Primary.GetByCustomerIdAsync(customerId);
+
+        if (_resolver.ShadowRead is not null)
+        {
+            var materialized = result as ICollection<Site> ?? result.ToList();
+            result = materialized;
+            await ShadowCompareAsync(
+                "Sites.GetByCustomerId",
+                materialized,
+                () => _postgres.GetByCustomerIdAsync(customerId));
+        }
+
+        return result;
+    }
+
     public async Task<Site?> GetByIdAsync(int siteId)
     {
         var result = await Primary.GetByIdAsync(siteId);
@@ -74,11 +92,32 @@ public sealed class SiteRepositoryRouter : ISiteRepository
 
     public async Task<bool> UpdateAsync(Site site)
     {
+        // Primary failures (including ownership violations) propagate unchanged.
         var result = await Primary.UpdateAsync(site);
 
         if (_resolver.DualWrite is not null)
         {
-            await DualWriteAsync("Sites.Update", () => _postgres.UpdateAsync(site));
+            // Best-effort secondary write: Postgres ownership guard still runs, and a mismatch is
+            // logged clearly before DualWriteAsync records the failure without failing the primary.
+            await DualWriteAsync("Sites.Update", async () =>
+            {
+                try
+                {
+                    await _postgres.UpdateAsync(site);
+                }
+                catch (UserValidationException ex) when (
+                    ex.Message.Contains(
+                        "Reassigning a site to another customer is not allowed",
+                        StringComparison.Ordinal))
+                {
+                    _logger.LogWarning(
+                        ex,
+                        "Secondary PostgreSQL dual-write ownership mismatch for Sites.Update SiteId={SiteId} CustomerId={CustomerId}.",
+                        site.SiteId,
+                        site.CustomerId);
+                    throw;
+                }
+            });
         }
 
         return result;

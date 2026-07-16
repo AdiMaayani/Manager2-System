@@ -40,6 +40,35 @@ public class SiteOwnershipSqlContractTests
         Assert.Contains("THROW 51450", sql);
     }
 
+    [Fact]
+    public void PostgresSiteRepository_GetByCustomerId_UsesCustomerScopedSqlFilter()
+    {
+        var source = File.ReadAllText(GetRepoRelativePath(
+            "apps/api/ManageR2.Infrastructure/Features/Sites/Repositories/PostgresSiteRepository.cs"));
+
+        Assert.Contains("GetByCustomerIdAsync(int customerId)", source);
+        Assert.Contains("WHERE \"CustomerId\" = @CustomerId", source);
+        Assert.Contains("AND \"IsActive\" = true", source);
+    }
+
+    [Fact]
+    public void PostgresSiteRepository_UpdateAsync_RejectsCustomerReassignment()
+    {
+        var source = File.ReadAllText(GetRepoRelativePath(
+            "apps/api/ManageR2.Infrastructure/Features/Sites/Repositories/PostgresSiteRepository.cs"));
+
+        Assert.Contains("FOR UPDATE", source);
+        Assert.Contains("\"CustomerId\" <> @CustomerId::int", source);
+        Assert.Contains("ownership_violation", source);
+        Assert.Contains("Reassigning a site to another customer is not allowed", source);
+        Assert.Contains("UPDATE \"Sites\" AS s SET", source);
+        Assert.DoesNotContain(
+            """
+                                "CustomerId"  = @CustomerId::int,
+            """,
+            source);
+    }
+
     private static string GetRepoRelativePath(string relativePath)
     {
         var current = new DirectoryInfo(AppContext.BaseDirectory);

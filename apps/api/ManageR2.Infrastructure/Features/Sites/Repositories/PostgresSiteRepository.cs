@@ -9,11 +9,13 @@ using Npgsql;
 namespace ManageR2.Infrastructure.Features.Sites.Repositories;
 
 // PostgreSQL implementation of the site contract (migration target). Reproduces sp_GetSites /
-// sp_GetSiteById / sp_CreateSite / sp_UpdateSite / sp_DeactivateSite against the translated "Sites"
-// table. Notable fidelity points preserved from the SQL Server procedures:
+// sp_GetSitesByCustomerId / sp_GetSiteById / sp_CreateSite / sp_UpdateSite / sp_DeactivateSite against
+// the translated "Sites" table. Notable fidelity points preserved from the SQL Server procedures:
 //   - reads and writes filter on IsActive = true (soft-delete model);
+//   - customer-scoped reads filter on CustomerId in SQL (no in-memory filtering of GetAll);
 //   - CreatedAt uses server local time (SYSDATETIME) while UpdatedAt/DeletedAt use UTC (SYSUTCDATETIME);
 //   - string columns are stored as-is (no trim/NULLIF, unlike customers/contacts);
+//   - Update rejects customer reassignment (mirrors THROW 51450 / sp_UpdateSite ownership guard);
 //   - Deactivate is blocked when open work items reference the site, mirroring THROW 51010.
 public sealed class PostgresSiteRepository : ISiteRepository
 {
@@ -61,6 +63,39 @@ public sealed class PostgresSiteRepository : ISiteRepository
         {
             _logger.LogError(ex, "Postgres GetAllAsync failed for Sites.");
             throw new UserValidationException("Failed to retrieve sites from the database.", ex);
+        }
+    }
+
+    public async Task<IEnumerable<Site>> GetByCustomerIdAsync(int customerId)
+    {
+        var sites = new List<Site>();
+        try
+        {
+            await using var connection = _connectionFactory.CreateConnection();
+            await using var command = connection.CreateCommand();
+            // Mirrors sp_GetSitesByCustomerId: CustomerId + IsActive filter, primary-first ordering.
+            command.CommandText = $"""
+                SELECT {SiteColumns}
+                FROM "Sites"
+                WHERE "CustomerId" = @CustomerId
+                  AND "IsActive" = true
+                ORDER BY "IsPrimary" DESC, "SiteName", "SiteId"
+                """;
+            AddParameter(command, "@CustomerId", customerId);
+
+            await connection.OpenAsync();
+            await using var reader = await command.ExecuteReaderAsync();
+            while (await reader.ReadAsync())
+            {
+                sites.Add(MapSite(reader));
+            }
+
+            return sites;
+        }
+        catch (DbException ex)
+        {
+            _logger.LogError(ex, "Postgres GetByCustomerIdAsync failed for CustomerId={CustomerId}.", customerId);
+            throw new UserValidationException("Failed to retrieve sites for the selected customer.", ex);
         }
     }
 
@@ -134,18 +169,37 @@ public sealed class PostgresSiteRepository : ISiteRepository
         {
             await using var connection = _connectionFactory.CreateConnection();
             await using var command = connection.CreateCommand();
+            // Atomic ownership guard: lock the active row, reject CustomerId changes (THROW 51450
+            // parity), and update non-ownership fields only when the persisted customer matches.
             command.CommandText =
                 """
-                UPDATE "Sites" SET
-                    "CustomerId"  = @CustomerId::int,
-                    "SiteName"    = @SiteName::text,
-                    "AddressLine" = @AddressLine::text,
-                    "City"        = @City::text,
-                    "IsPrimary"   = @IsPrimary::boolean,
-                    "Notes"       = @Notes::text,
-                    "UpdatedAt"   = (now() at time zone 'utc')
-                WHERE "SiteId" = @SiteId::int
-                  AND "IsActive" = true
+                WITH locked AS (
+                    SELECT "SiteId", "CustomerId"
+                    FROM "Sites"
+                    WHERE "SiteId" = @SiteId::int
+                      AND "IsActive" = true
+                    FOR UPDATE
+                ),
+                updated AS (
+                    UPDATE "Sites" AS s SET
+                        "SiteName"    = @SiteName::text,
+                        "AddressLine" = @AddressLine::text,
+                        "City"        = @City::text,
+                        "IsPrimary"   = @IsPrimary::boolean,
+                        "Notes"       = @Notes::text,
+                        "UpdatedAt"   = (now() at time zone 'utc')
+                    FROM locked
+                    WHERE s."SiteId" = locked."SiteId"
+                      AND locked."CustomerId" = @CustomerId::int
+                    RETURNING s."SiteId"
+                )
+                SELECT CASE
+                    WHEN EXISTS (
+                        SELECT 1 FROM locked WHERE "CustomerId" <> @CustomerId::int
+                    ) THEN 'ownership_violation'
+                    WHEN EXISTS (SELECT 1 FROM updated) THEN 'updated'
+                    ELSE 'not_found'
+                END
                 """;
 
             AddParameter(command, "@SiteId", site.SiteId);
@@ -157,8 +211,22 @@ public sealed class PostgresSiteRepository : ISiteRepository
             AddParameter(command, "@Notes", (object?)site.Notes ?? DBNull.Value);
 
             await connection.OpenAsync();
-            var rowsAffected = await command.ExecuteNonQueryAsync();
-            return rowsAffected > 0;
+            var outcome = Convert.ToString(await command.ExecuteScalarAsync());
+
+            if (string.Equals(outcome, "ownership_violation", StringComparison.Ordinal))
+            {
+                _logger.LogWarning(
+                    "Postgres UpdateAsync rejected customer reassignment for SiteId={SiteId}, CustomerId={CustomerId}.",
+                    site.SiteId,
+                    site.CustomerId);
+                throw new UserValidationException("Reassigning a site to another customer is not allowed.");
+            }
+
+            return string.Equals(outcome, "updated", StringComparison.Ordinal);
+        }
+        catch (UserValidationException)
+        {
+            throw;
         }
         catch (PostgresException ex) when (ex.SqlState is "23503" or "23514")
         {
