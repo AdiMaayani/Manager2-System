@@ -1,11 +1,11 @@
-﻿# ג”€ג”€ Node ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
+# ── Node ──────────────────────────────────────────
 node_modules/
 dist/
 dist-ssr/
 .cache/
 *.local
 
-# ג”€ג”€ Dotnet ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
+# ── Dotnet ────────────────────────────────────────
 bin/
 obj/
 *.dll
@@ -14,13 +14,13 @@ obj/
 *.nupkg
 packages/
 
-# ג”€ג”€ Visual Studio / Rider ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
+# ── Visual Studio / Rider ─────────────────────────
 .vs/
 *.user
 *.suo
 .idea/
 
-# ג”€ג”€ Environment / secrets ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
+# ── Environment / secrets ─────────────────────────
 .env
 .env.*
 !.env.example
@@ -28,45 +28,28 @@ appsettings.Development.json
 appsettings.Production.json
 appsettings.*.local.json
 
-# ג”€ג”€ Logs ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
+# ── Logs ──────────────────────────────────────────
 *.log
 logs/
 
-# ג”€ג”€ OS ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
+# ── OS ────────────────────────────────────────────
 .DS_Store
 Thumbs.db
 
-# ג”€ג”€ Vite / build artefacts ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€ג”€
+# ── Vite / build artefacts ────────────────────────
 apps/web/dist/
 apps/web/.vite/
 
-# ג”€ג”€ Uploaded runtime assets (keep folders, ignore uploaded files) ג”€ג”€
+# ── Uploaded runtime assets (keep folders, ignore uploaded files) ──
 apps/api/ManageR2.Api/wwwroot/uploads/inventory/*
 !apps/api/ManageR2.Api/wwwroot/uploads/inventory/.gitkeep
 
-# ג”€ג”€ Legacy reference clone (read-only, not part of monorepo) ג”€ג”€
+# ── Legacy reference clone (read-only, not part of monorepo) ──
 _temp/
-<<<<<<< HEAD
 # Runtime application data
 apps/api/ManageR2.Api/App_Data/
-=======
-
-# ג”€ג”€ Required reviewed SQL deployment patches ג”€ג”€ג”€ג”€ג”€
-# Local .git/info/exclude may ignore deployment/ broadly. Keep only the
-# approved shared-blocker patches visible without exposing other artifacts.
-!database/deployment/
-database/deployment/*
-!database/deployment/patches/
-database/deployment/patches/*
-!database/deployment/patches/2026-07-12_allow_same_day_project_milestones.sql
-!database/deployment/patches/2026-07-12_fix_workreport_lifecycle_result_contract.sql
-!database/deployment/patches/2026-07-12_prevent_site_customer_reassignment.sql
-!database/deployment/patches/2026-07-12_add_customer_scoped_sites.sql
->>>>>>> 303827b (test: validate approved deployment patch contracts)
-
-# ── Required reviewed SQL deployment patches ─────
-# Local .git/info/exclude may ignore deployment/ broadly. Keep only the
-# approved shared-blocker patches visible without exposing other artifacts.
+# Required reviewed SQL deployment patches
+# Keep only the approved shared-blocker patches visible.
 !database/deployment/
 database/deployment/*
 !database/deployment/patches/
