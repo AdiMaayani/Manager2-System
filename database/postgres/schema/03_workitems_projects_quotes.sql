@@ -110,7 +110,7 @@ CREATE TABLE IF NOT EXISTS "ProjectMilestones" (
     CONSTRAINT "CK_ProjectMilestones_SortOrder" CHECK ("SortOrder" >= 0),
     CONSTRAINT "CK_ProjectMilestones_PlannedRange" CHECK (
         ("PlannedStart" IS NULL AND "PlannedEnd" IS NULL) OR
-        ("PlannedStart" IS NOT NULL AND "PlannedEnd" IS NOT NULL AND "PlannedEnd" > "PlannedStart")
+        ("PlannedStart" IS NOT NULL AND "PlannedEnd" IS NOT NULL AND "PlannedEnd" >= "PlannedStart")
     ),
     CONSTRAINT "CK_ProjectMilestones_ActualRange" CHECK (
         ("ActualStart" IS NULL AND "ActualEnd" IS NULL) OR

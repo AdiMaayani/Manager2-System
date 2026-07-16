@@ -166,9 +166,17 @@ public class ReportsController : ControllerBase
 
             return Ok(MapLifecycle(result));
         }
-        catch (Exception ex) when (ex.Message.Contains("51350") || ex.Message.Contains("51352"))
+        catch (Exception ex) when (
+            ex.Message.Contains("51350", StringComparison.Ordinal) ||
+            ex.Message.Contains("51352", StringComparison.Ordinal) ||
+            ex.Message.Contains("A Draft report cannot be reversed", StringComparison.Ordinal) ||
+            ex.Message.Contains("Reversal reason is required", StringComparison.Ordinal))
         {
-            var message = ex.Message.Contains("51352") || ex.Message.Contains("Draft")
+            // SQL Server wraps THROW codes into the message; PostgreSQL emits the English text only.
+            var isDraftError =
+                ex.Message.Contains("51352", StringComparison.Ordinal) ||
+                ex.Message.Contains("A Draft report cannot be reversed", StringComparison.Ordinal);
+            var message = isDraftError
                 ? "לא ניתן להחזיר לטיוטה דיווח שכבר נמצא בטיוטה."
                 : "יש להזין סיבה להחזרת הדיווח לטיוטה.";
             return BadRequest(new { message });
