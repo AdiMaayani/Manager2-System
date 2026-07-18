@@ -161,13 +161,23 @@
   color: var(--color-neutral-500);
 }
 
-.projectOverviewTab__siteForm {
-  display: grid;
+.projectOverviewTab__customerAccessActions {
+  display: flex;
+  flex-wrap: wrap;
   gap: var(--spacing-sm);
-  padding: var(--spacing-md);
-  border: 1px solid var(--color-neutral-200);
-  border-radius: var(--radius-md);
-  background: var(--color-neutral-50);
+  margin-top: var(--spacing-xs);
+}
+
+.projectOverviewTab__customerLoadError {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+}
+
+.projectOverviewTab__siteManageAction {
+  display: flex;
+  margin-top: var(--spacing-xs);
 }
 
 .projectOverviewTab__sitePreview {
@@ -185,12 +195,6 @@
 .projectOverviewTab__sitePreview strong {
   color: var(--color-neutral-900);
   font-size: var(--font-size-base);
-}
-
-.projectOverviewTab__siteActions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--spacing-sm);
 }
 
 @media (max-width: 768px) {

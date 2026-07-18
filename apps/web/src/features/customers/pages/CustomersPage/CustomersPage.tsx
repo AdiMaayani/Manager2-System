@@ -123,7 +123,7 @@ export function CustomersPage() {
       align: 'center',
       cell: (customer) => (
         <Badge variant={customer.isActive ? 'success' : 'neutral'}>
-          {customer.status ?? (customer.isActive ? 'פעיל' : 'לא פעיל')}
+          {customer.isActive ? 'פעיל' : 'לא פעיל'}
         </Badge>
       ),
     },

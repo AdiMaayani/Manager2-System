@@ -5,7 +5,6 @@ import type {
   CreateProjectDrawingRequest,
   CreateProjectEquipmentItemRequest,
   CreateProjectRequest,
-  CreateSiteRequest,
   ProjectEmployeeOption,
   ProjectBoqItem,
   ProjectDrawing,
@@ -22,7 +21,6 @@ import type {
   UpdateProjectDrawingRequest,
   UpdateProjectEquipmentItemRequest,
   UpdateProjectRequest,
-  UpdateSiteRequest,
   UploadProjectDrawingRequest,
 } from '../types';
 
@@ -428,26 +426,6 @@ export function getSitesByCustomerIdAsync(customerId: number): Promise<Site[]> {
   return apiRequest<Site[]>(
     `/Sites?customerId=${encodeURIComponent(customerId)}`,
   );
-}
-
-export function createSiteAsync(body: CreateSiteRequest): Promise<Site> {
-  return apiRequest<Site>('/Sites', {
-    method: 'POST',
-    body: JSON.stringify(body),
-  });
-}
-
-export function updateSiteAsync(siteId: number, body: UpdateSiteRequest): Promise<Site> {
-  return apiRequest<Site>(`/Sites/${siteId}`, {
-    method: 'PUT',
-    body: JSON.stringify({ ...body, siteId }),
-  });
-}
-
-export function deactivateSiteAsync(siteId: number): Promise<void> {
-  return apiRequest<void>(`/Sites/${siteId}`, {
-    method: 'DELETE',
-  });
 }
 
 export function getProjectEmployeesAsync(): Promise<ProjectEmployeeOption[]> {

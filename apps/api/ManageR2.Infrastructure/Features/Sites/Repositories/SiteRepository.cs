@@ -266,6 +266,19 @@ public class SiteRepository : ISiteRepository
 
             return deactivated;
         }
+        // sp_DeactivateSite throws 51010 when open WorkItems still reference the site. Surface a
+        // precise Hebrew business message (HTTP 400 via UserValidationException) without leaking
+        // SQL error numbers or the English SP text to the client.
+        catch (SqlException ex) when (ex.Number == 51010)
+        {
+            _logger.LogWarning(
+                ex,
+                "DeactivateAsync rejected for SiteId={SiteId}: site is referenced by open work items.",
+                siteId);
+            throw new UserValidationException(
+                "לא ניתן להשבית אתר שמשויך לפרויקט, משימה או קריאת שירות פתוחים. יש לסגור את העבודות הפתוחות או לשייך אותן לאתר אחר לפני ההשבתה.",
+                ex);
+        }
         catch (SqlException ex)
         {
             _logger.LogError(ex, "DeactivateAsync failed with SQL error for SiteId={SiteId}.", siteId);
