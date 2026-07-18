@@ -10,7 +10,6 @@ import { RelatedSection } from '@shared/components/RelatedSection';
 import { Input } from '@shared/components/Input';
 import { Select } from '@shared/components/Select';
 import { Textarea } from '@shared/components/Textarea';
-import { Checkbox } from '@shared/components/Checkbox';
 import { InlineAlert } from '@shared/components/InlineAlert';
 import { ConfirmInline } from '@shared/components/ConfirmInline';
 import { usePermissions } from '@shared/auth/usePermissions';
@@ -24,7 +23,13 @@ import { getServiceCallsAsync } from '@features/serviceCalls/api/serviceCallsApi
 import { getContactsAsync } from '@features/contacts/api/contactsApiClient';
 import { CustomerVaultSection } from '@features/customerSystems';
 import { useCustomerMutations } from '../../hooks/useCustomers';
-import type { Customer, CreateCustomerRequest } from '../../types';
+import {
+  buildCreateCustomerRequest,
+  buildOrdinaryUpdateCustomerRequest,
+  buildRestoreCustomerRequest,
+  type CustomerEditableFields,
+} from '../../lib/customerRequestMapping';
+import type { Customer } from '../../types';
 import { CustomerSitesSection } from '../CustomerSitesSection';
 import './CustomerDrawer.css';
 
@@ -57,17 +62,7 @@ interface CustomerDrawerProps {
   customer?: Customer | null;
 }
 
-interface CustomerFormState {
-  customerName: string;
-  customerType: string;
-  primaryPhone: string;
-  primaryEmail: string;
-  city: string;
-  region: string;
-  address: string;
-  notes: string;
-  isActive: boolean;
-}
+type CustomerFormState = CustomerEditableFields;
 
 function buildInitialState(customer: Customer | null): CustomerFormState {
   return {
@@ -79,7 +74,6 @@ function buildInitialState(customer: Customer | null): CustomerFormState {
     region: customer?.region ?? '',
     address: customer?.address ?? '',
     notes: customer?.notes ?? '',
-    isActive: customer?.isActive ?? true,
   };
 }
 
@@ -168,20 +162,9 @@ function CustomerDrawerContent({ customer, onClose, onSaved }: CustomerDrawerCon
 
     setError(null);
 
-    const request: CreateCustomerRequest = {
-      customerName: form.customerName.trim(),
-      customerType: form.customerType,
-      primaryPhone: form.primaryPhone.trim() || undefined,
-      primaryEmail: form.primaryEmail.trim() || undefined,
-      city: form.city.trim() || undefined,
-      region: form.region.trim() || undefined,
-      address: form.address.trim() || undefined,
-      // The textual status mirrors the single isActive control so the badge
-      // and the boolean never disagree.
-      status: form.isActive ? 'פעיל' : 'לא פעיל',
-      notes: form.notes.trim() || undefined,
-      isActive: form.isActive,
-    };
+    const request = isExistingCustomer
+      ? buildOrdinaryUpdateCustomerRequest(form, customer)
+      : buildCreateCustomerRequest(form);
 
     try {
       let savedCustomer: Customer;
@@ -216,7 +199,7 @@ function CustomerDrawerContent({ customer, onClose, onSaved }: CustomerDrawerCon
       await deactivateMutation.mutateAsync(customer.customerId);
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'מחיקה נכשלה');
+      setError(err instanceof Error ? err.message : 'השבתת הלקוח נכשלה.');
     }
   }
 
@@ -225,18 +208,7 @@ function CustomerDrawerContent({ customer, onClose, onSaved }: CustomerDrawerCon
     if (!isExistingCustomer) return;
     setError(null);
 
-    const request: CreateCustomerRequest = {
-      customerName: customer.customerName,
-      customerType: customer.customerType,
-      primaryPhone: customer.primaryPhone || undefined,
-      primaryEmail: customer.primaryEmail || undefined,
-      city: customer.city || undefined,
-      region: customer.region || undefined,
-      address: customer.address || undefined,
-      status: 'פעיל',
-      notes: customer.notes || undefined,
-      isActive: true,
-    };
+    const request = buildRestoreCustomerRequest(customer);
 
     try {
       const restoredCustomer = await updateMutation.mutateAsync({
@@ -246,7 +218,7 @@ function CustomerDrawerContent({ customer, onClose, onSaved }: CustomerDrawerCon
       await onSaved?.(restoredCustomer ?? { ...customer, ...request });
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'שחזור נכשל');
+      setError(err instanceof Error ? err.message : 'שחזור הלקוח נכשל.');
     }
   }
 
@@ -281,16 +253,16 @@ function CustomerDrawerContent({ customer, onClose, onSaved }: CustomerDrawerCon
         <div className="customerDrawer__dangerActions">
           {customer.isActive ? (
             <ConfirmInline
-              triggerLabel="בטל פעילות"
-              message="לבטל את פעילות הלקוח? הלקוח יוסר מהרשימות הפעילות."
-              confirmLabel="אישור"
+              triggerLabel="השבת לקוח"
+              message="להשבית את הלקוח? הלקוח יוסר מהרשימות הפעילות, אך המידע וההיסטוריה שלו יישמרו."
+              confirmLabel="אישור השבתה"
               onConfirm={handleDeactivate}
               isPending={isSaving}
             />
           ) : (
             <ConfirmInline
-              triggerLabel="שחזור"
-              message="לשחזר את הלקוח?"
+              triggerLabel="שחזר לקוח"
+              message="לשחזר את הלקוח ולהחזיר אותו לרשימות הפעילות?"
               confirmLabel="אישור שחזור"
               variant="primary"
               onConfirm={handleRestore}
@@ -340,14 +312,6 @@ function CustomerDrawerContent({ customer, onClose, onSaved }: CustomerDrawerCon
                 ))}
               </Select>
             </div>
-
-            {isExistingCustomer && (
-              <Checkbox
-                label="לקוח פעיל"
-                checked={form.isActive}
-                onChange={(e) => setField('isActive', e.target.checked)}
-              />
-            )}
           </DetailsSection>
 
           <DetailsSection title="פרטי התקשרות">
@@ -457,7 +421,7 @@ function CustomerReviewDetails({ customer, canManage }: CustomerReviewDetailsPro
             label="סטטוס"
             value={
               <Badge variant={customer.isActive ? 'success' : 'neutral'}>
-                {customer.status ?? (customer.isActive ? 'פעיל' : 'לא פעיל')}
+                {customer.isActive ? 'פעיל' : 'לא פעיל'}
               </Badge>
             }
           />
