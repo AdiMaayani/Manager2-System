@@ -4,17 +4,10 @@ import { Button } from '@shared/components/Button';
 import { Input } from '@shared/components/Input';
 import { Select } from '@shared/components/Select';
 import { Textarea } from '@shared/components/Textarea';
-import { InlineAlert } from '@shared/components/InlineAlert';
-import { ConfirmInline } from '@shared/components/ConfirmInline';
 import { CustomerDrawer, type Customer } from '@features/customers';
 import {
-  ValidatedAddressField,
   ValidatedAddressDisplay,
-  buildAddressProfilePayload,
   getSiteAddressProfileOptionalAsync,
-  mapAddressProfileToFieldState,
-  type ValidatedAddressFieldState,
-  type UpsertAddressProfileRequest,
 } from '@features/geo';
 import { ProjectReportsCard } from '../ProjectReportsCard';
 import type {
@@ -34,9 +27,10 @@ import {
   getProjectStatusMeta,
 } from '../../../../utils/projectDisplayUtils';
 import {
-  getProjectSiteToggleLabel,
-  hasAssociatedProjectSite,
-} from '../../../../utils/projectSiteButtonState';
+  applyProjectCustomerChange,
+  filterProjectSitesByCustomer,
+  resolveProjectHistoricalSiteOption,
+} from '../../../../utils/projectSiteSelection';
 import './ProjectOverviewTab.css';
 
 interface ProjectOverviewTabProps {
@@ -51,24 +45,6 @@ interface ProjectOverviewTabProps {
   onChange: (form: ProjectOverviewForm) => void;
   onTeamChange: (form: ProjectTeamForm) => void;
   onCustomerCreated: (customerId: number) => Promise<void>;
-  onCreateSite: (payload: {
-    customerId: number;
-    siteName: string;
-    notes?: string;
-    isPrimary?: boolean;
-    addressProfile?: UpsertAddressProfileRequest;
-  }) => Promise<void>;
-  onUpdateSite: (
-    siteId: number,
-    payload: {
-      customerId: number;
-      siteName: string;
-      notes?: string;
-      isPrimary?: boolean;
-      addressProfile?: UpsertAddressProfileRequest;
-    },
-  ) => Promise<void>;
-  onDeactivateSite: (siteId: number) => Promise<void>;
 }
 
 export const ProjectOverviewTab = memo(function ProjectOverviewTab({
@@ -83,58 +59,55 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
   onChange,
   onTeamChange,
   onCustomerCreated,
-  onCreateSite,
-  onUpdateSite,
-  onDeactivateSite,
 }: ProjectOverviewTabProps) {
-  const [showSiteForm, setShowSiteForm] = useState(false);
-  const [showEditSiteForm, setShowEditSiteForm] = useState(false);
-  const [showCustomerDrawer, setShowCustomerDrawer] = useState(false);
-  const [newSiteName, setNewSiteName] = useState('');
-  const [newSiteAddressState, setNewSiteAddressState] = useState<ValidatedAddressFieldState>({
-    inputAddress: '',
-    validationStatus: null,
-  });
-  const [newSiteNotes, setNewSiteNotes] = useState('');
-  const [editSiteName, setEditSiteName] = useState('');
-  const [editSiteAddressState, setEditSiteAddressState] = useState<ValidatedAddressFieldState>({
-    inputAddress: '',
-    validationStatus: null,
-  });
-  const [editSiteNotes, setEditSiteNotes] = useState('');
-  const [siteError, setSiteError] = useState<string | null>(null);
+  // CustomerDrawer is reused for both "לקוח חדש" (create) and "ניהול אתרי הלקוח" (manage existing).
+  // Closed leaves the project form untouched so unsaved edits survive.
+  const [customerDrawerMode, setCustomerDrawerMode] = useState<'closed' | 'create' | 'manage'>(
+    'closed',
+  );
 
   const project = lifecycle?.project;
   const projectId = project?.workItemId;
   const filteredSites = useMemo(
-    () => sites.filter((site) => site.customerId === form.customerId),
+    () => filterProjectSitesByCustomer(sites, form.customerId),
     [form.customerId, sites],
   );
-  const resolvedSiteId = form.siteId > 0 ? form.siteId : (project?.siteId ?? 0);
-  const selectedSite = useMemo(
-    () => filteredSites.find((site) => site.siteId === resolvedSiteId) ?? null,
-    [filteredSites, resolvedSiteId],
+  // form.siteId is the single source of truth in edit/create mode (hydrated from the persisted
+  // project via overviewFormFromLifecycle). We never fall back to project.siteId at render time, so
+  // clearing the site on customer change fully removes the old-site preview and address query.
+  const resolvedSiteId = form.siteId;
+  // A persisted project may point at a now-inactive site missing from the active lookup. Surface it
+  // as a disabled option (and readable preview) only while the original customer/site pairing holds.
+  const historicalSiteOption = useMemo(
+    () =>
+      resolveProjectHistoricalSiteOption({
+        isCreateMode,
+        formCustomerId: form.customerId,
+        formSiteId: form.siteId,
+        persistedCustomerId: project?.customerId,
+        persistedSiteId: project?.siteId,
+        persistedSiteName: project?.siteName,
+        activeSiteIds: filteredSites.map((site) => site.siteId),
+      }),
+    [filteredSites, form.customerId, form.siteId, isCreateMode, project],
   );
+  const selectedSite = useMemo<Site | null>(() => {
+    const activeMatch = filteredSites.find((site) => site.siteId === resolvedSiteId);
+    if (activeMatch) return activeMatch;
+    if (historicalSiteOption && project) {
+      return {
+        siteId: historicalSiteOption.siteId,
+        customerId: project.customerId,
+        siteName: project.siteName ?? historicalSiteOption.label,
+        isPrimary: false,
+        createdAt: project.createdAt,
+      };
+    }
+    return null;
+  }, [filteredSites, historicalSiteOption, project, resolvedSiteId]);
   const selectedCustomer = useMemo(
     () => customers.find((customer) => customer.customerId === form.customerId) ?? null,
     [customers, form.customerId],
-  );
-  const hasProjectSite = useMemo(
-    () =>
-      hasAssociatedProjectSite({
-        siteId: form.siteId,
-        projectSiteId: project?.siteId,
-      }),
-    [form.siteId, project?.siteId],
-  );
-  const isSiteEditorOpen = showSiteForm || showEditSiteForm;
-  const siteActionLabel = useMemo(
-    () =>
-      getProjectSiteToggleLabel(
-        { siteId: form.siteId, projectSiteId: project?.siteId },
-        isSiteEditorOpen,
-      ),
-    [form.siteId, isSiteEditorOpen, project?.siteId],
   );
 
   const selectedSiteProfileQuery = useQuery({
@@ -193,127 +166,12 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
     onChange({ ...form, [key]: value });
   }, [form, onChange]);
 
-  const handleCreateSite = useCallback(async () => {
-    setSiteError(null);
-
-    if (!form.customerId) {
-      setSiteError('יש לבחור לקוח לפני יצירת אתר.');
-      return;
-    }
-
-    if (!newSiteName.trim()) {
-      setSiteError('יש להזין שם אתר.');
-      return;
-    }
-
-    try {
-      await onCreateSite({
-        customerId: form.customerId,
-        siteName: newSiteName.trim(),
-        notes: newSiteNotes.trim() || undefined,
-        addressProfile: buildAddressProfilePayload(newSiteAddressState) ?? undefined,
-      });
-
-      setSiteError(null);
-      setShowSiteForm(false);
-      setNewSiteName('');
-      setNewSiteAddressState({ inputAddress: '', validationStatus: null });
-      setNewSiteNotes('');
-    } catch (err) {
-      const message =
-        err instanceof Error && err.message
-          ? err.message
-          : 'יצירת האתר נכשלה. נסה שוב.';
-      setSiteError(message);
-    }
-  }, [form.customerId, newSiteAddressState, newSiteName, newSiteNotes, onCreateSite]);
-
-  const openEditSiteForm = useCallback(async () => {
-    if (!selectedSite) return;
-
-    setSiteError(null);
-    setShowSiteForm(false);
-    setShowEditSiteForm(true);
-    setEditSiteName(selectedSite.siteName);
-    setEditSiteNotes(selectedSite.notes ?? '');
-
-    try {
-      const profile = await getSiteAddressProfileOptionalAsync(selectedSite.siteId);
-      setEditSiteAddressState(
-        profile
-          ? mapAddressProfileToFieldState(profile)
-          : {
-              inputAddress: [selectedSite.addressLine, selectedSite.city].filter(Boolean).join(', '),
-              validationStatus: null,
-            },
-      );
-    } catch {
-      setEditSiteAddressState({
-        inputAddress: [selectedSite.addressLine, selectedSite.city].filter(Boolean).join(', '),
-        validationStatus: null,
-      });
-    }
-  }, [selectedSite]);
-
-  const handleUpdateSite = useCallback(async () => {
-    setSiteError(null);
-
-    if (!selectedSite) {
-      setSiteError('יש לבחור אתר לעריכה.');
-      return;
-    }
-
-    if (!editSiteName.trim()) {
-      setSiteError('יש להזין שם אתר.');
-      return;
-    }
-
-    try {
-      await onUpdateSite(selectedSite.siteId, {
-        customerId: selectedSite.customerId,
-        siteName: editSiteName.trim(),
-        notes: editSiteNotes.trim() || undefined,
-        isPrimary: selectedSite.isPrimary,
-        addressProfile: buildAddressProfilePayload(editSiteAddressState) ?? undefined,
-      });
-
-      setSiteError(null);
-      setShowEditSiteForm(false);
-    } catch (err) {
-      const message =
-        err instanceof Error && err.message
-          ? err.message
-          : 'עדכון האתר נכשל. נסה שוב.';
-      setSiteError(message);
-    }
-  }, [
-    editSiteAddressState,
-    editSiteName,
-    editSiteNotes,
-    onUpdateSite,
-    selectedSite,
-  ]);
-
-  const handleDeactivateSite = useCallback(async () => {
-    setSiteError(null);
-
-    if (!selectedSite) {
-      setSiteError('יש לבחור אתר למחיקה.');
-      return;
-    }
-
-    try {
-      await onDeactivateSite(selectedSite.siteId);
-      setSiteError(null);
-      setShowEditSiteForm(false);
-    } catch (err) {
-      const message =
-        err instanceof Error && err.message
-          ? err.message
-          : 'מחיקת האתר נכשלה. ודא שאין עבודות פתוחות באתר.';
-      setSiteError(message);
-    }
-  }, [onDeactivateSite, selectedSite]);
+  const handleManageCustomerSites = useCallback(() => {
+    // Sites are managed only from the customer record. Open CustomerDrawer above this project so the
+    // authenticated session and unsaved project form state stay intact (no tab / route navigation).
+    if (!selectedCustomer) return;
+    setCustomerDrawerMode('manage');
+  }, [selectedCustomer]);
 
   const handleProjectManagerChange = useCallback((value: string) => {
     const projectManagerEmployeeId = value ? Number(value) : null;
@@ -326,12 +184,20 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
     });
   }, [onTeamChange, teamForm]);
 
+  const handleCustomerDrawerClose = useCallback(() => {
+    setCustomerDrawerMode('closed');
+  }, []);
+
   const handleCustomerSaved = useCallback(
     async (customer: Customer) => {
-      await onCustomerCreated(customer.customerId);
-      setShowCustomerDrawer(false);
+      // Only a newly created customer updates the project selection. Managing sites/editing an
+      // existing customer must not clear or replace the project's customer/site fields.
+      if (customerDrawerMode === 'create') {
+        await onCustomerCreated(customer.customerId);
+      }
+      setCustomerDrawerMode('closed');
     },
-    [onCustomerCreated],
+    [customerDrawerMode, onCustomerCreated],
   );
 
   const handleAddTeamMember = useCallback((value: string) => {
@@ -354,24 +220,6 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
       ),
     });
   }, [onTeamChange, teamForm]);
-
-  const handleProjectSiteAction = useCallback(() => {
-    setSiteError(null);
-
-    if (hasProjectSite) {
-      if (showEditSiteForm) {
-        setShowEditSiteForm(false);
-        return;
-      }
-
-      setShowSiteForm(false);
-      void openEditSiteForm();
-      return;
-    }
-
-    setShowEditSiteForm(false);
-    setShowSiteForm((value) => !value);
-  }, [hasProjectSite, openEditSiteForm, showEditSiteForm]);
 
   const statusMeta = useMemo(
     () => getProjectStatusMeta(isEditMode ? form.status : project?.status),
@@ -404,9 +252,8 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
                   value={form.customerId || ''}
                   onChange={(event) => {
                     const customerId = Number(event.target.value);
-                    onChange({ ...form, customerId, siteId: 0 });
-                    setShowSiteForm(false);
-                    setShowEditSiteForm(false);
+                    setCustomerDrawerMode('closed');
+                    onChange(applyProjectCustomerChange(form, customerId));
                   }}
                   required
                 >
@@ -420,7 +267,7 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
                 <Button
                   type="button"
                   variant="secondary"
-                  onClick={() => setShowCustomerDrawer(true)}
+                  onClick={() => setCustomerDrawerMode('create')}
                 >
                   לקוח חדש
                 </Button>
@@ -533,18 +380,6 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
         <section className="projectOverviewTab__card">
           <div className="projectOverviewTab__cardHeader">
             <h3 className="projectOverviewTab__cardTitle">אתר ותיאור</h3>
-            {isEditMode && (
-              <div className="projectOverviewTab__cardActions">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={handleProjectSiteAction}
-                  disabled={!form.customerId}
-                >
-                  {siteActionLabel}
-                </Button>
-              </div>
-            )}
           </div>
           <div className="projectOverviewTab__field">
             <span className="projectOverviewTab__label">אתר</span>
@@ -553,6 +388,7 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
                 <Select
                   value={form.siteId || ''}
                   onChange={(event) => updateField('siteId', Number(event.target.value))}
+                  disabled={!form.customerId}
                 >
                   <option value="">בחר אתר</option>
                   {filteredSites.map((site) => (
@@ -560,15 +396,36 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
                       {[site.siteName, site.city, site.addressLine].filter(Boolean).join(' · ')}
                     </option>
                   ))}
+                  {historicalSiteOption && (
+                    <option value={historicalSiteOption.siteId} disabled>
+                      {historicalSiteOption.label}
+                    </option>
+                  )}
                 </Select>
-                {filteredSites.length > 0 ? (
+                {!form.customerId ? (
+                  <span className="projectOverviewTab__fieldNote">
+                    יש לבחור לקוח כדי לבחור אתר.
+                  </span>
+                ) : filteredSites.length > 0 ? (
                   <span className="projectOverviewTab__fieldNote">
                     נמצאו {filteredSites.length} אתרים ללקוח זה. בחר אתר מהרשימה.
                   </span>
                 ) : (
                   <span className="projectOverviewTab__fieldNote">
-                    אין עדיין אתרים ללקוח הנבחר.
+                    ללקוח הנבחר אין עדיין אתרים פעילים. יש לנהל אתרים מתוך כרטיס הלקוח.
                   </span>
+                )}
+                {form.customerId > 0 && (
+                  <div className="projectOverviewTab__siteManageAction">
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={handleManageCustomerSites}
+                      disabled={!selectedCustomer}
+                    >
+                      ניהול אתרי הלקוח
+                    </Button>
+                  </div>
                 )}
               </>
             ) : (
@@ -586,80 +443,6 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
                 validationStatus={selectedSiteProfileQuery.data?.validationStatus}
               />
               {selectedSite.notes && <span>{selectedSite.notes}</span>}
-              <div className="projectOverviewTab__siteDangerAction">
-                <ConfirmInline
-                  triggerLabel="מחיקה"
-                  message="למחוק את האתר?"
-                  confirmLabel="אישור מחיקה"
-                  onConfirm={handleDeactivateSite}
-                  isPending={false}
-                />
-              </div>
-            </div>
-          )}
-          {isEditMode && siteError && !showSiteForm && !showEditSiteForm && (
-            <InlineAlert variant="danger">{siteError}</InlineAlert>
-          )}
-          {isEditMode && showSiteForm && (
-            <div className="projectOverviewTab__siteForm">
-              <Input
-                label="שם אתר"
-                value={newSiteName}
-                onChange={(event) => setNewSiteName(event.target.value)}
-              />
-              <ValidatedAddressField
-                label="כתובת אתר"
-                value={newSiteAddressState}
-                onChange={setNewSiteAddressState}
-              />
-              <Input
-                label="הערות"
-                value={newSiteNotes}
-                onChange={(event) => setNewSiteNotes(event.target.value)}
-              />
-              {siteError && (
-                <InlineAlert variant="danger">{siteError}</InlineAlert>
-              )}
-              <Button type="button" variant="secondary" onClick={handleCreateSite}>
-                שמור אתר
-              </Button>
-            </div>
-          )}
-          {isEditMode && showEditSiteForm && selectedSite && (
-            <div className="projectOverviewTab__siteForm">
-              <Input
-                label="שם אתר"
-                value={editSiteName}
-                onChange={(event) => setEditSiteName(event.target.value)}
-              />
-              <ValidatedAddressField
-                label="כתובת אתר"
-                value={editSiteAddressState}
-                onChange={setEditSiteAddressState}
-              />
-              <Input
-                label="הערות"
-                value={editSiteNotes}
-                onChange={(event) => setEditSiteNotes(event.target.value)}
-              />
-              {siteError && (
-                <InlineAlert variant="danger">{siteError}</InlineAlert>
-              )}
-              <div className="projectOverviewTab__siteActions">
-                <Button type="button" variant="secondary" onClick={handleUpdateSite}>
-                  שמור אתר
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  onClick={() => {
-                    setShowEditSiteForm(false);
-                    setSiteError(null);
-                  }}
-                >
-                  ביטול
-                </Button>
-              </div>
             </div>
           )}
           <div className="projectOverviewTab__field">
@@ -767,8 +550,9 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
         )}
       </div>
       <CustomerDrawer
-        isOpen={showCustomerDrawer}
-        onClose={() => setShowCustomerDrawer(false)}
+        isOpen={customerDrawerMode !== 'closed'}
+        customer={customerDrawerMode === 'manage' ? selectedCustomer : null}
+        onClose={handleCustomerDrawerClose}
         onSaved={handleCustomerSaved}
       />
     </div>

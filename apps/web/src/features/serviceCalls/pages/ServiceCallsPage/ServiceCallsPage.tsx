@@ -229,9 +229,6 @@ export function ServiceCallsPage() {
         customers={lookups.customers}
         sites={lookups.sites}
         employees={lookups.employees}
-        onSitesChanged={async () => {
-          await lookups.refetch();
-        }}
         onClose={closeDrawer}
         onSaved={(message, savedServiceCall) => {
           setPageMessage(message);

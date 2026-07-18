@@ -2,12 +2,12 @@ import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
-  ValidatedAddressField,
+  CustomerDrawer,
+  getCustomerByIdAsync,
+} from '@features/customers';
+import {
   ValidatedAddressDisplay,
-  buildAddressProfilePayload,
-  createSiteWithAddressProfileAsync,
   getSiteAddressProfileOptionalAsync,
-  type ValidatedAddressFieldState,
 } from '@features/geo';
 import { Drawer, useDrawerMaximize } from '@shared/components/Drawer';
 import { Badge } from '@shared/components/Badge';
@@ -27,7 +27,8 @@ import { getServiceCallByIdAsync } from '../../api/serviceCallsApiClient';
 import { useServiceCallMutations } from '../../hooks/useServiceCalls';
 import {
   filterServiceCallSitesByCustomer,
-  getCreatedServiceCallSiteSelection,
+  resolveCompatibleServiceCallSiteId,
+  resolveServiceCallHistoricalSiteOption,
 } from '../../lib/serviceCallSiteSelection';
 import {
   buildServiceCallFormState,
@@ -70,7 +71,6 @@ interface ServiceCallDrawerProps {
   customers: ServiceCallCustomerOption[];
   sites: ServiceCallSiteOption[];
   employees: ServiceCallEmployeeOption[];
-  onSitesChanged: () => Promise<void>;
   onSaved: (message: string, savedServiceCall?: ServiceCallDetails) => void;
 }
 
@@ -112,7 +112,6 @@ export function ServiceCallDrawer({
   customers,
   sites,
   employees,
-  onSitesChanged,
   onSaved,
 }: ServiceCallDrawerProps) {
   if (!isOpen) return null;
@@ -126,7 +125,6 @@ export function ServiceCallDrawer({
       customers={customers}
       sites={sites}
       employees={employees}
-      onSitesChanged={onSitesChanged}
       onClose={onClose}
       onSaved={onSaved}
     />
@@ -138,7 +136,6 @@ interface ServiceCallDrawerContentProps {
   customers: ServiceCallCustomerOption[];
   sites: ServiceCallSiteOption[];
   employees: ServiceCallEmployeeOption[];
-  onSitesChanged: () => Promise<void>;
   onClose: () => void;
   onSaved: (message: string, savedServiceCall?: ServiceCallDetails) => void;
 }
@@ -148,7 +145,6 @@ function ServiceCallDrawerContent({
   customers,
   sites,
   employees,
-  onSitesChanged,
   onClose,
   onSaved,
 }: ServiceCallDrawerContentProps) {
@@ -175,14 +171,16 @@ function ServiceCallDrawerContent({
   const { isMaximized, toggleMaximize } = useDrawerMaximize();
   const [employeeIdToAssign, setEmployeeIdToAssign] = useState('');
   const [assignmentRole, setAssignmentRole] = useState(currentServiceCall?.requiredRole ?? '');
-  const [isCreatingSite, setIsCreatingSite] = useState(false);
-  const [newSiteName, setNewSiteName] = useState('');
-  const [newSiteAddress, setNewSiteAddress] = useState<ValidatedAddressFieldState>({
-    inputAddress: '',
-    validationStatus: null,
+  // Nested CustomerDrawer for site management — stays on this page so sessionStorage auth and
+  // unsaved service-call form fields are preserved (no tab / route navigation).
+  const [isManagingCustomerSites, setIsManagingCustomerSites] = useState(false);
+  const manageCustomerId = isManagingCustomerSites ? Number(form.customerId) || 0 : 0;
+  const manageCustomerQuery = useQuery({
+    queryKey: ['customers', 'detail', manageCustomerId],
+    queryFn: () => getCustomerByIdAsync(manageCustomerId),
+    enabled: isManagingCustomerSites && manageCustomerId > 0,
+    retry: false,
   });
-  const [siteCreationError, setSiteCreationError] = useState<string | null>(null);
-  const [isSavingSite, setIsSavingSite] = useState(false);
 
   // The edit form/assignment role are only shown in edit mode, and entering edit mode re-seeds them
   // from the freshest currentServiceCall (see handleStartEdit). Review mode renders directly from
@@ -200,6 +198,28 @@ function ServiceCallDrawerContent({
     );
   }, [form.customerId, sites]);
 
+  // A saved service call may reference a now-inactive site missing from the active lookup. Surface
+  // it as a disabled option (edit mode only) while the original customer/site relationship holds.
+  const historicalSiteOption = useMemo(
+    () =>
+      resolveServiceCallHistoricalSiteOption({
+        isExistingServiceCall,
+        formCustomerId: Number(form.customerId) || 0,
+        formSiteId: Number(form.siteId) || 0,
+        persistedCustomerId: currentServiceCall?.customerId,
+        persistedSiteId: currentServiceCall?.siteId,
+        persistedSiteName: currentServiceCall?.siteName,
+        activeSiteIds: filteredSites.map((site) => site.siteId),
+      }),
+    [
+      currentServiceCall,
+      filteredSites,
+      form.customerId,
+      form.siteId,
+      isExistingServiceCall,
+    ],
+  );
+
   const assignableEmployees = useMemo(
     () => employees.filter((employee) => employee.isActive !== false && employee.isAssignable !== false),
     [employees],
@@ -207,43 +227,6 @@ function ServiceCallDrawerContent({
 
   function setField<K extends keyof ServiceCallFormState>(key: K, value: ServiceCallFormState[K]) {
     setForm((current) => ({ ...current, [key]: value }));
-  }
-
-  async function handleCreateSite() {
-    const customerId = Number(form.customerId);
-    if (!customerId) {
-      setSiteCreationError('יש לבחור לקוח לפני יצירת אתר.');
-      return;
-    }
-    if (!newSiteName.trim()) {
-      setSiteCreationError('יש להזין שם אתר.');
-      return;
-    }
-
-    setSiteCreationError(null);
-    setIsSavingSite(true);
-    try {
-      const site = await createSiteWithAddressProfileAsync({
-        customerId,
-        siteName: newSiteName.trim(),
-        isPrimary: filteredSites.length === 0,
-        addressProfile: buildAddressProfilePayload(newSiteAddress) ?? undefined,
-      });
-      await onSitesChanged();
-      setField(
-        'siteId',
-        getCreatedServiceCallSiteSelection(customerId, site),
-      );
-      setNewSiteName('');
-      setNewSiteAddress({ inputAddress: '', validationStatus: null });
-      setIsCreatingSite(false);
-    } catch (siteError) {
-      setSiteCreationError(
-        siteError instanceof Error ? siteError.message : 'יצירת האתר נכשלה. נסו שוב.',
-      );
-    } finally {
-      setIsSavingSite(false);
-    }
   }
 
   function handleStartEdit() {
@@ -526,13 +509,17 @@ function ServiceCallDrawerContent({
                 required
                 value={form.customerId}
                 onChange={(event) => {
+                  const nextCustomerId = event.target.value;
+                  setIsManagingCustomerSites(false);
                   setForm((current) => ({
                     ...current,
-                    customerId: event.target.value,
-                    siteId: '',
+                    customerId: nextCustomerId,
+                    siteId: resolveCompatibleServiceCallSiteId(
+                      Number(current.siteId) || null,
+                      sites,
+                      Number(nextCustomerId) || null,
+                    ),
                   }));
-                  setIsCreatingSite(false);
-                  setSiteCreationError(null);
                 }}
               >
                 <option value="">בחר לקוח</option>
@@ -557,44 +544,47 @@ function ServiceCallDrawerContent({
                     {site.city ? ` — ${site.city}` : ''}
                   </option>
                 ))}
+                {historicalSiteOption && (
+                  <option value={historicalSiteOption.siteId} disabled>
+                    {historicalSiteOption.label}
+                  </option>
+                )}
               </Select>
             </div>
-            <Button
-              type="button"
-              variant="secondary"
-              disabled={!form.customerId}
-              onClick={() => {
-                setSiteCreationError(null);
-                setIsCreatingSite((current) => !current);
-              }}
-            >
-              {isCreatingSite ? 'סגור יצירת אתר' : 'צור אתר חדש ללקוח'}
-            </Button>
-            {isCreatingSite && (
-              <div className="serviceCallDrawer__inlineSiteForm">
-                <Input
-                  label="שם האתר"
-                  required
-                  value={newSiteName}
-                  onChange={(event) => setNewSiteName(event.target.value)}
-                />
-                <ValidatedAddressField
-                  label="כתובת (אופציונלי)"
-                  value={newSiteAddress}
-                  onChange={setNewSiteAddress}
-                  helpText="אפשר להקליד ולשמור כתובת ידנית גם ללא הצעות אוטומטיות."
-                />
-                {siteCreationError && (
-                  <InlineAlert variant="danger">{siteCreationError}</InlineAlert>
-                )}
+            {form.customerId && filteredSites.length === 0 && (
+              <p className="serviceCallDrawer__hint">
+                ללקוח זה אין אתרים פעילים. יש לנהל אתרים מתוך כרטיס הלקוח.
+              </p>
+            )}
+            {form.customerId && (
+              <div className="serviceCallDrawer__siteManageAction">
                 <Button
                   type="button"
-                  onClick={() => void handleCreateSite()}
-                  isLoading={isSavingSite}
-                  disabled={isSavingSite}
+                  variant="secondary"
+                  onClick={() => setIsManagingCustomerSites(true)}
+                  disabled={isManagingCustomerSites && manageCustomerQuery.isLoading}
                 >
-                  שמור ובחר אתר
+                  ניהול אתרי הלקוח
                 </Button>
+                {isManagingCustomerSites && manageCustomerQuery.isLoading && (
+                  <p className="serviceCallDrawer__hint">טוען פרטי לקוח…</p>
+                )}
+                {isManagingCustomerSites && manageCustomerQuery.error != null && (
+                  <>
+                    <InlineAlert variant="danger">
+                      {manageCustomerQuery.error instanceof Error
+                        ? manageCustomerQuery.error.message
+                        : 'טעינת פרטי הלקוח נכשלה.'}
+                    </InlineAlert>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => setIsManagingCustomerSites(false)}
+                    >
+                      סגור
+                    </Button>
+                  </>
+                )}
               </div>
             )}
           </DetailsSection>
@@ -707,6 +697,15 @@ function ServiceCallDrawerContent({
             />
           </DetailsSection>
         </div>
+      )}
+
+      {manageCustomerQuery.data && (
+        <CustomerDrawer
+          isOpen={isManagingCustomerSites}
+          customer={manageCustomerQuery.data}
+          onClose={() => setIsManagingCustomerSites(false)}
+          onSaved={() => setIsManagingCustomerSites(false)}
+        />
       )}
     </Drawer>
   );

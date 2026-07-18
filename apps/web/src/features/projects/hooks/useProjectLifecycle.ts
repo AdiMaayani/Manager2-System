@@ -5,7 +5,6 @@ import {
   reorderProjectMilestonesAsync,
   createMilestoneAsync,
   createProjectAsync,
-  createSiteAsync,
   deactivateMilestoneAsync,
   getProjectEmployeesAsync,
   getProjectLifecycleAsync,
@@ -18,7 +17,6 @@ import {
 import type {
   CreateMilestoneRequest,
   CreateProjectRequest,
-  CreateSiteRequest,
   ProjectTeamForm,
   SyncProjectEmployeeAssignmentsRequest,
   UpdateMilestoneRequest,
@@ -223,17 +221,6 @@ export function useMilestoneMutations(projectId: number | null) {
   });
 
   return { createMutation, updateMutation, deactivateMutation, reorderMutation };
-}
-
-export function useCreateSite() {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: (body: CreateSiteRequest) => createSiteAsync(body),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projectLookups', 'sites'] });
-    },
-  });
 }
 
 export function useAssignProjectTeam(projectId: number | null) {

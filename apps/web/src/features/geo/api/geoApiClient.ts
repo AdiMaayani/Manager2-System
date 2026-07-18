@@ -89,3 +89,12 @@ export function updateSiteWithAddressProfileAsync(
     body: JSON.stringify(request),
   });
 }
+
+// Sites belong to a customer and are managed from the customer record; deactivation is the safe
+// removal flow (soft delete) shared by every customer-site consumer. Uses the app-wide PascalCase
+// `/Sites` resource route (matching the Customers/Projects/ServiceCalls site lookups).
+export function deactivateSiteAsync(siteId: number): Promise<void> {
+  return apiRequest<void>(`/Sites/${siteId}`, {
+    method: 'DELETE',
+  });
+}

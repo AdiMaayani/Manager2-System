@@ -1,6 +1,7 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
 import { Maximize2, Minimize2, X } from 'lucide-react';
 import { IconButton } from '../IconButton';
+import { sharedDrawerStack } from './drawerStack';
 import './Drawer.css';
 
 interface DrawerProps {
@@ -27,21 +28,24 @@ export function Drawer({
   onToggleMaximize,
   children,
 }: DrawerProps) {
+  // Keep the latest onClose without re-registering on the shared stack. Re-registering when the
+  // callback identity changes would push this drawer to the top and steal Escape from a nested child.
+  const onCloseRef = useRef(onClose);
+
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   useEffect(() => {
     if (!isOpen) return undefined;
 
-    const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
-    };
-
-    document.body.classList.add('drawerOpen');
-    window.addEventListener('keydown', handleKeyDown);
-
-    return () => {
-      document.body.classList.remove('drawerOpen');
-      window.removeEventListener('keydown', handleKeyDown);
-    };
-  }, [isOpen, onClose]);
+    // Nested drawers share one Escape listener and a body-lock refcount via the stack.
+    // Only the topmost registered drawer closes on Escape; body.drawerOpen stays until the last drawer unregisters.
+    // The registered wrapper is stable for this open period so parent re-renders cannot reorder the stack.
+    return sharedDrawerStack.register(() => {
+      onCloseRef.current();
+    });
+  }, [isOpen]);
 
   if (!isOpen) return null;
 

@@ -206,17 +206,6 @@ export interface Site {
   updatedAt?: string;
 }
 
-export interface CreateSiteRequest {
-  customerId: number;
-  siteName: string;
-  addressLine?: string;
-  city?: string;
-  isPrimary?: boolean;
-  notes?: string;
-}
-
-export type UpdateSiteRequest = CreateSiteRequest;
-
 export interface ProjectBoqItem {
   projectBoqItemId: number;
   projectId: number;

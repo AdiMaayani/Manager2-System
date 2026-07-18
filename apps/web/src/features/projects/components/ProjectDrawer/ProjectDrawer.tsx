@@ -45,20 +45,11 @@ import type {
   UpdateProjectEquipmentItemRequest,
   UploadProjectDrawingRequest,
 } from '../../types';
-import {
-  deactivateSiteAsync,
-  syncProjectEmployeeAssignmentsAsync,
-} from '../../api/projectsApiClient';
-import {
-  createSiteWithAddressProfileAsync,
-  updateSiteWithAddressProfileAsync,
-  type UpsertAddressProfileRequest,
-} from '@features/geo';
+import { syncProjectEmployeeAssignmentsAsync } from '../../api/projectsApiClient';
 import {
   createEmptyOverviewForm,
   overviewFormFromLifecycle,
 } from '../../utils/projectDisplayUtils';
-import { getCreatedProjectSiteSelection } from '../../utils/projectSiteSelection';
 import { resolveProjectDrawerTab } from '../../utils/projectDrawerTabs';
 import { ProjectBoqTab } from './components/ProjectBoqTab';
 import { ProjectDrawingsTab } from './components/ProjectDrawingsTab';
@@ -225,65 +216,6 @@ export function ProjectDrawer({
     setIsEditMode(false);
     setSaveError(null);
   }, [initialTeamForm, isCreateMode, lifecycle, onClose]);
-
-  const handleCreateProjectSite = useCallback(
-    async (payload: {
-      customerId: number;
-      siteName: string;
-      notes?: string;
-      isPrimary?: boolean;
-      addressProfile?: UpsertAddressProfileRequest;
-    }) => {
-      const saved = await createSiteWithAddressProfileAsync({
-        customerId: payload.customerId,
-        siteName: payload.siteName,
-        isPrimary: payload.isPrimary ?? false,
-        notes: payload.notes,
-        addressProfile: payload.addressProfile,
-      });
-      setOverviewForm((current) => ({
-        ...current,
-        siteId: getCreatedProjectSiteSelection(payload.customerId, saved),
-      }));
-      await refetchLookups();
-    },
-    [refetchLookups],
-  );
-
-  const handleUpdateProjectSite = useCallback(
-    async (
-      siteId: number,
-      payload: {
-        customerId: number;
-        siteName: string;
-        notes?: string;
-        isPrimary?: boolean;
-        addressProfile?: UpsertAddressProfileRequest;
-      },
-    ) => {
-      await updateSiteWithAddressProfileAsync(siteId, {
-        siteId,
-        customerId: payload.customerId,
-        siteName: payload.siteName,
-        isPrimary: payload.isPrimary ?? false,
-        notes: payload.notes,
-        addressProfile: payload.addressProfile,
-      });
-      await refetchLookups();
-    },
-    [refetchLookups],
-  );
-
-  const handleDeactivateProjectSite = useCallback(
-    async (siteId: number) => {
-      await deactivateSiteAsync(siteId);
-      if (overviewForm.siteId === siteId) {
-        setOverviewForm((current) => ({ ...current, siteId: 0 }));
-      }
-      await refetchLookups();
-    },
-    [overviewForm.siteId, refetchLookups],
-  );
 
   const handleCreateMilestone = useCallback(
     async (body: Parameters<typeof createMilestoneAsync>[0]) => {
@@ -578,9 +510,6 @@ export function ProjectDrawer({
                   siteId: 0,
                 }));
               }}
-              onCreateSite={handleCreateProjectSite}
-              onUpdateSite={handleUpdateProjectSite}
-              onDeactivateSite={handleDeactivateProjectSite}
             />
           </>
         );
