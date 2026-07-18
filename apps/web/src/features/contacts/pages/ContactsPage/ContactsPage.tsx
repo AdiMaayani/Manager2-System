@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
+import { useUrlEntityDrawer } from '@shared/hooks';
 import { PageShell } from '@shared/components/PageShell';
 import { PageSpinner } from '@shared/components/PageSpinner';
 import { ErrorState } from '@shared/components/ErrorState';
@@ -34,33 +34,26 @@ function formatContactDate(value?: string | null) {
 export function ContactsPage() {
   const { can } = usePermissions();
   const { data: contacts, isLoading, error, refetch } = useContacts();
-  const [searchParams, setSearchParams] = useSearchParams();
   const [segment, setSegment] = useState('הכל');
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>('הכול');
   const [search, setSearch] = useState('');
-  // undefined = drawer closed, null = create mode, Contact = review existing.
-  const [drawerContact, setDrawerContact] = useState<Contact | null | undefined>(undefined);
-
-  // Deep link: ?contactId opens that contact in read-only review mode, then
-  // the param is removed (matching the Quotes ?quoteId behavior).
-  useEffect(() => {
-    const contactIdParam = searchParams.get('contactId');
-    if (!contactIdParam || !contacts) return;
-
-    const requestedContact = contacts.find(
-      (contact) => contact.contactId === Number(contactIdParam),
-    );
-    if (requestedContact) {
-      setDrawerContact(requestedContact);
-    }
-
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.delete('contactId');
-    setSearchParams(nextParams, { replace: true });
-  }, [contacts, searchParams, setSearchParams]);
-
-  const isDrawerOpen = drawerContact !== undefined;
-  const selectedContactId = drawerContact?.contactId ?? null;
+  // The ?contactId query parameter is the drawer's single source of truth: missing/invalid = closed,
+  // "new" = create, a positive integer = reviewing that contact. State is derived from the URL, so
+  // deep links and browser back/forward work without any URL→state effect.
+  const {
+    isDrawerOpen,
+    isCreating,
+    selectedEntity: drawerContact,
+    selectedId: selectedContactId,
+    openEntity: openContact,
+    openCreate,
+    showEntity: showContact,
+    close: closeDrawer,
+  } = useUrlEntityDrawer<Contact>({
+    paramName: 'contactId',
+    items: contacts,
+    getId: (contact) => contact.contactId,
+  });
 
   const filtered = useMemo(() => {
     if (!contacts) return [];
@@ -88,10 +81,6 @@ export function ContactsPage() {
     setSearch('');
     setSegment('הכל');
     setActiveFilter('הכול');
-  };
-
-  const openContact = (contact: Contact) => {
-    setDrawerContact(contact);
   };
 
   const columns: DataTableColumn<Contact>[] = [
@@ -132,7 +121,7 @@ export function ContactsPage() {
               </Button>
             )}
             {can('manageContacts') && (
-              <Button iconStart={<Plus size={18} />} onClick={() => setDrawerContact(null)}>
+              <Button iconStart={<Plus size={18} />} onClick={openCreate}>
                 איש קשר חדש
               </Button>
             )}
@@ -180,9 +169,9 @@ export function ContactsPage() {
 
       <ContactDrawer
         isOpen={isDrawerOpen}
-        onClose={() => setDrawerContact(undefined)}
-        onSaved={(savedContact) => setDrawerContact(savedContact)}
-        contact={drawerContact}
+        onClose={closeDrawer}
+        onSaved={showContact}
+        contact={isCreating ? null : drawerContact}
       />
     </PageShell>
   );

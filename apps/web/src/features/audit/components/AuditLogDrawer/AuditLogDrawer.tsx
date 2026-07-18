@@ -77,9 +77,20 @@ function parseMetadataRows(metadataJson: string | null): MetadataRow[] {
 }
 
 export function AuditLogDrawer({ entry, isOpen, onClose }: AuditLogDrawerProps) {
-  const { isMaximized, toggleMaximize } = useDrawerMaximize(isOpen);
-
+  // Mount the drawer content only while open, and key it by the entry id, so its maximize state
+  // resets both on reopen and when switching to another entry while open — no effect copies state.
   if (!isOpen || !entry) return null;
+
+  return <AuditLogDrawerContent key={entry.auditLogId} entry={entry} onClose={onClose} />;
+}
+
+interface AuditLogDrawerContentProps {
+  entry: AuditLogEntry;
+  onClose: () => void;
+}
+
+function AuditLogDrawerContent({ entry, onClose }: AuditLogDrawerContentProps) {
+  const { isMaximized, toggleMaximize } = useDrawerMaximize();
 
   const displaySummary = buildAuditDisplaySummary(entry);
   const metadataRows = parseMetadataRows(entry.metadataJson);
@@ -87,7 +98,7 @@ export function AuditLogDrawer({ entry, isOpen, onClose }: AuditLogDrawerProps) 
 
   return (
     <Drawer
-      isOpen={isOpen}
+      isOpen
       onClose={onClose}
       title={displaySummary}
       isMaximized={isMaximized}

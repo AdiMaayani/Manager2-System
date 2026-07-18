@@ -101,7 +101,7 @@ function ContactDrawerContent({ contact, onClose, onSaved }: ContactDrawerConten
   const [isEditing, setIsEditing] = useState(!isExistingContact);
   const [form, setForm] = useState<ContactFormState>(() => buildInitialState(contact));
   const [error, setError] = useState<string | null>(null);
-  const { isMaximized, toggleMaximize } = useDrawerMaximize(true);
+  const { isMaximized, toggleMaximize } = useDrawerMaximize();
 
   const requiresCustomer = CUSTOMER_LINK_CATEGORIES.includes(form.contactCategory);
 

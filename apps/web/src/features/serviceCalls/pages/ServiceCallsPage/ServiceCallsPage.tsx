@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
+import { useUrlEntityDrawer } from '@shared/hooks';
 import { PageShell } from '@shared/components/PageShell';
 import { PageSpinner } from '@shared/components/PageSpinner';
 import { ErrorState } from '@shared/components/ErrorState';
@@ -66,36 +66,28 @@ export function ServiceCallsPage() {
   const canManageServiceCalls = can('manageServiceCalls') && can('viewCustomers');
   const { data: serviceCalls, isLoading, error, refetch } = useServiceCalls();
   const lookups = useServiceCallLookups({ enabled: canManageServiceCalls });
-  const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [priorityFilter, setPriorityFilter] = useState('all');
-  // undefined = drawer closed, null = create mode, ServiceCallDetails = review existing.
-  const [drawerServiceCall, setDrawerServiceCall] = useState<ServiceCallDetails | null | undefined>(
-    undefined,
-  );
   const [pageMessage, setPageMessage] = useState<string | null>(null);
 
-  // Deep link: ?serviceCallId opens that call in read-only review mode, then
-  // the param is removed (matching the Quotes ?quoteId behavior).
-  useEffect(() => {
-    const serviceCallIdParam = searchParams.get('serviceCallId');
-    if (!serviceCallIdParam || !serviceCalls) return;
-
-    const requestedServiceCall = serviceCalls.find(
-      (serviceCall) => serviceCall.workItemId === Number(serviceCallIdParam),
-    );
-    if (requestedServiceCall) {
-      setDrawerServiceCall(requestedServiceCall);
-    }
-
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.delete('serviceCallId');
-    setSearchParams(nextParams, { replace: true });
-  }, [serviceCalls, searchParams, setSearchParams]);
-
-  const isDrawerOpen = drawerServiceCall !== undefined;
-  const selectedServiceCallId = drawerServiceCall?.workItemId ?? null;
+  // The ?serviceCallId query parameter is the drawer's single source of truth: missing/invalid =
+  // closed, "new" = create, a positive integer = reviewing that call. State is derived from the URL,
+  // so deep links and browser back/forward work without any URL→state effect.
+  const {
+    isDrawerOpen,
+    isCreating,
+    selectedEntity: drawerServiceCall,
+    selectedId: selectedServiceCallId,
+    openEntity,
+    openCreate,
+    showEntity,
+    close: closeDrawer,
+  } = useUrlEntityDrawer<ServiceCallDetails>({
+    paramName: 'serviceCallId',
+    items: serviceCalls,
+    getId: (serviceCall) => serviceCall.workItemId,
+  });
 
   const filteredServiceCalls = useMemo(() => {
     const calls = serviceCalls ?? [];
@@ -122,7 +114,12 @@ export function ServiceCallsPage() {
 
   const openServiceCall = (serviceCall: ServiceCallListItem) => {
     setPageMessage(null);
-    setDrawerServiceCall(serviceCall);
+    openEntity(serviceCall);
+  };
+
+  const openCreateServiceCall = () => {
+    setPageMessage(null);
+    openCreate();
   };
 
   const columns: DataTableColumn<ServiceCallListItem>[] = [
@@ -163,10 +160,7 @@ export function ServiceCallsPage() {
               <Button
                 type="button"
                 iconStart={<Plus size={18} />}
-                onClick={() => {
-                  setPageMessage(null);
-                  setDrawerServiceCall(null);
-                }}
+                onClick={openCreateServiceCall}
               >
                 קריאה חדשה
               </Button>
@@ -231,17 +225,17 @@ export function ServiceCallsPage() {
 
       <ServiceCallDrawer
         isOpen={isDrawerOpen}
-        serviceCall={drawerServiceCall}
+        serviceCall={isCreating ? null : drawerServiceCall}
         customers={lookups.customers}
         sites={lookups.sites}
         employees={lookups.employees}
         onSitesChanged={async () => {
           await lookups.refetch();
         }}
-        onClose={() => setDrawerServiceCall(undefined)}
+        onClose={closeDrawer}
         onSaved={(message, savedServiceCall) => {
           setPageMessage(message);
-          if (savedServiceCall) setDrawerServiceCall(savedServiceCall);
+          if (savedServiceCall) showEntity(savedServiceCall);
           void refetch();
         }}
       />

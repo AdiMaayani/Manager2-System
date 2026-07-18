@@ -128,7 +128,7 @@ function UserDrawerContent({
   const [isEditing, setIsEditing] = useState(!isExistingUser);
   const [form, setForm] = useState<UserFormState>(() => buildInitialState(user));
   const [error, setError] = useState<string | null>(null);
-  const { isMaximized, toggleMaximize } = useDrawerMaximize(true);
+  const { isMaximized, toggleMaximize } = useDrawerMaximize();
 
   // Restore is an explicit admin-driven selection (not a blanket reactivation): the admin chooses
   // which roles/departments the restored user gets, with at least one role required.

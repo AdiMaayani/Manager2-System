@@ -128,7 +128,7 @@ function InventoryDrawerContent({
     buildInitialState(inventoryItem, defaultCategory),
   );
   const [error, setError] = useState<string | null>(null);
-  const { isMaximized, toggleMaximize } = useDrawerMaximize(true);
+  const { isMaximized, toggleMaximize } = useDrawerMaximize();
 
   // Create persists the record and its image atomically (single request), so there is never a
   // half-created record to remember and a retry can never duplicate.

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { PageShell } from '@shared/components/PageShell';
@@ -12,19 +12,14 @@ import { StatusBadge } from '@shared/components/StatusBadge';
 import { DataTable, type DataTableColumn } from '@shared/components/DataTable';
 import { ProjectDrawer } from '../../components/ProjectDrawer';
 import { useProjects } from '../../hooks/useProjects';
-import type { ProjectDrawerMode, ProjectDrawerTabId, ProjectListItem } from '../../types';
+import type { ProjectDrawerTabId, ProjectListItem } from '../../types';
 import {
   STAGE_FILTER_OPTIONS,
   formatProjectDate,
   getProjectStatusMeta,
 } from '../../utils/projectDisplayUtils';
+import { resolveProjectDrawerState } from '../../utils/projectDrawerUrlState';
 import './ProjectsPage.css';
-
-interface DrawerState {
-  projectId: number | null;
-  mode: ProjectDrawerMode;
-  initialTab?: ProjectDrawerTabId;
-}
 
 export function ProjectsPage() {
   const { data: projects, isLoading, error, refetch } = useProjects();
@@ -33,10 +28,16 @@ export function ProjectsPage() {
   const [stageFilter, setStageFilter] = useState(() => searchParams.get('stage') ?? '');
   const [customerFilter, setCustomerFilter] = useState(() => searchParams.get('customer') ?? '');
   const [pmFilter, setPmFilter] = useState(() => searchParams.get('pm') ?? '');
-  const [drawerState, setDrawerState] = useState<DrawerState | null>(null);
+  // The query string is the single source of truth for the drawer, so the drawer state is derived
+  // from it rather than mirrored into local state via an effect (which previously required a
+  // deferred setState to satisfy the lint rule and risked racing the param updates).
+  const drawerState = useMemo(
+    () => resolveProjectDrawerState(searchParams),
+    [searchParams],
+  );
 
   const updateSearchParams = useCallback(
-    (updates: Record<string, string | null>) => {
+    (updates: Record<string, string | null>, options?: { replace?: boolean }) => {
       const nextParams = new URLSearchParams(searchParams);
 
       Object.entries(updates).forEach(([key, value]) => {
@@ -47,7 +48,7 @@ export function ProjectsPage() {
         }
       });
 
-      setSearchParams(nextParams);
+      setSearchParams(nextParams, { replace: options?.replace ?? false });
     },
     [searchParams, setSearchParams],
   );
@@ -83,30 +84,7 @@ export function ProjectsPage() {
     });
   }, [projects, search, stageFilter, customerFilter, pmFilter]);
 
-  useEffect(() => {
-    const modeParam = searchParams.get('mode');
-    const tabParam = searchParams.get('tab') as ProjectDrawerTabId | null;
-    const initialTab = tabParam ?? undefined;
-
-    if (modeParam === 'create') {
-      setDrawerState({ projectId: null, mode: 'create', initialTab });
-      return;
-    }
-
-    const projectIdParam = searchParams.get('projectId');
-    if (!projectIdParam) {
-      setDrawerState(null);
-      return;
-    }
-
-    const projectId = Number(projectIdParam);
-    if (Number.isNaN(projectId)) return;
-
-    setDrawerState({ projectId, mode: 'view', initialTab });
-  }, [searchParams]);
-
   const openProject = (project: ProjectListItem) => {
-    setDrawerState({ projectId: project.workItemId, mode: 'view', initialTab: 'overview' });
     updateSearchParams({
       projectId: String(project.workItemId),
       mode: null,
@@ -115,26 +93,22 @@ export function ProjectsPage() {
   };
 
   const openCreateProject = () => {
-    setDrawerState({ projectId: null, mode: 'create' });
     updateSearchParams({ projectId: null, mode: 'create', tab: 'overview' });
   };
 
   const closeDrawer = () => {
-    setDrawerState(null);
     updateSearchParams({ projectId: null, mode: null, tab: null });
   };
 
   const handleProjectSaved = (projectId: number) => {
-    setDrawerState({ projectId, mode: 'view', initialTab: 'overview' });
     updateSearchParams({ projectId: String(projectId), mode: null, tab: 'overview' });
     refetch();
   };
 
   const handleDrawerTabChange = (tabId: ProjectDrawerTabId) => {
-    updateSearchParams({ tab: tabId });
-    setDrawerState((current) =>
-      current ? { ...current, initialTab: tabId } : current,
-    );
+    // Manual tab switches replace the current history entry so browsing tabs inside an open project
+    // does not add a back-button step per click, while the tab stays deep-linkable.
+    updateSearchParams({ tab: tabId }, { replace: true });
   };
 
   const hasActiveFilters = Boolean(search || stageFilter || customerFilter || pmFilter);

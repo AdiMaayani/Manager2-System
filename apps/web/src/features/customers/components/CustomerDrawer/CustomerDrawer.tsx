@@ -130,7 +130,7 @@ function CustomerDrawerContent({ customer, onClose, onSaved }: CustomerDrawerCon
   const [isEditing, setIsEditing] = useState(!isExistingCustomer);
   const [form, setForm] = useState<CustomerFormState>(() => buildInitialState(customer));
   const [error, setError] = useState<string | null>(null);
-  const { isMaximized, toggleMaximize } = useDrawerMaximize(true);
+  const { isMaximized, toggleMaximize } = useDrawerMaximize();
 
   function setField<K extends keyof CustomerFormState>(key: K, value: CustomerFormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));

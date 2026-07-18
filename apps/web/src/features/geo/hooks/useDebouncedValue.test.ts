@@ -10,7 +10,7 @@ describe('debounced autocomplete input', () => {
     vi.useFakeTimers();
 
     const emitted: string[] = [];
-    let cancel = createDebouncedValue('abc', 300, (next) => emitted.push(next));
+    createDebouncedValue('abc', 300, (next) => emitted.push(next));
 
     vi.advanceTimersByTime(299);
     expect(emitted).toEqual([]);
@@ -18,7 +18,7 @@ describe('debounced autocomplete input', () => {
     vi.advanceTimersByTime(1);
     expect(emitted).toEqual(['abc']);
 
-    cancel = createDebouncedValue('abcd', 300, (next) => emitted.push(next));
+    const cancel = createDebouncedValue('abcd', 300, (next) => emitted.push(next));
     cancel();
     vi.advanceTimersByTime(300);
 

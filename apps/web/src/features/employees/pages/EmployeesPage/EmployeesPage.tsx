@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
+import { useUrlEntityDrawer } from '@shared/hooks';
 import { PageShell } from '@shared/components/PageShell';
 import { PageSpinner } from '@shared/components/PageSpinner';
 import { ErrorState } from '@shared/components/ErrorState';
@@ -26,35 +26,29 @@ const STATUS_FILTER_ITEMS: SegmentItem<StatusFilter>[] = STATUS_FILTERS.map((f) 
 
 export function EmployeesPage() {
   const { data: employees, isLoading, error, refetch } = useEmployees();
-  const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('הכול');
-  // undefined = drawer closed, null = create mode, Employee = review existing.
-  const [drawerEmployee, setDrawerEmployee] = useState<Employee | null | undefined>(undefined);
   const [pageMessage, setPageMessage] = useState<string | null>(null);
   const currentUser = getCurrentUser();
   const canManageEmployees = currentUser?.roles.includes('Admin') ?? false;
 
-  // Deep link: ?employeeId opens that employee in read-only review mode, then
-  // the param is removed (matching the Quotes ?quoteId behavior).
-  useEffect(() => {
-    const employeeIdParam = searchParams.get('employeeId');
-    if (!employeeIdParam || !employees) return;
-
-    const requestedEmployee = employees.find(
-      (employee) => employee.employeeId === Number(employeeIdParam),
-    );
-    if (requestedEmployee) {
-      setDrawerEmployee(requestedEmployee);
-    }
-
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.delete('employeeId');
-    setSearchParams(nextParams, { replace: true });
-  }, [employees, searchParams, setSearchParams]);
-
-  const isDrawerOpen = drawerEmployee !== undefined;
-  const selectedEmployeeId = drawerEmployee?.employeeId ?? null;
+  // The ?employeeId query parameter is the drawer's single source of truth: missing/invalid = closed,
+  // "new" = create, a positive integer = reviewing that employee. State is derived from the URL, so
+  // deep links and browser back/forward work without any URL→state effect.
+  const {
+    isDrawerOpen,
+    isCreating,
+    selectedEntity: drawerEmployee,
+    selectedId: selectedEmployeeId,
+    openEntity: openEmployee,
+    openCreate,
+    showEntity: showEmployee,
+    close: closeDrawer,
+  } = useUrlEntityDrawer<Employee>({
+    paramName: 'employeeId',
+    items: employees,
+    getId: (employee) => employee.employeeId,
+  });
 
   const filtered = useMemo(() => {
     if (!employees) return [];
@@ -80,10 +74,6 @@ export function EmployeesPage() {
   const resetFilters = () => {
     setSearch('');
     setStatusFilter('הכול');
-  };
-
-  const openEmployee = (employee: Employee) => {
-    setDrawerEmployee(employee);
   };
 
   const columns: DataTableColumn<Employee>[] = [
@@ -136,7 +126,7 @@ export function EmployeesPage() {
               </Button>
             )}
             {canManageEmployees && (
-              <Button iconStart={<Plus size={18} />} onClick={() => setDrawerEmployee(null)}>
+              <Button iconStart={<Plus size={18} />} onClick={openCreate}>
                 עובד חדש
               </Button>
             )}
@@ -186,12 +176,12 @@ export function EmployeesPage() {
 
       <EmployeeDrawer
         isOpen={isDrawerOpen}
-        employee={drawerEmployee}
+        employee={isCreating ? null : drawerEmployee}
         canEdit={canManageEmployees}
-        onClose={() => setDrawerEmployee(undefined)}
+        onClose={closeDrawer}
         onSaved={(savedEmployee, message) => {
           setPageMessage(message);
-          setDrawerEmployee(savedEmployee);
+          showEmployee(savedEmployee);
           void refetch();
         }}
       />

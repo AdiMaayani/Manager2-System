@@ -54,19 +54,36 @@ function validatePlannedUtcRange(parts: PlannedScheduleParts): {
   return buildPlannedUtcRangeFromParts(parts);
 }
 
-export function EditTaskDrawer({
-  isOpen,
-  task,
-  onClose,
-  onSaved,
-}: EditTaskDrawerProps) {
-  // Maximize state lives here (stable) so it survives the EditTaskForm remount on hydration.
-  const { isMaximized, toggleMaximize } = useDrawerMaximize(isOpen);
+export function EditTaskDrawer({ isOpen, task, onClose, onSaved }: EditTaskDrawerProps) {
+  // Mount the drawer content only while open, and key it by the task id (with a safe fallback when
+  // no task is selected), so maximize state resets on reopen and when switching tasks while open —
+  // no effect copies isOpen into state. The hook lives above EditTaskForm, so it still survives the
+  // form's seed→hydrated remount within the same task.
+  if (!isOpen) return null;
+
+  return (
+    <EditTaskDrawerContent
+      key={task?.taskId ?? 'new'}
+      task={task}
+      onClose={onClose}
+      onSaved={onSaved}
+    />
+  );
+}
+
+interface EditTaskDrawerContentProps {
+  task: WorkPlanTaskSelection | null;
+  onClose: () => void;
+  onSaved?: () => void;
+}
+
+function EditTaskDrawerContent({ task, onClose, onSaved }: EditTaskDrawerContentProps) {
+  const { isMaximized, toggleMaximize } = useDrawerMaximize();
 
   const workItemQuery = useQuery({
     queryKey: ['workplan', 'workItem', task?.taskId],
     queryFn: () => getWorkItemByIdAsync(task!.taskId),
-    enabled: isOpen && !!task?.taskId,
+    enabled: !!task?.taskId,
   });
 
   const closeFooter = (
@@ -80,7 +97,7 @@ export function EditTaskDrawer({
   if (workItemQuery.isError) {
     return (
       <Drawer
-        isOpen={isOpen}
+        isOpen
         onClose={onClose}
         title="עריכת משימה"
         isMaximized={isMaximized}
@@ -100,7 +117,7 @@ export function EditTaskDrawer({
   if (!task) {
     return (
       <Drawer
-        isOpen={isOpen}
+        isOpen
         onClose={onClose}
         title="עריכת משימה"
         isMaximized={isMaximized}
@@ -117,7 +134,7 @@ export function EditTaskDrawer({
       // Seed from the selection right away, then remount with the
       // authoritative work item once it loads so fields are never empty.
       key={`${task.taskId}-${workItemQuery.data ? 'hydrated' : 'seed'}`}
-      isOpen={isOpen}
+      isOpen
       isMaximized={isMaximized}
       onToggleMaximize={toggleMaximize}
       taskId={task.taskId}

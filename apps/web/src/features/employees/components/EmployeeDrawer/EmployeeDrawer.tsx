@@ -131,7 +131,7 @@ function EmployeeDrawerContent({ employee, canEdit, onClose, onSaved }: Employee
   const [partialAddressError, setPartialAddressError] = useState<string | null>(null);
   const [lastSavedEmployeeId, setLastSavedEmployeeId] = useState<number | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const { isMaximized, toggleMaximize } = useDrawerMaximize(true);
+  const { isMaximized, toggleMaximize } = useDrawerMaximize();
 
   function setField<K extends keyof EmployeeFormState>(key: K, value: EmployeeFormState[K]) {
     setForm((current) => ({ ...current, [key]: value }));

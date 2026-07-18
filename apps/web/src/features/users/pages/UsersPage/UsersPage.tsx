@@ -1,7 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
+import { useUrlEntityDrawer } from '@shared/hooks';
 import { PageShell } from '@shared/components/PageShell';
 import { PageSpinner } from '@shared/components/PageSpinner';
 import { ErrorState } from '@shared/components/ErrorState';
@@ -49,32 +49,28 @@ export function UsersPage() {
     staleTime: 60_000,
   });
 
-  const [searchParams, setSearchParams] = useSearchParams();
   const [search, setSearch] = useState('');
   const [activeFilter, setActiveFilter] = useState<ActiveFilter>('הכול');
   const [roleFilter, setRoleFilter] = useState('');
-  // undefined = drawer closed, null = create mode, User = review existing.
-  const [drawerUser, setDrawerUser] = useState<User | null | undefined>(undefined);
   const [pageMessage, setPageMessage] = useState<string | null>(null);
 
-  // Deep link: ?userId opens that user in read-only review mode, then the
-  // param is removed (matching the Quotes ?quoteId behavior).
-  useEffect(() => {
-    const userIdParam = searchParams.get('userId');
-    if (!userIdParam || !users) return;
-
-    const requestedUser = users.find((user) => user.userId === Number(userIdParam));
-    if (requestedUser) {
-      setDrawerUser(requestedUser);
-    }
-
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.delete('userId');
-    setSearchParams(nextParams, { replace: true });
-  }, [users, searchParams, setSearchParams]);
-
-  const isDrawerOpen = drawerUser !== undefined;
-  const selectedUserId = drawerUser?.userId ?? null;
+  // The ?userId query parameter is the drawer's single source of truth: missing/invalid = closed,
+  // "new" = create, a positive integer = reviewing that user. State is derived from the URL, so
+  // deep links and browser back/forward work without any URL→state effect.
+  const {
+    isDrawerOpen,
+    isCreating,
+    selectedEntity: drawerUser,
+    selectedId: selectedUserId,
+    openEntity,
+    openCreate,
+    showEntity,
+    close: closeDrawer,
+  } = useUrlEntityDrawer<User>({
+    paramName: 'userId',
+    items: users,
+    getId: (user) => user.userId,
+  });
 
   const employees = useMemo(() => employeesQuery.data ?? [], [employeesQuery.data]);
   const employeesById = useMemo(
@@ -126,7 +122,12 @@ export function UsersPage() {
 
   const openUser = (user: User) => {
     setPageMessage(null);
-    setDrawerUser(user);
+    openEntity(user);
+  };
+
+  const openCreateUser = () => {
+    setPageMessage(null);
+    openCreate();
   };
 
   const columns: DataTableColumn<User>[] = [
@@ -229,13 +230,7 @@ export function UsersPage() {
                 נקה סינון
               </Button>
             )}
-            <Button
-              iconStart={<Plus size={18} />}
-              onClick={() => {
-                setPageMessage(null);
-                setDrawerUser(null);
-              }}
-            >
+            <Button iconStart={<Plus size={18} />} onClick={openCreateUser}>
               משתמש חדש
             </Button>
           </>
@@ -290,15 +285,15 @@ export function UsersPage() {
 
       <UserDrawer
         isOpen={isDrawerOpen}
-        onClose={() => setDrawerUser(undefined)}
-        user={drawerUser}
+        onClose={closeDrawer}
+        user={isCreating ? null : drawerUser}
         employees={employees}
         roles={rolesQuery.data ?? []}
         departments={departmentsQuery.data ?? []}
         isLookupLoading={isLookupLoading}
         onSaved={(savedUser, message) => {
           setPageMessage(message);
-          setDrawerUser(savedUser);
+          showEntity(savedUser);
         }}
       />
     </PageShell>

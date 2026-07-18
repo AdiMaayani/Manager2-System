@@ -119,7 +119,7 @@ function QuoteDrawerContent({ quoteId, onClose, onSaved, initialProjectId }: Quo
   const [isEditing, setIsEditing] = useState(!isExistingQuote);
   const [form, setForm] = useState<QuoteFormState>(() => buildCreateState(initialProjectId));
   const [error, setError] = useState<string | null>(null);
-  const { isMaximized, toggleMaximize } = useDrawerMaximize(true);
+  const { isMaximized, toggleMaximize } = useDrawerMaximize();
 
   function setField<K extends keyof QuoteFormState>(key: K, value: QuoteFormState[K]) {
     setForm((prev) => ({ ...prev, [key]: value }));

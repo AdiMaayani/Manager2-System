@@ -1,6 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Plus } from 'lucide-react';
+import {
+  buildEntityDrawerSearchParams,
+  parseEntityDrawerParam,
+  parseEntityIdParam,
+  type EntityDrawerUrlState,
+} from '@shared/lib/urlEntityDrawer';
 import { Button } from '@shared/components/Button';
 import { EmptyState } from '@shared/components/EmptyState';
 import { ErrorState } from '@shared/components/ErrorState';
@@ -23,24 +29,22 @@ const STATUS_FILTER_ITEMS: SegmentItem<QuoteStatus | ''>[] = [
   ...QUOTE_STATUS_OPTIONS.map((status) => ({ id: status, label: getQuoteStatusLabel(status) })),
 ];
 
-interface DrawerState {
-  isOpen: boolean;
-  quoteId: number | null;
-}
-
-const CLOSED_DRAWER: DrawerState = { isOpen: false, quoteId: null };
-
 export function QuotesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
   const [customerId, setCustomerId] = useState('');
-  // projectId has no visible control; it is set only via the project→quotes deep link and is still
-  // sent to the server filter (API support preserved). "נקה סינון" clears it.
-  const [projectId, setProjectId] = useState(searchParams.get('projectId') ?? '');
   const [status, setStatus] = useState<QuoteStatus | ''>('');
-  const [drawer, setDrawer] = useState<DrawerState>(CLOSED_DRAWER);
+
+  // The query string is the single source of truth for the drawer and the (control-less) project
+  // filter, so both are derived from the current URL on every render — no effect or lazy initializer
+  // copies them into state. This keeps browser back/forward and deep links working: ?quoteId=<int>
+  // reviews a quote, ?quoteId=new opens create mode, and ?projectId pre-filters via the deep link.
+  const quoteDrawerState = parseEntityDrawerParam(searchParams.get('quoteId'));
+  const isDrawerOpen = quoteDrawerState.kind !== 'closed';
+  const drawerQuoteId = quoteDrawerState.kind === 'existing' ? quoteDrawerState.id : null;
+  const projectIdFilter = parseEntityIdParam(searchParams.get('projectId'));
 
   const { data: customerOptions } = useQuoteCustomerOptions();
 
@@ -49,54 +53,41 @@ export function QuotesPage() {
     return () => window.clearTimeout(timeoutId);
   }, [search]);
 
-  // Deep link from the project drawer: ?projectId pre-filters, ?quoteId opens that quote.
-  useEffect(() => {
-    const quoteIdParam = searchParams.get('quoteId');
-    const projectIdParam = searchParams.get('projectId');
-
-    if (projectIdParam) {
-      setProjectId(projectIdParam);
-    }
-
-    if (quoteIdParam) {
-      const parsed = Number(quoteIdParam);
-      if (Number.isFinite(parsed)) {
-        setDrawer({ isOpen: true, quoteId: parsed });
-      }
-    }
-
-    if (quoteIdParam || projectIdParam) {
-      const next = new URLSearchParams(searchParams);
-      next.delete('quoteId');
-      setSearchParams(next, { replace: true });
-    }
-    // Run only on the initial query string.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   const filters: QuoteFilters = useMemo(
     () => ({
       search: debouncedSearch,
       customerId: customerId ? Number(customerId) : undefined,
-      projectId: projectId ? Number(projectId) : undefined,
+      projectId: projectIdFilter ?? undefined,
       status: status || undefined,
     }),
-    [debouncedSearch, customerId, projectId, status],
+    [debouncedSearch, customerId, projectIdFilter, status],
   );
 
   const { data: quotes, isLoading, error, refetch } = useQuotes(filters);
 
-  const hasFilters = Boolean(search.trim() || customerId || projectId || status);
+  const hasFilters = Boolean(search.trim() || customerId || projectIdFilter != null || status);
+
+  function setQuoteDrawer(state: EntityDrawerUrlState, options?: { replace?: boolean }) {
+    setSearchParams(
+      (current) => buildEntityDrawerSearchParams(current, 'quoteId', state),
+      { replace: options?.replace ?? false },
+    );
+  }
 
   function resetFilters() {
     setSearch('');
     setCustomerId('');
-    setProjectId('');
     setStatus('');
+    // The project filter lives in the URL; clearing filters must remove it there too.
+    if (searchParams.has('projectId')) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('projectId');
+      setSearchParams(next, { replace: true });
+    }
   }
 
   function closeDrawer() {
-    setDrawer(CLOSED_DRAWER);
+    setQuoteDrawer({ kind: 'closed' });
   }
 
   return (
@@ -111,7 +102,7 @@ export function QuotesPage() {
             )}
             <Button
               iconStart={<Plus size={18} />}
-              onClick={() => setDrawer({ isOpen: true, quoteId: null })}
+              onClick={() => setQuoteDrawer({ kind: 'create' })}
             >
               הצעה חדשה
             </Button>
@@ -164,16 +155,19 @@ export function QuotesPage() {
       ) : (
         <QuotesTable
           quotes={quotes}
-          selectedQuoteId={drawer.isOpen ? drawer.quoteId : null}
-          onSelectQuote={(quoteId) => setDrawer({ isOpen: true, quoteId })}
+          selectedQuoteId={drawerQuoteId}
+          onSelectQuote={(quoteId) => setQuoteDrawer({ kind: 'existing', id: quoteId })}
         />
       )}
 
       <QuoteDrawer
-        isOpen={drawer.isOpen}
-        quoteId={drawer.quoteId}
+        isOpen={isDrawerOpen}
+        quoteId={drawerQuoteId}
+        initialProjectId={projectIdFilter ?? undefined}
         onClose={closeDrawer}
-        onSaved={(savedQuoteId) => setDrawer({ isOpen: true, quoteId: savedQuoteId })}
+        onSaved={(savedQuoteId) =>
+          setQuoteDrawer({ kind: 'existing', id: savedQuoteId }, { replace: true })
+        }
       />
     </PageShell>
   );

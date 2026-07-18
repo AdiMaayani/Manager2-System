@@ -59,6 +59,7 @@ import {
   overviewFormFromLifecycle,
 } from '../../utils/projectDisplayUtils';
 import { getCreatedProjectSiteSelection } from '../../utils/projectSiteSelection';
+import { resolveProjectDrawerTab } from '../../utils/projectDrawerTabs';
 import { ProjectBoqTab } from './components/ProjectBoqTab';
 import { ProjectDrawingsTab } from './components/ProjectDrawingsTab';
 import { ProjectEquipmentTab } from './components/ProjectEquipmentTab';
@@ -110,7 +111,10 @@ export function ProjectDrawer({
   onActiveTabChange,
 }: ProjectDrawerProps) {
   const isCreateMode = mode === 'create';
-  const [activeTab, setActiveTab] = useState<ProjectDrawerTabId>(initialTab);
+  // The active tab is fully controlled by the parent via `initialTab` (kept in the URL). Tab
+  // clicks are reported through onActiveTabChange, so there is no local tab state to synchronize
+  // with an effect; an invalid request falls back to the overview tab.
+  const activeTab = resolveProjectDrawerTab(initialTab);
   const [isEditMode, setIsEditMode] = useState(isCreateMode);
   const [isMaximized, setIsMaximized] = useState(false);
   const [overviewForm, setOverviewForm] = useState<ProjectOverviewForm>(
@@ -164,14 +168,9 @@ export function ProjectDrawer({
 
     let isCancelled = false;
 
-    const nextTab = DRAWER_TABS.some((tab) => tab.id === initialTab)
-      ? initialTab
-      : 'overview';
-
     queueMicrotask(() => {
       if (isCancelled) return;
 
-      setActiveTab(nextTab);
       setIsEditMode(isCreateMode);
       setIsMaximized(false);
       setSaveError(null);
@@ -187,13 +186,7 @@ export function ProjectDrawer({
     return () => {
       isCancelled = true;
     };
-  }, [isOpen, isCreateMode, initialTab, projectId]);
-
-  useEffect(() => {
-    if (!isOpen) return;
-    if (!DRAWER_TABS.some((tab) => tab.id === initialTab)) return;
-    setActiveTab(initialTab);
-  }, [initialTab, isOpen]);
+  }, [isOpen, isCreateMode, projectId]);
 
   useEffect(() => {
     if (lifecycleQuery.data && !isCreateMode && !isEditModeRef.current) {
@@ -738,9 +731,7 @@ export function ProjectDrawer({
         tabs={DRAWER_TABS}
         activeTabId={activeTab}
         onTabChange={(tabId) => {
-          const nextTabId = tabId as ProjectDrawerTabId;
-          setActiveTab(nextTabId);
-          onActiveTabChange?.(nextTabId);
+          onActiveTabChange?.(tabId as ProjectDrawerTabId);
         }}
       >
         {renderTabContent()}

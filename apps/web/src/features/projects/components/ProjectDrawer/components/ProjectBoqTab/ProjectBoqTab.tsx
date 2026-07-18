@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useInventory, type InventoryItem } from '@features/inventory';
 import { Button } from '@shared/components/Button';
 import { Input } from '@shared/components/Input';
@@ -10,6 +10,16 @@ import type {
   UpdateProjectBoqItemRequest,
 } from '../../../../types';
 import { BOQ_UNIT_OPTIONS } from '../../../../utils/projectDisplayUtils';
+import {
+  applyBoqDraftOverride,
+  buildBoqDraftMap,
+  clearBoqDraftOverride,
+  draftFromBoqItem,
+  EMPTY_BOQ_DRAFT,
+  formatBoqQuantity,
+  type BoqDraft,
+  type BoqDraftOverrides,
+} from './projectBoqDrafts';
 import './ProjectBoqTab.css';
 
 interface ProjectBoqTabProps {
@@ -20,42 +30,6 @@ interface ProjectBoqTabProps {
   onUpdate: (boqItemId: number, body: UpdateProjectBoqItemRequest) => Promise<void>;
   onDelete: (boqItemId: number) => Promise<void>;
   onReorder: (items: ProjectBoqItem[]) => Promise<void>;
-}
-
-interface BoqDraft {
-  systemName: string;
-  inventoryCategory: string;
-  inventoryItemId: string;
-  itemDescription: string;
-  quantity: string;
-  unit: string;
-  unitPrice: string;
-}
-
-const EMPTY_BOQ_DRAFT: BoqDraft = {
-  systemName: '',
-  inventoryCategory: '',
-  inventoryItemId: '',
-  itemDescription: '',
-  quantity: '1',
-  unit: BOQ_UNIT_OPTIONS[0],
-  unitPrice: '',
-};
-
-function formatQuantity(quantity: number): string {
-  return Number.isInteger(quantity) ? String(quantity) : String(quantity);
-}
-
-function draftFromItem(item: ProjectBoqItem): BoqDraft {
-  return {
-    systemName: item.systemName ?? '',
-    inventoryCategory: item.inventoryCategory ?? '',
-    inventoryItemId: item.inventoryItemId ? String(item.inventoryItemId) : '',
-    itemDescription: item.itemDescription,
-    quantity: formatQuantity(item.quantity),
-    unit: item.unit,
-    unitPrice: item.unitPrice != null ? String(item.unitPrice) : '',
-  };
 }
 
 function inventoryLabel(item: InventoryItem): string {
@@ -116,7 +90,12 @@ export function ProjectBoqTab({
       ),
     [items],
   );
-  const [drafts, setDrafts] = useState<Record<number, BoqDraft>>({});
+  // Only the fields a user has actually edited are stored, per row, as partial overrides; every
+  // other field is derived from the server row. A background query refresh therefore never clobbers
+  // unsaved edits, untouched fields on a dirty row still follow the server, and there is no effect
+  // copying the server list into local state.
+  const [overrides, setOverrides] = useState<BoqDraftOverrides>({});
+  const drafts = useMemo(() => buildBoqDraftMap(sortedItems, overrides), [sortedItems, overrides]);
   const [newItemDraft, setNewItemDraft] = useState<BoqDraft>(EMPTY_BOQ_DRAFT);
   const [error, setError] = useState<string | null>(null);
 
@@ -148,22 +127,10 @@ export function ProjectBoqTab({
     return inventoryItemsByCategory.get(category) ?? [];
   }
 
-  useEffect(() => {
-    setDrafts(
-      Object.fromEntries(
-        sortedItems.map((item) => [item.projectBoqItemId, draftFromItem(item)]),
-      ),
-    );
-  }, [sortedItems]);
-
   const updateDraft = (boqItemId: number, patch: Partial<BoqDraft>) => {
-    setDrafts((currentDrafts) => ({
-      ...currentDrafts,
-      [boqItemId]: {
-        ...(currentDrafts[boqItemId] ?? EMPTY_BOQ_DRAFT),
-        ...patch,
-      },
-    }));
+    // Store only the edited fields; the functional updater merges successive patches so multiple
+    // edits to the same row accumulate without freezing untouched fields against server refreshes.
+    setOverrides((current) => applyBoqDraftOverride(current, boqItemId, patch));
   };
 
   const applyInventoryItemToDraft = (
@@ -210,7 +177,7 @@ export function ProjectBoqTab({
 
   const handleUpdate = async (item: ProjectBoqItem) => {
     setError(null);
-    const request = buildBoqRequest(drafts[item.projectBoqItemId] ?? draftFromItem(item));
+    const request = buildBoqRequest(drafts[item.projectBoqItemId] ?? draftFromBoqItem(item));
 
     if ('error' in request) {
       setError(request.error);
@@ -222,6 +189,8 @@ export function ProjectBoqTab({
         ...request,
         sortOrder: item.sortOrder,
       });
+      // The row is now saved; drop its override so it reconciles with the refreshed server value.
+      setOverrides((current) => clearBoqDraftOverride(current, item.projectBoqItemId));
     } catch (updateError) {
       setError(updateError instanceof Error ? updateError.message : 'עדכון פריט כתב הכמויות נכשל.');
     }
@@ -232,6 +201,7 @@ export function ProjectBoqTab({
 
     try {
       await onDelete(boqItemId);
+      setOverrides((current) => clearBoqDraftOverride(current, boqItemId));
     } catch (deleteError) {
       setError(deleteError instanceof Error ? deleteError.message : 'מחיקת פריט כתב הכמויות נכשלה.');
     }
@@ -274,7 +244,7 @@ export function ProjectBoqTab({
           </thead>
           <tbody>
             {sortedItems.map((item, index) => {
-              const draft = drafts[item.projectBoqItemId] ?? draftFromItem(item);
+              const draft = drafts[item.projectBoqItemId] ?? draftFromBoqItem(item);
 
               return (
                 <tr key={item.projectBoqItemId}>
@@ -548,7 +518,7 @@ export function ProjectBoqTab({
               <td>{item.systemName || '-'}</td>
               <td>{item.inventorySkuCode ? `${item.inventorySkuCode} · ${item.inventoryItemName}` : '-'}</td>
               <td>{item.itemDescription}</td>
-              <td>{formatQuantity(item.quantity)}</td>
+              <td>{formatBoqQuantity(item.quantity)}</td>
               <td>{item.unit}</td>
               <td>{item.unitPrice != null ? item.unitPrice.toLocaleString('he-IL') : '-'}</td>
             </tr>

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 
 export interface DrawerMaximizeState {
   isMaximized: boolean;
@@ -6,16 +6,14 @@ export interface DrawerMaximizeState {
 }
 
 /**
- * Shared maximize state for every entity drawer. Mirrors ProjectDrawer: the drawer
- * starts at its normal size and resets back to it whenever it is (re)opened, so a
- * previously maximized drawer never reopens stuck in the wide footprint.
+ * Shared maximize state for every entity drawer: the drawer starts at its normal size and the user
+ * can toggle the wide footprint. Reset-on-reopen is owned by the drawer lifecycle rather than an
+ * effect — every consumer mounts the component that calls this hook only while the drawer is open
+ * (returning null when closed), so a fresh open always starts non-maximized and switching records
+ * (which remounts the content) can never retain a stale maximized state.
  */
-export function useDrawerMaximize(isOpen: boolean): DrawerMaximizeState {
+export function useDrawerMaximize(): DrawerMaximizeState {
   const [isMaximized, setIsMaximized] = useState(false);
-
-  useEffect(() => {
-    if (isOpen) setIsMaximized(false);
-  }, [isOpen]);
 
   const toggleMaximize = useCallback(() => {
     setIsMaximized((value) => !value);

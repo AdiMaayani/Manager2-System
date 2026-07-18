@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useMemo, useState } from 'react';
 import { Plus } from 'lucide-react';
+import { useUrlEntityDrawer } from '@shared/hooks';
 import { PageShell } from '@shared/components/PageShell';
 import { PageSpinner } from '@shared/components/PageSpinner';
 import { ErrorState } from '@shared/components/ErrorState';
@@ -26,32 +26,25 @@ const STATUS_FILTER_ITEMS: SegmentItem<StatusFilter>[] = STATUS_FILTERS.map((f) 
 export function CustomersPage() {
   const { can } = usePermissions();
   const { data: customers, isLoading, error, refetch } = useCustomers();
-  const [searchParams, setSearchParams] = useSearchParams();
-  // undefined = drawer closed, null = create mode, Customer = review existing.
-  const [drawerCustomer, setDrawerCustomer] = useState<Customer | null | undefined>(undefined);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('הכול');
-
-  // Deep link: ?customerId opens that customer in read-only review mode, then
-  // the param is removed (matching the Quotes ?quoteId behavior).
-  useEffect(() => {
-    const customerIdParam = searchParams.get('customerId');
-    if (!customerIdParam || !customers) return;
-
-    const requestedCustomer = customers.find(
-      (customer) => customer.customerId === Number(customerIdParam),
-    );
-    if (requestedCustomer) {
-      setDrawerCustomer(requestedCustomer);
-    }
-
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.delete('customerId');
-    setSearchParams(nextParams, { replace: true });
-  }, [customers, searchParams, setSearchParams]);
-
-  const isDrawerOpen = drawerCustomer !== undefined;
-  const selectedCustomerId = drawerCustomer?.customerId ?? null;
+  // The ?customerId query parameter is the drawer's single source of truth: missing/invalid = closed,
+  // "new" = create, a positive integer = reviewing that customer. State is derived from the URL, so
+  // deep links and browser back/forward work without any URL→state effect.
+  const {
+    isDrawerOpen,
+    isCreating,
+    selectedEntity: drawerCustomer,
+    selectedId: selectedCustomerId,
+    openEntity: openCustomer,
+    openCreate,
+    showEntity: showCustomer,
+    close: closeDrawer,
+  } = useUrlEntityDrawer<Customer>({
+    paramName: 'customerId',
+    items: customers,
+    getId: (customer) => customer.customerId,
+  });
 
   const filtered = useMemo(() => {
     if (!customers) return [];
@@ -76,10 +69,6 @@ export function CustomersPage() {
   const resetFilters = () => {
     setSearch('');
     setStatusFilter('הכול');
-  };
-
-  const openCustomer = (customer: Customer) => {
-    setDrawerCustomer(customer);
   };
 
   const columns: DataTableColumn<Customer>[] = [
@@ -118,7 +107,7 @@ export function CustomersPage() {
               </Button>
             )}
             {can('manageCustomers') && (
-              <Button iconStart={<Plus size={18} />} onClick={() => setDrawerCustomer(null)}>
+              <Button iconStart={<Plus size={18} />} onClick={openCreate}>
                 לקוח חדש
               </Button>
             )}
@@ -156,9 +145,9 @@ export function CustomersPage() {
 
       <CustomerDrawer
         isOpen={isDrawerOpen}
-        onClose={() => setDrawerCustomer(undefined)}
-        onSaved={(savedCustomer) => setDrawerCustomer(savedCustomer)}
-        customer={drawerCustomer}
+        onClose={closeDrawer}
+        onSaved={showCustomer}
+        customer={isCreating ? null : drawerCustomer}
       />
     </PageShell>
   );

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -29,6 +29,10 @@ import {
   filterServiceCallSitesByCustomer,
   getCreatedServiceCallSiteSelection,
 } from '../../lib/serviceCallSiteSelection';
+import {
+  buildServiceCallFormState,
+  type ServiceCallFormState,
+} from '../../lib/serviceCallFormState';
 import type {
   ServiceCallCustomerOption,
   ServiceCallDetails,
@@ -68,49 +72,6 @@ interface ServiceCallDrawerProps {
   employees: ServiceCallEmployeeOption[];
   onSitesChanged: () => Promise<void>;
   onSaved: (message: string, savedServiceCall?: ServiceCallDetails) => void;
-}
-
-interface ServiceCallFormState {
-  title: string;
-  description: string;
-  status: string;
-  billingType: string;
-  customerId: string;
-  siteId: string;
-  priority: string;
-  plannedStart: string;
-  plannedEnd: string;
-  estimatedHours: string;
-  actualStart: string;
-  actualEnd: string;
-  actualHours: string;
-  requiredRole: string;
-  isLocked: boolean;
-}
-
-function toDateTimeInputValue(value?: string | null): string {
-  if (!value) return '';
-  return value.slice(0, 16);
-}
-
-function buildInitialState(serviceCall: ServiceCallDetails | null | undefined): ServiceCallFormState {
-  return {
-    title: serviceCall?.title ?? '',
-    description: serviceCall?.description ?? '',
-    status: serviceCall?.status ?? 'Open',
-    billingType: serviceCall?.billingType ?? 'Hourly',
-    customerId: serviceCall?.customerId ? String(serviceCall.customerId) : '',
-    siteId: serviceCall?.siteId ? String(serviceCall.siteId) : '',
-    priority: serviceCall?.priority ?? '',
-    plannedStart: toDateTimeInputValue(serviceCall?.plannedStart),
-    plannedEnd: toDateTimeInputValue(serviceCall?.plannedEnd),
-    estimatedHours: serviceCall?.estimatedHours != null ? String(serviceCall.estimatedHours) : '',
-    actualStart: toDateTimeInputValue(serviceCall?.actualStart),
-    actualEnd: toDateTimeInputValue(serviceCall?.actualEnd),
-    actualHours: serviceCall?.actualHours != null ? String(serviceCall.actualHours) : '',
-    requiredRole: serviceCall?.requiredRole ?? '',
-    isLocked: serviceCall?.isLocked ?? false,
-  };
 }
 
 function nullableString(value: string): string | null {
@@ -207,9 +168,11 @@ function ServiceCallDrawerContent({
 
   // Existing service calls open in read-only review mode; create opens editable.
   const [isEditing, setIsEditing] = useState(!isExistingServiceCall);
-  const [form, setForm] = useState<ServiceCallFormState>(() => buildInitialState(currentServiceCall));
+  const [form, setForm] = useState<ServiceCallFormState>(() =>
+    buildServiceCallFormState(currentServiceCall),
+  );
   const [error, setError] = useState<string | null>(null);
-  const { isMaximized, toggleMaximize } = useDrawerMaximize(true);
+  const { isMaximized, toggleMaximize } = useDrawerMaximize();
   const [employeeIdToAssign, setEmployeeIdToAssign] = useState('');
   const [assignmentRole, setAssignmentRole] = useState(currentServiceCall?.requiredRole ?? '');
   const [isCreatingSite, setIsCreatingSite] = useState(false);
@@ -221,14 +184,9 @@ function ServiceCallDrawerContent({
   const [siteCreationError, setSiteCreationError] = useState<string | null>(null);
   const [isSavingSite, setIsSavingSite] = useState(false);
 
-  // Keep the form mirrored to the freshest server data while reviewing, without
-  // clobbering in-progress edits when the detail query resolves mid-edit.
-  useEffect(() => {
-    if (isEditing) return;
-    setForm(buildInitialState(currentServiceCall));
-    setAssignmentRole(currentServiceCall?.requiredRole ?? '');
-  }, [currentServiceCall, isEditing]);
-
+  // The edit form/assignment role are only shown in edit mode, and entering edit mode re-seeds them
+  // from the freshest currentServiceCall (see handleStartEdit). Review mode renders directly from
+  // currentServiceCall, so no effect is needed to mirror server data into form state.
   const activeCustomers = useMemo(
     () => customers.filter((customer) => customer.isActive !== false),
     [customers],
@@ -289,7 +247,7 @@ function ServiceCallDrawerContent({
   }
 
   function handleStartEdit() {
-    setForm(buildInitialState(currentServiceCall));
+    setForm(buildServiceCallFormState(currentServiceCall));
     setAssignmentRole(currentServiceCall?.requiredRole ?? '');
     setEmployeeIdToAssign('');
     setError(null);
@@ -302,7 +260,7 @@ function ServiceCallDrawerContent({
       return;
     }
 
-    setForm(buildInitialState(currentServiceCall));
+    setForm(buildServiceCallFormState(currentServiceCall));
     setAssignmentRole(currentServiceCall?.requiredRole ?? '');
     setEmployeeIdToAssign('');
     setError(null);
