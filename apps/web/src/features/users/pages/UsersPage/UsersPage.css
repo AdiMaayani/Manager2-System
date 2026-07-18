@@ -1,3 +1,17 @@
+/* Equal-width status SegmentedControl — list filter only. */
+.usersPage__statusControl {
+  width: 100%;
+}
+
+.usersPage__statusControl .segmented {
+  display: flex;
+  width: 100%;
+}
+
+.usersPage__statusControl .segmented__item {
+  flex: 1 1 0;
+}
+
 /* Multi-value cells inside the shared DataTable. */
 .usersPage__primaryCell {
   display: flex;

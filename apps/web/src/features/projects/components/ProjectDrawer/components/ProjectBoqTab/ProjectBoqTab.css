@@ -21,3 +21,137 @@
   margin: 0 0 var(--spacing-md);
   color: var(--color-neutral-600);
 }
+
+/* Edit-mode-only table sizing: horizontal scroll only kicks in below the table's own
+   minimum width, so the layout never overflows the drawer on normal desktop widths. */
+.projectBoqTab__tableScroll {
+  overflow-x: auto;
+}
+
+.projectBoqTab__table--editable {
+  table-layout: fixed;
+  min-width: 1100px;
+}
+
+.projectBoqTab__col--drag {
+  width: 44px;
+}
+
+.projectBoqTab__col--system {
+  width: 8%;
+}
+
+/* Real category names ("טלפוניה ואינטרקום", "כבילה ותשתיות") need more room than a 10%
+   share gave them — 10% left the select clipping the selected text. */
+.projectBoqTab__col--category {
+  width: 17%;
+}
+
+.projectBoqTab__col--inventoryItem {
+  width: 12%;
+}
+
+.projectBoqTab__col--description {
+  width: 16%;
+}
+
+.projectBoqTab__col--quantity {
+  width: 5%;
+}
+
+/* A fixed pixel width (not a percentage) is what actually guarantees this floor: under
+   table-layout: fixed, the base .projectBoqTab__table { width: 100% } rule leaves the
+   percentage columns no slack to grow into a cell's min-width, so a percentage-based Unit
+   column could still render below 170px even with min-width set. A fixed <col> width — the
+   same technique already used for the drag column — is the reliable first layer; min-width
+   on the cells and the table floor below are the other two reinforcing layers. */
+.projectBoqTab__col--unit {
+  width: 170px;
+}
+
+.projectBoqTab__col--unitPrice {
+  width: 6%;
+}
+
+.projectBoqTab__col--actions {
+  width: 16%;
+}
+
+.projectBoqTab__table--editable .projectBoqTab__unitCell {
+  min-width: 170px;
+}
+
+.projectBoqTab__dragHeaderCell {
+  padding: var(--spacing-sm) 0;
+}
+
+.projectBoqTab__dragCell {
+  padding-inline: 0;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.projectBoqTab__dragCell--empty {
+  background: transparent;
+}
+
+/* Placeholder left behind in the table while the row's drag clone follows the pointer. */
+.projectBoqTab__row--dragging {
+  opacity: 0.4;
+}
+
+.projectBoqTab__dragHandle {
+  cursor: grab;
+  color: var(--color-neutral-400);
+}
+
+.projectBoqTab__dragHandle:active,
+.projectBoqTab__dragHandle--grabbing {
+  cursor: grabbing;
+}
+
+.projectBoqTab__dragHandle:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Non-interactive drag-handle glyph shown inside the DragOverlay clone. */
+.projectBoqTab__dragHandle--active {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-height-sm);
+  height: var(--control-height-sm);
+  flex-shrink: 0;
+  color: var(--color-neutral-400);
+  cursor: grabbing;
+}
+
+/* Compact, non-interactive preview rendered under the pointer — deliberately lighter
+   than the real row so no form controls are duplicated while dragging. */
+.projectBoqTab__overlayRow {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-md);
+  background: #fff;
+  box-shadow: var(--shadow-lg);
+  transform: scale(1.02);
+  cursor: grabbing;
+}
+
+.projectBoqTab__overlayDescription {
+  overflow: hidden;
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-900);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.projectBoqTab__overlayUnit {
+  flex-shrink: 0;
+  color: var(--color-neutral-600);
+  font-size: var(--font-size-sm);
+}

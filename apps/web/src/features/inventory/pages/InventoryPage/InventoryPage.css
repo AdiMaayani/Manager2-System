@@ -1,8 +1,15 @@
-/* Align the low-stock checkbox with the bottom of the sibling filter fields. */
-.inventoryPage__checkboxField {
+/* Equal-width status segments so the selected background fills exactly one third. */
+.inventoryPage__statusControl {
+  width: 100%;
+}
+
+.inventoryPage__statusControl .segmented {
   display: flex;
-  align-items: center;
-  min-height: var(--control-height-md);
+  width: 100%;
+}
+
+.inventoryPage__statusControl .segmented__item {
+  flex: 1 1 0;
 }
 
 .inventoryPage__sku {
@@ -107,7 +114,7 @@
   flex-wrap: wrap;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .inventoryPage__categoryThumb {
     width: 72px;
   }

@@ -16,73 +16,10 @@
   gap: var(--spacing-md);
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .contactDrawer__grid {
     grid-template-columns: 1fr;
   }
-}
-
-.contactDrawer__field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
-}
-
-.contactDrawer__label {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-neutral-700);
-}
-
-.contactDrawer__select {
-  padding: var(--spacing-sm) var(--spacing-md);
-  border: 1px solid var(--color-neutral-300);
-  border-radius: var(--radius-md);
-  background: #fff;
-  font-size: var(--font-size-sm);
-  color: var(--color-neutral-900);
-  direction: rtl;
-}
-
-.contactDrawer__select:focus {
-  outline: none;
-  border-color: var(--color-primary-500);
-  box-shadow: 0 0 0 2px var(--color-primary-100);
-}
-
-.contactDrawer__textarea {
-  padding: var(--spacing-sm) var(--spacing-md);
-  border: 1px solid var(--color-neutral-300);
-  border-radius: var(--radius-md);
-  background: #fff;
-  font-size: var(--font-size-sm);
-  color: var(--color-neutral-900);
-  resize: vertical;
-  direction: rtl;
-  font-family: inherit;
-}
-
-.contactDrawer__textarea:focus {
-  outline: none;
-  border-color: var(--color-primary-500);
-  box-shadow: 0 0 0 2px var(--color-primary-100);
-}
-
-.contactDrawer__checkboxRow {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  font-size: var(--font-size-sm);
-  cursor: pointer;
-}
-
-.contactDrawer__error {
-  color: var(--color-danger-600);
-  font-size: var(--font-size-sm);
-  background: var(--color-danger-50);
-  border: 1px solid var(--color-danger-200);
-  border-radius: var(--radius-md);
-  padding: var(--spacing-sm) var(--spacing-md);
 }
 
 /* Footer styles: the shared Drawer footer slot provides background and border. */
@@ -119,15 +56,29 @@
   font-weight: var(--font-weight-medium);
 }
 
-/* Read-only review mode: sectioned cards with a responsive field grid. */
+/* Read-only review mode: sectioned cards with a responsive field grid. Gap matches the
+   Customers/Service Calls card rhythm (var(--spacing-lg)) so every drawer reads consistently. */
 .contactDrawer--review {
-  gap: var(--spacing-md);
+  gap: var(--spacing-lg);
 }
 
 .contactDrawer__detailsGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: var(--spacing-md);
+}
+
+/* Elevates the lead "פרטים כלליים" section to the same primary-card treatment used by
+   CustomerDrawer/ServiceCallDrawer, via a local wrapper — DetailsSection/DetailsField
+   themselves are not modified, only overridden from within this drawer's own class. */
+.contactDrawer__primarySection .detailsSection {
+  border-color: var(--color-primary-200);
+  box-shadow: var(--shadow-card);
+}
+
+.contactDrawer__primarySection .detailsSection__title {
+  color: var(--color-primary-700);
+  font-size: var(--font-size-lg);
 }
 
 /* Related operational records inside review mode. */

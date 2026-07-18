@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { useUrlEntityDrawer } from '@shared/hooks';
 import { PageShell } from '@shared/components/PageShell';
@@ -19,18 +20,77 @@ import './EmployeesPage.css';
 
 const STATUS_FILTERS = ['פעילים', 'בארכיון', 'הכול'] as const;
 type StatusFilter = (typeof STATUS_FILTERS)[number];
-const STATUS_FILTER_ITEMS: SegmentItem<StatusFilter>[] = STATUS_FILTERS.map((f) => ({
-  id: f,
-  label: f,
+
+const DEFAULT_STATUS_FILTER: StatusFilter = 'הכול';
+
+const STATUS_FILTER_ITEMS: SegmentItem<StatusFilter>[] = STATUS_FILTERS.map((filter) => ({
+  id: filter,
+  label: filter,
 }));
+
+// Hebrew SegmentedControl ids stay unchanged; URL uses stable English values.
+// Default "הכול" omits the status parameter; "all" is accepted for direct links.
+function statusFilterToUrlParam(status: StatusFilter): string | null {
+  if (status === 'פעילים') return 'active';
+  if (status === 'בארכיון') return 'inactive';
+  return null;
+}
+
+function resolveStatusFilterParam(value: string | null): StatusFilter {
+  if (value === 'active') return 'פעילים';
+  if (value === 'inactive') return 'בארכיון';
+  if (value === 'all' || value == null || value === '') return DEFAULT_STATUS_FILTER;
+  return DEFAULT_STATUS_FILTER;
+}
 
 export function EmployeesPage() {
   const { data: employees, isLoading, error, refetch } = useEmployees();
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('הכול');
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Status is derived from the URL so back/forward restores it without a sync effect.
+  const statusFilter = resolveStatusFilterParam(searchParams.get('status'));
+  const urlSearchParam = searchParams.get('search') ?? '';
+
+  const [search, setSearch] = useState(urlSearchParam);
+  const [prevUrlSearch, setPrevUrlSearch] = useState(urlSearchParam);
+
+  // When the URL search param changes (back/forward, clear filters), adjust the controlled
+  // input during render — avoids a setState-in-effect lint violation. Skip overwrite while the
+  // local value is ahead of the previous URL value (in-progress typing before the URL catches up).
+  if (urlSearchParam !== prevUrlSearch) {
+    const shouldSyncSearch =
+      search === prevUrlSearch ||
+      search.trim() === prevUrlSearch ||
+      search === urlSearchParam ||
+      search.trim() === urlSearchParam;
+    setPrevUrlSearch(urlSearchParam);
+    if (shouldSyncSearch) {
+      setSearch(urlSearchParam);
+    }
+  }
+
   const [pageMessage, setPageMessage] = useState<string | null>(null);
   const currentUser = getCurrentUser();
   const canManageEmployees = currentUser?.roles.includes('Admin') ?? false;
+
+  // Filters persist to the URL; only named keys are updated so employeeId/new and unrelated
+  // params are always preserved untouched.
+  const updateSearchParams = useCallback(
+    (updates: Record<string, string | null>) => {
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        Object.entries(updates).forEach(([key, value]) => {
+          if (value) {
+            next.set(key, value);
+          } else {
+            next.delete(key);
+          }
+        });
+        return next;
+      });
+    },
+    [setSearchParams],
+  );
 
   // The ?employeeId query parameter is the drawer's single source of truth: missing/invalid = closed,
   // "new" = create, a positive integer = reviewing that employee. State is derived from the URL, so
@@ -69,26 +129,29 @@ export function EmployeesPage() {
     });
   }, [employees, search, statusFilter]);
 
-  const hasActiveFilters = Boolean(search.trim()) || statusFilter !== 'הכול';
+  const hasActiveFilters = Boolean(search.trim()) || statusFilter !== DEFAULT_STATUS_FILTER;
 
   const resetFilters = () => {
-    setSearch('');
-    setStatusFilter('הכול');
+    updateSearchParams({ search: null, status: null });
   };
 
   const columns: DataTableColumn<Employee>[] = [
-    { id: 'name', header: 'שם', cell: (employee) => employee.fullName },
-    { id: 'role', header: 'תפקיד', cell: (employee) => employee.primaryRole || '—' },
-    { id: 'phone', header: 'טלפון', cell: (employee) => employee.phone ?? '—' },
-    { id: 'email', header: 'אימייל', cell: (employee) => employee.email ?? '—' },
+    { id: 'name', header: 'שם', width: '20%', cell: (employee) => employee.fullName },
+    { id: 'role', header: 'תפקיד', width: '16%', cell: (employee) => employee.primaryRole || '—' },
+    { id: 'phone', header: 'טלפון', width: '120px', cell: (employee) => employee.phone ?? '—' },
+    { id: 'email', header: 'אימייל', width: '18%', cell: (employee) => employee.email ?? '—' },
     {
       id: 'capacity',
       header: 'קיבולת יומית',
+      width: '110px',
+      align: 'end',
       cell: (employee) => employee.dailyCapacityHours ?? '—',
     },
     {
       id: 'assignable',
       header: 'ניתן לשיבוץ',
+      width: '110px',
+      align: 'center',
       cell: (employee) => (
         <Badge variant={employee.isAssignable ? 'success' : 'neutral'}>
           {employee.isAssignable ? 'כן' : 'לא'}
@@ -98,6 +161,8 @@ export function EmployeesPage() {
     {
       id: 'status',
       header: 'סטטוס',
+      width: '110px',
+      align: 'center',
       cell: (employee) => (
         <Badge variant={employee.isActive ? 'success' : 'neutral'}>
           {employee.isActive ? 'פעיל' : 'לא פעיל'}
@@ -106,17 +171,24 @@ export function EmployeesPage() {
     },
   ];
 
-  if (isLoading) return <PageShell title="עובדים"><PageSpinner /></PageShell>;
+  if (isLoading) {
+    return (
+      <PageShell title="עובדים" wide>
+        <PageSpinner />
+      </PageShell>
+    );
+  }
+
   if (error) {
     return (
-      <PageShell title="עובדים">
+      <PageShell title="עובדים" wide>
         <ErrorState message={error.message} onRetry={() => refetch()} />
       </PageShell>
     );
   }
 
   return (
-    <PageShell title="עובדים">
+    <PageShell title="עובדים" wide>
       <FilterBar
         actions={
           <>
@@ -136,19 +208,28 @@ export function EmployeesPage() {
         <FilterField label="חיפוש" grow>
           <Input
             placeholder="חיפוש עובד..."
+            aria-label="חיפוש עובדים"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(event) => {
+              const value = event.target.value;
+              setSearch(value);
+              updateSearchParams({ search: value.trim() || null });
+            }}
           />
         </FilterField>
 
         <FilterField label="סטטוס">
-          <SegmentedControl
-            items={STATUS_FILTER_ITEMS}
-            value={statusFilter}
-            onChange={setStatusFilter}
-            ariaLabel="סינון לפי סטטוס"
-            size="sm"
-          />
+          <div className="employeesPage__statusControl">
+            <SegmentedControl
+              items={STATUS_FILTER_ITEMS}
+              value={statusFilter}
+              onChange={(value) => {
+                updateSearchParams({ status: statusFilterToUrlParam(value) });
+              }}
+              ariaLabel="סינון לפי סטטוס"
+              size="sm"
+            />
+          </div>
         </FilterField>
       </FilterBar>
 

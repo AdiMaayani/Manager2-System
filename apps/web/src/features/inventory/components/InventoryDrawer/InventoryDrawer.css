@@ -10,15 +10,29 @@
   gap: var(--spacing-lg);
 }
 
-/* Read-only review mode: sectioned cards with a responsive field grid. */
+/* Read-only review mode: sectioned cards with a responsive field grid. Gap matches the
+   Customers/Service Calls/Quotes card rhythm so every drawer reads consistently. */
 .inventoryDrawer--review {
-  gap: var(--spacing-md);
+  gap: var(--spacing-lg);
 }
 
 .inventoryDrawer__detailsGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: var(--spacing-md);
+}
+
+/* Elevates the lead "תמונה וזיהוי" section to the same primary-card treatment used by
+   CustomerDrawer/ServiceCallDrawer/ContactDrawer/QuoteDrawer, via a local wrapper —
+   DetailsSection/DetailsField themselves are not modified. */
+.inventoryDrawer__primarySection .detailsSection {
+  border-color: var(--color-primary-200);
+  box-shadow: var(--shadow-card);
+}
+
+.inventoryDrawer__primarySection .detailsSection__title {
+  color: var(--color-primary-700);
+  font-size: var(--font-size-lg);
 }
 
 .inventoryDrawer__skuValue {
@@ -95,58 +109,6 @@
   gap: var(--spacing-md);
 }
 
-.inventoryDrawer__field {
-  display: flex;
-  flex-direction: column;
-  gap: var(--spacing-xs);
-}
-
-.inventoryDrawer__label {
-  font-size: var(--font-size-sm);
-  font-weight: var(--font-weight-medium);
-  color: var(--color-neutral-700);
-}
-
-.inventoryDrawer__input,
-.inventoryDrawer__textarea {
-  padding: var(--spacing-sm) var(--spacing-md);
-  border: 1px solid var(--color-neutral-300);
-  border-radius: var(--radius-md);
-  background: #fff;
-  font-size: var(--font-size-sm);
-  color: var(--color-neutral-900);
-  direction: rtl;
-  font-family: inherit;
-}
-
-.inventoryDrawer__input:focus,
-.inventoryDrawer__textarea:focus {
-  outline: none;
-  border-color: var(--color-primary-500);
-  box-shadow: 0 0 0 2px var(--color-primary-100);
-}
-
-.inventoryDrawer__textarea {
-  resize: vertical;
-}
-
-.inventoryDrawer__checkboxRow {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-sm);
-  font-size: var(--font-size-sm);
-  cursor: pointer;
-}
-
-.inventoryDrawer__error {
-  color: var(--color-danger-600);
-  font-size: var(--font-size-sm);
-  background: var(--color-danger-50);
-  border: 1px solid var(--color-danger-200);
-  border-radius: var(--radius-md);
-  padding: var(--spacing-sm) var(--spacing-md);
-}
-
 /* Footer styles: the shared Drawer footer slot provides background and border. */
 .inventoryDrawer__footerContent {
   display: flex;
@@ -170,13 +132,7 @@
   margin-inline-start: auto;
 }
 
-.inventoryDrawer__confirmText {
-  font-size: var(--font-size-sm);
-  color: var(--color-danger-600);
-  font-weight: var(--font-weight-medium);
-}
-
-@media (max-width: 720px) {
+@media (max-width: 768px) {
   .inventoryDrawer__grid {
     grid-template-columns: 1fr;
   }

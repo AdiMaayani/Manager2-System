@@ -1,12 +1,35 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type Announcements,
+  type DragEndEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { GripVertical } from 'lucide-react';
 import { Badge } from '@shared/components/Badge';
 import { StatusBadge } from '@shared/components/StatusBadge';
 import { Button } from '@shared/components/Button';
+import { IconButton } from '@shared/components/IconButton';
 import { Input } from '@shared/components/Input';
 import { Select } from '@shared/components/Select';
 import { ListSelect } from '@shared/components/ListSelect';
 import { Textarea } from '@shared/components/Textarea';
 import { ConfirmInline } from '@shared/components/ConfirmInline';
+import { EmptyState } from '@shared/components/EmptyState';
 import { InlineAlert } from '@shared/components/InlineAlert';
 import { PageSpinner } from '@shared/components/PageSpinner';
 import { useProjectMilestones } from '../../../../hooks/useProjectLifecycle';
@@ -96,6 +119,163 @@ function buildUpdateMilestoneRequest(form: ProjectMilestoneForm): UpdateMileston
   };
 }
 
+interface MilestoneCardBodyProps {
+  milestone: ProjectMilestone;
+  index: number;
+  total: number;
+  isCancelled: boolean;
+  managerName?: string;
+  isReordering: boolean;
+  isSaving: boolean;
+  onMove: (milestoneId: number, direction: 'up' | 'down') => void;
+  onEdit: (milestoneId: number) => void;
+  onCancel: (milestoneId: number) => void;
+  dragHandle: ReactNode;
+}
+
+/** Shared card markup reused by the sortable list item and the drag overlay preview. */
+function MilestoneCardBody({
+  milestone,
+  index,
+  total,
+  isCancelled,
+  managerName,
+  isReordering,
+  isSaving,
+  onMove,
+  onEdit,
+  onCancel,
+  dragHandle,
+}: MilestoneCardBodyProps) {
+  const id = milestoneIdOf(milestone);
+
+  return (
+    <>
+      <div className="projectMilestonesTab__cardHeader">
+        <div className="projectMilestonesTab__cardHeaderTitle">
+          {dragHandle}
+          <h4>{milestone.title}</h4>
+        </div>
+        <div className="projectMilestonesTab__badges">
+          {milestone.sortOrder != null && (
+            <Badge variant="neutral">#{milestone.sortOrder + 1}</Badge>
+          )}
+          <StatusBadge domain="milestone" status={milestone.status} />
+          {milestone.progressPercent != null && (
+            <Badge variant="primary">{milestone.progressPercent}%</Badge>
+          )}
+        </div>
+      </div>
+      <p>{milestone.description || '-'}</p>
+      <div className="projectMilestonesTab__meta">
+        {managerName && <span>מנהל שלב: {managerName}</span>}
+        <span>מתוכנן: {formatProjectDate(milestone.plannedStart)}</span>
+        <span>עד: {formatProjectDate(milestone.plannedEnd)}</span>
+      </div>
+      <div className="projectMilestonesTab__cardActions">
+        <Button
+          type="button"
+          variant="ghost"
+          disabled={isReordering || isSaving || index === 0}
+          onClick={() => onMove(id, 'up')}
+        >
+          למעלה
+        </Button>
+        <Button
+          type="button"
+          variant="ghost"
+          disabled={isReordering || isSaving || index === total - 1}
+          onClick={() => onMove(id, 'down')}
+        >
+          למטה
+        </Button>
+        <Button type="button" variant="ghost" onClick={() => onEdit(id)}>
+          ערוך
+        </Button>
+        {!isCancelled && (
+          <div className="projectMilestonesTab__cardDangerSlot">
+            <ConfirmInline
+              triggerLabel="הסר אבן דרך"
+              message="להסיר את אבן הדרך מהרשימה?"
+              confirmLabel="אישור"
+              onConfirm={() => onCancel(id)}
+              isPending={isSaving}
+            />
+          </div>
+        )}
+      </div>
+    </>
+  );
+}
+
+interface SortableMilestoneCardProps extends Omit<MilestoneCardBodyProps, 'dragHandle'> {
+  isDragDisabled: boolean;
+}
+
+/** Draggable list item — only the handle receives drag listeners, never the whole card. */
+function SortableMilestoneCard({ isDragDisabled, ...bodyProps }: SortableMilestoneCardProps) {
+  const id = milestoneIdOf(bodyProps.milestone);
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id,
+    disabled: isDragDisabled,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  const dragHandle = (
+    <IconButton
+      label={`גרור לשינוי סדר אבן הדרך: ${bodyProps.milestone.title}`}
+      icon={<GripVertical size={16} aria-hidden="true" />}
+      variant="ghost"
+      size="sm"
+      className="projectMilestonesTab__dragHandle"
+      disabled={isDragDisabled}
+      {...attributes}
+      {...listeners}
+    />
+  );
+
+  return (
+    <article
+      ref={setNodeRef}
+      style={style}
+      className={`projectMilestonesTab__card${
+        isDragging ? ' projectMilestonesTab__card--dragging' : ''
+      }`}
+    >
+      <MilestoneCardBody {...bodyProps} dragHandle={dragHandle} />
+    </article>
+  );
+}
+
+/** Minimal, non-interactive preview shown under the pointer while dragging. */
+function MilestoneDragOverlayCard({ milestone }: { milestone: ProjectMilestone }) {
+  return (
+    <article className="projectMilestonesTab__card projectMilestonesTab__card--overlay">
+      <div className="projectMilestonesTab__cardHeader">
+        <div className="projectMilestonesTab__cardHeaderTitle">
+          <span
+            className="projectMilestonesTab__dragHandle projectMilestonesTab__dragHandle--active"
+            aria-hidden="true"
+          >
+            <GripVertical size={16} />
+          </span>
+          <h4>{milestone.title}</h4>
+        </div>
+        <div className="projectMilestonesTab__badges">
+          {milestone.sortOrder != null && (
+            <Badge variant="neutral">#{milestone.sortOrder + 1}</Badge>
+          )}
+          <StatusBadge domain="milestone" status={milestone.status} />
+        </div>
+      </div>
+    </article>
+  );
+}
+
 export function ProjectMilestonesTab({
   projectId,
   lifecycle,
@@ -112,6 +292,12 @@ export function ProjectMilestonesTab({
   const [form, setForm] = useState<ProjectMilestoneForm>(createEmptyMilestoneForm());
   const [reorderError, setReorderError] = useState<string | null>(null);
   const [managerError, setManagerError] = useState<string | null>(null);
+  const [activeDragMilestoneId, setActiveDragMilestoneId] = useState<number | null>(null);
+
+  const dragSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   const milestonesQuery = useProjectMilestones(projectId, true);
 
@@ -170,6 +356,83 @@ export function ProjectMilestonesTab({
     } catch (error) {
       setReorderError(error instanceof Error ? error.message : 'סידור אבני הדרך נכשל.');
     }
+  };
+
+  const milestoneIds = useMemo(
+    () => sortedMilestones.map((milestone) => milestoneIdOf(milestone)),
+    [sortedMilestones],
+  );
+
+  const activeDragMilestone =
+    activeDragMilestoneId != null
+      ? sortedMilestones.find((milestone) => milestoneIdOf(milestone) === activeDragMilestoneId)
+      : undefined;
+
+  const milestoneTitleById = (milestoneId: number): string =>
+    sortedMilestones.find((milestone) => milestoneIdOf(milestone) === milestoneId)?.title ?? '';
+
+  const milestonePositionById = (milestoneId: number): number =>
+    milestoneIds.indexOf(milestoneId) + 1;
+
+  const milestoneDragAnnouncements: Announcements = {
+    onDragStart({ active }) {
+      const title = milestoneTitleById(active.id as number);
+      return `הרמת אבן הדרך "${title}" לשינוי סדר. המיקום הנוכחי: ${milestonePositionById(
+        active.id as number,
+      )} מתוך ${milestoneIds.length}.`;
+    },
+    onDragOver({ active, over }) {
+      const title = milestoneTitleById(active.id as number);
+      if (!over) {
+        return `אבן הדרך "${title}" אינה ממוקמת מעל מיקום חדש.`;
+      }
+      return `אבן הדרך "${title}" הועברה למיקום ${milestonePositionById(
+        over.id as number,
+      )} מתוך ${milestoneIds.length}.`;
+    },
+    onDragEnd({ active, over }) {
+      const title = milestoneTitleById(active.id as number);
+      if (!over) {
+        return `שינוי הסדר של אבן הדרך "${title}" בוטל.`;
+      }
+      return `אבן הדרך "${title}" הונחה במיקום ${milestonePositionById(
+        over.id as number,
+      )} מתוך ${milestoneIds.length}.`;
+    },
+    onDragCancel({ active }) {
+      const title = milestoneTitleById(active.id as number);
+      return `שינוי הסדר של אבן הדרך "${title}" בוטל.`;
+    },
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveDragMilestoneId(event.active.id as number);
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveDragMilestoneId(null);
+
+    if (!over || active.id === over.id) return;
+    if (isReordering || isSaving) return;
+
+    const oldIndex = milestoneIds.indexOf(active.id as number);
+    const newIndex = milestoneIds.indexOf(over.id as number);
+    if (oldIndex < 0 || newIndex < 0) return;
+
+    const nextOrder = arrayMove(milestoneIds, oldIndex, newIndex);
+    const items = nextOrder.map((id, sortOrder) => ({ projectMilestoneId: id, sortOrder }));
+
+    setReorderError(null);
+    try {
+      await onReorderMilestones(items);
+    } catch (error) {
+      setReorderError(error instanceof Error ? error.message : 'סידור אבני הדרך נכשל.');
+    }
+  };
+
+  const handleDragCancel = () => {
+    setActiveDragMilestoneId(null);
   };
 
   const resetForm = () => {
@@ -384,78 +647,57 @@ export function ProjectMilestonesTab({
           <PageSpinner />
         ) : sortedMilestones.length === 0 ? (
           <div className="projectMilestonesTab__emptyState">
-            <p className="projectMilestonesTab__empty">לא נמצאו אבני דרך בטבלה הייעודית לפרויקט זה.</p>
+            <EmptyState title="לא נמצאו אבני דרך בטבלה הייעודית לפרויקט זה." />
             <p className="projectMilestonesTab__legacyHint">
               משימות ילד legacy בפרויקט אינן מסווגות אוטומטית כאבני דרך; סיווג מחייב מיפוי מפורש
               ב־_MilestoneMigrationMap על ידי מפעיל.
             </p>
           </div>
         ) : (
-          sortedMilestones.map((milestone, index) => {
-            const id = milestoneIdOf(milestone);
-            const isCancelled =
-              milestone.status === 'Cancelled' ||
-              milestone.status === 'Closed' ||
-              ('isActive' in milestone && milestone.isActive === false);
-            const managerName = resolveManagerName(milestone);
+          <DndContext
+            sensors={dragSensors}
+            collisionDetection={closestCenter}
+            autoScroll
+            accessibility={{ announcements: milestoneDragAnnouncements }}
+            onDragStart={handleDragStart}
+            onDragEnd={(event) => void handleDragEnd(event)}
+            onDragCancel={handleDragCancel}
+          >
+            <SortableContext items={milestoneIds} strategy={verticalListSortingStrategy}>
+              {sortedMilestones.map((milestone, index) => {
+                const id = milestoneIdOf(milestone);
+                const isCancelled =
+                  milestone.status === 'Cancelled' ||
+                  milestone.status === 'Closed' ||
+                  ('isActive' in milestone && milestone.isActive === false);
+                const managerName = resolveManagerName(milestone);
 
-            return (
-              <article key={id} className="projectMilestonesTab__card">
-                <div className="projectMilestonesTab__cardHeader">
-                  <h4>{milestone.title}</h4>
-                  <div className="projectMilestonesTab__badges">
-                    {milestone.sortOrder != null && (
-                      <Badge variant="neutral">#{milestone.sortOrder + 1}</Badge>
-                    )}
-                    <StatusBadge domain="milestone" status={milestone.status} />
-                    {milestone.progressPercent != null && (
-                      <Badge variant="primary">{milestone.progressPercent}%</Badge>
-                    )}
-                  </div>
-                </div>
-                <p>{milestone.description || '-'}</p>
-                <div className="projectMilestonesTab__meta">
-                  {managerName && <span>מנהל שלב: {managerName}</span>}
-                  <span>
-                    מתוכנן: {formatProjectDate(milestone.plannedStart)}
-                  </span>
-                  <span>עד: {formatProjectDate(milestone.plannedEnd)}</span>
-                </div>
-                <div className="projectMilestonesTab__cardActions">
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    disabled={isReordering || isSaving || index === 0}
-                    onClick={() => void handleMoveMilestone(id, 'up')}
-                  >
-                    למעלה
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    disabled={
-                      isReordering || isSaving || index === sortedMilestones.length - 1
+                return (
+                  <SortableMilestoneCard
+                    key={id}
+                    milestone={milestone}
+                    index={index}
+                    total={sortedMilestones.length}
+                    isCancelled={isCancelled}
+                    managerName={managerName}
+                    isReordering={isReordering}
+                    isSaving={isSaving}
+                    isDragDisabled={isReordering || isSaving}
+                    onMove={(milestoneId, direction) =>
+                      void handleMoveMilestone(milestoneId, direction)
                     }
-                    onClick={() => void handleMoveMilestone(id, 'down')}
-                  >
-                    למטה
-                  </Button>
-                  <Button type="button" variant="ghost" onClick={() => handleEdit(id)}>
-                    ערוך
-                  </Button>
-                  {!isCancelled && (
-                    <ConfirmInline
-                      triggerLabel="הסר אבן דרך"
-                      message="להסיר את אבן הדרך מהרשימה?"
-                      confirmLabel="אישור"
-                      onConfirm={() => handleCancelMilestone(id)}
-                      isPending={isSaving}
-                    />
-                  )}
-                </div>
-              </article>
-            );
-          })
+                    onEdit={handleEdit}
+                    onCancel={(milestoneId) => void handleCancelMilestone(milestoneId)}
+                  />
+                );
+              })}
+            </SortableContext>
+            <DragOverlay>
+              {activeDragMilestone ? (
+                <MilestoneDragOverlayCard milestone={activeDragMilestone} />
+              ) : null}
+            </DragOverlay>
+          </DndContext>
         )}
       </div>
     </div>

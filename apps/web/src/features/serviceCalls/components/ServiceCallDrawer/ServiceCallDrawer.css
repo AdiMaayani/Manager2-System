@@ -9,15 +9,29 @@
   gap: var(--spacing-lg);
 }
 
-/* Read-only review mode: sectioned cards with a responsive field grid. */
+/* Read-only review mode: sectioned cards with a responsive field grid. Gap matches the
+   Projects overview card grid rhythm (var(--spacing-lg)) so both drawers read consistently. */
 .serviceCallDrawer--review {
-  gap: var(--spacing-md);
+  gap: var(--spacing-lg);
 }
 
 .serviceCallDrawer__detailsGrid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: var(--spacing-md);
+}
+
+/* Elevates the lead "פרטי קריאה" section to the same primary-card treatment used by
+   ProjectOverviewTab's general-details card, via a local wrapper — DetailsSection/DetailsField
+   themselves are not modified, only overridden from within this drawer's own class. */
+.serviceCallDrawer__primarySection .detailsSection {
+  border-color: var(--color-primary-200);
+  box-shadow: var(--shadow-card);
+}
+
+.serviceCallDrawer__primarySection .detailsSection__title {
+  color: var(--color-primary-700);
+  font-size: var(--font-size-lg);
 }
 
 .serviceCallDrawer__grid {
@@ -80,15 +94,43 @@
   cursor: pointer;
 }
 
-/* Immediate assign action, visually separated from the saved form fields. */
+/* Immediate assign action, visually separated from the saved form fields. The accent start-border
+   plus header badge make it read as its own distinct action rather than another saved form field. */
 .serviceCallDrawer__assignAction {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-md);
   padding: var(--spacing-md);
   border: 1px solid var(--color-neutral-200);
+  border-inline-start: 3px solid var(--color-primary-300);
   border-radius: var(--radius-lg);
   background: var(--color-neutral-50);
+}
+
+.serviceCallDrawer__assignActionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.serviceCallDrawer__assignActionTitle {
+  margin: 0;
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-800);
+}
+
+.serviceCallDrawer__assignActionBadge {
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-medium);
+  color: var(--color-primary-700);
+  background: var(--color-primary-50);
+  border: 1px solid var(--color-primary-200);
+  padding: 2px var(--spacing-sm);
+  border-radius: var(--radius-full);
+  white-space: nowrap;
 }
 
 .serviceCallDrawer__inlineLink {
@@ -151,8 +193,12 @@
   font-weight: var(--font-weight-medium);
 }
 
-@media (max-width: 720px) {
+@media (max-width: 768px) {
   .serviceCallDrawer__grid {
     grid-template-columns: 1fr;
+  }
+
+  .serviceCallDrawer__assignActionHeader {
+    align-items: flex-start;
   }
 }

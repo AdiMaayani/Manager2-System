@@ -381,8 +381,9 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
   return (
     <div className="projectOverviewTab">
       <div className="projectOverviewTab__grid">
-        <section className="projectOverviewTab__card">
+        <section className="projectOverviewTab__card projectOverviewTab__card--primary">
           <h3 className="projectOverviewTab__cardTitle">פרטים כלליים</h3>
+          <div className="projectOverviewTab__primaryGrid">
           <div className="projectOverviewTab__field">
             <span className="projectOverviewTab__label">שם הפרויקט</span>
             {isEditMode ? (
@@ -468,6 +469,7 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
               <span>{getBillingTypeDisplay(project?.billingType)}</span>
             )}
           </div>
+          </div>
         </section>
 
         <section className="projectOverviewTab__card">
@@ -547,7 +549,9 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
             )}
           </div>
           <div className="projectOverviewTab__field">
-            <span className="projectOverviewTab__label">אתר</span>
+            <span className="projectOverviewTab__label">
+              אתר <span className="projectOverviewTab__required">*</span>
+            </span>
             {isEditMode ? (
               <>
                 <Select

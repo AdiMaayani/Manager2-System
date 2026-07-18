@@ -1,2 +1,13 @@
-/* EmployeesPage now composes shared FilterBar/FilterField, InlineAlert, and
-   DataTable; no page-specific styles are required. */
+/* Equal-width status segments so the selected background fills exactly one third. */
+.employeesPage__statusControl {
+  width: 100%;
+}
+
+.employeesPage__statusControl .segmented {
+  display: flex;
+  width: 100%;
+}
+
+.employeesPage__statusControl .segmented__item {
+  flex: 1 1 0;
+}

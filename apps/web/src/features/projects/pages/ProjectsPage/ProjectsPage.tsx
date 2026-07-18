@@ -124,16 +124,25 @@ export function ProjectsPage() {
   const columns: DataTableColumn<ProjectListItem>[] = [
     { id: 'number', header: 'מספר', width: '110px', cell: (project) => project.projectNumber },
     { id: 'title', header: 'שם הפרויקט', cell: (project) => project.title },
-    { id: 'customer', header: 'לקוח', cell: (project) => project.customerName },
-    { id: 'pm', header: 'מנהל פרויקט', cell: (project) => project.projectManagerName },
+    { id: 'customer', header: 'לקוח', width: '180px', cell: (project) => project.customerName },
+    {
+      id: 'pm',
+      header: 'מנהל פרויקט',
+      width: '160px',
+      cell: (project) => project.projectManagerName,
+    },
     {
       id: 'status',
       header: 'סטטוס',
+      width: '130px',
+      align: 'center',
       cell: (project) => <StatusBadge domain="project" status={project.status} />,
     },
     {
       id: 'created',
       header: 'תאריך פתיחה',
+      width: '130px',
+      align: 'end',
       cell: (project) => formatProjectDate(project.createdAt),
     },
   ];

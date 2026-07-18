@@ -486,28 +486,30 @@ interface QuoteReviewDetailsProps {
 function QuoteReviewDetails({ quote }: QuoteReviewDetailsProps) {
   return (
     <div className="quoteDrawer quoteDrawer--review">
-      <DetailsSection title="פרטי הצעה">
-        <div className="quoteDrawer__detailsGrid">
-          <DetailsField
-            label="מספר הצעה"
-            value={<span className="quoteDrawer__numberValue">{quote.quoteNumber}</span>}
-          />
-          <DetailsField
-            label="סטטוס"
-            value={
-              <span className="quoteDrawer__statusBadges">
-                <QuoteStatusBadge status={quote.status} />
-                {!quote.isActive && <Badge variant="neutral">בוטל</Badge>}
-              </span>
-            }
-          />
-          <DetailsField label="תאריך הצעה" value={formatDate(quote.quoteDate)} />
-          <DetailsField
-            label="בתוקף עד"
-            value={quote.validUntil ? formatDate(quote.validUntil) : undefined}
-          />
-        </div>
-      </DetailsSection>
+      <div className="quoteDrawer__primarySection">
+        <DetailsSection title="פרטי הצעה">
+          <div className="quoteDrawer__detailsGrid">
+            <DetailsField
+              label="מספר הצעה"
+              value={<span className="quoteDrawer__numberValue">{quote.quoteNumber}</span>}
+            />
+            <DetailsField
+              label="סטטוס"
+              value={
+                <span className="quoteDrawer__statusBadges">
+                  <QuoteStatusBadge status={quote.status} />
+                  {!quote.isActive && <Badge variant="neutral">בוטל</Badge>}
+                </span>
+              }
+            />
+            <DetailsField label="תאריך הצעה" value={formatDate(quote.quoteDate)} />
+            <DetailsField
+              label="בתוקף עד"
+              value={quote.validUntil ? formatDate(quote.validUntil) : undefined}
+            />
+          </div>
+        </DetailsSection>
+      </div>
 
       <DetailsSection title="לקוח ופרויקט">
         <div className="quoteDrawer__detailsGrid">

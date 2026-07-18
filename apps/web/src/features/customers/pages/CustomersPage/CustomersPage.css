@@ -1,2 +1,19 @@
 /* CustomersPage now composes shared FilterBar/FilterField and DataTable; no
    page-specific styles are required. */
+
+/* The shared SegmentedControl sizes itself to its content (inline-flex), so inside the
+   status FilterField it left a gap instead of filling the field's width. This wrapper
+   stretches the control and its three segments evenly without touching the shared
+   component, which other pages still use with its default content-sized behavior. */
+.customersPage__statusControl {
+  width: 100%;
+}
+
+.customersPage__statusControl .segmented {
+  display: flex;
+  width: 100%;
+}
+
+.customersPage__statusControl .segmented__item {
+  flex: 1 1 0;
+}

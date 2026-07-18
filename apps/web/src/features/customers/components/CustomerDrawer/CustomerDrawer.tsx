@@ -449,22 +449,24 @@ function CustomerReviewDetails({ customer, canManage }: CustomerReviewDetailsPro
 
   return (
     <div className="customerDrawer customerDrawer--review">
-      <DetailsSection title="פרטי לקוח">
-        <div className="customerDrawer__detailsGrid">
-          <DetailsField label="שם לקוח" value={customer.customerName} />
-          <DetailsField label="סוג לקוח" value={customer.customerType} />
-          <DetailsField
-            label="סטטוס"
-            value={
-              <Badge variant={customer.isActive ? 'success' : 'neutral'}>
-                {customer.status ?? (customer.isActive ? 'פעיל' : 'לא פעיל')}
-              </Badge>
-            }
-          />
-          <DetailsField label="טלפון" value={customer.primaryPhone} />
-          <DetailsField label="אימייל" value={customer.primaryEmail} />
-        </div>
-      </DetailsSection>
+      <div className="customerDrawer__primarySection">
+        <DetailsSection title="פרטי לקוח">
+          <div className="customerDrawer__detailsGrid">
+            <DetailsField label="שם לקוח" value={customer.customerName} />
+            <DetailsField label="סוג לקוח" value={customer.customerType} />
+            <DetailsField
+              label="סטטוס"
+              value={
+                <Badge variant={customer.isActive ? 'success' : 'neutral'}>
+                  {customer.status ?? (customer.isActive ? 'פעיל' : 'לא פעיל')}
+                </Badge>
+              }
+            />
+            <DetailsField label="טלפון" value={customer.primaryPhone} />
+            <DetailsField label="אימייל" value={customer.primaryEmail} />
+          </div>
+        </DetailsSection>
+      </div>
 
       <DetailsSection title="מיקום והערות">
         <div className="customerDrawer__detailsGrid">

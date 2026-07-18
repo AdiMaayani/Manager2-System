@@ -9,7 +9,7 @@
   border: 1px solid var(--color-neutral-200);
   border-radius: var(--radius-lg);
   background: #fff;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+  box-shadow: var(--shadow-card);
 }
 
 .projectMilestonesTab__formCard {
@@ -83,8 +83,55 @@
   align-items: flex-start;
 }
 
+.projectMilestonesTab__cardHeaderTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-width: 0;
+}
+
 .projectMilestonesTab__card {
   padding: var(--spacing-lg);
+  transform-origin: center;
+}
+
+/* Placeholder left behind in the list while the card's drag clone follows the pointer. */
+.projectMilestonesTab__card--dragging {
+  opacity: 0.4;
+}
+
+/* Static clone rendered inside DragOverlay — same card language, lifted appearance. */
+.projectMilestonesTab__card--overlay {
+  box-shadow: var(--shadow-lg);
+  transform: scale(1.02);
+  cursor: grabbing;
+}
+
+.projectMilestonesTab__dragHandle {
+  cursor: grab;
+  color: var(--color-neutral-400);
+  flex-shrink: 0;
+}
+
+.projectMilestonesTab__dragHandle:active {
+  cursor: grabbing;
+}
+
+.projectMilestonesTab__dragHandle:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Non-interactive drag-handle glyph shown inside the DragOverlay clone. */
+.projectMilestonesTab__dragHandle--active {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-height-sm);
+  height: var(--control-height-sm);
+  flex-shrink: 0;
+  color: var(--color-neutral-400);
+  cursor: grabbing;
 }
 
 .projectMilestonesTab__cardHeader h4 {
@@ -108,8 +155,18 @@
 
 .projectMilestonesTab__cardActions {
   display: flex;
+  flex-wrap: wrap;
+  align-items: center;
   gap: var(--spacing-sm);
   margin-top: var(--spacing-md);
+}
+
+/* Separates the destructive action from the move/edit cluster so it isn't a same-weight
+   neighbour of "up/down/edit". */
+.projectMilestonesTab__cardDangerSlot {
+  margin-inline-start: auto;
+  padding-inline-start: var(--spacing-sm);
+  border-inline-start: 1px solid var(--color-neutral-200);
 }
 
 .projectMilestonesTab__error {
@@ -124,15 +181,12 @@
   gap: var(--spacing-sm);
 }
 
-.projectMilestonesTab__empty {
-  margin: 0;
-  color: var(--color-neutral-600);
-}
-
 .projectMilestonesTab__legacyHint {
   margin: 0;
+  padding: 0 var(--spacing-2xl);
   color: var(--color-neutral-500);
   font-size: var(--font-size-sm);
+  text-align: center;
 }
 
 
@@ -166,7 +220,7 @@
   align-items: center;
 }
 
-@media (max-width: 760px) {
+@media (max-width: 768px) {
   .projectMilestonesTab__assignmentRow {
     grid-template-columns: 1fr;
   }

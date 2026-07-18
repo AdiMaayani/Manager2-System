@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { useUrlEntityDrawer } from '@shared/hooks';
 import { PageShell } from '@shared/components/PageShell';
@@ -35,9 +36,16 @@ const STATUS_FILTER_ITEMS: SegmentItem<string>[] = [
 
 const PRIORITY_OPTIONS = ['Low', 'Medium', 'High', 'Urgent'];
 
-function getPriorityLabel(priority?: string | null): string {
-  if (!priority) return '-';
-  return PRIORITY_LABELS[priority] ?? priority;
+const STATUS_FILTER_IDS = STATUS_FILTER_ITEMS.map((item) => item.id);
+
+// Falls back to "all" for a missing/unrecognized URL value instead of silently
+// filtering to an empty list, so stale or hand-edited links stay usable.
+function resolveStatusFilterParam(value: string | null): string {
+  return value && STATUS_FILTER_IDS.includes(value) ? value : 'all';
+}
+
+function resolvePriorityFilterParam(value: string | null): string {
+  return value && PRIORITY_OPTIONS.includes(value) ? value : 'all';
 }
 
 function formatDate(value?: string | null): string {
@@ -66,10 +74,38 @@ export function ServiceCallsPage() {
   const canManageServiceCalls = can('manageServiceCalls') && can('viewCustomers');
   const { data: serviceCalls, isLoading, error, refetch } = useServiceCalls();
   const lookups = useServiceCallLookups({ enabled: canManageServiceCalls });
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [priorityFilter, setPriorityFilter] = useState('all');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [search, setSearch] = useState(() => searchParams.get('search') ?? '');
+  const [statusFilter, setStatusFilter] = useState(() =>
+    resolveStatusFilterParam(searchParams.get('status')),
+  );
+  const [priorityFilter, setPriorityFilter] = useState(() =>
+    resolvePriorityFilterParam(searchParams.get('priority')),
+  );
+  // Customer options come from the already-loaded service call list (no extra lookup call), so this
+  // filter works the same for every role, unlike the gated customer/site lookups used by the form.
+  const [customerFilter, setCustomerFilter] = useState(() => searchParams.get('customer') ?? '');
   const [pageMessage, setPageMessage] = useState<string | null>(null);
+
+  // Filters persist to the URL the same way the Projects list page does, so refresh and
+  // browser back/forward restore the same filtered view. Unrelated params (e.g. serviceCallId)
+  // are preserved since only the named keys are updated.
+  const updateSearchParams = useCallback(
+    (updates: Record<string, string | null>, options?: { replace?: boolean }) => {
+      const nextParams = new URLSearchParams(searchParams);
+
+      Object.entries(updates).forEach(([key, value]) => {
+        if (value) {
+          nextParams.set(key, value);
+        } else {
+          nextParams.delete(key);
+        }
+      });
+
+      setSearchParams(nextParams, { replace: options?.replace ?? false });
+    },
+    [searchParams, setSearchParams],
+  );
 
   // The ?serviceCallId query parameter is the drawer's single source of truth: missing/invalid =
   // closed, "new" = create, a positive integer = reviewing that call. State is derived from the URL,
@@ -89,6 +125,13 @@ export function ServiceCallsPage() {
     getId: (serviceCall) => serviceCall.workItemId,
   });
 
+  const customerOptions = useMemo(() => {
+    const names = (serviceCalls ?? [])
+      .map((call) => call.customerName)
+      .filter((name): name is string => Boolean(name));
+    return [...new Set(names)].sort();
+  }, [serviceCalls]);
+
   const filteredServiceCalls = useMemo(() => {
     const calls = serviceCalls ?? [];
     const normalizedSearch = search.trim().toLowerCase();
@@ -96,20 +139,26 @@ export function ServiceCallsPage() {
     return calls.filter((serviceCall) => {
       const matchesStatus = statusFilter === 'all' || serviceCall.status === statusFilter;
       const matchesPriority = priorityFilter === 'all' || serviceCall.priority === priorityFilter;
+      const matchesCustomer = !customerFilter || serviceCall.customerName === customerFilter;
       const matchesSearch =
         !normalizedSearch || buildSearchText(serviceCall).includes(normalizedSearch);
 
-      return matchesStatus && matchesPriority && matchesSearch;
+      return matchesStatus && matchesPriority && matchesCustomer && matchesSearch;
     });
-  }, [search, serviceCalls, statusFilter, priorityFilter]);
+  }, [search, serviceCalls, statusFilter, priorityFilter, customerFilter]);
 
   const hasActiveFilters =
-    Boolean(search.trim()) || statusFilter !== 'all' || priorityFilter !== 'all';
+    Boolean(search.trim()) ||
+    statusFilter !== 'all' ||
+    priorityFilter !== 'all' ||
+    Boolean(customerFilter);
 
   const resetFilters = () => {
     setSearch('');
     setStatusFilter('all');
     setPriorityFilter('all');
+    setCustomerFilter('');
+    updateSearchParams({ search: null, status: null, priority: null, customer: null });
   };
 
   const openServiceCall = (serviceCall: ServiceCallListItem) => {
@@ -125,29 +174,49 @@ export function ServiceCallsPage() {
   const columns: DataTableColumn<ServiceCallListItem>[] = [
     { id: 'number', header: 'מספר', width: '90px', cell: (call) => `SC-${call.workItemId}` },
     { id: 'title', header: 'כותרת', cell: (call) => call.title },
-    { id: 'customer', header: 'לקוח', cell: (call) => call.customerName ?? '-' },
-    { id: 'site', header: 'אתר', cell: (call) => call.siteName ?? '-' },
+    { id: 'customer', header: 'לקוח', width: '160px', cell: (call) => call.customerName ?? '-' },
+    { id: 'site', header: 'אתר', width: '160px', cell: (call) => call.siteName ?? '-' },
     {
       id: 'status',
       header: 'סטטוס',
+      width: '120px',
+      align: 'center',
       cell: (call) => <StatusBadge domain="serviceCall" status={call.status} />,
     },
-    { id: 'priority', header: 'עדיפות', cell: (call) => getPriorityLabel(call.priority) },
-    { id: 'planned', header: 'מתוכנן', cell: (call) => formatDate(call.plannedStart) },
-    { id: 'role', header: 'תפקיד', cell: (call) => call.requiredRole ?? '-' },
+    {
+      id: 'priority',
+      header: 'עדיפות',
+      width: '110px',
+      align: 'center',
+      cell: (call) => <StatusBadge domain="serviceCallPriority" status={call.priority} />,
+    },
+    {
+      id: 'planned',
+      header: 'מתוכנן',
+      width: '120px',
+      align: 'end',
+      cell: (call) => formatDate(call.plannedStart),
+    },
+    { id: 'role', header: 'תפקיד', width: '140px', cell: (call) => call.requiredRole ?? '-' },
   ];
 
-  if (isLoading) return <PageShell title="קריאות שירות"><PageSpinner /></PageShell>;
+  if (isLoading) {
+    return (
+      <PageShell title="קריאות שירות" wide>
+        <PageSpinner />
+      </PageShell>
+    );
+  }
   if (error) {
     return (
-      <PageShell title="קריאות שירות">
+      <PageShell title="קריאות שירות" wide>
         <ErrorState message={error.message} onRetry={() => refetch()} />
       </PageShell>
     );
   }
 
   return (
-    <PageShell title="קריאות שירות">
+    <PageShell title="קריאות שירות" wide>
       <FilterBar
         actions={
           <>
@@ -171,30 +240,64 @@ export function ServiceCallsPage() {
         <FilterField label="חיפוש" grow>
           <Input
             placeholder="חיפוש לפי כותרת, לקוח, אתר או תפקיד..."
+            aria-label="חיפוש קריאות שירות"
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={(event) => {
+              const value = event.target.value;
+              setSearch(value);
+              updateSearchParams({ search: value.trim() || null });
+            }}
           />
         </FilterField>
 
         <FilterField label="סטטוס">
-          <SegmentedControl
-            items={STATUS_FILTER_ITEMS}
-            value={statusFilter}
-            onChange={setStatusFilter}
-            ariaLabel="סינון לפי סטטוס"
-            size="sm"
-          />
+          <div className="serviceCallsPage__statusControl">
+            <SegmentedControl
+              items={STATUS_FILTER_ITEMS}
+              value={statusFilter}
+              onChange={(value) => {
+                setStatusFilter(value);
+                updateSearchParams({ status: value !== 'all' ? value : null });
+              }}
+              ariaLabel="סינון לפי סטטוס"
+              size="sm"
+            />
+          </div>
         </FilterField>
 
         <FilterField label="עדיפות">
           <Select
             value={priorityFilter}
-            onChange={(event) => setPriorityFilter(event.target.value)}
+            aria-label="סינון לפי עדיפות"
+            onChange={(event) => {
+              const value = event.target.value;
+              setPriorityFilter(value);
+              updateSearchParams({ priority: value !== 'all' ? value : null });
+            }}
           >
             <option value="all">כל העדיפויות</option>
             {PRIORITY_OPTIONS.map((priority) => (
               <option key={priority} value={priority}>
                 {PRIORITY_LABELS[priority]}
+              </option>
+            ))}
+          </Select>
+        </FilterField>
+
+        <FilterField label="לקוח">
+          <Select
+            value={customerFilter}
+            aria-label="סינון לפי לקוח"
+            onChange={(event) => {
+              const value = event.target.value;
+              setCustomerFilter(value);
+              updateSearchParams({ customer: value || null });
+            }}
+          >
+            <option value="">כל הלקוחות</option>
+            {customerOptions.map((name) => (
+              <option key={name} value={name}>
+                {name}
               </option>
             ))}
           </Select>

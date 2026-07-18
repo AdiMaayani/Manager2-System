@@ -1,8 +1,31 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type CSSProperties, type ReactNode } from 'react';
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type Announcements,
+  type DragEndEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { GripVertical } from 'lucide-react';
 import { useInventory, type InventoryItem } from '@features/inventory';
 import { StatusBadge } from '@shared/components/StatusBadge';
 import { Button } from '@shared/components/Button';
+import { ConfirmInline } from '@shared/components/ConfirmInline';
 import { EmptyState } from '@shared/components/EmptyState';
+import { IconButton } from '@shared/components/IconButton';
 import { Input } from '@shared/components/Input';
 import { Select } from '@shared/components/Select';
 import { InlineAlert } from '@shared/components/InlineAlert';
@@ -55,6 +78,10 @@ interface EquipmentEditCardProps {
   onDelete: (equipmentItemId: number) => Promise<void>;
   onMove: (index: number, direction: -1 | 1) => Promise<void>;
   onValidationError: (message: string) => void;
+  dragHandle: ReactNode;
+  cardRef?: (element: HTMLDivElement | null) => void;
+  cardStyle?: CSSProperties;
+  isDragging?: boolean;
 }
 
 function EquipmentEditCard({
@@ -68,6 +95,10 @@ function EquipmentEditCard({
   onDelete,
   onMove,
   onValidationError,
+  dragHandle,
+  cardRef,
+  cardStyle,
+  isDragging,
 }: EquipmentEditCardProps) {
   const [draftName, setDraftName] = useState(item.name);
   const [draftInventoryCategory, setDraftInventoryCategory] = useState(item.inventoryCategory ?? '');
@@ -109,7 +140,17 @@ function EquipmentEditCard({
   };
 
   return (
-    <div className="projectEquipmentTab__editCard">
+    <div
+      ref={cardRef}
+      style={cardStyle}
+      className={`projectEquipmentTab__editCard${
+        isDragging ? ' projectEquipmentTab__editCard--dragging' : ''
+      }`}
+    >
+      <div className="projectEquipmentTab__editCardHeader">
+        {dragHandle}
+        <span className="projectEquipmentTab__editCardKicker">עריכת פריט: {item.name}</span>
+      </div>
       <Input
         label="שם"
         value={draftName}
@@ -178,14 +219,72 @@ function EquipmentEditCard({
         >
           למטה
         </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={() => onDelete(item.projectEquipmentItemId)}
-          disabled={isSaving}
+        <div className="projectEquipmentTab__dangerSlot">
+          <ConfirmInline
+            triggerLabel="הסר"
+            message="להסיר את הפריט מרשימת הציוד?"
+            confirmLabel="אישור הסרה"
+            onConfirm={() => onDelete(item.projectEquipmentItemId)}
+            isPending={isSaving}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+interface SortableEquipmentEditCardProps extends Omit<EquipmentEditCardProps, 'dragHandle' | 'cardRef' | 'cardStyle' | 'isDragging'> {
+  isDragDisabled: boolean;
+}
+
+/** Draggable list item — only the handle receives drag listeners, never the whole card. */
+function SortableEquipmentEditCard({ isDragDisabled, ...cardProps }: SortableEquipmentEditCardProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: cardProps.item.projectEquipmentItemId,
+    disabled: isDragDisabled,
+  });
+
+  const style: CSSProperties = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  const dragHandle = (
+    <IconButton
+      label={`גרור לשינוי סדר הפריט: ${cardProps.item.name}`}
+      icon={<GripVertical size={16} aria-hidden="true" />}
+      variant="ghost"
+      size="sm"
+      className="projectEquipmentTab__dragHandle"
+      disabled={isDragDisabled}
+      {...attributes}
+      {...listeners}
+    />
+  );
+
+  return (
+    <EquipmentEditCard
+      {...cardProps}
+      dragHandle={dragHandle}
+      cardRef={setNodeRef}
+      cardStyle={style}
+      isDragging={isDragging}
+    />
+  );
+}
+
+/** Minimal, non-interactive preview shown under the pointer while dragging. */
+function EquipmentDragOverlayCard({ item }: { item: ProjectEquipmentItem }) {
+  return (
+    <div className="projectEquipmentTab__editCard projectEquipmentTab__editCard--overlay">
+      <div className="projectEquipmentTab__editCardHeader">
+        <span
+          className="projectEquipmentTab__dragHandle projectEquipmentTab__dragHandle--active"
+          aria-hidden="true"
         >
-          הסר
-        </Button>
+          <GripVertical size={16} />
+        </span>
+        <span className="projectEquipmentTab__editCardKicker">{item.name}</span>
       </div>
     </div>
   );
@@ -211,6 +310,12 @@ export function ProjectEquipmentTab({
   const [status, setStatus] = useState('waiting');
   const [location, setLocation] = useState('');
   const [error, setError] = useState<string | null>(null);
+  const [activeDragItemId, setActiveDragItemId] = useState<number | null>(null);
+
+  const dragSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
 
   const filteredInventoryItems = inventoryCategory
     ? inventoryItems.filter((inventoryItem) => inventoryItem.category === inventoryCategory)
@@ -263,6 +368,81 @@ export function ProjectEquipmentTab({
     await onReorder(reorderedItems);
   };
 
+  const equipmentItemIds = useMemo(
+    () => items.map((item) => item.projectEquipmentItemId),
+    [items],
+  );
+
+  const activeDragItem =
+    activeDragItemId != null
+      ? items.find((item) => item.projectEquipmentItemId === activeDragItemId)
+      : undefined;
+
+  const equipmentNameById = (equipmentItemId: number): string =>
+    items.find((item) => item.projectEquipmentItemId === equipmentItemId)?.name ?? '';
+
+  const equipmentPositionById = (equipmentItemId: number): number =>
+    equipmentItemIds.indexOf(equipmentItemId) + 1;
+
+  const equipmentDragAnnouncements: Announcements = {
+    onDragStart({ active }) {
+      const itemName = equipmentNameById(active.id as number);
+      return `הרמת הפריט "${itemName}" לשינוי סדר. המיקום הנוכחי: ${equipmentPositionById(
+        active.id as number,
+      )} מתוך ${equipmentItemIds.length}.`;
+    },
+    onDragOver({ active, over }) {
+      const itemName = equipmentNameById(active.id as number);
+      if (!over) {
+        return `הפריט "${itemName}" אינו ממוקם מעל מיקום חדש.`;
+      }
+      return `הפריט "${itemName}" הועבר למיקום ${equipmentPositionById(
+        over.id as number,
+      )} מתוך ${equipmentItemIds.length}.`;
+    },
+    onDragEnd({ active, over }) {
+      const itemName = equipmentNameById(active.id as number);
+      if (!over) {
+        return `שינוי הסדר של הפריט "${itemName}" בוטל.`;
+      }
+      return `הפריט "${itemName}" הונח במיקום ${equipmentPositionById(
+        over.id as number,
+      )} מתוך ${equipmentItemIds.length}.`;
+    },
+    onDragCancel({ active }) {
+      const itemName = equipmentNameById(active.id as number);
+      return `שינוי הסדר של הפריט "${itemName}" בוטל.`;
+    },
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveDragItemId(event.active.id as number);
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveDragItemId(null);
+
+    if (!over || active.id === over.id) return;
+    if (isSaving) return;
+
+    const oldIndex = equipmentItemIds.indexOf(active.id as number);
+    const newIndex = equipmentItemIds.indexOf(over.id as number);
+    if (oldIndex < 0 || newIndex < 0) return;
+
+    const reorderedItems = arrayMove(items, oldIndex, newIndex).map((item, itemIndex) => ({
+      ...item,
+      sortOrder: itemIndex + 1,
+    }));
+
+    setError(null);
+    await onReorder(reorderedItems);
+  };
+
+  const handleDragCancel = () => {
+    setActiveDragItemId(null);
+  };
+
   const addItem = async () => {
     if (!name.trim()) {
       setError('שם הפריט הוא שדה חובה.');
@@ -290,23 +470,40 @@ export function ProjectEquipmentTab({
       <div className="projectEquipmentTab">
         {error && <InlineAlert variant="danger">{error}</InlineAlert>}
         <div className="projectEquipmentTab__editList">
-          {items.map((item, index) => (
-            <EquipmentEditCard
-              key={`${item.projectEquipmentItemId}-${item.updatedAt ?? item.createdAt ?? ''}-${item.sortOrder}`}
-              item={item}
-              index={index}
-              itemCount={items.length}
-              inventoryItems={inventoryItems}
-              inventoryCategories={inventoryCategories}
-              isSaving={isSaving}
-              onSave={onUpdate}
-              onDelete={removeItem}
-              onMove={moveItem}
-              onValidationError={setError}
-            />
-          ))}
-          {items.length === 0 && (
+          {items.length === 0 ? (
             <EmptyState title="אין ציוד לפרויקט" description="הוסף ציוד כדי לעקוב אחר סטטוס ומיקום." />
+          ) : (
+            <DndContext
+              sensors={dragSensors}
+              collisionDetection={closestCenter}
+              autoScroll
+              accessibility={{ announcements: equipmentDragAnnouncements }}
+              onDragStart={handleDragStart}
+              onDragEnd={(event) => void handleDragEnd(event)}
+              onDragCancel={handleDragCancel}
+            >
+              <SortableContext items={equipmentItemIds} strategy={verticalListSortingStrategy}>
+                {items.map((item, index) => (
+                  <SortableEquipmentEditCard
+                    key={`${item.projectEquipmentItemId}-${item.updatedAt ?? item.createdAt ?? ''}-${item.sortOrder}`}
+                    item={item}
+                    index={index}
+                    itemCount={items.length}
+                    inventoryItems={inventoryItems}
+                    inventoryCategories={inventoryCategories}
+                    isSaving={isSaving}
+                    isDragDisabled={isSaving}
+                    onSave={onUpdate}
+                    onDelete={removeItem}
+                    onMove={moveItem}
+                    onValidationError={setError}
+                  />
+                ))}
+              </SortableContext>
+              <DragOverlay>
+                {activeDragItem ? <EquipmentDragOverlayCard item={activeDragItem} /> : null}
+              </DragOverlay>
+            </DndContext>
           )}
         </div>
         <div className="projectEquipmentTab__addForm">

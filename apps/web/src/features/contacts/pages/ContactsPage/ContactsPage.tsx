@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { useUrlEntityDrawer } from '@shared/hooks';
 import { PageShell } from '@shared/components/PageShell';
@@ -16,15 +17,52 @@ import { ContactDrawer } from '../../components/ContactDrawer';
 import type { Contact } from '../../types';
 import './ContactsPage.css';
 
-const SEGMENTS = ['הכל', 'לקוחות', 'נציגי לקוחות', 'ספקים', 'קבלנים', 'שותפים עסקיים'];
-const ACTIVE_FILTERS = ['פעילים', 'מחוקים', 'הכול'] as const;
-type ActiveFilter = (typeof ACTIVE_FILTERS)[number];
+// Stable English category ids for the URL, mapped locally to the existing Hebrew values that
+// drive client-side filtering (categoryMapping.ts's Hebrew↔enum boundary is untouched).
+type CategoryFilter = 'all' | 'customer' | 'customerRep' | 'supplier' | 'contractor' | 'partner' | 'other';
 
-const SEGMENT_ITEMS: SegmentItem<string>[] = SEGMENTS.map((s) => ({ id: s, label: s }));
-const ACTIVE_FILTER_ITEMS: SegmentItem<ActiveFilter>[] = ACTIVE_FILTERS.map((f) => ({
-  id: f,
-  label: f,
-}));
+const CATEGORY_FILTER_ITEMS: SegmentItem<CategoryFilter>[] = [
+  { id: 'all', label: 'הכל' },
+  { id: 'customer', label: 'לקוחות' },
+  { id: 'customerRep', label: 'נציגי לקוחות' },
+  { id: 'supplier', label: 'ספקים' },
+  { id: 'contractor', label: 'קבלנים' },
+  { id: 'partner', label: 'שותפים עסקיים' },
+  { id: 'other', label: 'אחר' },
+];
+
+const CATEGORY_FILTER_TO_HEBREW: Record<Exclude<CategoryFilter, 'all'>, string> = {
+  customer: 'לקוחות',
+  customerRep: 'נציגי לקוחות',
+  supplier: 'ספקים',
+  contractor: 'קבלנים',
+  partner: 'שותפים עסקיים',
+  other: 'אחר',
+};
+
+const CATEGORY_FILTER_IDS = CATEGORY_FILTER_ITEMS.map((item) => item.id);
+
+function resolveCategoryFilterParam(value: string | null): CategoryFilter {
+  return value && (CATEGORY_FILTER_IDS as string[]).includes(value)
+    ? (value as CategoryFilter)
+    : 'all';
+}
+
+type StatusFilter = 'active' | 'inactive' | 'all';
+
+const STATUS_FILTER_ITEMS: SegmentItem<StatusFilter>[] = [
+  { id: 'active', label: 'פעילים' },
+  { id: 'inactive', label: 'מחוקים' },
+  { id: 'all', label: 'הכול' },
+];
+
+const STATUS_FILTER_IDS = STATUS_FILTER_ITEMS.map((item) => item.id);
+
+function resolveStatusFilterParam(value: string | null): StatusFilter {
+  return value && (STATUS_FILTER_IDS as string[]).includes(value)
+    ? (value as StatusFilter)
+    : 'all';
+}
 
 function formatContactDate(value?: string | null) {
   if (!value) return '—';
@@ -34,9 +72,34 @@ function formatContactDate(value?: string | null) {
 export function ContactsPage() {
   const { can } = usePermissions();
   const { data: contacts, isLoading, error, refetch } = useContacts();
-  const [segment, setSegment] = useState('הכל');
-  const [activeFilter, setActiveFilter] = useState<ActiveFilter>('הכול');
-  const [search, setSearch] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [segment, setSegment] = useState<CategoryFilter>(() =>
+    resolveCategoryFilterParam(searchParams.get('category')),
+  );
+  const [activeFilter, setActiveFilter] = useState<StatusFilter>(() =>
+    resolveStatusFilterParam(searchParams.get('status')),
+  );
+  const [search, setSearch] = useState(() => searchParams.get('search') ?? '');
+
+  // Filters persist to the URL the same way the Projects/Service Calls/Customers list pages do.
+  // Only the named keys are updated, so the contactId drawer param is always preserved untouched.
+  const updateSearchParams = useCallback(
+    (updates: Record<string, string | null>) => {
+      const nextParams = new URLSearchParams(searchParams);
+
+      Object.entries(updates).forEach(([key, value]) => {
+        if (value) {
+          nextParams.set(key, value);
+        } else {
+          nextParams.delete(key);
+        }
+      });
+
+      setSearchParams(nextParams);
+    },
+    [searchParams, setSearchParams],
+  );
+
   // The ?contactId query parameter is the drawer's single source of truth: missing/invalid = closed,
   // "new" = create, a positive integer = reviewing that contact. State is derived from the URL, so
   // deep links and browser back/forward work without any URL→state effect.
@@ -58,7 +121,8 @@ export function ContactsPage() {
   const filtered = useMemo(() => {
     if (!contacts) return [];
     return contacts.filter((c) => {
-      const matchSegment = segment === 'הכל' || c.contactCategory === segment;
+      const matchSegment =
+        segment === 'all' || CATEGORY_FILTER_TO_HEBREW[segment] === c.contactCategory;
       const q = search.trim().toLowerCase();
       const matchSearch =
         !q ||
@@ -67,51 +131,66 @@ export function ContactsPage() {
         (c.phone ?? '').includes(q) ||
         (c.email ?? '').toLowerCase().includes(q);
       const matchActive =
-        activeFilter === 'הכול' ||
-        (activeFilter === 'פעילים' && c.isActive) ||
-        (activeFilter === 'מחוקים' && !c.isActive);
+        activeFilter === 'all' ||
+        (activeFilter === 'active' && c.isActive) ||
+        (activeFilter === 'inactive' && !c.isActive);
       return matchSegment && matchSearch && matchActive;
     });
   }, [contacts, segment, search, activeFilter]);
 
   const hasActiveFilters =
-    Boolean(search.trim()) || segment !== 'הכל' || activeFilter !== 'הכול';
+    Boolean(search.trim()) || segment !== 'all' || activeFilter !== 'all';
 
   const resetFilters = () => {
     setSearch('');
-    setSegment('הכל');
-    setActiveFilter('הכול');
+    setSegment('all');
+    setActiveFilter('all');
+    updateSearchParams({ search: null, category: null, status: null });
   };
 
   const columns: DataTableColumn<Contact>[] = [
-    { id: 'name', header: 'שם', cell: (c) => c.fullName },
-    { id: 'company', header: 'חברה', cell: (c) => c.companyName || '—' },
-    { id: 'category', header: 'קטגוריה', cell: (c) => c.contactCategory },
-    { id: 'phone', header: 'טלפון', cell: (c) => c.phone || '—' },
-    { id: 'email', header: 'מייל', cell: (c) => c.email || '—' },
+    { id: 'name', header: 'שם', width: '18%', cell: (c) => c.fullName },
+    { id: 'company', header: 'חברה', width: '16%', cell: (c) => c.companyName || '—' },
+    { id: 'category', header: 'קטגוריה', width: '140px', cell: (c) => c.contactCategory },
+    { id: 'phone', header: 'טלפון', width: '130px', cell: (c) => c.phone || '—' },
+    { id: 'email', header: 'מייל', width: '18%', cell: (c) => c.email || '—' },
     {
       id: 'status',
       header: 'סטטוס',
+      width: '110px',
+      align: 'center',
       cell: (c) => (
         <Badge variant={c.isActive ? 'success' : 'neutral'}>
           {c.status ?? (c.isActive ? 'פעיל' : 'לא פעיל')}
         </Badge>
       ),
     },
-    { id: 'updated', header: 'עודכן', cell: (c) => formatContactDate(c.updatedAt) },
+    {
+      id: 'updated',
+      header: 'עודכן',
+      width: '110px',
+      align: 'end',
+      cell: (c) => formatContactDate(c.updatedAt),
+    },
   ];
 
-  if (isLoading) return <PageShell title="אנשי קשר"><PageSpinner /></PageShell>;
+  if (isLoading) {
+    return (
+      <PageShell title="אנשי קשר" wide>
+        <PageSpinner />
+      </PageShell>
+    );
+  }
   if (error) {
     return (
-      <PageShell title="אנשי קשר">
+      <PageShell title="אנשי קשר" wide>
         <ErrorState message={error.message} onRetry={() => refetch()} />
       </PageShell>
     );
   }
 
   return (
-    <PageShell title="אנשי קשר">
+    <PageShell title="אנשי קשר" wide>
       <FilterBar
         actions={
           <>
@@ -131,29 +210,42 @@ export function ContactsPage() {
         <FilterField label="חיפוש" grow>
           <Input
             placeholder="חיפוש איש קשר..."
+            aria-label="חיפוש אנשי קשר"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              const value = e.target.value;
+              setSearch(value);
+              updateSearchParams({ search: value.trim() || null });
+            }}
           />
         </FilterField>
 
         <FilterField label="קטגוריה">
           <SegmentedControl
-            items={SEGMENT_ITEMS}
+            items={CATEGORY_FILTER_ITEMS}
             value={segment}
-            onChange={setSegment}
+            onChange={(value) => {
+              setSegment(value);
+              updateSearchParams({ category: value !== 'all' ? value : null });
+            }}
             ariaLabel="סינון לפי קטגוריה"
             size="sm"
           />
         </FilterField>
 
         <FilterField label="סטטוס">
-          <SegmentedControl
-            items={ACTIVE_FILTER_ITEMS}
-            value={activeFilter}
-            onChange={setActiveFilter}
-            ariaLabel="סינון לפי סטטוס"
-            size="sm"
-          />
+          <div className="contactsPage__statusControl">
+            <SegmentedControl
+              items={STATUS_FILTER_ITEMS}
+              value={activeFilter}
+              onChange={(value) => {
+                setActiveFilter(value);
+                updateSearchParams({ status: value !== 'all' ? value : null });
+              }}
+              ariaLabel="סינון לפי סטטוס"
+              size="sm"
+            />
+          </div>
         </FilterField>
       </FilterBar>
 

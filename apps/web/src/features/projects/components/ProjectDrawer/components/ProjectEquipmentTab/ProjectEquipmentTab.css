@@ -11,6 +11,7 @@
   border-radius: var(--radius-lg);
   overflow: hidden;
   background: #fff;
+  box-shadow: var(--shadow-card);
 }
 
 .projectEquipmentTab__groupHeader {
@@ -88,10 +89,64 @@
   padding: var(--spacing-md);
   border: 1px solid var(--color-neutral-200);
   border-radius: var(--radius-md);
+  box-shadow: var(--shadow-card);
 }
 
 .projectEquipmentTab__addForm {
   background: var(--color-neutral-50);
+}
+
+.projectEquipmentTab__editCardHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  grid-column: 1 / -1;
+}
+
+.projectEquipmentTab__editCardKicker {
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-700);
+}
+
+/* Placeholder left behind in the list while the card's drag clone follows the pointer. */
+.projectEquipmentTab__editCard--dragging {
+  opacity: 0.4;
+}
+
+/* Static clone rendered inside DragOverlay — same card language, lifted appearance. */
+.projectEquipmentTab__editCard--overlay {
+  box-shadow: var(--shadow-lg);
+  transform: scale(1.02);
+  cursor: grabbing;
+  background: #fff;
+}
+
+.projectEquipmentTab__dragHandle {
+  cursor: grab;
+  color: var(--color-neutral-400);
+  flex-shrink: 0;
+}
+
+.projectEquipmentTab__dragHandle:active {
+  cursor: grabbing;
+}
+
+.projectEquipmentTab__dragHandle:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+/* Non-interactive drag-handle glyph shown inside the DragOverlay clone. */
+.projectEquipmentTab__dragHandle--active {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--control-height-sm);
+  height: var(--control-height-sm);
+  flex-shrink: 0;
+  color: var(--color-neutral-400);
+  cursor: grabbing;
 }
 
 .projectEquipmentTab__actions {
@@ -99,4 +154,28 @@
   flex-wrap: wrap;
   gap: var(--spacing-sm);
   align-items: end;
+  grid-column: 1 / -1;
+}
+
+/* Separates the destructive action from the move/save cluster so it isn't a same-weight
+   neighbour of "up/down/save". */
+.projectEquipmentTab__dangerSlot {
+  margin-inline-start: auto;
+  padding-inline-start: var(--spacing-sm);
+  border-inline-start: 1px solid var(--color-neutral-200);
+}
+
+@media (max-width: 768px) {
+  .projectEquipmentTab__actions {
+    justify-content: flex-start;
+  }
+
+  .projectEquipmentTab__dangerSlot {
+    margin-inline-start: 0;
+    padding-inline-start: 0;
+    border-inline-start: none;
+    flex-basis: 100%;
+    padding-top: var(--spacing-xs);
+    border-top: 1px solid var(--color-neutral-200);
+  }
 }

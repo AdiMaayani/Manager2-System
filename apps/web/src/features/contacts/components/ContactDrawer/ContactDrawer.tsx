@@ -502,21 +502,23 @@ function ContactReviewDetails({ contact }: ContactReviewDetailsProps) {
 
   return (
     <div className="contactDrawer contactDrawer--review">
-      <DetailsSection title="פרטים כלליים">
-        <div className="contactDrawer__detailsGrid">
-          <DetailsField label="שם מלא" value={contact.fullName} />
-          <DetailsField label="תפקיד" value={contact.jobTitle} />
-          <DetailsField label="קטגוריה" value={contact.contactCategory} />
-          <DetailsField
-            label="סטטוס"
-            value={
-              <Badge variant={contact.isActive ? 'success' : 'neutral'}>
-                {contact.status ?? (contact.isActive ? 'פעיל' : 'לא פעיל')}
-              </Badge>
-            }
-          />
-        </div>
-      </DetailsSection>
+      <div className="contactDrawer__primarySection">
+        <DetailsSection title="פרטים כלליים">
+          <div className="contactDrawer__detailsGrid">
+            <DetailsField label="שם מלא" value={contact.fullName} />
+            <DetailsField label="תפקיד" value={contact.jobTitle} />
+            <DetailsField label="קטגוריה" value={contact.contactCategory} />
+            <DetailsField
+              label="סטטוס"
+              value={
+                <Badge variant={contact.isActive ? 'success' : 'neutral'}>
+                  {contact.status ?? (contact.isActive ? 'פעיל' : 'לא פעיל')}
+                </Badge>
+              }
+            />
+          </div>
+        </DetailsSection>
+      </div>
 
       <DetailsSection title="פרטי התקשרות">
         <div className="contactDrawer__detailsGrid">

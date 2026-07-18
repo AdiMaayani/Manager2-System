@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Plus } from 'lucide-react';
@@ -63,10 +63,26 @@ import { shouldApplyQuickReportAsyncResult } from '../../quickReportWorkers';
 import { getWorkItemByIdAsync } from '@features/workplan/api/workplanApiClient';
 
 const LIST_STATUS_OPTIONS = ['הוגש', 'טיוטה'];
+const DEFAULT_STATUS_FILTER = '';
 const STATUS_FILTER_ITEMS: SegmentItem<string>[] = [
   { id: '', label: 'הכול' },
   ...LIST_STATUS_OPTIONS.map((status) => ({ id: status, label: status })),
 ];
+
+// Hebrew SegmentedControl / filter ids stay unchanged; URL uses stable English values.
+// Default "הכול" (empty id) omits the status parameter; "all" is accepted for direct links.
+function statusFilterToUrlParam(status: string): string | null {
+  if (status === 'הוגש') return 'submitted';
+  if (status === 'טיוטה') return 'draft';
+  return null;
+}
+
+function resolveStatusFilterParam(value: string | null): string {
+  if (value === 'submitted') return 'הוגש';
+  if (value === 'draft') return 'טיוטה';
+  if (value === 'all' || value == null || value === '') return DEFAULT_STATUS_FILTER;
+  return DEFAULT_STATUS_FILTER;
+}
 
 const REPORT_TARGET_TYPE_ITEMS: SegmentItem<ReportTypeValue>[] = [
   { id: 'regular', label: 'דיווח על משימה כללית' },
@@ -225,7 +241,7 @@ export function ReportsPage() {
   const { data: reports, isLoading, error, refetch } = useReports();
   const queryClient = useQueryClient();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useSearchParams();
   const quickParam = searchParams.get('quick') === '1';
   const requestedWorkItemId = searchParams.get('workItemId');
   const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -244,9 +260,49 @@ export function ReportsPage() {
   const hasHandledQuickReportPrefill = useRef(false);
   const hasUserEditedReportForm = useRef(false);
 
-  const [filterSearch, setFilterSearch] = useState('');
-  const [filterCustomer, setFilterCustomer] = useState('');
-  const [filterStatus, setFilterStatus] = useState('');
+  // List filters only — never touch quick / workItemId / unrelated params.
+  const updateListFilterParams = useCallback(
+    (updates: Partial<Record<'search' | 'status' | 'customer', string | null>>) => {
+      setSearchParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          (Object.entries(updates) as Array<
+            ['search' | 'status' | 'customer', string | null | undefined]
+          >).forEach(([key, value]) => {
+            if (value == null || value === '') {
+              next.delete(key);
+            } else {
+              next.set(key, value);
+            }
+          });
+          return next;
+        },
+        { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  const filterStatus = resolveStatusFilterParam(searchParams.get('status'));
+  const filterCustomer = searchParams.get('customer') ?? '';
+  const urlSearchParam = searchParams.get('search') ?? '';
+  const [filterSearch, setFilterSearch] = useState(urlSearchParam);
+  const [prevUrlSearch, setPrevUrlSearch] = useState(urlSearchParam);
+
+  // When the URL search param changes (back/forward, clear filters), sync the controlled input
+  // during render — avoids a setState-in-effect lint violation. Skip overwrite while the local
+  // value is ahead of the previous URL value (in-progress typing before the URL catches up).
+  if (urlSearchParam !== prevUrlSearch) {
+    const shouldSyncSearch =
+      filterSearch === prevUrlSearch ||
+      filterSearch.trim() === prevUrlSearch ||
+      filterSearch === urlSearchParam ||
+      filterSearch.trim() === urlSearchParam;
+    setPrevUrlSearch(urlSearchParam);
+    if (shouldSyncSearch) {
+      setFilterSearch(urlSearchParam);
+    }
+  }
 
   const reportTargetsQuery = useQuery({
     queryKey: REPORT_TARGETS_QUERY_KEY,
@@ -350,8 +406,7 @@ export function ReportsPage() {
 
   const resetFilters = () => {
     setFilterSearch('');
-    setFilterCustomer('');
-    setFilterStatus('');
+    updateListFilterParams({ search: null, status: null, customer: null });
   };
 
   useEffect(() => {
@@ -596,24 +651,58 @@ export function ReportsPage() {
     },
   });
 
-  if (isLoading) return <PageShell title="דיווחים"><PageSpinner /></PageShell>;
+  if (isLoading) {
+    return (
+      <PageShell title="דיווחים" wide>
+        <PageSpinner />
+      </PageShell>
+    );
+  }
+
   if (error) {
     return (
-      <PageShell title="דיווחים">
+      <PageShell title="דיווחים" wide>
         <ErrorState message={error.message} onRetry={() => refetch()} />
       </PageShell>
     );
   }
 
   const reportColumns: DataTableColumn<WorkReportListItem>[] = [
-    { id: 'date', header: 'תאריך', cell: (report) => formatReportDate(report.reportDate) || '—' },
-    { id: 'number', header: 'מס׳ דיווח', cell: (report) => `#${report.reportId}` },
-    { id: 'project', header: 'פרויקט', cell: (report) => report.projectTitle ?? '—' },
-    { id: 'customer', header: 'לקוח', cell: (report) => report.customerName ?? '—' },
-    { id: 'reporter', header: 'מדווח', cell: (report) => report.reportedByName ?? '—' },
+    {
+      id: 'date',
+      header: 'תאריך',
+      width: '110px',
+      cell: (report) => formatReportDate(report.reportDate) || '—',
+    },
+    {
+      id: 'number',
+      header: 'מס׳ דיווח',
+      width: '110px',
+      cell: (report) => `#${report.reportId}`,
+    },
+    {
+      id: 'project',
+      header: 'פרויקט',
+      width: '22%',
+      cell: (report) => report.projectTitle ?? '—',
+    },
+    {
+      id: 'customer',
+      header: 'לקוח',
+      width: '18%',
+      cell: (report) => report.customerName ?? '—',
+    },
+    {
+      id: 'reporter',
+      header: 'מדווח',
+      width: '16%',
+      cell: (report) => report.reportedByName ?? '—',
+    },
     {
       id: 'status',
       header: 'סטטוס',
+      width: '110px',
+      align: 'center',
       cell: (report) => <StatusBadge domain="report" status={report.status} />,
     },
   ];
@@ -621,7 +710,7 @@ export function ReportsPage() {
   const legacySystems = editingReport?.systems ?? [];
 
   return (
-    <PageShell title="דיווחים">
+    <PageShell title="דיווחים" wide>
       {pageMessage && (
         <InlineAlert variant="success" onDismiss={() => setPageMessage(null)}>
           {pageMessage}
@@ -652,21 +741,36 @@ export function ReportsPage() {
           <Input
             type="search"
             placeholder="פרויקט, לקוח, מדווח או מס׳ דיווח"
+            aria-label="חיפוש דיווחים"
             value={filterSearch}
-            onChange={(event) => setFilterSearch(event.target.value)}
+            onChange={(event) => {
+              const value = event.target.value;
+              setFilterSearch(value);
+              updateListFilterParams({ search: value.trim() || null });
+            }}
           />
         </FilterField>
         <FilterField label="סטטוס">
-          <SegmentedControl
-            items={STATUS_FILTER_ITEMS}
-            value={filterStatus}
-            onChange={setFilterStatus}
-            ariaLabel="סינון לפי סטטוס"
-            size="sm"
-          />
+          <div className="reportsPage__statusControl">
+            <SegmentedControl
+              items={STATUS_FILTER_ITEMS}
+              value={filterStatus}
+              onChange={(value) => {
+                updateListFilterParams({ status: statusFilterToUrlParam(value) });
+              }}
+              ariaLabel="סינון לפי סטטוס"
+              size="sm"
+            />
+          </div>
         </FilterField>
         <FilterField label="לקוח">
-          <Select value={filterCustomer} onChange={(event) => setFilterCustomer(event.target.value)}>
+          <Select
+            value={filterCustomer}
+            aria-label="סינון לפי לקוח"
+            onChange={(event) => {
+              updateListFilterParams({ customer: event.target.value || null });
+            }}
+          >
             <option value="">הכל</option>
             {customerOptions.map((name) => (
               <option key={name} value={name}>

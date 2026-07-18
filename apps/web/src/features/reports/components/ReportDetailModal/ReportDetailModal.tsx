@@ -213,51 +213,53 @@ export function ReportDetailModal({
 
       {!isLoading && !error && report && (
         <div className="reportDetailModal">
-          <section className="reportDetailModal__section">
-            <h3>פרטי דיווח</h3>
-            <div className="reportDetailModal__badges">
-              <StatusBadge domain="report" status={report.status} />
-              <StatusBadge domain="reportLifecycle" status={report.lifecycleStatus} />
-            </div>
-            <dl className="reportDetailModal__meta">
-              <div>
-                <dt>תאריך</dt>
-                <dd>{formatReportDate(report.reportDate)}</dd>
+          <div className="reportsDetail__primarySection">
+            <section className="reportDetailModal__section">
+              <h3>פרטי דיווח</h3>
+              <div className="reportDetailModal__badges">
+                <StatusBadge domain="report" status={report.status} />
+                <StatusBadge domain="reportLifecycle" status={report.lifecycleStatus} />
               </div>
-              {report.reportType !== 'service_call' && (
+              <dl className="reportDetailModal__meta">
                 <div>
-                  <dt>פרויקט</dt>
-                  <dd>{report.projectTitle ?? '—'}</dd>
+                  <dt>תאריך</dt>
+                  <dd>{formatReportDate(report.reportDate)}</dd>
                 </div>
-              )}
-              <div>
-                <dt>לקוח</dt>
-                <dd>{report.customerName ?? '—'}</dd>
-              </div>
-              {report.serviceCallId != null && (
+                {report.reportType !== 'service_call' && (
+                  <div>
+                    <dt>פרויקט</dt>
+                    <dd>{report.projectTitle ?? '—'}</dd>
+                  </div>
+                )}
                 <div>
-                  <dt>קריאת שירות</dt>
+                  <dt>לקוח</dt>
+                  <dd>{report.customerName ?? '—'}</dd>
+                </div>
+                {report.serviceCallId != null && (
+                  <div>
+                    <dt>קריאת שירות</dt>
+                    <dd>
+                      {report.serviceCallTitle
+                        ? `#${report.serviceCallId} · ${report.serviceCallTitle}`
+                        : `#${report.serviceCallId}`}
+                    </dd>
+                  </div>
+                )}
+                <div>
+                  <dt>מדווח</dt>
+                  <dd>{report.reportedByName ?? '—'}</dd>
+                </div>
+                <div>
+                  <dt>שעות עבודה</dt>
                   <dd>
-                    {report.serviceCallTitle
-                      ? `#${report.serviceCallId} · ${report.serviceCallTitle}`
-                      : `#${report.serviceCallId}`}
+                    {report.start || report.end
+                      ? `${report.start ?? '—'} – ${report.end ?? '—'}`
+                      : '—'}
                   </dd>
                 </div>
-              )}
-              <div>
-                <dt>מדווח</dt>
-                <dd>{report.reportedByName ?? '—'}</dd>
-              </div>
-              <div>
-                <dt>שעות עבודה</dt>
-                <dd>
-                  {report.start || report.end
-                    ? `${report.start ?? '—'} – ${report.end ?? '—'}`
-                    : '—'}
-                </dd>
-              </div>
-            </dl>
-          </section>
+              </dl>
+            </section>
+          </div>
 
           <section className="reportDetailModal__section">
             <h3>סיכום עבודה</h3>

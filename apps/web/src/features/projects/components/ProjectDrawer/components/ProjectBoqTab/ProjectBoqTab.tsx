@@ -1,6 +1,28 @@
 import { useMemo, useState } from 'react';
+import {
+  DndContext,
+  DragOverlay,
+  KeyboardSensor,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+  type Announcements,
+  type DragEndEvent,
+  type DragStartEvent,
+} from '@dnd-kit/core';
+import {
+  SortableContext,
+  arrayMove,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+} from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+import { GripVertical } from 'lucide-react';
 import { useInventory, type InventoryItem } from '@features/inventory';
 import { Button } from '@shared/components/Button';
+import { IconButton } from '@shared/components/IconButton';
 import { Input } from '@shared/components/Input';
 import { Select } from '@shared/components/Select';
 import { InlineAlert } from '@shared/components/InlineAlert';
@@ -69,6 +91,173 @@ function buildBoqRequest(
     unit,
     unitPrice,
   };
+}
+
+interface SortableBoqRowProps {
+  item: ProjectBoqItem;
+  index: number;
+  itemCount: number;
+  draft: BoqDraft;
+  isSaving: boolean;
+  isDragDisabled: boolean;
+  inventoryCategories: string[];
+  getFilteredInventoryItems: (category: string) => InventoryItem[];
+  onDraftChange: (patch: Partial<BoqDraft>) => void;
+  onApplyInventoryItem: (inventoryItemId: string) => void;
+  onSave: () => void;
+  onMove: (direction: -1 | 1) => void;
+  onDelete: () => void;
+}
+
+/** Draggable persisted BOQ row — only the handle cell receives drag listeners. */
+function SortableBoqRow({
+  item,
+  index,
+  itemCount,
+  draft,
+  isSaving,
+  isDragDisabled,
+  inventoryCategories,
+  getFilteredInventoryItems,
+  onDraftChange,
+  onApplyInventoryItem,
+  onSave,
+  onMove,
+  onDelete,
+}: SortableBoqRowProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: item.projectBoqItemId,
+    disabled: isDragDisabled,
+  });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+  };
+
+  return (
+    <tr
+      ref={setNodeRef}
+      style={style}
+      className={isDragging ? 'projectBoqTab__row--dragging' : undefined}
+    >
+      <td className="projectBoqTab__dragCell">
+        <IconButton
+          label={`גרור לשינוי סדר: ${item.itemDescription}`}
+          icon={<GripVertical size={16} aria-hidden="true" />}
+          variant="ghost"
+          size="sm"
+          className={`projectBoqTab__dragHandle${isDragging ? ' projectBoqTab__dragHandle--grabbing' : ''}`}
+          disabled={isDragDisabled}
+          {...attributes}
+          {...listeners}
+        />
+      </td>
+      <td>
+        <Input
+          value={draft.systemName}
+          onChange={(event) => onDraftChange({ systemName: event.target.value })}
+        />
+      </td>
+      <td>
+        <Select
+          value={draft.inventoryCategory}
+          onChange={(event) =>
+            onDraftChange({ inventoryCategory: event.target.value, inventoryItemId: '' })
+          }
+        >
+          <option value="">כל הקטגוריות</option>
+          {inventoryCategories.map((category) => (
+            <option key={category} value={category}>
+              {category}
+            </option>
+          ))}
+        </Select>
+      </td>
+      <td>
+        <Select
+          value={draft.inventoryItemId}
+          onChange={(event) => onApplyInventoryItem(event.target.value)}
+        >
+          <option value="">ללא קישור</option>
+          {getFilteredInventoryItems(draft.inventoryCategory).map((inventoryItem) => (
+            <option key={inventoryItem.inventoryItemId} value={inventoryItem.inventoryItemId}>
+              {inventoryLabel(inventoryItem)}
+            </option>
+          ))}
+        </Select>
+      </td>
+      <td>
+        <Input
+          value={draft.itemDescription}
+          onChange={(event) => onDraftChange({ itemDescription: event.target.value })}
+        />
+      </td>
+      <td>
+        <Input
+          value={draft.quantity}
+          onChange={(event) => onDraftChange({ quantity: event.target.value })}
+        />
+      </td>
+      <td className="projectBoqTab__unitCell">
+        <Select value={draft.unit} onChange={(event) => onDraftChange({ unit: event.target.value })}>
+          {BOQ_UNIT_OPTIONS.map((unit) => (
+            <option key={unit} value={unit}>
+              {unit}
+            </option>
+          ))}
+        </Select>
+      </td>
+      <td>
+        <Input
+          value={draft.unitPrice}
+          onChange={(event) => onDraftChange({ unitPrice: event.target.value })}
+        />
+      </td>
+      <td>
+        <div className="projectBoqTab__actions">
+          <Button type="button" variant="secondary" onClick={onSave} disabled={isSaving}>
+            שמור פריט
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => onMove(-1)}
+            disabled={isSaving || index === 0}
+          >
+            למעלה
+          </Button>
+          <Button
+            type="button"
+            variant="ghost"
+            onClick={() => onMove(1)}
+            disabled={isSaving || index === itemCount - 1}
+          >
+            למטה
+          </Button>
+          <Button type="button" variant="ghost" onClick={onDelete} disabled={isSaving}>
+            הסר
+          </Button>
+        </div>
+      </td>
+    </tr>
+  );
+}
+
+/** Minimal, non-interactive preview shown under the pointer while dragging. */
+function BoqDragOverlayRow({ item }: { item: ProjectBoqItem }) {
+  return (
+    <div className="projectBoqTab__overlayRow">
+      <span
+        className="projectBoqTab__dragHandle projectBoqTab__dragHandle--active"
+        aria-hidden="true"
+      >
+        <GripVertical size={16} />
+      </span>
+      <span className="projectBoqTab__overlayDescription">{item.itemDescription}</span>
+      <span className="projectBoqTab__overlayUnit">{item.unit}</span>
+    </div>
+  );
 }
 
 export function ProjectBoqTab({
@@ -222,6 +411,88 @@ export function ProjectBoqTab({
     }
   };
 
+  const [activeDragItemId, setActiveDragItemId] = useState<number | null>(null);
+
+  const dragSensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
+  );
+
+  const boqItemIds = useMemo(
+    () => sortedItems.map((item) => item.projectBoqItemId),
+    [sortedItems],
+  );
+
+  const activeDragItem =
+    activeDragItemId != null
+      ? sortedItems.find((item) => item.projectBoqItemId === activeDragItemId)
+      : undefined;
+
+  const boqItemDescriptionById = (boqItemId: number): string =>
+    sortedItems.find((item) => item.projectBoqItemId === boqItemId)?.itemDescription ?? '';
+
+  const boqItemPositionById = (boqItemId: number): number => boqItemIds.indexOf(boqItemId) + 1;
+
+  const boqDragAnnouncements: Announcements = {
+    onDragStart({ active }) {
+      const description = boqItemDescriptionById(active.id as number);
+      return `הרמת הפריט "${description}" לשינוי סדר. המיקום הנוכחי: ${boqItemPositionById(
+        active.id as number,
+      )} מתוך ${boqItemIds.length}.`;
+    },
+    onDragOver({ active, over }) {
+      const description = boqItemDescriptionById(active.id as number);
+      if (!over) {
+        return `הפריט "${description}" אינו ממוקם מעל מיקום חדש.`;
+      }
+      return `הפריט "${description}" הועבר למיקום ${boqItemPositionById(
+        over.id as number,
+      )} מתוך ${boqItemIds.length}.`;
+    },
+    onDragEnd({ active, over }) {
+      const description = boqItemDescriptionById(active.id as number);
+      if (!over) {
+        return `שינוי הסדר של הפריט "${description}" בוטל.`;
+      }
+      return `הפריט "${description}" הונח במיקום ${boqItemPositionById(
+        over.id as number,
+      )} מתוך ${boqItemIds.length}.`;
+    },
+    onDragCancel({ active }) {
+      const description = boqItemDescriptionById(active.id as number);
+      return `שינוי הסדר של הפריט "${description}" בוטל.`;
+    },
+  };
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setActiveDragItemId(event.active.id as number);
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    setActiveDragItemId(null);
+
+    if (!over || active.id === over.id) return;
+    if (isSaving) return;
+
+    const oldIndex = boqItemIds.indexOf(active.id as number);
+    const newIndex = boqItemIds.indexOf(over.id as number);
+    if (oldIndex < 0 || newIndex < 0) return;
+
+    const nextItems = arrayMove(sortedItems, oldIndex, newIndex);
+    setError(null);
+
+    try {
+      await onReorder(nextItems);
+    } catch (reorderError) {
+      setError(reorderError instanceof Error ? reorderError.message : 'סידור כתב הכמויות נכשל.');
+    }
+  };
+
+  const handleDragCancel = () => {
+    setActiveDragItemId(null);
+  };
+
   if (isEditMode) {
     return (
       <div className="projectBoqTab">
@@ -229,154 +500,78 @@ export function ProjectBoqTab({
         {sortedItems.length === 0 && (
           <p className="projectBoqTab__empty">אין עדיין פריטי כתב כמויות לפרויקט.</p>
         )}
-        <table className="projectBoqTab__table">
-          <thead>
-            <tr>
-              <th>מערכת</th>
-              <th>קטגוריה</th>
-              <th>פריט מלאי</th>
-              <th>פריט</th>
-              <th>כמות</th>
-              <th>יחידה</th>
-              <th>מחיר יחידה</th>
-              <th>פעולות</th>
-            </tr>
-          </thead>
-          <tbody>
-            {sortedItems.map((item, index) => {
-              const draft = drafts[item.projectBoqItemId] ?? draftFromBoqItem(item);
-
-              return (
-                <tr key={item.projectBoqItemId}>
-                  <td>
-                    <Input
-                      value={draft.systemName}
-                      onChange={(event) =>
-                        updateDraft(item.projectBoqItemId, { systemName: event.target.value })
-                      }
-                    />
-                  </td>
-                  <td>
-                    <Select
-                      value={draft.inventoryCategory}
-                      onChange={(event) =>
-                        updateDraft(item.projectBoqItemId, {
-                          inventoryCategory: event.target.value,
-                          inventoryItemId: '',
-                        })
-                      }
-                    >
-                      <option value="">כל הקטגוריות</option>
-                      {inventoryCategories.map((category) => (
-                        <option key={category} value={category}>
-                          {category}
-                        </option>
-                      ))}
-                    </Select>
-                  </td>
-                  <td>
-                    <Select
-                      value={draft.inventoryItemId}
-                      onChange={(event) =>
-                        applyInventoryItemToDraft(event.target.value, (patch) =>
-                          updateDraft(item.projectBoqItemId, patch),
-                        )
-                      }
-                    >
-                      <option value="">ללא קישור</option>
-                      {getFilteredInventoryItems(draft.inventoryCategory).map((inventoryItem) => (
-                        <option
-                          key={inventoryItem.inventoryItemId}
-                          value={inventoryItem.inventoryItemId}
-                        >
-                          {inventoryLabel(inventoryItem)}
-                        </option>
-                      ))}
-                    </Select>
-                  </td>
-                  <td>
-                    <Input
-                      value={draft.itemDescription}
-                      onChange={(event) =>
-                        updateDraft(item.projectBoqItemId, {
-                          itemDescription: event.target.value,
-                        })
-                      }
-                    />
-                  </td>
-                  <td>
-                    <Input
-                      value={draft.quantity}
-                      onChange={(event) =>
-                        updateDraft(item.projectBoqItemId, { quantity: event.target.value })
-                      }
-                    />
-                  </td>
-                  <td>
-                    <Select
-                      value={draft.unit}
-                      onChange={(event) =>
-                        updateDraft(item.projectBoqItemId, { unit: event.target.value })
-                      }
-                    >
-                      {BOQ_UNIT_OPTIONS.map((unit) => (
-                        <option key={unit} value={unit}>
-                          {unit}
-                        </option>
-                      ))}
-                    </Select>
-                  </td>
-                  <td>
-                    <Input
-                      value={draft.unitPrice}
-                      onChange={(event) =>
-                        updateDraft(item.projectBoqItemId, { unitPrice: event.target.value })
-                      }
-                    />
-                  </td>
-                  <td>
-                    <div className="projectBoqTab__actions">
-                      <Button
-                        type="button"
-                        variant="secondary"
-                        onClick={() => handleUpdate(item)}
-                        disabled={isSaving}
-                      >
-                        שמור פריט
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() => handleMove(index, -1)}
-                        disabled={isSaving || index === 0}
-                      >
-                        למעלה
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() => handleMove(index, 1)}
-                        disabled={isSaving || index === sortedItems.length - 1}
-                      >
-                        למטה
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        onClick={() => handleDelete(item.projectBoqItemId)}
-                        disabled={isSaving}
-                      >
-                        הסר
-                      </Button>
-                    </div>
-                  </td>
+        <DndContext
+          sensors={dragSensors}
+          collisionDetection={closestCenter}
+          autoScroll
+          accessibility={{ announcements: boqDragAnnouncements }}
+          onDragStart={handleDragStart}
+          onDragEnd={(event) => void handleDragEnd(event)}
+          onDragCancel={handleDragCancel}
+        >
+          <div className="projectBoqTab__tableScroll">
+            <table className="projectBoqTab__table projectBoqTab__table--editable">
+              <colgroup>
+                <col className="projectBoqTab__col--drag" />
+                <col className="projectBoqTab__col--system" />
+                <col className="projectBoqTab__col--category" />
+                <col className="projectBoqTab__col--inventoryItem" />
+                <col className="projectBoqTab__col--description" />
+                <col className="projectBoqTab__col--quantity" />
+                <col className="projectBoqTab__col--unit" />
+                <col className="projectBoqTab__col--unitPrice" />
+                <col className="projectBoqTab__col--actions" />
+              </colgroup>
+              <thead>
+                <tr>
+                  <th className="projectBoqTab__dragHeaderCell" aria-hidden="true" />
+                  <th>מערכת</th>
+                  <th>קטגוריה</th>
+                  <th>פריט מלאי</th>
+                  <th>פריט</th>
+                  <th>כמות</th>
+                  <th className="projectBoqTab__unitCell">יחידה</th>
+                  <th>מחיר יחידה</th>
+                  <th>פעולות</th>
                 </tr>
-              );
-            })}
-            <tr>
-              <td>
-                <Input
-                  value={newItemDraft.systemName}
+              </thead>
+              <tbody>
+                <SortableContext items={boqItemIds} strategy={verticalListSortingStrategy}>
+                  {sortedItems.map((item, index) => {
+                    const draft = drafts[item.projectBoqItemId] ?? draftFromBoqItem(item);
+
+                    return (
+                      <SortableBoqRow
+                        key={item.projectBoqItemId}
+                        item={item}
+                        index={index}
+                        itemCount={sortedItems.length}
+                        draft={draft}
+                        isSaving={isSaving}
+                        isDragDisabled={isSaving}
+                        inventoryCategories={inventoryCategories}
+                        getFilteredInventoryItems={getFilteredInventoryItems}
+                        onDraftChange={(patch) => updateDraft(item.projectBoqItemId, patch)}
+                        onApplyInventoryItem={(inventoryItemId) =>
+                          applyInventoryItemToDraft(inventoryItemId, (patch) =>
+                            updateDraft(item.projectBoqItemId, patch),
+                          )
+                        }
+                        onSave={() => handleUpdate(item)}
+                        onMove={(direction) => handleMove(index, direction)}
+                        onDelete={() => handleDelete(item.projectBoqItemId)}
+                      />
+                    );
+                  })}
+                </SortableContext>
+                <tr>
+                  <td
+                    className="projectBoqTab__dragCell projectBoqTab__dragCell--empty"
+                    aria-hidden="true"
+                  />
+                  <td>
+                    <Input
+                      value={newItemDraft.systemName}
                   onChange={(event) =>
                     setNewItemDraft((currentDraft) => ({
                       ...currentDraft,
@@ -446,7 +641,7 @@ export function ProjectBoqTab({
                   }
                 />
               </td>
-              <td>
+              <td className="projectBoqTab__unitCell">
                 <Select
                   value={newItemDraft.unit}
                   onChange={(event) =>
@@ -484,9 +679,14 @@ export function ProjectBoqTab({
                   הוסף שורה
                 </Button>
               </td>
-            </tr>
-          </tbody>
-        </table>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <DragOverlay>
+            {activeDragItem ? <BoqDragOverlayRow item={activeDragItem} /> : null}
+          </DragOverlay>
+        </DndContext>
       </div>
     );
   }

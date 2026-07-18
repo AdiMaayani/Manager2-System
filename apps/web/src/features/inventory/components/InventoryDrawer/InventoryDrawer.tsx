@@ -633,35 +633,37 @@ function InventoryReviewDetails({ inventoryItem }: InventoryReviewDetailsProps) 
 
   return (
     <div className="inventoryDrawer inventoryDrawer--review">
-      <DetailsSection title="תמונה וזיהוי">
-        <div className="inventoryDrawer__imageFrame">
-          <InventoryImage
-            sources={reviewImage.sources}
-            alt={inventoryItem.itemName}
-            variant="drawer"
-            showMissingState
-            eager
-          />
-        </div>
-        <div className="inventoryDrawer__detailsGrid">
-          <DetailsField label="שם פריט" value={inventoryItem.itemName} />
-          <DetailsField
-            label="מק״ט"
-            value={<span className="inventoryDrawer__skuValue">{inventoryItem.skuCode}</span>}
-          />
-          <DetailsField
-            label="סטטוס"
-            value={
-              <span className="inventoryDrawer__statusBadges">
-                <Badge variant={inventoryItem.isActive ? 'success' : 'neutral'}>
-                  {inventoryItem.isActive ? 'פעיל' : 'לא פעיל'}
-                </Badge>
-                {isItemLowOnStock && <Badge variant="warning">מלאי נמוך</Badge>}
-              </span>
-            }
-          />
-        </div>
-      </DetailsSection>
+      <div className="inventoryDrawer__primarySection">
+        <DetailsSection title="תמונה וזיהוי">
+          <div className="inventoryDrawer__imageFrame">
+            <InventoryImage
+              sources={reviewImage.sources}
+              alt={inventoryItem.itemName}
+              variant="drawer"
+              showMissingState
+              eager
+            />
+          </div>
+          <div className="inventoryDrawer__detailsGrid">
+            <DetailsField label="שם פריט" value={inventoryItem.itemName} />
+            <DetailsField
+              label="מק״ט"
+              value={<span className="inventoryDrawer__skuValue">{inventoryItem.skuCode}</span>}
+            />
+            <DetailsField
+              label="סטטוס"
+              value={
+                <span className="inventoryDrawer__statusBadges">
+                  <Badge variant={inventoryItem.isActive ? 'success' : 'neutral'}>
+                    {inventoryItem.isActive ? 'פעיל' : 'לא פעיל'}
+                  </Badge>
+                  {isItemLowOnStock && <Badge variant="warning">מלאי נמוך</Badge>}
+                </span>
+              }
+            />
+          </div>
+        </DetailsSection>
+      </div>
 
       <DetailsSection title="מלאי וזמינות">
         <div className="inventoryDrawer__detailsGrid">
