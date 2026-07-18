@@ -593,21 +593,23 @@ interface UserReviewDetailsProps {
 function UserReviewDetails({ user, linkedEmployee }: UserReviewDetailsProps) {
   return (
     <div className="userDrawer userDrawer--review">
-      <DetailsSection title="פרטי משתמש">
-        <div className="userDrawer__detailsGrid">
-          <DetailsField label="שם משתמש" value={user.username} />
-          <DetailsField label="אימייל" value={user.email} />
-          <DetailsField label="טלפון" value={user.phone} />
-          <DetailsField
-            label="סטטוס"
-            value={
-              <Badge variant={user.isActive ? 'success' : 'neutral'}>
-                {user.isActive ? 'פעיל' : 'לא פעיל'}
-              </Badge>
-            }
-          />
-        </div>
-      </DetailsSection>
+      <div className="userDrawer__primarySection">
+        <DetailsSection title="פרטי משתמש">
+          <div className="userDrawer__detailsGrid">
+            <DetailsField label="שם משתמש" value={user.username} />
+            <DetailsField label="אימייל" value={user.email} />
+            <DetailsField label="טלפון" value={user.phone} />
+            <DetailsField
+              label="סטטוס"
+              value={
+                <Badge variant={user.isActive ? 'success' : 'neutral'}>
+                  {user.isActive ? 'פעיל' : 'לא פעיל'}
+                </Badge>
+              }
+            />
+          </div>
+        </DetailsSection>
+      </div>
 
       <DetailsSection title="עובד מקושר">
         {linkedEmployee ? (

@@ -505,21 +505,23 @@ function EmployeeReviewDetails({ employee, canViewLinkedUser }: EmployeeReviewDe
 
   return (
     <div className="employeeDrawer employeeDrawer--review">
-      <DetailsSection title="פרטי עובד">
-        <div className="employeeDrawer__detailsGrid">
-          <DetailsField label="שם מלא" value={employee.fullName} />
-          <DetailsField label="תפקיד ראשי" value={employee.primaryRole} />
-          <DetailsField
-            label="סטטוס"
-            value={
-              <Badge variant={employee.isActive ? 'success' : 'neutral'}>
-                {employee.isActive ? 'פעיל' : 'לא פעיל'}
-              </Badge>
-            }
-          />
-          <DetailsField label="נוצר בתאריך" value={formatEmployeeDate(employee.createdAt)} />
-        </div>
-      </DetailsSection>
+      <div className="employeeDrawer__primarySection">
+        <DetailsSection title="פרטי עובד">
+          <div className="employeeDrawer__detailsGrid">
+            <DetailsField label="שם מלא" value={employee.fullName} />
+            <DetailsField label="תפקיד ראשי" value={employee.primaryRole} />
+            <DetailsField
+              label="סטטוס"
+              value={
+                <Badge variant={employee.isActive ? 'success' : 'neutral'}>
+                  {employee.isActive ? 'פעיל' : 'לא פעיל'}
+                </Badge>
+              }
+            />
+            <DetailsField label="נוצר בתאריך" value={formatEmployeeDate(employee.createdAt)} />
+          </div>
+        </DetailsSection>
+      </div>
 
       <DetailsSection title="פרטי התקשרות">
         <div className="employeeDrawer__detailsGrid">

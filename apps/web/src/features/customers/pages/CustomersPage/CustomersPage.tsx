@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { useUrlEntityDrawer } from '@shared/hooks';
 import { PageShell } from '@shared/components/PageShell';
@@ -16,18 +17,51 @@ import { CustomerDrawer } from '../../components/CustomerDrawer';
 import type { Customer } from '../../types';
 import './CustomersPage.css';
 
-const STATUS_FILTERS = ['פעילים', 'מחוקים', 'הכול'] as const;
-type StatusFilter = (typeof STATUS_FILTERS)[number];
-const STATUS_FILTER_ITEMS: SegmentItem<StatusFilter>[] = STATUS_FILTERS.map((f) => ({
-  id: f,
-  label: f,
-}));
+// Stable English query-param values, decoupled from the Hebrew labels shown in the UI, so URLs
+// stay valid even if the displayed labels change later.
+type StatusFilter = 'active' | 'inactive' | 'all';
+const STATUS_FILTER_ITEMS: SegmentItem<StatusFilter>[] = [
+  { id: 'active', label: 'פעילים' },
+  { id: 'inactive', label: 'מחוקים' },
+  { id: 'all', label: 'הכול' },
+];
+const STATUS_FILTER_IDS = STATUS_FILTER_ITEMS.map((item) => item.id);
+
+// Falls back to "all" for a missing/unrecognized URL value instead of silently
+// filtering to an empty list, so stale or hand-edited links stay usable.
+function resolveStatusFilterParam(value: string | null): StatusFilter {
+  return value && (STATUS_FILTER_IDS as string[]).includes(value)
+    ? (value as StatusFilter)
+    : 'all';
+}
 
 export function CustomersPage() {
   const { can } = usePermissions();
   const { data: customers, isLoading, error, refetch } = useCustomers();
-  const [search, setSearch] = useState('');
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('הכול');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [search, setSearch] = useState(() => searchParams.get('search') ?? '');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(() =>
+    resolveStatusFilterParam(searchParams.get('status')),
+  );
+
+  // Filters persist to the URL the same way the Projects/Service Calls list pages do. Only the
+  // named keys are updated, so the customerId drawer param is always preserved untouched.
+  const updateSearchParams = useCallback(
+    (updates: Record<string, string | null>, options?: { replace?: boolean }) => {
+      const nextParams = new URLSearchParams(searchParams);
+
+      Object.entries(updates).forEach(([key, value]) => {
+        if (value) {
+          nextParams.set(key, value);
+        } else {
+          nextParams.delete(key);
+        }
+      });
+
+      setSearchParams(nextParams, { replace: options?.replace ?? false });
+    },
+    [searchParams, setSearchParams],
+  );
   // The ?customerId query parameter is the drawer's single source of truth: missing/invalid = closed,
   // "new" = create, a positive integer = reviewing that customer. State is derived from the URL, so
   // deep links and browser back/forward work without any URL→state effect.
@@ -51,9 +85,9 @@ export function CustomersPage() {
     const q = search.trim().toLowerCase();
     return customers.filter((customer) => {
       const matchesStatus =
-        statusFilter === 'הכול' ||
-        (statusFilter === 'פעילים' && customer.isActive) ||
-        (statusFilter === 'מחוקים' && !customer.isActive);
+        statusFilter === 'all' ||
+        (statusFilter === 'active' && customer.isActive) ||
+        (statusFilter === 'inactive' && !customer.isActive);
       if (!matchesStatus) return false;
       if (!q) return true;
       return (
@@ -64,21 +98,29 @@ export function CustomersPage() {
     });
   }, [customers, search, statusFilter]);
 
-  const hasActiveFilters = Boolean(search.trim()) || statusFilter !== 'הכול';
+  const hasActiveFilters = Boolean(search.trim()) || statusFilter !== 'all';
 
   const resetFilters = () => {
     setSearch('');
-    setStatusFilter('הכול');
+    setStatusFilter('all');
+    updateSearchParams({ search: null, status: null });
   };
 
   const columns: DataTableColumn<Customer>[] = [
-    { id: 'name', header: 'שם לקוח', width: '30%', cell: (customer) => customer.customerName },
-    { id: 'type', header: 'סוג', cell: (customer) => customer.customerType || '—' },
-    { id: 'city', header: 'עיר', cell: (customer) => customer.city || '—' },
-    { id: 'phone', header: 'טלפון', cell: (customer) => customer.primaryPhone || '—' },
+    { id: 'name', header: 'שם לקוח', width: '28%', cell: (customer) => customer.customerName },
+    { id: 'type', header: 'סוג', width: '160px', cell: (customer) => customer.customerType || '—' },
+    { id: 'city', header: 'עיר', width: '140px', cell: (customer) => customer.city || '—' },
+    {
+      id: 'phone',
+      header: 'טלפון',
+      width: '140px',
+      cell: (customer) => customer.primaryPhone || '—',
+    },
     {
       id: 'status',
       header: 'סטטוס',
+      width: '110px',
+      align: 'center',
       cell: (customer) => (
         <Badge variant={customer.isActive ? 'success' : 'neutral'}>
           {customer.isActive ? 'פעיל' : 'לא פעיל'}
@@ -87,17 +129,23 @@ export function CustomersPage() {
     },
   ];
 
-  if (isLoading) return <PageShell title="לקוחות"><PageSpinner /></PageShell>;
+  if (isLoading) {
+    return (
+      <PageShell title="לקוחות" wide>
+        <PageSpinner />
+      </PageShell>
+    );
+  }
   if (error) {
     return (
-      <PageShell title="לקוחות">
+      <PageShell title="לקוחות" wide>
         <ErrorState message={error.message} onRetry={() => refetch()} />
       </PageShell>
     );
   }
 
   return (
-    <PageShell title="לקוחות">
+    <PageShell title="לקוחות" wide>
       <FilterBar
         actions={
           <>
@@ -117,19 +165,29 @@ export function CustomersPage() {
         <FilterField label="חיפוש" grow>
           <Input
             placeholder="חיפוש לקוח..."
+            aria-label="חיפוש לקוחות"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              const value = e.target.value;
+              setSearch(value);
+              updateSearchParams({ search: value.trim() || null });
+            }}
           />
         </FilterField>
 
         <FilterField label="סטטוס">
-          <SegmentedControl
-            items={STATUS_FILTER_ITEMS}
-            value={statusFilter}
-            onChange={setStatusFilter}
-            ariaLabel="סינון לפי סטטוס"
-            size="sm"
-          />
+          <div className="customersPage__statusControl">
+            <SegmentedControl
+              items={STATUS_FILTER_ITEMS}
+              value={statusFilter}
+              onChange={(value) => {
+                setStatusFilter(value);
+                updateSearchParams({ status: value !== 'all' ? value : null });
+              }}
+              ariaLabel="סינון לפי סטטוס"
+              size="sm"
+            />
+          </div>
         </FilterField>
       </FilterBar>
 

@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useSearchParams } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import { useUrlEntityDrawer } from '@shared/hooks';
 import { PageShell } from '@shared/components/PageShell';
@@ -23,10 +24,27 @@ import './UsersPage.css';
 const ACTIVE_FILTERS = ['פעילים', 'מחוקים', 'הכול'] as const;
 type ActiveFilter = (typeof ACTIVE_FILTERS)[number];
 
+const DEFAULT_ACTIVE_FILTER: ActiveFilter = 'הכול';
+
 const ACTIVE_FILTER_ITEMS: SegmentItem<ActiveFilter>[] = ACTIVE_FILTERS.map((f) => ({
   id: f,
   label: f,
 }));
+
+// Hebrew SegmentedControl ids stay unchanged; URL uses stable English values.
+// Default "הכול" omits the status parameter; "all" is accepted for direct links.
+function statusFilterToUrlParam(status: ActiveFilter): string | null {
+  if (status === 'פעילים') return 'active';
+  if (status === 'מחוקים') return 'inactive';
+  return null;
+}
+
+function resolveStatusFilterParam(value: string | null): ActiveFilter {
+  if (value === 'active') return 'פעילים';
+  if (value === 'inactive') return 'מחוקים';
+  if (value === 'all' || value == null || value === '') return DEFAULT_ACTIVE_FILTER;
+  return DEFAULT_ACTIVE_FILTER;
+}
 
 function formatDate(value?: string | null): string {
   if (!value) return '—';
@@ -48,11 +66,52 @@ export function UsersPage() {
     queryFn: getEmployeesAsync,
     staleTime: 60_000,
   });
+  const [searchParams, setSearchParams] = useSearchParams();
 
-  const [search, setSearch] = useState('');
-  const [activeFilter, setActiveFilter] = useState<ActiveFilter>('הכול');
-  const [roleFilter, setRoleFilter] = useState('');
+  // Status / role are derived from the URL so back/forward restores them without a sync effect.
+  const activeFilter = resolveStatusFilterParam(searchParams.get('status'));
+  const roleFilter = searchParams.get('role') ?? '';
+  const urlSearchParam = searchParams.get('search') ?? '';
+
+  const [search, setSearch] = useState(urlSearchParam);
+  const [prevUrlSearch, setPrevUrlSearch] = useState(urlSearchParam);
+
+  // When the URL search param changes (back/forward, clear filters), adjust the controlled
+  // input during render — avoids a setState-in-effect lint violation. Skip overwrite while the
+  // local value is ahead of the previous URL value (in-progress typing before the URL catches up).
+  if (urlSearchParam !== prevUrlSearch) {
+    const shouldSyncSearch =
+      search === prevUrlSearch ||
+      search.trim() === prevUrlSearch ||
+      search === urlSearchParam ||
+      search.trim() === urlSearchParam;
+    setPrevUrlSearch(urlSearchParam);
+    if (shouldSyncSearch) {
+      setSearch(urlSearchParam);
+    }
+  }
+
   const [pageMessage, setPageMessage] = useState<string | null>(null);
+
+  // List filters only — never touch userId / new / unrelated params.
+  const updateListFilterParams = useCallback(
+    (updates: Partial<Record<'search' | 'status' | 'role', string | null>>) => {
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        (Object.entries(updates) as Array<
+          ['search' | 'status' | 'role', string | null | undefined]
+        >).forEach(([key, value]) => {
+          if (value == null || value === '') {
+            next.delete(key);
+          } else {
+            next.set(key, value);
+          }
+        });
+        return next;
+      });
+    },
+    [setSearchParams],
+  );
 
   // The ?userId query parameter is the drawer's single source of truth: missing/invalid = closed,
   // "new" = create, a positive integer = reviewing that user. State is derived from the URL, so
@@ -112,12 +171,10 @@ export function UsersPage() {
   }, [users, employeesById, search, activeFilter, roleFilter]);
 
   const hasActiveFilters =
-    Boolean(search.trim()) || activeFilter !== 'הכול' || Boolean(roleFilter);
+    Boolean(search.trim()) || activeFilter !== DEFAULT_ACTIVE_FILTER || Boolean(roleFilter);
 
   const resetFilters = () => {
-    setSearch('');
-    setActiveFilter('הכול');
-    setRoleFilter('');
+    updateListFilterParams({ search: null, status: null, role: null });
   };
 
   const openUser = (user: User) => {
@@ -134,6 +191,7 @@ export function UsersPage() {
     {
       id: 'username',
       header: 'שם משתמש',
+      width: '16%',
       cell: (user) => (
         <div className="usersPage__primaryCell">
           <span>{user.username}</span>
@@ -144,12 +202,19 @@ export function UsersPage() {
     {
       id: 'employee',
       header: 'עובד מקושר',
+      width: '16%',
       cell: (user) => getEmployeeName(employeesById, user.employeeId),
     },
-    { id: 'email', header: 'אימייל', cell: (user) => user.email },
+    {
+      id: 'email',
+      header: 'אימייל',
+      width: '18%',
+      cell: (user) => user.email,
+    },
     {
       id: 'roles',
       header: 'תפקידים',
+      width: '16%',
       cell: (user) => (
         <div className="usersPage__badges">
           {user.roles.map((role) => (
@@ -163,6 +228,7 @@ export function UsersPage() {
     {
       id: 'departments',
       header: 'מחלקות',
+      width: '14%',
       cell: (user) => (
         <div className="usersPage__badges">
           {user.departments.map((department) => (
@@ -176,13 +242,21 @@ export function UsersPage() {
     {
       id: 'status',
       header: 'סטטוס',
+      width: '100px',
+      align: 'center',
       cell: (user) => (
         <Badge variant={user.isActive ? 'success' : 'neutral'}>
           {user.isActive ? 'פעיל' : 'לא פעיל'}
         </Badge>
       ),
     },
-    { id: 'lastLogin', header: 'כניסה אחרונה', cell: (user) => formatDate(user.lastLoginAt) },
+    {
+      id: 'lastLogin',
+      header: 'כניסה אחרונה',
+      width: '140px',
+      align: 'end',
+      cell: (user) => formatDate(user.lastLoginAt),
+    },
   ];
 
   const isLookupLoading =
@@ -239,23 +313,38 @@ export function UsersPage() {
         <FilterField label="חיפוש" grow>
           <Input
             placeholder="חיפוש משתמש, עובד, תפקיד או מחלקה..."
+            aria-label="חיפוש משתמשים"
             value={search}
-            onChange={(event) => setSearch(event.target.value)}
+            onChange={(event) => {
+              const value = event.target.value;
+              setSearch(value);
+              updateListFilterParams({ search: value.trim() || null });
+            }}
           />
         </FilterField>
 
         <FilterField label="סטטוס">
-          <SegmentedControl
-            items={ACTIVE_FILTER_ITEMS}
-            value={activeFilter}
-            onChange={setActiveFilter}
-            ariaLabel="סינון לפי סטטוס"
-            size="sm"
-          />
+          <div className="usersPage__statusControl">
+            <SegmentedControl
+              items={ACTIVE_FILTER_ITEMS}
+              value={activeFilter}
+              onChange={(value) => {
+                updateListFilterParams({ status: statusFilterToUrlParam(value) });
+              }}
+              ariaLabel="סינון לפי סטטוס"
+              size="sm"
+            />
+          </div>
         </FilterField>
 
         <FilterField label="תפקיד">
-          <Select value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)}>
+          <Select
+            value={roleFilter}
+            aria-label="סינון לפי תפקיד"
+            onChange={(event) => {
+              updateListFilterParams({ role: event.target.value || null });
+            }}
+          >
             <option value="">כל התפקידים</option>
             {roleOptions.map((role) => (
               <option key={role} value={role}>

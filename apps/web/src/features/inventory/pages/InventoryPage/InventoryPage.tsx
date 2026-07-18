@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ArrowRight, Plus } from 'lucide-react';
 import { Badge } from '@shared/components/Badge';
@@ -40,11 +40,27 @@ import './InventoryPage.css';
 
 const VIEW_MODE_STORAGE_KEY = 'manager2_inventory_view_mode';
 
+const DEFAULT_STATUS_FILTER: InventoryStatusFilter = 'active';
+
 const STATUS_FILTER_ITEMS: SegmentItem<InventoryStatusFilter>[] = [
   { id: 'active', label: 'פעילים' },
   { id: 'inactive', label: 'מחוקים' },
   { id: 'all', label: 'הכול' },
 ];
+
+const STATUS_FILTER_IDS = STATUS_FILTER_ITEMS.map((item) => item.id);
+
+// Falls back to the page default ("active") for a missing/unrecognized URL value so stale or
+// hand-edited links stay usable and filter semantics match the previous in-memory default.
+function resolveStatusFilterParam(value: string | null): InventoryStatusFilter {
+  return value && STATUS_FILTER_IDS.includes(value as InventoryStatusFilter)
+    ? (value as InventoryStatusFilter)
+    : DEFAULT_STATUS_FILTER;
+}
+
+function resolveLowStockOnlyParam(value: string | null): boolean {
+  return value === 'true';
+}
 
 export function InventoryPage() {
   // The selected category lives in the URL (?category=...) so it survives refresh and
@@ -60,19 +76,59 @@ export function InventoryPage() {
 
   const [categorySearch, setCategorySearch] = useState('');
 
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [status, setStatus] = useState<InventoryStatusFilter>('active');
-  const [lowStockOnly, setLowStockOnly] = useState(false);
+  // Status and low-stock are derived from the URL so back/forward restores them without a
+  // separate sync effect. Search input stays local so keystrokes can debounce before hitting the URL;
+  // the committed search used for queries is the URL value itself (updated after the debounce).
+  const status = resolveStatusFilterParam(searchParams.get('status'));
+  const lowStockOnly = resolveLowStockOnlyParam(searchParams.get('lowStockOnly'));
+  const debouncedSearch = searchParams.get('search') ?? '';
+
+  const [search, setSearch] = useState(debouncedSearch);
+  const [prevUrlSearch, setPrevUrlSearch] = useState(debouncedSearch);
+
+  // When the URL search param changes (back/forward, clear filters, category drill-down reset),
+  // adjust the controlled input during render — avoids a setState-in-effect lint violation.
+  if (debouncedSearch !== prevUrlSearch) {
+    setPrevUrlSearch(debouncedSearch);
+    setSearch(debouncedSearch);
+  }
 
   // undefined = drawer closed, null = create mode, InventoryItem = review existing.
+  // Drawer state remains React-local in this phase (not URL-driven).
   const [drawerInventoryItem, setDrawerInventoryItem] =
     useState<InventoryItem | null | undefined>(undefined);
 
+  // Product filters persist to the URL the same way as Quotes/Customers/Contacts. Only the named
+  // keys are updated, so category and any unrelated params are always preserved untouched.
+  const updateSearchParams = useCallback(
+    (updates: Record<string, string | null>) => {
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        Object.entries(updates).forEach(([key, value]) => {
+          if (value) {
+            next.set(key, value);
+          } else {
+            next.delete(key);
+          }
+        });
+        return next;
+      });
+    },
+    [setSearchParams],
+  );
+
+  // Debounce keeps the existing 300ms-after-typing-stops filtering behavior; the URL's search
+  // param is the committed filter value, so queries only change after the debounce settles.
+  // Skip the URL write when the committed value already matches, to avoid empty history noise on mount.
   useEffect(() => {
-    const timeoutId = window.setTimeout(() => setDebouncedSearch(search), 300);
+    const timeoutId = window.setTimeout(() => {
+      const nextSearch = search.trim();
+      if (nextSearch !== debouncedSearch) {
+        updateSearchParams({ search: nextSearch || null });
+      }
+    }, 300);
     return () => window.clearTimeout(timeoutId);
-  }, [search]);
+  }, [search, debouncedSearch, updateSearchParams]);
 
   // Drop an unsupported category from the URL so the overview shows cleanly and back/forward
   // never lands on an invalid value. setSearchParams is router navigation, not React state.
@@ -151,17 +207,19 @@ export function InventoryPage() {
 
   const isDrawerOpen = drawerInventoryItem !== undefined;
   const selectedInventoryItemId = drawerInventoryItem?.inventoryItemId ?? null;
-  const hasProductFilters = Boolean(search.trim() || lowStockOnly || status !== 'active');
+  const hasProductFilters = Boolean(search.trim() || lowStockOnly || status !== DEFAULT_STATUS_FILTER);
 
   const handleSelectCategory = (name: string) => {
     // Enter a category with a clean filter context so the full category is visible first.
-    setSearch('');
-    setDebouncedSearch('');
-    setStatus('active');
-    setLowStockOnly(false);
-    const nextParams = new URLSearchParams(searchParams);
-    nextParams.set('category', name);
-    setSearchParams(nextParams);
+    // Clearing URL product-filter params also resets the local search input via URL sync above.
+    setSearchParams((current) => {
+      const nextParams = new URLSearchParams(current);
+      nextParams.set('category', name);
+      nextParams.delete('search');
+      nextParams.delete('status');
+      nextParams.delete('lowStockOnly');
+      return nextParams;
+    });
   };
 
   const handleBackToCategories = () => {
@@ -183,10 +241,8 @@ export function InventoryPage() {
   };
 
   const resetProductFilters = () => {
-    setSearch('');
-    setDebouncedSearch('');
-    setStatus('active');
-    setLowStockOnly(false);
+    // Clearing URL params resets derived status/lowStock and the local search input via URL sync.
+    updateSearchParams({ search: null, status: null, lowStockOnly: null });
   };
 
   const openInventoryItem = (item: InventoryItem) => {
@@ -197,11 +253,13 @@ export function InventoryPage() {
     {
       id: 'sku',
       header: 'מק״ט',
+      width: '120px',
       cell: (item) => <span className="inventoryPage__sku">{item.skuCode}</span>,
     },
     {
       id: 'item',
       header: 'פריט',
+      width: '26%',
       cell: (item) => (
         <>
           <div className="inventoryPage__itemName">{item.itemName}</div>
@@ -209,10 +267,17 @@ export function InventoryPage() {
         </>
       ),
     },
-    { id: 'category', header: 'קטגוריה', cell: (item) => item.category ?? '—' },
+    {
+      id: 'category',
+      header: 'קטגוריה',
+      width: '14%',
+      cell: (item) => item.category ?? '—',
+    },
     {
       id: 'quantity',
       header: 'כמות',
+      width: '110px',
+      align: 'end',
       cell: (item) => (
         <span className={isLowStock(item) ? 'inventoryPage__lowStock' : ''}>
           {formatQuantity(item.quantityOnHand, item.unit)}
@@ -222,15 +287,24 @@ export function InventoryPage() {
     {
       id: 'minimum',
       header: 'מינימום',
+      width: '110px',
+      align: 'end',
       cell: (item) =>
         item.minimumQuantity == null ? '—' : formatQuantity(item.minimumQuantity, item.unit),
     },
-    { id: 'location', header: 'מיקום', cell: (item) => item.locationName ?? '—' },
+    {
+      id: 'location',
+      header: 'מיקום',
+      width: '14%',
+      cell: (item) => item.locationName ?? '—',
+    },
     {
       id: 'status',
       header: 'סטטוס',
+      width: '160px',
+      align: 'center',
       cell: (item) => (
-        <div className="inventoryPage__badges">
+        <div className="inventoryPage__badges" style={{ justifyContent: 'center' }}>
           <Badge variant={item.isActive ? 'success' : 'neutral'}>
             {item.isActive ? 'פעיל' : 'לא פעיל'}
           </Badge>
@@ -246,7 +320,7 @@ export function InventoryPage() {
     : 'הוסיפו פריט ראשון לקטגוריה זו.';
 
   return (
-    <PageShell title="מלאי">
+    <PageShell title="מלאי" wide>
       {showOverview ? (
         <CategoryOverview
           isLoading={isCategoriesLoading}
@@ -305,24 +379,32 @@ export function InventoryPage() {
             <FilterField label="חיפוש" grow>
               <Input
                 placeholder="שם פריט, מק״ט, מיקום..."
+                aria-label="חיפוש פריטי מלאי"
                 value={search}
                 onChange={(event) => setSearch(event.target.value)}
               />
             </FilterField>
 
             <FilterField label="סטטוס">
-              <SegmentedControl
-                items={STATUS_FILTER_ITEMS}
-                value={status}
-                onChange={setStatus}
-                ariaLabel="סינון לפי סטטוס"
-                size="sm"
-              />
+              <div className="inventoryPage__statusControl">
+                <SegmentedControl
+                  items={STATUS_FILTER_ITEMS}
+                  value={status}
+                  onChange={(value) => {
+                    updateSearchParams({
+                      status: value !== DEFAULT_STATUS_FILTER ? value : null,
+                    });
+                  }}
+                  ariaLabel="סינון לפי סטטוס"
+                  size="sm"
+                />
+              </div>
             </FilterField>
 
             <FilterField label="קטגוריה">
               <Select
                 value={selectedCategory ?? ''}
+                aria-label="סינון לפי קטגוריה"
                 onChange={(event) => handleCategoryChange(event.target.value)}
               >
                 {CANONICAL_CATEGORIES.map((name) => (
@@ -337,7 +419,11 @@ export function InventoryPage() {
               <Checkbox
                 label="מתחת למינימום"
                 checked={lowStockOnly}
-                onChange={(event) => setLowStockOnly(event.target.checked)}
+                onChange={(event) => {
+                  updateSearchParams({
+                    lowStockOnly: event.target.checked ? 'true' : null,
+                  });
+                }}
               />
             </FilterField>
           </FilterBar>
@@ -420,6 +506,7 @@ function CategoryOverview({
         <FilterField label="חיפוש קטגוריה" grow>
           <Input
             placeholder="חיפוש קטגוריה..."
+            aria-label="חיפוש קטגוריות מלאי"
             value={categorySearch}
             onChange={(event) => onCategorySearchChange(event.target.value)}
           />

@@ -698,9 +698,22 @@ function ServiceCallDrawerContent({
             </div>
 
             {isExistingServiceCall && (
-              <div className="serviceCallDrawer__assignAction">
+              <div
+                className="serviceCallDrawer__assignAction"
+                role="group"
+                aria-labelledby="serviceCallDrawer-assignActionTitle"
+              >
+                <div className="serviceCallDrawer__assignActionHeader">
+                  <h4
+                    id="serviceCallDrawer-assignActionTitle"
+                    className="serviceCallDrawer__assignActionTitle"
+                  >
+                    שיוך עובד לקריאה
+                  </h4>
+                  <span className="serviceCallDrawer__assignActionBadge">פעולה מיידית</span>
+                </div>
                 <p className="serviceCallDrawer__hint">
-                  שיוך עובד מתבצע מיידית ואינו תלוי בלחיצה על שמירה.
+                  שיוך עובד נשמר באופן מיידי ואינו תלוי בלחיצה על &quot;שמור&quot; בטופס הראשי.
                 </p>
                 <div className="serviceCallDrawer__grid">
                   <Select
@@ -800,33 +813,35 @@ function ServiceCallReviewDetails({
 
   return (
     <div className="serviceCallDrawer serviceCallDrawer--review">
-      <DetailsSection title="פרטי קריאה">
-        <div className="serviceCallDrawer__detailsGrid">
-          <DetailsField label="מספר" value={`SC-${serviceCall.workItemId}`} />
-          <DetailsField label="כותרת" value={serviceCall.title} />
-          <DetailsField
-            label="סטטוס"
-            value={<StatusBadge domain="serviceCall" status={serviceCall.status} />}
-          />
-          <DetailsField
-            label="עדיפות"
-            value={
-              serviceCall.priority ? (
-                <StatusBadge domain="serviceCallPriority" status={serviceCall.priority} />
-              ) : undefined
-            }
-          />
-          <DetailsField label="סוג חיוב" value={getBillingTypeLabel(serviceCall.billingType)} />
-          <DetailsField
-            label="נעילה תפעולית"
-            value={
-              <Badge variant={serviceCall.isLocked ? 'warning' : 'neutral'}>
-                {serviceCall.isLocked ? 'נעולה' : 'לא נעולה'}
-              </Badge>
-            }
-          />
-        </div>
-      </DetailsSection>
+      <div className="serviceCallDrawer__primarySection">
+        <DetailsSection title="פרטי קריאה">
+          <div className="serviceCallDrawer__detailsGrid">
+            <DetailsField label="מספר" value={`SC-${serviceCall.workItemId}`} />
+            <DetailsField label="כותרת" value={serviceCall.title} />
+            <DetailsField
+              label="סטטוס"
+              value={<StatusBadge domain="serviceCall" status={serviceCall.status} />}
+            />
+            <DetailsField
+              label="עדיפות"
+              value={
+                serviceCall.priority ? (
+                  <StatusBadge domain="serviceCallPriority" status={serviceCall.priority} />
+                ) : undefined
+              }
+            />
+            <DetailsField label="סוג חיוב" value={getBillingTypeLabel(serviceCall.billingType)} />
+            <DetailsField
+              label="נעילה תפעולית"
+              value={
+                <Badge variant={serviceCall.isLocked ? 'warning' : 'neutral'}>
+                  {serviceCall.isLocked ? 'נעולה' : 'לא נעולה'}
+                </Badge>
+              }
+            />
+          </div>
+        </DetailsSection>
+      </div>
 
       <DetailsSection title="לקוח ואתר">
         <div className="serviceCallDrawer__detailsGrid">

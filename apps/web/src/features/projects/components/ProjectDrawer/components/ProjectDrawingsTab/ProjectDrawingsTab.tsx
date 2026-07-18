@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Button } from '@shared/components/Button';
+import { ConfirmInline } from '@shared/components/ConfirmInline';
 import { EmptyState } from '@shared/components/EmptyState';
 import { Input } from '@shared/components/Input';
 import { Select } from '@shared/components/Select';
@@ -124,6 +125,7 @@ function DrawingEditCard({
 
   return (
     <div className="projectDrawingsTab__editCard">
+      <span className="projectDrawingsTab__editCardKicker">עריכת שרטוט: {drawing.name}</span>
       <Input
         label="שם"
         value={draft.name}
@@ -171,14 +173,15 @@ function DrawingEditCard({
         >
           הורד קובץ
         </Button>
-        <Button
-          type="button"
-          variant="ghost"
-          onClick={() => onDelete(drawing.projectDrawingId)}
-          disabled={isSaving}
-        >
-          הסר
-        </Button>
+        <div className="projectDrawingsTab__dangerSlot">
+          <ConfirmInline
+            triggerLabel="הסר"
+            message="להסיר את השרטוט מהפרויקט?"
+            confirmLabel="אישור הסרה"
+            onConfirm={() => onDelete(drawing.projectDrawingId)}
+            isPending={isSaving}
+          />
+        </div>
       </div>
     </div>
   );
@@ -323,16 +326,27 @@ export function ProjectDrawingsTab({
         <div className="projectDrawingsTab__viewList">
           {drawings.map((drawing) => (
             <div key={drawing.projectDrawingId} className="projectDrawingsTab__card">
-              <strong>{drawing.name}</strong>
-              <span>{drawing.type}</span>
-              <span>{formatProjectDate(drawing.date)}</span>
-              {drawing.originalFileName && (
-                <span>
-                  {drawing.originalFileName}
-                  {drawing.fileSizeBytes ? ` · ${formatFileSize(drawing.fileSizeBytes)}` : ''}
-                </span>
-              )}
-              {drawing.note && <p>{drawing.note}</p>}
+              <strong className="projectDrawingsTab__cardTitle">{drawing.name}</strong>
+              <div className="projectDrawingsTab__viewMeta">
+                <div className="projectDrawingsTab__viewField">
+                  <span className="projectDrawingsTab__viewLabel">סוג</span>
+                  <span>{drawing.type}</span>
+                </div>
+                <div className="projectDrawingsTab__viewField">
+                  <span className="projectDrawingsTab__viewLabel">תאריך</span>
+                  <span>{formatProjectDate(drawing.date)}</span>
+                </div>
+                {drawing.originalFileName && (
+                  <div className="projectDrawingsTab__viewField">
+                    <span className="projectDrawingsTab__viewLabel">קובץ</span>
+                    <span>
+                      {drawing.originalFileName}
+                      {drawing.fileSizeBytes ? ` · ${formatFileSize(drawing.fileSizeBytes)}` : ''}
+                    </span>
+                  </div>
+                )}
+              </div>
+              {drawing.note && <p className="projectDrawingsTab__cardNote">{drawing.note}</p>}
               <Button
                 type="button"
                 variant="ghost"
