@@ -181,6 +181,8 @@ public class WorkItemRepository : IWorkItemRepository
         command.Parameters.AddWithValue("@RequiredRole", (object?)workItem.RequiredRole ?? DBNull.Value);
         command.Parameters.AddWithValue("@IsLocked", workItem.IsLocked);
 
+        await connection.OpenAsync();
+
         var result = await command.ExecuteScalarAsync();
         var rowsAffected = result != null ? Convert.ToInt32(result) : 0;
 
