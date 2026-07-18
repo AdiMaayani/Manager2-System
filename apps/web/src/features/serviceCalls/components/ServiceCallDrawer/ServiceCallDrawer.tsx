@@ -1,9 +1,12 @@
 import { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import {
   CustomerDrawer,
   getCustomerByIdAsync,
+  resolveCanonicalCustomerQueryId,
+  resolveCustomerDrawerIntentAfterCustomerChange,
+  shouldFetchCanonicalCustomerDetail,
+  type NestedCustomerDrawerIntent,
 } from '@features/customers';
 import {
   ValidatedAddressDisplay,
@@ -25,6 +28,7 @@ import { PageSpinner } from '@shared/components/PageSpinner';
 import { usePermissions } from '@shared/auth/usePermissions';
 import { getServiceCallByIdAsync } from '../../api/serviceCallsApiClient';
 import { useServiceCallMutations } from '../../hooks/useServiceCalls';
+import { resolveServiceCallCustomerAccessId } from '../../lib/serviceCallCustomerAccess';
 import {
   filterServiceCallSitesByCustomer,
   resolveCompatibleServiceCallSiteId,
@@ -159,6 +163,7 @@ function ServiceCallDrawerContent({
   // Technicians have viewServiceCalls but not manageServiceCalls — they may review a call but must
   // not reach edit/close/assign actions (the edit form, which holds those, stays hidden for them).
   const canManage = can('manageServiceCalls');
+  const canViewCustomers = can('viewCustomers');
   const { createMutation, updateMutation, closeMutation, assignEmployeeMutation } =
     useServiceCallMutations();
 
@@ -171,16 +176,36 @@ function ServiceCallDrawerContent({
   const { isMaximized, toggleMaximize } = useDrawerMaximize();
   const [employeeIdToAssign, setEmployeeIdToAssign] = useState('');
   const [assignmentRole, setAssignmentRole] = useState(currentServiceCall?.requiredRole ?? '');
-  // Nested CustomerDrawer for site management — stays on this page so sessionStorage auth and
-  // unsaved service-call form fields are preserved (no tab / route navigation).
-  const [isManagingCustomerSites, setIsManagingCustomerSites] = useState(false);
-  const manageCustomerId = isManagingCustomerSites ? Number(form.customerId) || 0 : 0;
-  const manageCustomerQuery = useQuery({
-    queryKey: ['customers', 'detail', manageCustomerId],
-    queryFn: () => getCustomerByIdAsync(manageCustomerId),
-    enabled: isManagingCustomerSites && manageCustomerId > 0,
+  // Nested CustomerDrawer intents (view record / manage sites) — stays on this page so
+  // sessionStorage auth and unsaved service-call form fields are preserved.
+  const [customerDrawerIntent, setCustomerDrawerIntent] =
+    useState<NestedCustomerDrawerIntent>('closed');
+  const customerAccessId = resolveServiceCallCustomerAccessId({
+    isEditing,
+    formCustomerId: form.customerId,
+    persistedCustomerId: currentServiceCall?.customerId,
+  });
+  const detailCustomerId = resolveCanonicalCustomerQueryId({
+    intent: customerDrawerIntent,
+    accessCustomerId: customerAccessId,
+  });
+  const customerDetailQuery = useQuery({
+    queryKey: ['customers', 'detail', detailCustomerId],
+    queryFn: () => getCustomerByIdAsync(detailCustomerId),
+    enabled: shouldFetchCanonicalCustomerDetail({
+      intent: customerDrawerIntent,
+      customerId: detailCustomerId,
+      canViewCustomers,
+    }),
     retry: false,
   });
+  const isLoadingCustomerDetail =
+    (customerDrawerIntent === 'view' || customerDrawerIntent === 'manageSites') &&
+    customerDetailQuery.isLoading;
+  const customerDetailError =
+    customerDrawerIntent === 'view' || customerDrawerIntent === 'manageSites'
+      ? customerDetailQuery.error
+      : null;
 
   // The edit form/assignment role are only shown in edit mode, and entering edit mode re-seeds them
   // from the freshest currentServiceCall (see handleStartEdit). Review mode renders directly from
@@ -444,6 +469,14 @@ function ServiceCallDrawerContent({
           serviceCall={currentServiceCall}
           customers={customers}
           sites={sites}
+          canViewCustomers={canViewCustomers}
+          isLoadingCustomerDetail={isLoadingCustomerDetail}
+          customerDetailError={customerDetailError}
+          onOpenCustomerRecord={() => {
+            if (!canViewCustomers || customerAccessId <= 0) return;
+            setCustomerDrawerIntent('view');
+          }}
+          onCancelCustomerLoad={() => setCustomerDrawerIntent('closed')}
         />
       ) : (
         <div className="serviceCallDrawer serviceCallDrawer--edit">
@@ -510,7 +543,7 @@ function ServiceCallDrawerContent({
                 value={form.customerId}
                 onChange={(event) => {
                   const nextCustomerId = event.target.value;
-                  setIsManagingCustomerSites(false);
+                  setCustomerDrawerIntent(resolveCustomerDrawerIntentAfterCustomerChange());
                   setForm((current) => ({
                     ...current,
                     customerId: nextCustomerId,
@@ -556,30 +589,46 @@ function ServiceCallDrawerContent({
                 ללקוח זה אין אתרים פעילים. יש לנהל אתרים מתוך כרטיס הלקוח.
               </p>
             )}
-            {form.customerId && (
-              <div className="serviceCallDrawer__siteManageAction">
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={() => setIsManagingCustomerSites(true)}
-                  disabled={isManagingCustomerSites && manageCustomerQuery.isLoading}
-                >
-                  ניהול אתרי הלקוח
-                </Button>
-                {isManagingCustomerSites && manageCustomerQuery.isLoading && (
+            {canViewCustomers && form.customerId && (
+              <div className="serviceCallDrawer__customerAccessActions">
+                <div className="serviceCallDrawer__customerAccessButtons">
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      if (customerAccessId <= 0) return;
+                      setCustomerDrawerIntent('view');
+                    }}
+                    disabled={isLoadingCustomerDetail}
+                  >
+                    פתח תיק לקוח
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => {
+                      if (customerAccessId <= 0) return;
+                      setCustomerDrawerIntent('manageSites');
+                    }}
+                    disabled={isLoadingCustomerDetail}
+                  >
+                    ניהול אתרי הלקוח
+                  </Button>
+                </div>
+                {isLoadingCustomerDetail && (
                   <p className="serviceCallDrawer__hint">טוען פרטי לקוח…</p>
                 )}
-                {isManagingCustomerSites && manageCustomerQuery.error != null && (
+                {customerDetailError != null && (
                   <>
                     <InlineAlert variant="danger">
-                      {manageCustomerQuery.error instanceof Error
-                        ? manageCustomerQuery.error.message
+                      {customerDetailError instanceof Error
+                        ? customerDetailError.message
                         : 'טעינת פרטי הלקוח נכשלה.'}
                     </InlineAlert>
                     <Button
                       type="button"
                       variant="ghost"
-                      onClick={() => setIsManagingCustomerSites(false)}
+                      onClick={() => setCustomerDrawerIntent('closed')}
                     >
                       סגור
                     </Button>
@@ -699,12 +748,13 @@ function ServiceCallDrawerContent({
         </div>
       )}
 
-      {manageCustomerQuery.data && (
+      {customerDetailQuery.data &&
+        (customerDrawerIntent === 'view' || customerDrawerIntent === 'manageSites') && (
         <CustomerDrawer
-          isOpen={isManagingCustomerSites}
-          customer={manageCustomerQuery.data}
-          onClose={() => setIsManagingCustomerSites(false)}
-          onSaved={() => setIsManagingCustomerSites(false)}
+          isOpen
+          customer={customerDetailQuery.data}
+          onClose={() => setCustomerDrawerIntent('closed')}
+          onSaved={() => setCustomerDrawerIntent('closed')}
         />
       )}
     </Drawer>
@@ -715,9 +765,23 @@ interface ServiceCallReviewDetailsProps {
   serviceCall: ServiceCallDetails;
   customers: ServiceCallCustomerOption[];
   sites: ServiceCallSiteOption[];
+  canViewCustomers: boolean;
+  isLoadingCustomerDetail: boolean;
+  customerDetailError: Error | null | unknown;
+  onOpenCustomerRecord: () => void;
+  onCancelCustomerLoad: () => void;
 }
 
-function ServiceCallReviewDetails({ serviceCall, customers, sites }: ServiceCallReviewDetailsProps) {
+function ServiceCallReviewDetails({
+  serviceCall,
+  customers,
+  sites,
+  canViewCustomers,
+  isLoadingCustomerDetail,
+  customerDetailError,
+  onOpenCustomerRecord,
+  onCancelCustomerLoad,
+}: ServiceCallReviewDetailsProps) {
   // The list/detail payload may omit display names, so they fall back to the
   // lookup lists already loaded by the page.
   const customerName =
@@ -731,6 +795,8 @@ function ServiceCallReviewDetails({ serviceCall, customers, sites }: ServiceCall
     queryFn: () => getSiteAddressProfileOptionalAsync(serviceCall.siteId),
     retry: false,
   });
+
+  const showOpenCustomerRecord = canViewCustomers && serviceCall.customerId > 0;
 
   return (
     <div className="serviceCallDrawer serviceCallDrawer--review">
@@ -766,18 +832,7 @@ function ServiceCallReviewDetails({ serviceCall, customers, sites }: ServiceCall
         <div className="serviceCallDrawer__detailsGrid">
           <DetailsField
             label="לקוח"
-            value={
-              serviceCall.customerId ? (
-                <Link
-                  className="serviceCallDrawer__inlineLink"
-                  to={`/customers?customerId=${serviceCall.customerId}`}
-                >
-                  {customerName ?? `לקוח #${serviceCall.customerId}`}
-                </Link>
-              ) : (
-                customerName
-              )
-            }
+            value={customerName ?? (serviceCall.customerId ? `לקוח #${serviceCall.customerId}` : undefined)}
           />
           <DetailsField label="אתר" value={siteName} />
           <ValidatedAddressDisplay
@@ -785,6 +840,35 @@ function ServiceCallReviewDetails({ serviceCall, customers, sites }: ServiceCall
             validationStatus={siteProfileQuery.data?.validationStatus}
           />
         </div>
+        {showOpenCustomerRecord && (
+          <div className="serviceCallDrawer__customerAccessActions">
+            <div className="serviceCallDrawer__customerAccessButtons">
+              <Button
+                type="button"
+                variant="secondary"
+                onClick={onOpenCustomerRecord}
+                disabled={isLoadingCustomerDetail}
+              >
+                פתח תיק לקוח
+              </Button>
+            </div>
+            {isLoadingCustomerDetail && (
+              <p className="serviceCallDrawer__hint">טוען פרטי לקוח…</p>
+            )}
+            {customerDetailError != null && (
+              <>
+                <InlineAlert variant="danger">
+                  {customerDetailError instanceof Error
+                    ? customerDetailError.message
+                    : 'טעינת פרטי הלקוח נכשלה.'}
+                </InlineAlert>
+                <Button type="button" variant="ghost" onClick={onCancelCustomerLoad}>
+                  סגור
+                </Button>
+              </>
+            )}
+          </div>
+        )}
       </DetailsSection>
 
       <DetailsSection title="תזמון ושיבוץ">

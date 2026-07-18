@@ -4,7 +4,18 @@ import { Button } from '@shared/components/Button';
 import { Input } from '@shared/components/Input';
 import { Select } from '@shared/components/Select';
 import { Textarea } from '@shared/components/Textarea';
-import { CustomerDrawer, type Customer } from '@features/customers';
+import { InlineAlert } from '@shared/components/InlineAlert';
+import { usePermissions } from '@shared/auth/usePermissions';
+import {
+  CustomerDrawer,
+  getCustomerByIdAsync,
+  resolveCanonicalCustomerQueryId,
+  resolveCustomerDrawerIntentAfterCustomerChange,
+  shouldFetchCanonicalCustomerDetail,
+  shouldInvokeCustomerCreatedOnSave,
+  type Customer,
+  type NestedCustomerDrawerIntent,
+} from '@features/customers';
 import {
   ValidatedAddressDisplay,
   getSiteAddressProfileOptionalAsync,
@@ -26,6 +37,7 @@ import {
   getProjectNumber,
   getProjectStatusMeta,
 } from '../../../../utils/projectDisplayUtils';
+import { resolveProjectCustomerAccessId } from '../../../../utils/projectCustomerAccess';
 import {
   applyProjectCustomerChange,
   filterProjectSitesByCustomer,
@@ -60,11 +72,12 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
   onTeamChange,
   onCustomerCreated,
 }: ProjectOverviewTabProps) {
-  // CustomerDrawer is reused for both "לקוח חדש" (create) and "ניהול אתרי הלקוח" (manage existing).
-  // Closed leaves the project form untouched so unsaved edits survive.
-  const [customerDrawerMode, setCustomerDrawerMode] = useState<'closed' | 'create' | 'manage'>(
-    'closed',
-  );
+  // One nested CustomerDrawer: create / view record / manage sites. Closed leaves the project
+  // form untouched so unsaved edits survive.
+  const [customerDrawerIntent, setCustomerDrawerIntent] =
+    useState<NestedCustomerDrawerIntent>('closed');
+  const { can } = usePermissions();
+  const canViewCustomers = can('viewCustomers');
 
   const project = lifecycle?.project;
   const projectId = project?.workItemId;
@@ -109,6 +122,33 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
     () => customers.find((customer) => customer.customerId === form.customerId) ?? null,
     [customers, form.customerId],
   );
+
+  const customerAccessId = resolveProjectCustomerAccessId({
+    isEditMode,
+    formCustomerId: form.customerId,
+    persistedCustomerId: project?.customerId,
+  });
+  const detailCustomerId = resolveCanonicalCustomerQueryId({
+    intent: customerDrawerIntent,
+    accessCustomerId: customerAccessId,
+  });
+  const customerDetailQuery = useQuery({
+    queryKey: ['customers', 'detail', detailCustomerId],
+    queryFn: () => getCustomerByIdAsync(detailCustomerId),
+    enabled: shouldFetchCanonicalCustomerDetail({
+      intent: customerDrawerIntent,
+      customerId: detailCustomerId,
+      canViewCustomers,
+    }),
+    retry: false,
+  });
+  const isLoadingCustomerDetail =
+    (customerDrawerIntent === 'view' || customerDrawerIntent === 'manageSites') &&
+    customerDetailQuery.isLoading;
+  const customerDetailError =
+    customerDrawerIntent === 'view' || customerDrawerIntent === 'manageSites'
+      ? customerDetailQuery.error
+      : null;
 
   const selectedSiteProfileQuery = useQuery({
     queryKey: ['sites', selectedSite?.siteId, 'address-profile'],
@@ -166,12 +206,17 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
     onChange({ ...form, [key]: value });
   }, [form, onChange]);
 
+  const handleOpenCustomerRecord = useCallback(() => {
+    if (!canViewCustomers || customerAccessId <= 0) return;
+    setCustomerDrawerIntent('view');
+  }, [canViewCustomers, customerAccessId]);
+
   const handleManageCustomerSites = useCallback(() => {
     // Sites are managed only from the customer record. Open CustomerDrawer above this project so the
     // authenticated session and unsaved project form state stay intact (no tab / route navigation).
-    if (!selectedCustomer) return;
-    setCustomerDrawerMode('manage');
-  }, [selectedCustomer]);
+    if (!canViewCustomers || customerAccessId <= 0) return;
+    setCustomerDrawerIntent('manageSites');
+  }, [canViewCustomers, customerAccessId]);
 
   const handleProjectManagerChange = useCallback((value: string) => {
     const projectManagerEmployeeId = value ? Number(value) : null;
@@ -185,19 +230,19 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
   }, [onTeamChange, teamForm]);
 
   const handleCustomerDrawerClose = useCallback(() => {
-    setCustomerDrawerMode('closed');
+    setCustomerDrawerIntent('closed');
   }, []);
 
   const handleCustomerSaved = useCallback(
     async (customer: Customer) => {
-      // Only a newly created customer updates the project selection. Managing sites/editing an
+      // Only a newly created customer updates the project selection. Viewing/managing an
       // existing customer must not clear or replace the project's customer/site fields.
-      if (customerDrawerMode === 'create') {
+      if (shouldInvokeCustomerCreatedOnSave(customerDrawerIntent)) {
         await onCustomerCreated(customer.customerId);
       }
-      setCustomerDrawerMode('closed');
+      setCustomerDrawerIntent('closed');
     },
-    [customerDrawerMode, onCustomerCreated],
+    [customerDrawerIntent, onCustomerCreated],
   );
 
   const handleAddTeamMember = useCallback((value: string) => {
@@ -226,6 +271,31 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
     [form.status, isEditMode, project?.status],
   );
 
+  const showOpenCustomerRecord =
+    canViewCustomers && customerAccessId > 0;
+  const showManageCustomerSites =
+    isEditMode && canViewCustomers && form.customerId > 0;
+
+  const customerLoadStatus = (
+    <>
+      {isLoadingCustomerDetail && (
+        <p className="projectOverviewTab__fieldNote">טוען פרטי לקוח…</p>
+      )}
+      {customerDetailError != null && (
+        <div className="projectOverviewTab__customerLoadError">
+          <InlineAlert variant="danger">
+            {customerDetailError instanceof Error
+              ? customerDetailError.message
+              : 'טעינת פרטי הלקוח נכשלה.'}
+          </InlineAlert>
+          <Button type="button" variant="ghost" onClick={handleCustomerDrawerClose}>
+            סגור
+          </Button>
+        </div>
+      )}
+    </>
+  );
+
   return (
     <div className="projectOverviewTab">
       <div className="projectOverviewTab__grid">
@@ -252,7 +322,7 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
                   value={form.customerId || ''}
                   onChange={(event) => {
                     const customerId = Number(event.target.value);
-                    setCustomerDrawerMode('closed');
+                    setCustomerDrawerIntent(resolveCustomerDrawerIntentAfterCustomerChange());
                     onChange(applyProjectCustomerChange(form, customerId));
                   }}
                   required
@@ -267,7 +337,7 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
                 <Button
                   type="button"
                   variant="secondary"
-                  onClick={() => setCustomerDrawerMode('create')}
+                  onClick={() => setCustomerDrawerIntent('create')}
                 >
                   לקוח חדש
                 </Button>
@@ -280,6 +350,19 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
                 נבחר: {selectedCustomer.customerName}
               </span>
             )}
+            {showOpenCustomerRecord && (
+              <div className="projectOverviewTab__customerAccessActions">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={handleOpenCustomerRecord}
+                  disabled={isLoadingCustomerDetail}
+                >
+                  פתח תיק לקוח
+                </Button>
+              </div>
+            )}
+            {customerDrawerIntent !== 'manageSites' && customerLoadStatus}
           </div>
           <div className="projectOverviewTab__field">
             <span className="projectOverviewTab__label">סטטוס</span>
@@ -415,16 +498,17 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
                     ללקוח הנבחר אין עדיין אתרים פעילים. יש לנהל אתרים מתוך כרטיס הלקוח.
                   </span>
                 )}
-                {form.customerId > 0 && (
+                {showManageCustomerSites && (
                   <div className="projectOverviewTab__siteManageAction">
                     <Button
                       type="button"
                       variant="secondary"
                       onClick={handleManageCustomerSites}
-                      disabled={!selectedCustomer}
+                      disabled={isLoadingCustomerDetail}
                     >
                       ניהול אתרי הלקוח
                     </Button>
+                    {customerDrawerIntent === 'manageSites' && customerLoadStatus}
                   </div>
                 )}
               </>
@@ -550,8 +634,14 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
         )}
       </div>
       <CustomerDrawer
-        isOpen={customerDrawerMode !== 'closed'}
-        customer={customerDrawerMode === 'manage' ? selectedCustomer : null}
+        isOpen={
+          customerDrawerIntent === 'create' ||
+          ((customerDrawerIntent === 'view' || customerDrawerIntent === 'manageSites') &&
+            customerDetailQuery.data != null)
+        }
+        customer={
+          customerDrawerIntent === 'create' ? null : (customerDetailQuery.data ?? null)
+        }
         onClose={handleCustomerDrawerClose}
         onSaved={handleCustomerSaved}
       />

@@ -81,11 +81,6 @@
   background: var(--color-neutral-50);
 }
 
-.serviceCallDrawer__inlineLink {
-  color: var(--color-primary-700);
-  font-weight: var(--font-weight-medium);
-}
-
 .serviceCallDrawer__multilineValue {
   margin: 0;
   font-size: var(--font-size-sm);
@@ -97,6 +92,20 @@
   margin: 0;
   color: var(--color-neutral-600);
   font-size: var(--font-size-sm);
+}
+
+.serviceCallDrawer__customerAccessActions {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  margin-top: var(--spacing-sm);
+}
+
+.serviceCallDrawer__customerAccessButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
 }
 
 .serviceCallDrawer__siteManageAction {
