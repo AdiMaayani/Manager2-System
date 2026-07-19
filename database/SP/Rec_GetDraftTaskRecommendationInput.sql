@@ -47,6 +47,17 @@ BEGIN
         wi.EstimatedHours,
         wi.Priority,
         wi.RequiredRole,
+        CASE WHEN EXISTS
+        (
+            SELECT 1 FROM dbo.WorkItemRequiredRoles AS requiredRole
+            WHERE requiredRole.WorkItemId = wi.WorkItemId
+        ) THEN (
+            SELECT requiredRole.RoleName AS [Role]
+            FROM dbo.WorkItemRequiredRoles AS requiredRole
+            WHERE requiredRole.WorkItemId = wi.WorkItemId
+            ORDER BY requiredRole.RoleName
+            FOR XML PATH(''), ROOT('Roles'), TYPE
+        ) ELSE CAST(NULL AS XML) END AS RequiredRolesXml,
         wi.IsLocked,
         wi.SiteId,
         wi.CustomerId,
@@ -80,15 +91,25 @@ BEGIN
     -- 3. EMPLOYEES
     --------------------------------------------------
     SELECT
-        EmployeeId,
-        FullName,
-        PrimaryRole,
-        IsActive,
-        IsAssignable,
-        DailyCapacityHours
-    FROM dbo.Employees
-    WHERE IsActive = 1
-      AND IsAssignable = 1;
+        employee.EmployeeId,
+        employee.FullName,
+        employee.PrimaryRole,
+        employee.IsActive,
+        employee.IsAssignable,
+        employee.DailyCapacityHours,
+        CASE WHEN EXISTS
+        (
+            SELECT 1 FROM dbo.EmployeeProfessions AS profession
+            WHERE profession.EmployeeId = employee.EmployeeId
+        ) THEN (
+            SELECT profession.RoleName AS [Role]
+            FROM dbo.EmployeeProfessions AS profession
+            WHERE profession.EmployeeId = employee.EmployeeId
+            ORDER BY profession.RoleName
+            FOR XML PATH(''), ROOT('Roles'), TYPE
+        ) ELSE CAST(NULL AS XML) END AS ProfessionsXml
+    FROM dbo.Employees AS employee
+    WHERE employee.IsActive = 1;
 
     --------------------------------------------------
     -- 4. EMPLOYEE SKILLS
@@ -143,8 +164,14 @@ BEGIN
         b.EmployeeId,
         b.FormattedAddress,
         b.City,
-        b.ZoneId
-    FROM dbo.Rec_EmployeeBaseAddress b;
+        b.ZoneId,
+        b.Latitude,
+        b.Longitude
+    FROM dbo.Rec_EmployeeBaseAddress b
+    WHERE b.ValidationStatus = N'Validated'
+      AND b.ValidationProvider = N'Geoapify'
+      AND b.Latitude BETWEEN -90 AND 90
+      AND b.Longitude BETWEEN -180 AND 180;
 
     --------------------------------------------------
     -- 8. SITE ADDRESS
@@ -153,11 +180,17 @@ BEGIN
         p.SiteId,
         p.FormattedAddress,
         p.City,
-        p.ZoneId
+        p.ZoneId,
+        p.Latitude,
+        p.Longitude
     FROM dbo.Rec_SiteAddressProfile p
     WHERE p.SiteId = (
         SELECT SiteId FROM dbo.WorkItems WHERE WorkItemId = @WorkItemId
-    );
+    )
+      AND p.ValidationStatus = N'Validated'
+      AND p.ValidationProvider = N'Geoapify'
+      AND p.Latitude BETWEEN -90 AND 90
+      AND p.Longitude BETWEEN -180 AND 180;
 
     --------------------------------------------------
     -- 9. WORK ZONES
@@ -176,8 +209,12 @@ BEGIN
         ps.SiteId,
         ps.PlannedStartAt,
         ps.PlannedEndAt,
-        ps.FormattedAddress
+        ps.FormattedAddress,
+        COALESCE(ps.Latitude, plannedStopSite.Latitude) AS Latitude,
+        COALESCE(ps.Longitude, plannedStopSite.Longitude) AS Longitude
     FROM dbo.Rec_EmployeePlannedStops ps
+    LEFT JOIN dbo.Rec_SiteAddressProfile AS plannedStopSite
+        ON plannedStopSite.SiteId = ps.SiteId
     WHERE ps.PlannedDate = CAST(@StartAt AS DATE);
 
     --------------------------------------------------
@@ -185,9 +222,14 @@ BEGIN
     --------------------------------------------------
     SELECT
         le.EmployeeId,
+        le.SiteId,
         le.FormattedAddress,
-        le.EventTime
+        le.EventTime,
+        COALESCE(le.Latitude, locationEventSite.Latitude) AS Latitude,
+        COALESCE(le.Longitude, locationEventSite.Longitude) AS Longitude
     FROM dbo.Rec_EmployeeLocationEvents le
+    LEFT JOIN dbo.Rec_SiteAddressProfile AS locationEventSite
+        ON locationEventSite.SiteId = le.SiteId
     WHERE le.EventDate = CAST(@StartAt AS DATE);
 
     --------------------------------------------------
@@ -198,9 +240,12 @@ BEGIN
         r.TargetSiteId,
         r.OriginType,
         r.EstimatedDistanceKm,
-        r.EstimatedTravelMinutes
+        r.EstimatedTravelMinutes,
+        r.RoutingProvider,
+        r.CalculatedAt
     FROM dbo.Rec_RouteEstimates r
     WHERE r.IsCurrent = 1
+      AND r.RoutingMode = N'Driving'
       AND r.TargetSiteId = (
         SELECT SiteId FROM dbo.WorkItems WHERE WorkItemId = @WorkItemId
     );
@@ -226,8 +271,7 @@ BEGIN
           AND CAST(wiLoad.PlannedStart AS DATE) = CAST(@StartAt AS DATE)
           AND ISNULL(wiLoad.Status, '') NOT IN ('Closed', 'Cancelled', 'Canceled', 'Deleted')
     ) load
-    WHERE e.IsActive = 1
-      AND e.IsAssignable = 1;
+    WHERE e.IsActive = 1;
 
     --------------------------------------------------
     -- 14. CONTINUITY — has the employee previously worked this project / customer / site?
@@ -253,7 +297,6 @@ BEGIN
         ON wiHist.WorkItemId = weaHist.WorkItemId
        AND wiHist.WorkItemId <> @WorkItemId
     WHERE e.IsActive = 1
-      AND e.IsAssignable = 1
     GROUP BY e.EmployeeId;
 END
 GO
@@ -271,7 +314,8 @@ CREATE OR ALTER PROCEDURE [dbo].[Rec_GetDraftTaskRecommendationInput]
     @EstimatedHours DECIMAL(10,2) = NULL,
     @Priority       NVARCHAR(50) = NULL,
     @RequiredRole   NVARCHAR(100) = NULL,
-    @SiteId         INT = NULL
+    @SiteId         INT = NULL,
+    @RequiredRolesXml XML = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -303,6 +347,48 @@ BEGIN
 
     DECLARE @StartAt DATETIME2 = @PlannedStart;
     DECLARE @EndAt DATETIME2 = @PlannedEnd;
+    DECLARE @ResolvedRequiredRole NVARCHAR(100) = NULLIF(LTRIM(RTRIM(@RequiredRole)), N'');
+    DECLARE @ResolvedRequiredRolesXml XML;
+
+    IF @RequiredRolesXml IS NOT NULL AND @RequiredRolesXml.exist('/Roles') = 0
+        THROW 53330, 'RequiredRolesXml must have a Roles root element.', 1;
+
+    IF @RequiredRolesXml IS NOT NULL
+       AND EXISTS
+       (
+           SELECT 1
+           FROM @RequiredRolesXml.nodes('/Roles/Role') AS requiredRole(roleNode)
+           WHERE LEN(requiredRole.roleNode.value('(text())[1]', 'nvarchar(4000)')) > 100
+       )
+    BEGIN
+        THROW 53331, 'A required role cannot exceed 100 characters.', 1;
+    END;
+
+    IF @RequiredRolesXml IS NOT NULL
+    BEGIN
+        SET @ResolvedRequiredRolesXml = @RequiredRolesXml;
+        SET @ResolvedRequiredRole = NULL;
+
+        SELECT TOP (1)
+            @ResolvedRequiredRole = normalizedRequiredRole.RoleName
+        FROM
+        (
+            SELECT DISTINCT
+                CONVERT(NVARCHAR(100), LTRIM(RTRIM(requiredRole.roleNode.value('(text())[1]', 'nvarchar(4000)')))) AS RoleName
+            FROM @RequiredRolesXml.nodes('/Roles/Role') AS requiredRole(roleNode)
+            WHERE DATALENGTH(LTRIM(RTRIM(requiredRole.roleNode.value('(text())[1]', 'nvarchar(4000)')))) > 0
+        ) AS normalizedRequiredRole
+        ORDER BY normalizedRequiredRole.RoleName;
+    END
+    ELSE
+    BEGIN
+        SET @ResolvedRequiredRolesXml =
+        (
+            SELECT @ResolvedRequiredRole AS [Role]
+            WHERE @ResolvedRequiredRole IS NOT NULL
+            FOR XML PATH(''), ROOT('Roles'), TYPE
+        );
+    END;
 
     --------------------------------------------------
     -- 1. TASK CORE DATA (synthesized for the draft)
@@ -316,7 +402,8 @@ BEGIN
         @PlannedEnd               AS PlannedEnd,
         @ResolvedEstimatedHours   AS EstimatedHours,
         @Priority                 AS Priority,
-        @RequiredRole             AS RequiredRole,
+        @ResolvedRequiredRole     AS RequiredRole,
+        @ResolvedRequiredRolesXml AS RequiredRolesXml,
         CAST(0 AS BIT)            AS IsLocked,
         @ResolvedSiteId           AS SiteId,
         @ResolvedCustomerId       AS CustomerId,
@@ -343,15 +430,25 @@ BEGIN
     -- 3. EMPLOYEES
     --------------------------------------------------
     SELECT
-        EmployeeId,
-        FullName,
-        PrimaryRole,
-        IsActive,
-        IsAssignable,
-        DailyCapacityHours
-    FROM dbo.Employees
-    WHERE IsActive = 1
-      AND IsAssignable = 1;
+        employee.EmployeeId,
+        employee.FullName,
+        employee.PrimaryRole,
+        employee.IsActive,
+        employee.IsAssignable,
+        employee.DailyCapacityHours,
+        CASE WHEN EXISTS
+        (
+            SELECT 1 FROM dbo.EmployeeProfessions AS profession
+            WHERE profession.EmployeeId = employee.EmployeeId
+        ) THEN (
+            SELECT profession.RoleName AS [Role]
+            FROM dbo.EmployeeProfessions AS profession
+            WHERE profession.EmployeeId = employee.EmployeeId
+            ORDER BY profession.RoleName
+            FOR XML PATH(''), ROOT('Roles'), TYPE
+        ) ELSE CAST(NULL AS XML) END AS ProfessionsXml
+    FROM dbo.Employees AS employee
+    WHERE employee.IsActive = 1;
 
     --------------------------------------------------
     -- 4. EMPLOYEE SKILLS
@@ -397,8 +494,14 @@ BEGIN
         b.EmployeeId,
         b.FormattedAddress,
         b.City,
-        b.ZoneId
-    FROM dbo.Rec_EmployeeBaseAddress b;
+        b.ZoneId,
+        b.Latitude,
+        b.Longitude
+    FROM dbo.Rec_EmployeeBaseAddress b
+    WHERE b.ValidationStatus = N'Validated'
+      AND b.ValidationProvider = N'Geoapify'
+      AND b.Latitude BETWEEN -90 AND 90
+      AND b.Longitude BETWEEN -180 AND 180;
 
     --------------------------------------------------
     -- 8. SITE ADDRESS (resolved from project/site)
@@ -407,9 +510,15 @@ BEGIN
         p.SiteId,
         p.FormattedAddress,
         p.City,
-        p.ZoneId
+        p.ZoneId,
+        p.Latitude,
+        p.Longitude
     FROM dbo.Rec_SiteAddressProfile p
-    WHERE p.SiteId = @ResolvedSiteId;
+    WHERE p.SiteId = @ResolvedSiteId
+      AND p.ValidationStatus = N'Validated'
+      AND p.ValidationProvider = N'Geoapify'
+      AND p.Latitude BETWEEN -90 AND 90
+      AND p.Longitude BETWEEN -180 AND 180;
 
     --------------------------------------------------
     -- 9. WORK ZONES
@@ -428,8 +537,12 @@ BEGIN
         ps.SiteId,
         ps.PlannedStartAt,
         ps.PlannedEndAt,
-        ps.FormattedAddress
+        ps.FormattedAddress,
+        COALESCE(ps.Latitude, plannedStopSite.Latitude) AS Latitude,
+        COALESCE(ps.Longitude, plannedStopSite.Longitude) AS Longitude
     FROM dbo.Rec_EmployeePlannedStops ps
+    LEFT JOIN dbo.Rec_SiteAddressProfile AS plannedStopSite
+        ON plannedStopSite.SiteId = ps.SiteId
     WHERE ps.PlannedDate = CAST(@StartAt AS DATE);
 
     --------------------------------------------------
@@ -437,9 +550,14 @@ BEGIN
     --------------------------------------------------
     SELECT
         le.EmployeeId,
+        le.SiteId,
         le.FormattedAddress,
-        le.EventTime
+        le.EventTime,
+        COALESCE(le.Latitude, locationEventSite.Latitude) AS Latitude,
+        COALESCE(le.Longitude, locationEventSite.Longitude) AS Longitude
     FROM dbo.Rec_EmployeeLocationEvents le
+    LEFT JOIN dbo.Rec_SiteAddressProfile AS locationEventSite
+        ON locationEventSite.SiteId = le.SiteId
     WHERE le.EventDate = CAST(@StartAt AS DATE);
 
     --------------------------------------------------
@@ -450,9 +568,12 @@ BEGIN
         r.TargetSiteId,
         r.OriginType,
         r.EstimatedDistanceKm,
-        r.EstimatedTravelMinutes
+        r.EstimatedTravelMinutes,
+        r.RoutingProvider,
+        r.CalculatedAt
     FROM dbo.Rec_RouteEstimates r
     WHERE r.IsCurrent = 1
+      AND r.RoutingMode = N'Driving'
       AND r.TargetSiteId = @ResolvedSiteId;
 
     --------------------------------------------------
@@ -474,8 +595,7 @@ BEGIN
           AND CAST(wiLoad.PlannedStart AS DATE) = CAST(@StartAt AS DATE)
           AND ISNULL(wiLoad.Status, '') NOT IN ('Closed', 'Cancelled', 'Canceled', 'Deleted')
     ) load
-    WHERE e.IsActive = 1
-      AND e.IsAssignable = 1;
+    WHERE e.IsActive = 1;
 
     --------------------------------------------------
     -- 14. CONTINUITY — has the employee previously worked this project / customer / site?
@@ -492,7 +612,6 @@ BEGIN
     LEFT JOIN dbo.WorkItems wiHist
         ON wiHist.WorkItemId = weaHist.WorkItemId
     WHERE e.IsActive = 1
-      AND e.IsAssignable = 1
     GROUP BY e.EmployeeId;
 END
 GO

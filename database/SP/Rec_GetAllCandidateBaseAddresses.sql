@@ -20,6 +20,8 @@ BEGIN
         b.City,
         b.Country,
         b.ZoneId,
+        b.Latitude,
+        b.Longitude,
         wz.ZoneName
     FROM dbo.Rec_EmployeeBaseAddress b
     INNER JOIN dbo.Employees e

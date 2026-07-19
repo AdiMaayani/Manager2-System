@@ -49,6 +49,7 @@ public class WorkPlanScheduleDtoFactoryTests
             {
                 new WorkPlanAssignmentResult
                 {
+                    WorkEmployeeAssignmentId = 91,
                     WorkItemId = 1,
                     EmployeeId = 7,
                     EmployeeName = "Worker",
@@ -68,6 +69,7 @@ public class WorkPlanScheduleDtoFactoryTests
         Assert.Equal("Unscheduled", dto.UnscheduledTasks[0].Title);
         Assert.Equal("Worker", dto.Employees[0].FullName);
         Assert.Equal("Task", dto.ScheduledTasks[0].Assignments[0].AssignmentSource);
+        Assert.Equal(91, dto.ScheduledTasks[0].Assignments[0].WorkEmployeeAssignmentId);
         Assert.Equal(7, dto.ScheduledTasks[0].Assignments[0].EmployeeId);
     }
 

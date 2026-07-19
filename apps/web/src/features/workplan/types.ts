@@ -40,10 +40,12 @@ export interface WorkPlanScheduledTask {
   milestoneId?: number | null;
   milestoneTitle?: string | null;
   requiredRole?: string | null;
+  requiredRoles?: string[] | null;
   isServiceCall: boolean;
 }
 
 export interface WorkPlanScheduleAssignment {
+  workEmployeeAssignmentId?: number | null;
   workItemId: number;
   employeeId?: number | null;
   employeeName?: string | null;
@@ -64,6 +66,7 @@ export interface WorkPlanEmployee {
   employeeId: number;
   fullName: string;
   primaryRole: string;
+  professions?: string[] | null;
   dailyCapacityHours?: number | null;
   isAssignable: boolean;
   isActive: boolean;
@@ -76,6 +79,7 @@ export interface ResolvedAssignment {
   employeeId: string | null;
   contractorId: string | null;
   role: string;
+  isManualAssignment: boolean | null;
 }
 
 export interface ScheduledTaskBar {
@@ -100,10 +104,12 @@ export interface ScheduledTaskBar {
   estimatedHours?: number | null;
   priority?: string | null;
   requiredRole?: string | null;
+  requiredRoles?: string[] | null;
   isLocked: boolean;
   isUrgent: boolean;
   isUnscheduled: boolean;
   assignmentSource: ResolvedAssignment['source'];
+  isManualAssignment?: boolean | null;
   violationCount: number;
   warningCount: number;
   suggestionCount: number;
@@ -134,6 +140,8 @@ export interface WorkPlanTaskSelection {
   estimatedHours?: number | null;
   priority?: string | null;
   requiredRole?: string | null;
+  requiredRoles?: string[] | null;
+  isManualAssignment?: boolean | null;
 }
 
 export interface GanttTask {
@@ -150,6 +158,15 @@ export interface SmartAssignmentRequest {
   planningDate?: string | null;
   includeLockedTasks?: boolean;
   saveRun?: boolean;
+  weights?: SmartAssignmentWeights | null;
+}
+
+export interface SmartAssignmentWeights {
+  professionalFit: number;
+  availability: number;
+  workload: number;
+  geography: number;
+  experience: number;
 }
 
 export interface RecommendationFactor {
@@ -157,9 +174,44 @@ export interface RecommendationFactor {
   label: string;
   score?: number | null;
   weightPercent: number;
+  weightedContribution?: number | null;
   explanation: string;
   dataSource: string;
   hasData: boolean;
+  isDefaulted?: boolean;
+  missingInputCodes?: string[];
+  sourceValues?: Record<string, unknown>;
+}
+
+export interface SmartAssignmentRejectionReason {
+  code: string;
+  explanation: string;
+}
+
+export interface SmartAssignmentCandidate {
+  rankOrder?: number | null;
+  employeeId: number;
+  fullName?: string | null;
+  primaryRole?: string | null;
+  professions?: string[] | null;
+  requiredRoles?: string[] | null;
+  matchedRoles?: string[] | null;
+  missingRoles?: string[] | null;
+  totalScore?: number | null;
+  isEligible: boolean;
+  exclusionReason?: string | null;
+  status: string;
+  recommendationSummary?: string | null;
+  warnings: string[];
+  factors: RecommendationFactor[];
+  rejectionReasons: SmartAssignmentRejectionReason[];
+  missingInputCodes: string[];
+  policyProfileKey?: string | null;
+  policyVersion?: number | null;
+  policyDisplayName?: string | null;
+  originTypeUsed?: string | null;
+  travelMinutes?: number | null;
+  distanceKm?: number | null;
 }
 
 export interface SmartAssignmentTaskResult {
@@ -174,6 +226,11 @@ export interface SmartAssignmentTaskResult {
   warnings: string[];
   reasons: string[];
   factors?: RecommendationFactor[];
+  bestIneligibleAlternative?: SmartAssignmentCandidate | null;
+  policyProfileKey?: string | null;
+  policyVersion?: number | null;
+  policyDisplayName?: string | null;
+  requiredRoles?: string[] | null;
 }
 
 export interface DraftRecommendationRequest {
@@ -185,6 +242,8 @@ export interface DraftRecommendationRequest {
   plannedEnd: string;
   priority?: string | null;
   requiredRole?: string | null;
+  requiredRoles?: string[] | null;
+  weights?: SmartAssignmentWeights | null;
 }
 
 export interface DraftRecommendationCandidate {
@@ -192,12 +251,24 @@ export interface DraftRecommendationCandidate {
   employeeId: number;
   fullName?: string | null;
   primaryRole?: string | null;
+  professions?: string[] | null;
+  requiredRoles?: string[] | null;
+  matchedRoles?: string[] | null;
+  missingRoles?: string[] | null;
   totalScore?: number | null;
   isEligible: boolean;
   exclusionReason?: string | null;
   status: string;
   recommendationSummary?: string | null;
   warnings: string[];
+  rejectionReasonCodes: string[];
+  missingInputCodes: string[];
+  policyProfileKey?: string | null;
+  policyVersion?: number | null;
+  policyDisplayName?: string | null;
+  originTypeUsed?: string | null;
+  travelMinutes?: number | null;
+  distanceKm?: number | null;
   factors: RecommendationFactor[];
 }
 
@@ -208,6 +279,8 @@ export interface DraftRecommendationResponse {
 }
 
 export interface SmartAssignmentResponse {
+  recommendationRunId?: number | null;
+  generatedAt: string;
   summary: {
     totalTasks: number;
     tasksWithRecommendations: number;
@@ -216,6 +289,7 @@ export interface SmartAssignmentResponse {
     message: string;
   };
   taskResults: SmartAssignmentTaskResult[];
+  compatibilityWarnings: string[];
   employeeLoad: Array<{
     employeeId: number;
     employeeName: string;
@@ -239,11 +313,22 @@ export interface CreateTaskRequest {
   plannedEnd?: string | null;
   priority?: string | null;
   requiredRole?: string | null;
+  requiredRoles?: string[] | null;
 }
 
 export interface AssignEmployeeRequest {
   employeeId: number;
   assignmentRole: string;
+  recommendationRunId?: number | null;
+}
+
+export interface ReplaceEmployeeAssignmentRequest {
+  employeeId: number;
+}
+
+export interface EmployeeAssignmentReplacementRequest {
+  workEmployeeAssignmentId: number;
+  employeeId: number;
 }
 
 export interface WorkItemResponse {
@@ -259,6 +344,7 @@ export interface WorkItemResponse {
   plannedStart?: string | null;
   plannedEnd?: string | null;
   requiredRole?: string | null;
+  requiredRoles?: string[] | null;
   isLocked: boolean;
   customerId?: number | null;
   siteId?: number | null;
@@ -287,6 +373,7 @@ export interface UpdateTaskRequest {
   plannedEnd?: string | null;
   priority?: string | null;
   requiredRole?: string | null;
+  requiredRoles?: string[] | null;
   isLocked: boolean;
   dealCloseDate?: string | null;
   financeProjectNumber?: string | null;
@@ -294,6 +381,7 @@ export interface UpdateTaskRequest {
   actualStart?: string | null;
   actualEnd?: string | null;
   actualHours?: number | null;
+  employeeReplacements?: EmployeeAssignmentReplacementRequest[];
 }
 
 export interface TaskInsightCounts {
@@ -318,6 +406,7 @@ export interface MappedWorkPlan {
     plannedStart?: string | null;
     plannedEnd?: string | null;
     requiredRole?: string | null;
+    requiredRoles?: string[] | null;
     isLocked: boolean;
     parentWorkItemId?: number | null;
   }>;
@@ -332,4 +421,62 @@ export interface MappedWorkPlan {
     employeeName?: string | null;
     contractorName?: string | null;
   }>;
+}
+
+export interface SmartAssignmentFeedbackRequest {
+  recommendationRunId: number;
+  workItemId: number;
+  recommendedEmployeeId: number;
+  policyProfileKey: string;
+  policyVersion: number;
+  rating: number;
+  comment?: string | null;
+}
+
+export interface SmartAssignmentFeedbackRecord extends SmartAssignmentFeedbackRequest {
+  feedbackId?: number | null;
+  actingUserId?: number | null;
+  createdAtUtc?: string | null;
+  updatedAtUtc?: string | null;
+  wasCreated?: boolean;
+  wasChanged?: boolean;
+}
+
+export type SmartAssignmentAssignmentMethod = 'SmartAssignment' | 'Manual';
+
+export interface SmartAssignmentAssignmentRecommendationFactor {
+  key: string;
+  label: string;
+  score: number | null;
+  weightPercent: number | null;
+  weightedContribution: number | null;
+  isTieBreaker: boolean;
+}
+
+export interface SmartAssignmentAssignmentRecommendation {
+  recommendationId: number;
+  recommendationRunId: number;
+  rankOrder: number;
+  totalScore: number;
+  policyProfileKey?: string | null;
+  policyDisplayName?: string | null;
+  policyVersion?: number | null;
+  travelMinutes?: number | null;
+  distanceKm?: number | null;
+  factors: SmartAssignmentAssignmentRecommendationFactor[];
+}
+
+export interface SmartAssignmentAssignmentFeedback {
+  workItemId: number;
+  assignedEmployeeId: number;
+  assignedEmployeeName?: string | null;
+  isManualAssignment: boolean;
+  assignmentMethod: SmartAssignmentAssignmentMethod;
+  recommendationRunId?: number | null;
+  policyProfileKey?: string | null;
+  policyVersion?: number | null;
+  rankOrder?: number | null;
+  score?: number | null;
+  recommendation?: SmartAssignmentAssignmentRecommendation | null;
+  feedback?: SmartAssignmentFeedbackRecord | null;
 }

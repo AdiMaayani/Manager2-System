@@ -53,6 +53,7 @@ function buildSearchText(serviceCall: ServiceCallListItem): string {
     serviceCall.status,
     serviceCall.priority,
     serviceCall.requiredRole,
+    ...(serviceCall.requiredRoles ?? []),
   ]
     .filter(Boolean)
     .join(' ')
@@ -134,7 +135,12 @@ export function ServiceCallsPage() {
     },
     { id: 'priority', header: 'עדיפות', cell: (call) => getPriorityLabel(call.priority) },
     { id: 'planned', header: 'מתוכנן', cell: (call) => formatDate(call.plannedStart) },
-    { id: 'role', header: 'תפקיד', cell: (call) => call.requiredRole ?? '-' },
+    {
+      id: 'role',
+      header: 'מקצועות',
+      cell: (call) =>
+        call.requiredRoles?.length ? call.requiredRoles.join(' · ') : call.requiredRole ?? '-',
+    },
   ];
 
   if (isLoading) return <PageShell title="קריאות שירות"><PageSpinner /></PageShell>;

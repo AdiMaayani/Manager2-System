@@ -16,11 +16,23 @@ namespace ManageR2.Infrastructure.Repositories
         Task<int> CreateAsync(WorkItem workItem);
 
         Task<bool> UpdateAsync(int id, WorkItem workItem);
+        Task<bool> UpdateWithEmployeeReplacementsAsync(
+            int id,
+            WorkItem workItem,
+            IReadOnlyCollection<(int WorkEmployeeAssignmentId, int EmployeeId)> replacements);
 
         Task<bool> CloseAsync(int id);
         Task<DeleteWorkPlanTaskResult> DeleteWorkPlanTaskAsync(int workItemId);
 
-        Task<bool> AssignEmployeeToWorkAsync(int workItemId, int employeeId, string assignmentRole);
+        Task<bool> AssignEmployeeToWorkAsync(
+            int workItemId,
+            int employeeId,
+            string assignmentRole,
+            int? recommendationRunId = null);
+        Task<bool> UpdateEmployeeWorkAssignmentAsync(
+            int workItemId,
+            int workEmployeeAssignmentId,
+            int employeeId);
         Task<bool> AssignContractorToWorkAsync(int workItemId, int contractorId, string assignmentRole);
         Task<bool> SyncEmployeeAssignmentsByWorkItemIdAsync(int workItemId, IReadOnlyCollection<(int EmployeeId, string AssignmentRole)> assignments);
 

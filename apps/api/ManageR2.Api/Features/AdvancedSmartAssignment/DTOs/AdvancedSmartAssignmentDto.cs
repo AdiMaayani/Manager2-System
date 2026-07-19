@@ -18,6 +18,7 @@
 
         // תפקיד העובד
         public string? PrimaryRole { get; set; }
+        public List<string> Professions { get; set; } = new();
 
         // הציון הכולל בלבד
         public decimal? TotalScore { get; set; }
@@ -32,5 +33,20 @@
         // טקסט סטטוס נוח להצגה
         // לדוגמה: "כשיר" / "לא זמין"
         public string Status { get; set; } = string.Empty;
+
+        // Additive structured explanation and policy metadata.
+        public string? RecommendationSummary { get; set; }
+        public List<RecommendationFactorDto> Factors { get; set; } = new();
+        public List<RecommendationRejectionDto> RejectionReasons { get; set; } = new();
+        public List<string> MissingInputCodes { get; set; } = new();
+        public string? PolicyProfileKey { get; set; }
+        public int? PolicyVersion { get; set; }
+        public string? PolicyDisplayName { get; set; }
+        public List<string> RequiredRoles { get; set; } = new();
+        public List<string> MatchedRoles { get; set; } = new();
+        public List<string> MissingRoles { get; set; } = new();
+        public string? OriginTypeUsed { get; set; }
+        public int? TravelMinutes { get; set; }
+        public decimal? DistanceKm { get; set; }
     }
 }

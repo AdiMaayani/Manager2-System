@@ -17,6 +17,8 @@ public static class AuditEntityTypes
     public const string CustomerSystemSecret = "CustomerSystemSecret";
     public const string ServiceCall = "ServiceCall";
     public const string WorkItem = "WorkItem";
+    public const string SmartAssignmentPolicy = "SmartAssignmentPolicy";
+    public const string RecommendationFeedback = "RecommendationFeedback";
 }
 
 public static class AuditActions
@@ -51,6 +53,13 @@ public static class AuditActions
     public const string WorkItemCreated = "WorkItemCreated";
     public const string WorkItemUpdated = "WorkItemUpdated";
     public const string WorkItemAssigned = "WorkItemAssigned";
+    public const string WorkItemAssignmentUpdated = "WorkItemAssignmentUpdated";
     public const string WorkItemClosed = "WorkItemClosed";
     public const string WorkItemDeleted = "WorkItemDeleted";
+
+    // Smart Assignment settings
+    public const string SmartAssignmentPolicyUpdated = "SmartAssignmentPolicyUpdated";
+    public const string SmartAssignmentPolicyReset = "SmartAssignmentPolicyReset";
+    public const string RecommendationFeedbackCreated = "RecommendationFeedbackCreated";
+    public const string RecommendationFeedbackUpdated = "RecommendationFeedbackUpdated";
 }

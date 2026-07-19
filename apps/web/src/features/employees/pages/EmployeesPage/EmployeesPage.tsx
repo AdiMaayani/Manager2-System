@@ -63,6 +63,7 @@ export function EmployeesPage() {
       return (
         e.fullName.toLowerCase().includes(q) ||
         e.primaryRole.toLowerCase().includes(q) ||
+        (e.professions ?? []).some((profession) => profession.toLowerCase().includes(q)) ||
         (e.email ?? '').toLowerCase().includes(q) ||
         (e.phone ?? '').includes(q)
       );
@@ -78,7 +79,12 @@ export function EmployeesPage() {
 
   const columns: DataTableColumn<Employee>[] = [
     { id: 'name', header: 'שם', cell: (employee) => employee.fullName },
-    { id: 'role', header: 'תפקיד', cell: (employee) => employee.primaryRole || '—' },
+    {
+      id: 'role',
+      header: 'מקצועות',
+      cell: (employee) =>
+        employee.professions?.length ? employee.professions.join(' · ') : employee.primaryRole || '—',
+    },
     { id: 'phone', header: 'טלפון', cell: (employee) => employee.phone ?? '—' },
     { id: 'email', header: 'אימייל', cell: (employee) => employee.email ?? '—' },
     {

@@ -169,6 +169,12 @@
   padding: var(--spacing-lg) 0;
 }
 
+.newTaskModal__smartResults {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
 .newTaskModal__smartSummary {
   display: flex;
   flex-direction: column;
@@ -208,11 +214,89 @@
 .newTaskModal__recommendation {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-md);
-  padding: var(--spacing-md);
+  overflow: hidden;
   border: 1px solid var(--color-primary-200);
   border-radius: var(--radius-md);
   background: var(--color-primary-50);
+}
+
+.newTaskModal__candidateRow {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+}
+
+.newTaskModal__candidateToggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  min-width: 0;
+  min-height: var(--control-height-md);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  color: var(--color-neutral-900);
+  text-align: start;
+}
+
+.newTaskModal__candidateToggle:hover {
+  background: rgb(255 255 255 / 65%);
+}
+
+.newTaskModal__candidateToggle:focus-visible {
+  outline: 2px solid var(--color-primary-500);
+  outline-offset: 2px;
+}
+
+.newTaskModal__candidateIdentity,
+.newTaskModal__candidateSummary {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-width: 0;
+}
+
+.newTaskModal__candidateIdentity {
+  flex-wrap: wrap;
+}
+
+.newTaskModal__relativeRank {
+  padding: 2px var(--spacing-sm);
+  border: 1px solid var(--color-primary-200);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-primary-700);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.newTaskModal__candidateSummary {
+  flex-shrink: 0;
+}
+
+.newTaskModal__candidateChevron {
+  flex-shrink: 0;
+  color: var(--color-neutral-500);
+  transition: transform var(--transition-fast);
+}
+
+.newTaskModal__candidateToggle[aria-expanded='true'] .newTaskModal__candidateChevron {
+  transform: rotate(180deg);
+}
+
+.newTaskModal__candidateDetails {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  border-top: 1px solid var(--color-primary-200);
+  background: var(--color-surface);
+}
+
+.newTaskModal__candidateDetails[hidden] {
+  display: none;
 }
 
 .newTaskModal__recommendationHead {
@@ -249,6 +333,106 @@
   background: var(--color-primary-600);
   color: #fff;
   font-weight: var(--font-weight-semibold);
+}
+
+.newTaskModal__candidateGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.newTaskModal__candidateGroupHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  padding-block-end: var(--spacing-xs);
+  border-bottom: 1px solid var(--color-neutral-200);
+}
+
+.newTaskModal__candidateGroupHead h5 {
+  margin: 0;
+  color: var(--color-neutral-900);
+  font-size: var(--font-size-base);
+}
+
+.newTaskModal__candidateGroupHead span {
+  min-width: 1.75rem;
+  padding: 2px var(--spacing-sm);
+  border-radius: var(--radius-full);
+  background: var(--color-neutral-100);
+  color: var(--color-neutral-700);
+  text-align: center;
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.newTaskModal__professionsField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.newTaskModal__professionAddPrompt {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+  border: 1px dashed var(--color-primary-300);
+  border-radius: var(--radius-md);
+  background: var(--color-primary-50);
+  color: var(--color-primary-900);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
+}
+
+.newTaskModal__professionAddIcon {
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: var(--radius-full);
+  background: var(--color-primary-600);
+  color: #fff;
+}
+
+.newTaskModal__professionChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.newTaskModal__professionChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-primary-200);
+  border-radius: var(--radius-full);
+  background: var(--color-primary-50);
+  color: var(--color-primary-900);
+  font-size: var(--font-size-sm);
+}
+
+.newTaskModal__professionRemove {
+  padding: 2px var(--spacing-xs);
+  border-radius: var(--radius-sm);
+  color: var(--color-primary-700);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.newTaskModal__professionRemove:hover {
+  background: var(--color-primary-100);
+}
+
+.newTaskModal__professionRemove:focus-visible {
+  outline: 2px solid var(--color-primary-500);
+  outline-offset: 1px;
 }
 
 .newTaskModal__reasons {
@@ -327,6 +511,12 @@
 }
 
 /* Smart Assignment explainability — per-factor breakdown */
+.newTaskModal__contributionsTitle {
+  margin: 0;
+  color: var(--color-neutral-700);
+  font-size: var(--font-size-sm);
+}
+
 .newTaskModal__factors {
   list-style: none;
   margin: var(--spacing-sm) 0 0;
@@ -350,6 +540,7 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  flex-wrap: wrap;
   gap: var(--spacing-sm);
 }
 
@@ -358,9 +549,17 @@
   color: var(--color-neutral-800);
 }
 
-.newTaskModal__factorScore {
-  font-family: monospace;
+.newTaskModal__factorMetrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs) var(--spacing-md);
+  color: var(--color-neutral-600);
+  font-size: var(--font-size-xs);
+}
+
+.newTaskModal__factorMetrics b {
   color: var(--color-primary-700);
+  font-family: monospace;
 }
 
 .newTaskModal__factorExplain {
@@ -368,7 +567,73 @@
   color: var(--color-neutral-700);
 }
 
+.newTaskModal__routeEndpoints {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--spacing-sm);
+  margin-block: var(--spacing-xs);
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-primary-200);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.newTaskModal__routeEndpoint {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  min-width: 0;
+  color: var(--color-primary-700);
+}
+
+.newTaskModal__routeEndpoint > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.newTaskModal__routeEndpointLabel {
+  color: var(--color-neutral-600);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.newTaskModal__routeEndpoint strong {
+  color: var(--color-neutral-900);
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+}
+
 .newTaskModal__factorSource {
   font-size: var(--font-size-xs);
   color: var(--color-neutral-500);
+}
+
+.newTaskModal__ratingAction {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  padding-block-start: var(--spacing-xs);
+}
+
+.newTaskModal__ratingStatus {
+  color: var(--color-success-700);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+@media (max-width: 640px) {
+  .newTaskModal__candidateRow {
+    grid-template-columns: 1fr;
+  }
+
+  .newTaskModal__candidateRow > .button {
+    width: 100%;
+  }
+
+  .newTaskModal__routeEndpoints {
+    grid-template-columns: 1fr;
+  }
 }

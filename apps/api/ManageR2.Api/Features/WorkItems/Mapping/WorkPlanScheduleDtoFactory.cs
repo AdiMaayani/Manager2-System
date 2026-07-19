@@ -30,6 +30,7 @@ public static class WorkPlanScheduleDtoFactory
     {
         return new WorkPlanTaskAssignmentDto
         {
+            WorkEmployeeAssignmentId = assignment.WorkEmployeeAssignmentId ?? 0,
             EmployeeId = assignment.EmployeeId,
             EmployeeName = assignment.EmployeeName,
             AssignmentRole = assignment.AssignmentRole,
@@ -58,6 +59,8 @@ public static class WorkPlanScheduleDtoFactory
             PlannedEnd = task.PlannedEnd,
             DerivedDurationMinutes = task.DerivedDurationMinutes,
             EstimatedHours = task.EstimatedHours,
+            RequiredRole = task.RequiredRole,
+            RequiredRoles = task.RequiredRoles,
             IsLocked = task.IsLocked,
             CustomerId = task.CustomerId,
             CustomerName = task.CustomerName,
@@ -79,6 +82,7 @@ public static class WorkPlanScheduleDtoFactory
             EmployeeId = employee.EmployeeId,
             FullName = employee.FullName,
             PrimaryRole = employee.PrimaryRole,
+            Professions = employee.Professions,
             IsActive = employee.IsActive,
             IsAssignable = employee.IsAssignable
         };

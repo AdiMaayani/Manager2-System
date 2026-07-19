@@ -15,6 +15,7 @@ import { Button } from '@shared/components/Button';
 import { DetailsField } from '@shared/components/DetailsField';
 import { DetailsSection } from '@shared/components/DetailsSection';
 import { Input } from '@shared/components/Input';
+import { ListSelect } from '@shared/components/ListSelect';
 import { Select } from '@shared/components/Select';
 import { Textarea } from '@shared/components/Textarea';
 import { Checkbox } from '@shared/components/Checkbox';
@@ -25,6 +26,13 @@ import { PageSpinner } from '@shared/components/PageSpinner';
 import { usePermissions } from '@shared/auth/usePermissions';
 import { getServiceCallByIdAsync } from '../../api/serviceCallsApiClient';
 import { useServiceCallMutations } from '../../hooks/useServiceCalls';
+import { useEmployeePrimaryRoles } from '@features/employees/hooks/useEmployeePrimaryRoles';
+import {
+  addRequiredProfession,
+  isRequiredProfessionSelected,
+  legacyRequiredRole,
+  removeRequiredProfession,
+} from '@features/workplan/lib/requiredProfessions';
 import {
   filterServiceCallSitesByCustomer,
   getCreatedServiceCallSiteSelection,
@@ -105,6 +113,12 @@ function formatHours(value?: number | null): string | undefined {
   return value != null ? `${value} שעות` : undefined;
 }
 
+function getServiceCallPrimaryRequiredRole(
+  serviceCall?: ServiceCallDetails | null,
+): string {
+  return legacyRequiredRole(serviceCall?.requiredRoles ?? []) ?? serviceCall?.requiredRole ?? '';
+}
+
 export function ServiceCallDrawer({
   isOpen,
   onClose,
@@ -171,10 +185,20 @@ function ServiceCallDrawerContent({
   const [form, setForm] = useState<ServiceCallFormState>(() =>
     buildServiceCallFormState(currentServiceCall),
   );
+  const professionOptionsQuery = useEmployeePrimaryRoles(isEditing);
+  const availableProfessionOptions = useMemo(
+    () =>
+      (professionOptionsQuery.data ?? []).filter(
+        (profession) => !isRequiredProfessionSelected(form.requiredRoles, profession),
+      ),
+    [form.requiredRoles, professionOptionsQuery.data],
+  );
   const [error, setError] = useState<string | null>(null);
   const { isMaximized, toggleMaximize } = useDrawerMaximize();
   const [employeeIdToAssign, setEmployeeIdToAssign] = useState('');
-  const [assignmentRole, setAssignmentRole] = useState(currentServiceCall?.requiredRole ?? '');
+  const [assignmentRole, setAssignmentRole] = useState(
+    getServiceCallPrimaryRequiredRole(currentServiceCall),
+  );
   const [isCreatingSite, setIsCreatingSite] = useState(false);
   const [newSiteName, setNewSiteName] = useState('');
   const [newSiteAddress, setNewSiteAddress] = useState<ValidatedAddressFieldState>({
@@ -207,6 +231,20 @@ function ServiceCallDrawerContent({
 
   function setField<K extends keyof ServiceCallFormState>(key: K, value: ServiceCallFormState[K]) {
     setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  function addRequiredRole(value: string) {
+    setForm((current) => ({
+      ...current,
+      requiredRoles: addRequiredProfession(current.requiredRoles, value),
+    }));
+  }
+
+  function removeRequiredRole(value: string) {
+    setForm((current) => ({
+      ...current,
+      requiredRoles: removeRequiredProfession(current.requiredRoles, value),
+    }));
   }
 
   async function handleCreateSite() {
@@ -248,7 +286,7 @@ function ServiceCallDrawerContent({
 
   function handleStartEdit() {
     setForm(buildServiceCallFormState(currentServiceCall));
-    setAssignmentRole(currentServiceCall?.requiredRole ?? '');
+    setAssignmentRole(getServiceCallPrimaryRequiredRole(currentServiceCall));
     setEmployeeIdToAssign('');
     setError(null);
     setIsEditing(true);
@@ -261,7 +299,7 @@ function ServiceCallDrawerContent({
     }
 
     setForm(buildServiceCallFormState(currentServiceCall));
-    setAssignmentRole(currentServiceCall?.requiredRole ?? '');
+    setAssignmentRole(getServiceCallPrimaryRequiredRole(currentServiceCall));
     setEmployeeIdToAssign('');
     setError(null);
     setIsEditing(false);
@@ -286,6 +324,7 @@ function ServiceCallDrawerContent({
   }
 
   function buildRequest(): UpsertServiceCallRequest {
+    const requiredRole = legacyRequiredRole(form.requiredRoles);
     return {
       title: form.title.trim(),
       description: nullableString(form.description),
@@ -300,7 +339,8 @@ function ServiceCallDrawerContent({
       actualStart: nullableString(form.actualStart),
       actualEnd: nullableString(form.actualEnd),
       actualHours: nullableNumber(form.actualHours),
-      requiredRole: nullableString(form.requiredRole),
+      requiredRole,
+      requiredRoles: form.requiredRoles,
       isLocked: form.isLocked,
     };
   }
@@ -650,12 +690,74 @@ function ServiceCallDrawerContent({
           </DetailsSection>
 
           <DetailsSection title="שיבוץ ותפקיד">
-            <div className="serviceCallDrawer__grid">
-              <Input
-                label="תפקיד נדרש"
-                value={form.requiredRole}
-                onChange={(event) => setField('requiredRole', event.target.value)}
+            <div className="serviceCallDrawer__professionsField">
+              <ListSelect
+                label="מקצועות נדרשים"
+                value=""
+                onChange={addRequiredRole}
+                placeholder={
+                  professionOptionsQuery.isLoading
+                    ? 'טוען מקצועות…'
+                    : 'בחר מקצוע להוספה'
+                }
+                searchable
+                searchPlaceholder="חיפוש מקצוע..."
+                emptyMessage="אין מקצועות נוספים לבחירה."
+                disabled={professionOptionsQuery.isLoading || professionOptionsQuery.isError}
+                options={
+                  availableProfessionOptions.length === 0
+                    ? [
+                        {
+                          value: '__none__',
+                          label: professionOptionsQuery.isLoading
+                            ? 'טוען מקצועות…'
+                            : 'אין מקצועות נוספים לבחירה',
+                          disabled: true,
+                        },
+                      ]
+                    : availableProfessionOptions.map((profession) => ({
+                        value: profession,
+                        label: profession,
+                      }))
+                }
               />
+              {professionOptionsQuery.isError && (
+                <InlineAlert variant="warning">
+                  <span>טעינת רשימת המקצועות נכשלה. ניתן עדיין לשמור את המקצועות הקיימים.</span>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => professionOptionsQuery.refetch()}
+                  >
+                    נסה שוב
+                  </Button>
+                </InlineAlert>
+              )}
+              {form.requiredRoles.length > 0 ? (
+                <ul className="serviceCallDrawer__professionChips" aria-label="מקצועות נדרשים">
+                  {form.requiredRoles.map((profession, index) => (
+                    <li key={profession} className="serviceCallDrawer__professionChip">
+                      <span>{profession}</span>
+                      {index === 0 && (
+                        <span className="serviceCallDrawer__legacyProfession">ראשי</span>
+                      )}
+                      <button
+                        type="button"
+                        className="serviceCallDrawer__professionRemove"
+                        onClick={() => removeRequiredRole(profession)}
+                        aria-label={`הסר את המקצוע ${profession}`}
+                      >
+                        הסר
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="serviceCallDrawer__hint">לא נבחרו מקצועות חובה.</p>
+              )}
+              <p className="serviceCallDrawer__hint">
+                המקצוע הראשון נשמר גם בשדה התפקיד הישן לצורך תאימות.
+              </p>
             </div>
 
             {isExistingServiceCall && (
@@ -673,7 +775,11 @@ function ServiceCallDrawerContent({
                     {assignableEmployees.map((employee) => (
                       <option key={employee.employeeId} value={employee.employeeId}>
                         {employee.fullName}
-                        {employee.primaryRole ? ` — ${employee.primaryRole}` : ''}
+                        {employee.professions?.length
+                          ? ` — ${employee.professions.join(', ')}`
+                          : employee.primaryRole
+                            ? ` — ${employee.primaryRole}`
+                            : ''}
                       </option>
                     ))}
                   </Select>
@@ -796,7 +902,14 @@ function ServiceCallReviewDetails({ serviceCall, customers, sites }: ServiceCall
           <DetailsField label="סיום בפועל" value={formatDateTime(serviceCall.actualEnd)} />
           <DetailsField label="שעות מתוכננות" value={formatHours(serviceCall.estimatedHours)} />
           <DetailsField label="שעות בפועל" value={formatHours(serviceCall.actualHours)} />
-          <DetailsField label="תפקיד נדרש" value={serviceCall.requiredRole} />
+          <DetailsField
+            label="מקצועות נדרשים"
+            value={
+              serviceCall.requiredRoles?.length
+                ? serviceCall.requiredRoles.join(' · ')
+                : serviceCall.requiredRole
+            }
+          />
         </div>
       </DetailsSection>
 

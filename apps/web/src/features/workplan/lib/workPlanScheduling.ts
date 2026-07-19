@@ -49,6 +49,7 @@ export function buildTaskSearchFields(
     assignment.displayName,
     assignment.role,
     task.requiredRole,
+    task.requiredRoles?.join(' '),
     task.status,
     getWorkPlanStatusDisplay(task.status),
     task.priority,
@@ -79,6 +80,7 @@ export function resolveFlatAssignment(
     employeeId: null,
     contractorId: null,
     role: '',
+    isManualAssignment: null,
   };
 
   const taskAssignment = assignments.find((a) => a.workItemId === task.workItemId);
@@ -91,6 +93,7 @@ export function resolveFlatAssignment(
         taskAssignment.employeeId != null ? String(taskAssignment.employeeId) : null,
       contractorId: null,
       role: taskAssignment.assignmentRole ?? '',
+      isManualAssignment: taskAssignment.isManualAssignment,
     };
   }
 
@@ -109,6 +112,7 @@ export function resolveFlatAssignment(
             : null,
         contractorId: null,
         role: projectAssignment.assignmentRole ?? '',
+        isManualAssignment: projectAssignment.isManualAssignment,
       };
     }
   }
@@ -171,6 +175,8 @@ export function buildWorkPlanTaskSelection(
     estimatedHours: task.estimatedHours,
     priority: task.priority,
     requiredRole: task.requiredRole ?? null,
+    requiredRoles: task.requiredRoles ?? null,
+    isManualAssignment: assignment.isManualAssignment,
   };
 }
 
@@ -218,10 +224,12 @@ function scheduledTaskToBar(
     estimatedHours: task.estimatedHours,
     priority: task.priority,
     requiredRole: task.requiredRole ?? null,
+    requiredRoles: task.requiredRoles ?? null,
     isLocked: task.isLocked,
     isUrgent: isWorkPlanPriorityUrgent(task.priority),
     isUnscheduled,
     assignmentSource: assignment.source,
+    isManualAssignment: assignment.isManualAssignment,
     violationCount: insights.violationCount,
     warningCount: insights.warningCount,
     suggestionCount: insights.suggestionCount,
@@ -376,6 +384,7 @@ function buildUnassignedEmployeeDailyRow(
       employeeId: 0,
       fullName: 'לא משויך',
       primaryRole: '',
+      professions: [],
       isAssignable: false,
       isActive: true,
     },

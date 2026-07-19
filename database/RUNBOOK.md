@@ -116,17 +116,17 @@ The 4 tables and (originally) 17 procedures that were first delivered **only in 
 > procedure bodies and are (re-)deployed **after** all migrations (see
 > [§4](#4-database-build-fresh-database)).
 
-The pre-overhaul repo + required migrations reproduce the earlier dump, and the 2026-06-19 foundation
-plus the 2026-06-20 geo migrations add the remaining tables and canonical procedures, so the expected
-post-foundation totals are **50 tables / 170 procedures** (verified against the schema snapshot). An
-approved timezone conversion later adds 2 audit tables (52 total); its default diagnostics-only run
-adds nothing.
+The pre-overhaul repo + required migrations reproduce the earlier dump, and the 2026-06-19 foundation,
+2026-06-20 geo migrations, Smart Assignment policy migration, and multi-role/feedback migration add
+the remaining objects. The expected totals are **55 tables / 177 procedures**. An approved timezone
+conversion later adds 2 audit tables (57 total); its default diagnostics-only run adds nothing.
 
 ---
 
 ## 2. Prerequisites
 
-- **SQL Server** 2016+ (the dump targets SQL Server 2016, compat level 100) and **SSMS** or `sqlcmd`.
+- **SQL Server** 2016 SP1 or later (the canonical scripts use `CREATE OR ALTER`; 2016 RTM is not
+  supported) and **SSMS** or `sqlcmd`.
 - **.NET 8 SDK** (the API targets `net8.0`).
 - **Node.js 18+** and npm (the web app is a Vite + React workspace).
 - Repository checked out at the workspace root (`ManageR2-System/`).
@@ -150,6 +150,10 @@ adds nothing.
 | `migrations/2026-06-15_audit_log_core.sql` | **Required** migration | Yes (`IF NOT EXISTS` + `CREATE OR ALTER`) | Fresh build + existing DBs (independent; additive only) |
 | `migrations/2026-06-17_dashboard_command_center.sql` | **Required** migration | Yes (`CREATE OR ALTER`) | Fresh build + existing DBs (independent; read-only SPs only) |
 | `migrations/2026-06-19_workplan_reports_overhaul.sql` | **Required foundation** | Yes (guarded additive DDL/backfill) | Fresh build + existing DBs; after earlier required migrations |
+| `migrations/2026-06-20_geo_rec_tables_canonical.sql` | **Required** geo schema gate | Yes (guarded additive DDL + shape assertions) | After the foundation; before coordinate verification and canonical geo-dependent SPs |
+| `migrations/2026-06-20_geo_address_coordinates.sql` | **Required** coordinate verification | Yes (add-if-missing + shape assertions) | Immediately after the canonical geo schema gate |
+| `migrations/2026-07-18_smart_assignment_policy_profiles.sql` | **Required** Smart Assignment policy migration | Yes (guarded DDL + idempotent seed + `CREATE OR ALTER`) | After the earlier Smart Assignment persistence and AuditLog migrations; before the final canonical `SP/` redeploy |
+| `migrations/2026-07-19_smart_assignment_multi_role_feedback.sql` | **Required** multi-role + feedback migration | Yes (transactional guarded DDL + non-destructive backfill) | After geo coordinates and policy profiles; before the final canonical `SP/` redeploy |
 | `migrations/2026-06-19_workitems_check_constraints_null_semantics_fix.sql` | **Required corrective** | Yes (drop/recreate two CHECK constraints) | After foundation; before INTERNAL migration on DBs that already ran foundation |
 | `migrations/2026-06-19_legacy_data_migration.sql` | Read-only diagnostics | Yes | Existing populated DBs after foundation |
 | `migrations/2026-06-19_planned_datetime_utc.sql` | Read-only by default; operator-gated conversion | Yes | Existing populated DBs after foundation |
@@ -183,15 +187,15 @@ Run `database/schema/tables.sql` → creates 38 tables + indexes, PKs, FKs, defa
 ### Step 3 — Functions (idempotent)
 Run every file in `database/functions/` (order irrelevant). → `funcParseTaskPriority`, `funcParseTaskStatus`.
 
-### Step 4 — Stored procedures (idempotent)
-Run every `database/SP/*.sql` **except** the two `2026-04-20_*` files. Order irrelevant
-(`CREATE OR ALTER` does not require referenced objects to exist at create time). This now includes the
-22 formerly migration-only procedures (11 Vault, 3 login-lockout, 2 AuditLog, 6 Dashboard) that have
-canonical `SP/` files. These same files are **re-deployed after the migrations in Step 5.5**, which is
-the deployment that determines the final procedure bodies.
+### Step 4 — Pre-migration-safe stored procedures (idempotent)
+Run every `database/SP/*.sql` except the two `2026-04-20_*` files, every `Rec_*` procedure, and the
+employee/work-item/work-plan procedures listed in the helper's `$preMigrationSpExclusions`. Those
+canonical bodies reference policy metadata, coordinate columns, profession tables, or feedback
+objects created in Step 5. Deploying them before the migrations can fail a fresh build. Step 5.5
+deploys **all** canonical procedures after the schema is ready and determines their final bodies.
 
 ### Step 5 — Required recent migrations (idempotent, **order-sensitive**)
-Run these seven, **in this order**:
+Run these eleven, **in this order**:
 
 1. `migrations/2026-06-14_users_login_lockout.sql` — adds 2 `Users` columns + 3 `sp_Users_*` SPs.
 2. `migrations/2026-06-15_customer_systems_vault.sql` — adds 3 Vault tables + 11 Vault SPs.
@@ -201,6 +205,17 @@ Run these seven, **in this order**:
 6. `migrations/2026-06-17_dashboard_command_center.sql` — adds six read-only `sp_Dashboard_*` procedures that back `GET /api/dashboard`. Additive and order-independent (only references baseline tables for reads).
 7. `migrations/2026-06-19_workplan_reports_overhaul.sql` — adds the WorkPlan/report foundation,
    guarded legacy backfills, and empty migration-control/audit tables. Stop on unknown report status.
+8. `migrations/2026-06-20_geo_rec_tables_canonical.sql` — creates or validates the canonical geo
+   tables and adds missing base/site coordinate columns.
+9. `migrations/2026-06-20_geo_address_coordinates.sql` — verifies base/site coordinate columns are
+   `DECIMAL(9,6) NULL`; it must run after #8.
+10. `migrations/2026-07-18_smart_assignment_policy_profiles.sql` — adds versioned Smart Assignment
+    policy profiles, approved default versions, and additive recommendation policy metadata. Run it
+    before Step 5.5 so the canonical policy/recommendation SP definitions are installed against the
+    new tables and columns.
+11. `migrations/2026-07-19_smart_assignment_multi_role_feedback.sql` — creates normalized employee
+    professions, work-item required roles, persisted recommendation feedback, and planned-stop/location
+    coordinate extensions; performs conservative legacy scalar backfill. Run it after #9 and #10.
 
 > ℹ️ **The audit-log migration (#3) is order-independent** — it only adds new objects and references
 > the existing baseline `Users` table for display joins. It is placed between the Vault and Smart
@@ -268,8 +283,31 @@ sqlcmd -S $server -d $db -b -i "$root\schema\tables.sql"
 # 2) functions
 Get-ChildItem "$root\functions\*.sql" | ForEach-Object { sqlcmd -S $server -d $db -b -i $_.FullName }
 
-# 3) stored procedures (skip the two dated historical files)
-Get-ChildItem "$root\SP\*.sql" -Exclude '2026-*' | ForEach-Object { sqlcmd -S $server -d $db -b -i $_.FullName }
+# 3) pre-migration-safe stored procedures
+$preMigrationSpExclusions = @(
+  '2026-*',
+  'Rec_*',
+  'sp_CreateEmployee.sql',
+  'sp_UpdateEmployee.sql',
+  'sp_GetEmployees.sql',
+  'sp_GetEmployeeById.sql',
+  'sp_Employees_GetDistinctPrimaryRoles.sql',
+  'sp_CreateWorkItem.sql',
+  'sp_UpdateWorkItem.sql',
+  'sp_GetWorkItems.sql',
+  'sp_GetWorkItemDetails.sql',
+  'sp_GetWorkItemsByType.sql',
+  'sp_GetTasksByParentWorkItemId.sql',
+  'sp_GetAllProjectsForWorkPlans.sql',
+  'sp_GetProjectForWorkPlan.sql',
+  'sp_GetProjectTasksForWorkPlan.sql',
+  'sp_GetWorkPlanProject.sql',
+  'sp_GetWorkPlanTasks.sql',
+  'sp_GetWorkPlanSchedule.sql',
+  'sp_WorkItems_DeleteTask.sql'
+)
+Get-ChildItem "$root\SP\*.sql" -Exclude $preMigrationSpExclusions |
+  ForEach-Object { sqlcmd -S $server -d $db -b -i $_.FullName }
 
 # 4) required migrations — EXPLICIT order (do NOT sort the folder alphabetically)
 $migrations = @(
@@ -278,20 +316,25 @@ $migrations = @(
   "$root\migrations\2026-06-15_audit_log_core.sql",
   "$root\migrations\2026-06-15_smart_assignment_persistence_explainability.sql",
   "$root\migrations\2026-06-15_smart_assignment_factor_activation.sql",
-  "$root\migrations\2026-06-17_dashboard_command_center.sql"
-  "$root\migrations\2026-06-19_workplan_reports_overhaul.sql"
+  "$root\migrations\2026-06-17_dashboard_command_center.sql",
+  "$root\migrations\2026-06-19_workplan_reports_overhaul.sql",
+  "$root\migrations\2026-06-20_geo_rec_tables_canonical.sql",
+  "$root\migrations\2026-06-20_geo_address_coordinates.sql",
+  "$root\migrations\2026-07-18_smart_assignment_policy_profiles.sql",
+  "$root\migrations\2026-07-19_smart_assignment_multi_role_feedback.sql"
 )
-$migrations | ForEach-Object { sqlcmd -S $server -d $db -b -i $_ }
+$migrations | ForEach-Object { sqlcmd -S $server -d $db -b -f 65001 -i $_ }
 
 # 4.5) re-deploy the canonical SP folder AFTER the migrations so the canonical bodies are the final ones
-Get-ChildItem "$root\SP\*.sql" -Exclude '2026-*' | ForEach-Object { sqlcmd -S $server -d $db -b -i $_.FullName }
+Get-ChildItem "$root\SP\*.sql" -Exclude '2026-*' | ForEach-Object { sqlcmd -S $server -d $db -b -f 65001 -i $_.FullName }
 
 # 5) required seeds
 sqlcmd -S $server -d $db -b -i "$root\seed\2026-06-14_permission_roles.sql"
 sqlcmd -S $server -d $db -b -i "$root\seed\initial_admin\00_seed_initial_admin.sql"
 ```
 > `-b` makes `sqlcmd` stop on the first error so a broken deploy fails loudly.
-> Hebrew seed files are UTF-8 **with BOM**; `sqlcmd` auto-detects the BOM (force with `-f 65001` if needed).
+> Required migrations and the final canonical SP redeploy explicitly use `-f 65001`, so Hebrew text
+> is decoded consistently even when a file has no BOM. Hebrew seed files with BOM auto-detect correctly.
 
 ### Existing-database upgrade (not a fresh build)
 
@@ -327,6 +370,7 @@ non-secret defaults live in `appsettings.json` with placeholder sentinels (`__SE
 | `Jwt:Audience` | Yes (default `ManageR2Client`) | Token audience | `Jwt__Audience` |
 | `Jwt:ExpirationMinutes` | No (default `480`) | Access-token lifetime | `Jwt__ExpirationMinutes` |
 | `CustomerSystemsVault:EncryptionKey` | **Yes for Vault** | **Base64-encoded 32-byte (256-bit) AES key** | `CustomerSystemsVault__EncryptionKey` |
+| `Geoapify:ApiKey` | **Yes for measured Smart Assignment travel time** | Server-side Geoapify key with Routing API access; never expose it to the web client | `Geoapify__ApiKey` |
 | `Cors:AllowedOrigins` | Prod only | Extra allowed web origins (array) | `Cors__AllowedOrigins__0`, `__1`, … |
 | `RateLimiting:Login:PermitLimit` / `WindowSeconds` | No (10 / 60) | Per-IP login throttle | `RateLimiting__Login__PermitLimit` |
 
@@ -340,6 +384,7 @@ dotnet user-secrets init   # first time only (project already has a UserSecretsI
 
 dotnet user-secrets set "ConnectionStrings:DefaultConnection" "Server=localhost;Database=ManageR2_Dev;Trusted_Connection=True;TrustServerCertificate=True;"
 dotnet user-secrets set "Jwt:Key" "<a-random-string-of-at-least-32-characters>"
+dotnet user-secrets set "Geoapify:ApiKey" "<your-server-side-geoapify-key>"
 
 # Customer Systems Vault key — base64 of 32 random bytes (AES-256):
 $key = [Convert]::ToBase64String((1..32 | ForEach-Object { Get-Random -Maximum 256 }))
@@ -348,6 +393,10 @@ dotnet user-secrets set "CustomerSystemsVault:EncryptionKey" $key
 > ⚠️ **The Vault encryption key is permanent for stored secrets.** Changing it makes all previously
 > encrypted secrets undecryptable. Back it up securely (e.g. a password manager / key vault) and reuse
 > the **same** key across restarts and environments that must read the same secrets.
+
+Smart Assignment sends valid origin/destination coordinates to Geoapify's driving route endpoint.
+If the key, coordinates, network access, quota, or provider result is unavailable, no travel minutes or
+distance are invented: the recommendation explicitly uses the configured missing-route score instead.
 
 A copyable template lives at `apps/api/ManageR2.Api/appsettings.Development.example.json` (do **not**
 commit real secrets into `appsettings*.json`).
@@ -386,14 +435,14 @@ npm run build      # production build of apps/web
 Run these against the target database after [§4](#4-database-build-fresh-database).
 
 ```sql
--- (a) Object counts after the 2026-06-19 foundation — expect 50 / 170 / 2 / 0.
--- After an approved timezone conversion, USER_TABLE becomes 52.
+-- (a) Object counts after the multi-role/feedback migration — expect 55 / 177 / 2 / 0.
+-- After an approved timezone conversion, USER_TABLE becomes 57.
 SELECT type_desc, COUNT(*) AS Cnt
 FROM sys.objects
 WHERE is_ms_shipped = 0 AND schema_id = SCHEMA_ID('dbo')
   AND type_desc IN ('USER_TABLE','SQL_STORED_PROCEDURE','SQL_SCALAR_FUNCTION','VIEW')
 GROUP BY type_desc ORDER BY type_desc;
--- USER_TABLE = 50, SQL_STORED_PROCEDURE = 170, SQL_SCALAR_FUNCTION = 2, VIEW = 0
+-- USER_TABLE = 55, SQL_STORED_PROCEDURE = 177, SQL_SCALAR_FUNCTION = 2, VIEW = 0
 
 -- (b) Customer Systems Vault tables exist (expect 3 rows)
 SELECT name FROM sys.tables
@@ -403,11 +452,15 @@ WHERE name IN ('CustomerSystems','CustomerSystemSecrets','CustomerSystemSecretAc
 SELECT name FROM sys.columns
 WHERE object_id = OBJECT_ID('dbo.Users') AND name IN ('FailedLoginAttempts','LockoutUntilUtc');
 
--- (d) Key Smart Assignment + Vault + lockout procedures exist (expect 9 rows)
+-- (d) Key Smart Assignment + Vault + lockout procedures exist (expect 15 rows)
 SELECT name FROM sys.procedures
 WHERE name IN (
   'Rec_GetTaskRecommendationInput','Rec_GetDraftTaskRecommendationInput',
-  'Rec_CreateRecommendationRun','Rec_SaveTaskAssignmentRecommendation','Rec_GetLatestRecommendationsForTask',
+  'Rec_CreateRecommendationRun','Rec_CompleteRecommendationRun',
+  'Rec_SaveTaskAssignmentRecommendation','Rec_GetLatestRecommendationsForTask',
+  'Rec_GetSmartAssignmentPolicyProfiles','Rec_GetSmartAssignmentPolicyVersionHistory',
+  'Rec_SaveSmartAssignmentPolicyVersion','Rec_UpsertRecommendationFeedback',
+  'Rec_GetRecommendationFeedback',
   'sp_CustomerSystemSecrets_GetForReveal','sp_CustomerSystemSecrets_LogAccess',
   'sp_Users_RegisterFailedLogin','sp_Users_ClearFailedLogin')
 ORDER BY name;
@@ -432,6 +485,25 @@ FROM dbo.Users u WHERE u.Email = 'admin@manager2.local';
 SELECT COUNT(*) AS RunRows FROM dbo.Rec_RecommendationRuns;
 SELECT COUNT(*) AS RecRows FROM dbo.Rec_TaskAssignmentRecommendations;
 
+-- (h2) Versioned policy objects and additive recommendation metadata exist (expect 2 / 4 rows)
+SELECT name FROM sys.tables
+WHERE name IN ('Rec_SmartAssignmentPolicyProfiles','Rec_SmartAssignmentPolicyVersions');
+SELECT name FROM sys.columns
+WHERE object_id = OBJECT_ID('dbo.Rec_TaskAssignmentRecommendations')
+  AND name IN ('PolicyProfileKey','PolicyVersionNumber','PolicyDisplayName','PolicySnapshotJson');
+
+-- (h3) Multi-role and feedback tables exist (expect 3 rows)
+SELECT name FROM sys.tables
+WHERE name IN ('EmployeeProfessions','WorkItemRequiredRoles','Rec_RecommendationFeedback');
+
+-- (h4) All route-origin coordinate columns exist (expect 8 rows)
+SELECT OBJECT_NAME(object_id) AS TableName, name AS ColumnName
+FROM sys.columns
+WHERE (object_id = OBJECT_ID('dbo.Rec_EmployeeBaseAddress') AND name IN ('Latitude','Longitude'))
+   OR (object_id = OBJECT_ID('dbo.Rec_SiteAddressProfile') AND name IN ('Latitude','Longitude'))
+   OR (object_id = OBJECT_ID('dbo.Rec_EmployeePlannedStops') AND name IN ('Latitude','Longitude'))
+   OR (object_id = OBJECT_ID('dbo.Rec_EmployeeLocationEvents') AND name IN ('Latitude','Longitude'));
+
 -- (i) Audit log table exists (expect 1 row)
 SELECT name FROM sys.tables WHERE name = 'AuditLog';
 
@@ -448,10 +520,10 @@ ORDER BY OccurredAtUtc DESC, AuditLogId DESC;
 ```
 
 ### Final verification checklist
-- [ ] **Tables exist** — query (a) returns `USER_TABLE = 50` after foundation (`52` after approved timezone conversion).
-- [ ] **Important SPs exist** — query (d) returns all 9; query (a) returns `SQL_STORED_PROCEDURE = 170`.
+- [ ] **Tables exist** — query (a) returns `USER_TABLE = 55` (`57` after approved timezone conversion).
+- [ ] **Important SPs exist** — query (d) returns all 15; query (a) returns `SQL_STORED_PROCEDURE = 177`.
 - [ ] **Vault tables + lockout columns** — queries (b) = 3 rows, (c) = 2 rows.
-- [ ] **Smart Assignment SPs exist & factor activation applied** — query (e) = `PASS`.
+- [ ] **Smart Assignment objects exist** — query (e) = `PASS`; query (h2) returns 2 policy tables and 4 metadata columns; query (h3) returns 3 tables; query (h4) returns 8 coordinate columns.
 - [ ] **Audit log objects exist** — query (i) = 1 row (`AuditLog`); query (j) = 2 rows (`sp_AuditLog_Create`, `sp_AuditLog_GetList`).
 - [ ] **Roles exist** — query (f) shows `Admin`, `SeniorManagement`, `ProjectManager`, `Office`, `Technician`, `Inventory`.
 - [ ] **Admin can log in** — query (g) shows the admin user `IsActive = 1`, `HasActiveAdminRole = 1`; confirm by logging into the web app with `admin@manager2.local` / `Admin#2026!`.
@@ -530,13 +602,19 @@ migration-delivered objects above, which the ordered build applies.
 1. CREATE DATABASE [ManageR2_Dev]; USE [ManageR2_Dev];
 2. Run  schema/tables.sql
 3. Run  functions/*.sql
-4. Run  SP/*.sql            (exclude SP/2026-*)
+4. Run  pre-migration-safe SP/*.sql only (use the exclusion list in Step 4)
 5. Run  migrations, in order:
      2026-06-14_users_login_lockout.sql
      2026-06-15_customer_systems_vault.sql
      2026-06-15_audit_log_core.sql
      2026-06-15_smart_assignment_persistence_explainability.sql
      2026-06-15_smart_assignment_factor_activation.sql      (must be last of the SA pair)
+     2026-06-17_dashboard_command_center.sql
+     2026-06-19_workplan_reports_overhaul.sql
+     2026-06-20_geo_rec_tables_canonical.sql
+     2026-06-20_geo_address_coordinates.sql
+     2026-07-18_smart_assignment_policy_profiles.sql
+     2026-07-19_smart_assignment_multi_role_feedback.sql
 5b. Re-run SP/*.sql        (exclude SP/2026-*)  <- AFTER migrations, so canonical bodies win
 6. Run  seed/2026-06-14_permission_roles.sql
         seed/initial_admin/00_seed_initial_admin.sql

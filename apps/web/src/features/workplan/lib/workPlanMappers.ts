@@ -27,11 +27,13 @@ interface RawScheduledTask {
   milestoneId?: number | null;
   milestoneTitle?: string | null;
   requiredRole?: string | null;
+  requiredRoles?: string[] | null;
   isServiceCall?: boolean;
   assignments?: RawAssignment[];
 }
 
 interface RawAssignment {
+  workEmployeeAssignmentId?: number | null;
   workItemId?: number;
   employeeId?: number | null;
   employeeName?: string | null;
@@ -45,6 +47,7 @@ interface RawEmployee {
   employeeId?: number;
   fullName?: string;
   primaryRole?: string;
+  professions?: string[] | null;
   dailyCapacityHours?: number | null;
   isAssignable?: boolean;
   isActive?: boolean;
@@ -80,6 +83,7 @@ function mapScheduledTask(raw: RawScheduledTask): WorkPlanScheduledTask {
     milestoneId: raw.milestoneId ?? null,
     milestoneTitle: raw.milestoneTitle ?? null,
     requiredRole: raw.requiredRole ?? null,
+    requiredRoles: Array.isArray(raw.requiredRoles) ? raw.requiredRoles : null,
     isServiceCall: raw.isServiceCall === true,
   };
 }
@@ -87,6 +91,7 @@ function mapScheduledTask(raw: RawScheduledTask): WorkPlanScheduledTask {
 function mapAssignment(raw: RawAssignment): WorkPlanScheduleAssignment {
   const source = String(raw.assignmentSource ?? 'Task');
   return {
+    workEmployeeAssignmentId: raw.workEmployeeAssignmentId ?? null,
     workItemId: raw.workItemId ?? 0,
     employeeId: raw.employeeId ?? null,
     employeeName: raw.employeeName ?? null,
@@ -102,6 +107,7 @@ function mapEmployee(raw: RawEmployee): WorkPlanEmployee {
     employeeId: raw.employeeId ?? 0,
     fullName: raw.fullName ?? '',
     primaryRole: raw.primaryRole ?? '',
+    professions: Array.isArray(raw.professions) ? raw.professions : null,
     dailyCapacityHours: raw.dailyCapacityHours ?? null,
     isAssignable: raw.isAssignable !== false,
     isActive: raw.isActive !== false,
@@ -120,7 +126,10 @@ function flattenScheduleAssignments(
     if (workItemId <= 0) return;
     const source = String(raw.assignmentSource ?? 'Task');
     const employeeId = raw.employeeId ?? null;
-    const key = `${workItemId}:${employeeId ?? 'none'}:${source}`;
+    const assignmentId = raw.workEmployeeAssignmentId ?? null;
+    const key = assignmentId != null && assignmentId > 0
+      ? `assignment:${assignmentId}`
+      : `${workItemId}:${employeeId ?? 'none'}:${source}:${raw.assignmentRole ?? ''}`;
     byKey.set(
       key,
       mapAssignment({

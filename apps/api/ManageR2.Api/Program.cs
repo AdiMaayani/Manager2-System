@@ -24,6 +24,9 @@ using ManageR2.Infrastructure.Features.Geo.Clients;
 using ManageR2.Infrastructure.Features.Geo.Services;
 using ManageR2.Infrastructure.Features.AddressProfiles.Repositories;
 using ManageR2.Infrastructure.Features.AddressProfiles.Services;
+using ManageR2.Infrastructure.Features.SmartAssignment.Repositories;
+using ManageR2.Infrastructure.Features.SmartAssignment.Scoring;
+using AdvancedSmartAssignmentRepositoryContract = ManageR2.Infrastructure.Repositories.SmartAssignment.ISmartAssignmentRepository;
 
 
 
@@ -213,6 +216,14 @@ builder.Services.AddScoped<IDashboardService, DashboardService>();
 builder.Services.AddScoped<ISmartAssignmentService, SmartAssignmentBatchService>();
 // Advanced ranked recommendations: concrete repository + service from SmartAssignment module (aliased at top of file).
 builder.Services.AddScoped<AdvancedSmartAssignmentRepository>();
+builder.Services.AddScoped<AdvancedSmartAssignmentRepositoryContract>(serviceProvider =>
+    serviceProvider.GetRequiredService<AdvancedSmartAssignmentRepository>());
+builder.Services.AddScoped<ISmartAssignmentPolicyRepository, SmartAssignmentPolicyRepository>();
+builder.Services.AddScoped<ISmartAssignmentPolicyProvider, PersistedSmartAssignmentPolicyProvider>();
+builder.Services.AddScoped<ISmartAssignmentPolicyManagementService, SmartAssignmentPolicyManagementService>();
+builder.Services.AddScoped<ISmartAssignmentFeedbackRepository, SmartAssignmentFeedbackRepository>();
+builder.Services.AddScoped<ISmartAssignmentFeedbackService, SmartAssignmentFeedbackService>();
+builder.Services.AddScoped<ISmartAssignmentScoringEngine, SmartAssignmentScoringEngine>();
 builder.Services.AddScoped<IAdvancedSmartAssignmentService, AdvancedSmartAssignmentService>();
 builder.Services.AddHttpClient<GeoapifyClient>(client =>
 {
@@ -222,6 +233,12 @@ builder.Services.AddHttpClient<GeoapifyClient>(client =>
 // Geoapify authenticates through a query parameter. Disable the default HttpClient
 // URI logger so the server-side key cannot appear in application logs.
 .RemoveAllLoggers();
+builder.Services.AddScoped<IGeoRoutingClient>(serviceProvider =>
+    serviceProvider.GetRequiredService<GeoapifyClient>());
+builder.Services.AddSingleton<IGeoRouteLookupCache>(_ => new InMemoryGeoRouteLookupCache());
+builder.Services.AddScoped<IGeoRoutingService, GeoRoutingService>();
+builder.Services.AddSingleton<ISmartAssignmentRouteOriginResolver, SmartAssignmentRouteOriginResolver>();
+builder.Services.AddScoped<ISmartAssignmentRouteEnricher, SmartAssignmentRouteEnricher>();
 builder.Services.AddScoped<IGeoService, GeoService>();
 builder.Services.AddScoped<IEmployeeBaseAddressRepository, EmployeeBaseAddressRepository>();
 builder.Services.AddScoped<ISiteAddressProfileRepository, SiteAddressProfileRepository>();

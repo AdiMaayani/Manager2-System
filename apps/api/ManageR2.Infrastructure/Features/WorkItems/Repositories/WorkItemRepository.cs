@@ -1,5 +1,7 @@
 using System.Data;
 using ManageR2.Domain.Entities;
+using ManageR2.Domain.Features.SmartAssignment;
+using ManageR2.Infrastructure.Models.SmartAssignment;
 using ManageR2.Infrastructure.DAL;
 using ManageR2.Infrastructure.Features.WorkItems.Models;
 using ManageR2.Infrastructure.Models;
@@ -139,6 +141,10 @@ public class WorkItemRepository : IWorkItemRepository
         AddDecimalHoursParameter(command, "@ActualHours", workItem.ActualHours);
         command.Parameters.AddWithValue("@Priority", (object?)workItem.Priority ?? DBNull.Value);
         command.Parameters.AddWithValue("@RequiredRole", (object?)workItem.RequiredRole ?? DBNull.Value);
+        command.Parameters.Add("@RequiredRolesXml", SqlDbType.Xml).Value = ProfessionXmlSerializer.Serialize(
+            ProfessionCollection.Resolve(
+                workItem.RequiredRoles.Count > 0 ? workItem.RequiredRoles : null,
+                workItem.RequiredRole));
         command.Parameters.AddWithValue("@IsLocked", workItem.IsLocked);
 
         await connection.OpenAsync();
@@ -153,9 +159,85 @@ public class WorkItemRepository : IWorkItemRepository
     {
         // Updates editable work item fields through stored procedure.
         await using var connection = _dbServices.CreateConnection();
-        await using var command = new SqlCommand("sp_UpdateWorkItem", connection)
+        await using var command = CreateWorkItemUpdateCommand(connection, null, id, workItem);
+
+        await connection.OpenAsync();
+
+        var result = await command.ExecuteScalarAsync();
+        var rowsAffected = result != null ? Convert.ToInt32(result) : 0;
+
+        return rowsAffected > 0;
+    }
+
+    public async Task<bool> UpdateWithEmployeeReplacementsAsync(
+        int id,
+        WorkItem workItem,
+        IReadOnlyCollection<(int WorkEmployeeAssignmentId, int EmployeeId)> replacements)
+    {
+        await using var connection = _dbServices.CreateConnection();
+        await connection.OpenAsync();
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync();
+
+        try
         {
-            CommandType = CommandType.StoredProcedure
+            foreach (var replacement in replacements)
+            {
+                await using var replacementCommand = new SqlCommand(
+                    "dbo.sp_UpdateEmployeeWorkAssignment",
+                    connection,
+                    transaction)
+                {
+                    CommandType = CommandType.StoredProcedure
+                };
+                replacementCommand.Parameters.Add("@WorkItemId", SqlDbType.Int).Value = id;
+                replacementCommand.Parameters.Add("@WorkEmployeeAssignmentId", SqlDbType.Int).Value =
+                    replacement.WorkEmployeeAssignmentId;
+                replacementCommand.Parameters.Add("@EmployeeId", SqlDbType.Int).Value =
+                    replacement.EmployeeId;
+
+                var replacementResult = await replacementCommand.ExecuteScalarAsync();
+                if (replacementResult == null || Convert.ToInt32(replacementResult) != 1)
+                {
+                    throw new InvalidOperationException("Failed to replace an employee assignment.");
+                }
+            }
+
+            await using var updateCommand = CreateWorkItemUpdateCommand(
+                connection,
+                transaction,
+                id,
+                workItem);
+            var updateResult = await updateCommand.ExecuteScalarAsync();
+            if (updateResult == null || Convert.ToInt32(updateResult) <= 0)
+            {
+                throw new InvalidOperationException("Failed to update the work item.");
+            }
+
+            await transaction.CommitAsync();
+            return true;
+        }
+        catch (SqlException ex)
+        {
+            await TryRollbackAsync(transaction);
+            throw new InvalidOperationException(ex.Message, ex);
+        }
+        catch
+        {
+            await TryRollbackAsync(transaction);
+            throw;
+        }
+    }
+
+    private static SqlCommand CreateWorkItemUpdateCommand(
+        SqlConnection connection,
+        SqlTransaction? transaction,
+        int id,
+        WorkItem workItem)
+    {
+        var command = new SqlCommand("sp_UpdateWorkItem", connection)
+        {
+            CommandType = CommandType.StoredProcedure,
+            Transaction = transaction
         };
 
         command.Parameters.AddWithValue("@WorkItemId", id);
@@ -179,14 +261,29 @@ public class WorkItemRepository : IWorkItemRepository
         AddDecimalHoursParameter(command, "@ActualHours", workItem.ActualHours);
         command.Parameters.AddWithValue("@Priority", (object?)workItem.Priority ?? DBNull.Value);
         command.Parameters.AddWithValue("@RequiredRole", (object?)workItem.RequiredRole ?? DBNull.Value);
+        command.Parameters.Add("@RequiredRolesXml", SqlDbType.Xml).Value = ProfessionXmlSerializer.Serialize(
+            ProfessionCollection.Resolve(
+                workItem.RequiredRoles.Count > 0 ? workItem.RequiredRoles : null,
+                workItem.RequiredRole));
         command.Parameters.AddWithValue("@IsLocked", workItem.IsLocked);
 
-        await connection.OpenAsync();
+        return command;
+    }
 
-        var result = await command.ExecuteScalarAsync();
-        var rowsAffected = result != null ? Convert.ToInt32(result) : 0;
-
-        return rowsAffected > 0;
+    private static async Task TryRollbackAsync(SqlTransaction transaction)
+    {
+        try
+        {
+            await transaction.RollbackAsync();
+        }
+        catch (InvalidOperationException)
+        {
+            // A nested stored procedure may already have rolled back the outer transaction.
+        }
+        catch (SqlException)
+        {
+            // Preserve the original persistence failure when SQL already completed the rollback.
+        }
     }
 
     public async Task<bool> CloseAsync(int workItemId)
@@ -246,7 +343,11 @@ public class WorkItemRepository : IWorkItemRepository
             : DeleteWorkPlanTaskResultCode.Failed;
     }
 
-    public async Task<bool> AssignEmployeeToWorkAsync(int workItemId, int employeeId, string assignmentRole)
+    public async Task<bool> AssignEmployeeToWorkAsync(
+        int workItemId,
+        int employeeId,
+        string assignmentRole,
+        int? recommendationRunId = null)
     {
         // Creates employee assignment link for a specific work item.
         try
@@ -260,12 +361,44 @@ public class WorkItemRepository : IWorkItemRepository
             command.Parameters.AddWithValue("@WorkItemId", workItemId);
             command.Parameters.AddWithValue("@EmployeeId", employeeId);
             command.Parameters.AddWithValue("@AssignmentRole", assignmentRole);
+            command.Parameters.Add("@RecommendationRunId", SqlDbType.Int).Value =
+                recommendationRunId.HasValue ? recommendationRunId.Value : DBNull.Value;
 
             await connection.OpenAsync();
             var result = await command.ExecuteScalarAsync();
             var rowsAffected = result != null ? Convert.ToInt32(result) : 0;
 
             return rowsAffected > 0;
+        }
+        catch (SqlException ex)
+        {
+            throw new InvalidOperationException(ex.Message, ex);
+        }
+    }
+
+    public async Task<bool> UpdateEmployeeWorkAssignmentAsync(
+        int workItemId,
+        int workEmployeeAssignmentId,
+        int employeeId)
+    {
+        try
+        {
+            await using var connection = _dbServices.CreateConnection();
+            await using var command = new SqlCommand("dbo.sp_UpdateEmployeeWorkAssignment", connection)
+            {
+                CommandType = CommandType.StoredProcedure
+            };
+
+            command.Parameters.Add("@WorkItemId", SqlDbType.Int).Value = workItemId;
+            command.Parameters.Add("@WorkEmployeeAssignmentId", SqlDbType.Int).Value =
+                workEmployeeAssignmentId;
+            command.Parameters.Add("@EmployeeId", SqlDbType.Int).Value = employeeId;
+
+            await connection.OpenAsync();
+            var result = await command.ExecuteScalarAsync();
+            var rowsAffected = result != null ? Convert.ToInt32(result) : 0;
+
+            return rowsAffected == 1;
         }
         catch (SqlException ex)
         {
@@ -500,6 +633,7 @@ public class WorkItemRepository : IWorkItemRepository
         {
             result.Assignments.Add(new WorkPlanAssignmentResult
             {
+                WorkEmployeeAssignmentId = GetIntValue(reader, "WorkEmployeeAssignmentId"),
                 WorkItemId = GetIntValue(reader, "WorkItemId"),
                 EmployeeId = GetNullableIntValue(reader, "EmployeeId"),
                 AssignmentRole = GetStringValue(reader, "AssignmentRole"),
@@ -523,6 +657,9 @@ public class WorkItemRepository : IWorkItemRepository
                 EmployeeId = GetIntValue(reader, "EmployeeId"),
                 FullName = GetStringValue(reader, "FullName") ?? string.Empty,
                 PrimaryRole = GetStringValue(reader, "PrimaryRole"),
+                Professions = ProfessionXmlSerializer.Deserialize(
+                    GetStringValue(reader, "ProfessionsXml"),
+                    GetStringValue(reader, "PrimaryRole")),
                 IsActive = GetBoolValue(reader, "IsActive"),
                 IsAssignable = GetBoolValue(reader, "IsAssignable")
             });
@@ -546,6 +683,10 @@ public class WorkItemRepository : IWorkItemRepository
             PlannedEnd = GetDateTimeValue(reader, "PlannedEnd"),
             DerivedDurationMinutes = GetNullableIntValue(reader, "DerivedDurationMinutes"),
             EstimatedHours = GetDecimalValue(reader, "EstimatedHours"),
+            RequiredRole = GetStringValue(reader, "RequiredRole"),
+            RequiredRoles = ProfessionXmlSerializer.Deserialize(
+                GetStringValue(reader, "RequiredRolesXml"),
+                GetStringValue(reader, "RequiredRole")),
             IsLocked = GetBoolValue(reader, "IsLocked"),
             CustomerId = GetNullableIntValue(reader, "CustomerId"),
             CustomerName = GetStringValue(reader, "CustomerName"),
@@ -562,6 +703,11 @@ public class WorkItemRepository : IWorkItemRepository
     private static WorkItem MapWorkItem(SqlDataReader reader)
     {
         // Reader-to-entity mapping for shared work item shape across procedures.
+        var legacyRequiredRole = GetStringValue(reader, "RequiredRole");
+        var requiredRoles = ProfessionXmlSerializer.Deserialize(
+            GetStringValue(reader, "RequiredRolesXml"),
+            legacyRequiredRole);
+
         return new WorkItem
         {
             WorkItemId = GetIntValue(reader, "WorkItemId"),
@@ -578,7 +724,8 @@ public class WorkItemRepository : IWorkItemRepository
             Priority = GetStringValue(reader, "Priority"),
             PlannedStart = GetDateTimeValue(reader, "PlannedStart"),
             PlannedEnd = GetDateTimeValue(reader, "PlannedEnd"),
-            RequiredRole = GetStringValue(reader, "RequiredRole"),
+            RequiredRole = legacyRequiredRole,
+            RequiredRoles = requiredRoles,
             IsLocked = GetBoolValue(reader, "IsLocked"),
             CustomerId = GetNullableIntValue(reader, "CustomerId"),
             CustomerName = GetStringValue(reader, "CustomerName"),
@@ -603,6 +750,7 @@ public class WorkItemRepository : IWorkItemRepository
         // Reader-to-model mapping for assignment rows in work plan responses.
         return new WorkPlanAssignmentResult
         {
+            WorkEmployeeAssignmentId = GetNullableIntValue(reader, "WorkEmployeeAssignmentId"),
             WorkItemId = GetIntValue(reader, "WorkItemId"),
             EmployeeId = GetNullableIntValue(reader, "EmployeeId"),
             ContractorId = GetNullableIntValue(reader, "ContractorId"),
@@ -628,6 +776,7 @@ public class WorkItemRepository : IWorkItemRepository
 
         return false;
     }
+
 
     private static string? GetStringValue(SqlDataReader reader, string columnName)
     {

@@ -2,6 +2,7 @@
 using Microsoft.Data.SqlClient; // מאפשר עבודה מול SQL Server
 using ManageR2.Infrastructure.DAL; // מאפשר להשתמש ב-DBServices
 using ManageR2.Infrastructure.Models.SmartAssignment; // מאפשר להשתמש במודלים של SmartAssignment
+using ManageR2.Domain.Features.SmartAssignment;
 
 namespace ManageR2.Infrastructure.Repositories.SmartAssignment
 {
@@ -10,7 +11,7 @@ namespace ManageR2.Infrastructure.Repositories.SmartAssignment
     // כאן לא מחשבים ציונים
     // כאן לא מדרגים עובדים
     // כאן רק קוראים ל-Stored Procedure וממפים תוצאות לאובייקטים
-    public class SmartAssignmentRepository
+    public class SmartAssignmentRepository : ISmartAssignmentRepository
     {
         // DBServices היא המחלקה הקיימת אצלכם שיודעת ליצור חיבור ל-DB
         private readonly DBServices _db;
@@ -53,11 +54,23 @@ namespace ManageR2.Infrastructure.Repositories.SmartAssignment
             command.Parameters.AddWithValue("@EstimatedHours", (object?)context.EstimatedHours ?? DBNull.Value);
             command.Parameters.AddWithValue("@Priority", (object?)context.Priority ?? DBNull.Value);
             command.Parameters.AddWithValue("@RequiredRole", (object?)context.RequiredRole ?? DBNull.Value);
+            command.Parameters.Add("@RequiredRolesXml", SqlDbType.Xml).Value =
+                ProfessionXmlSerializer.Serialize(ProfessionCollection.Resolve(
+                    context.RequiredRoles,
+                    context.RequiredRole));
             command.Parameters.AddWithValue("@SiteId", (object?)context.SiteId ?? DBNull.Value);
 
             await connection.OpenAsync();
             using var reader = await command.ExecuteReaderAsync();
-            return await MapInputAsync(reader);
+            var result = await MapInputAsync(reader);
+            if (result.Task is not null)
+            {
+                var roles = ProfessionCollection.Resolve(context.RequiredRoles, context.RequiredRole);
+                result.Task.RequiredRoles = roles.ToList();
+                result.Task.RequiredRole = roles.FirstOrDefault();
+            }
+            result.RequiredSkillsInputAvailable = false;
+            return result;
         }
 
         // English: shared mapping of the 12 recommendation-input result sets into the unified model.
@@ -71,6 +84,7 @@ namespace ManageR2.Infrastructure.Repositories.SmartAssignment
             // צפויה בדרך כלל שורה אחת בלבד
             if (await reader.ReadAsync())
             {
+                var legacyRequiredRole = GetString(reader, "RequiredRole");
                 result.Task = new TaskCoreDataModel
                 {
                     WorkItemId = GetInt(reader, "WorkItemId"),
@@ -81,7 +95,10 @@ namespace ManageR2.Infrastructure.Repositories.SmartAssignment
                     PlannedEnd = GetNullableDateTime(reader, "PlannedEnd"),
                     EstimatedHours = GetNullableDecimal(reader, "EstimatedHours"),
                     Priority = GetString(reader, "Priority"),
-                    RequiredRole = GetString(reader, "RequiredRole"),
+                    RequiredRole = legacyRequiredRole,
+                    RequiredRoles = ProfessionXmlSerializer.Deserialize(
+                        GetOptionalString(reader, "RequiredRolesXml"),
+                        legacyRequiredRole),
                     IsLocked = GetBool(reader, "IsLocked"),
                     SiteId = GetNullableInt(reader, "SiteId"),
                     CustomerId = GetNullableInt(reader, "CustomerId"),
@@ -90,7 +107,17 @@ namespace ManageR2.Infrastructure.Repositories.SmartAssignment
                     RequiredWorkersCount = GetNullableInt(reader, "RequiredWorkersCount"),
                     AlgorithmPriorityOverride = GetString(reader, "AlgorithmPriorityOverride"),
                     UrgencyOverride = GetString(reader, "UrgencyOverride"),
-                    PlanningNotes = GetString(reader, "PlanningNotes")
+                    PlanningNotes = GetString(reader, "PlanningNotes"),
+                    HasManualOriginOverride = GetOptionalBool(reader, "HasManualOriginOverride"),
+                    ManualOriginAddress = GetOptionalString(reader, "ManualOriginAddress"),
+                    ManualOriginFormattedAddress = GetOptionalString(reader, "ManualOriginFormattedAddress"),
+                    ManualOriginProvider = GetOptionalString(reader, "ManualOriginProvider"),
+                    ManualOriginValidationStatus = GetOptionalString(reader, "ManualOriginValidationStatus"),
+                    ManualOriginExternalPlaceRef = GetOptionalString(reader, "ManualOriginExternalPlaceRef"),
+                    ManualOriginCity = GetOptionalString(reader, "ManualOriginCity"),
+                    ManualOriginZoneId = GetOptionalNullableInt(reader, "ManualOriginZoneId"),
+                    ManualOriginLatitude = GetOptionalNullableDecimal(reader, "ManualOriginLatitude"),
+                    ManualOriginLongitude = GetOptionalNullableDecimal(reader, "ManualOriginLongitude")
                 };
             }
 
@@ -120,11 +147,15 @@ namespace ManageR2.Infrastructure.Repositories.SmartAssignment
             // =====================================================
             while (await reader.ReadAsync())
             {
+                var primaryRole = GetString(reader, "PrimaryRole");
                 result.Employees.Add(new EmployeeCandidateModel
                 {
                     EmployeeId = GetInt(reader, "EmployeeId"),
                     FullName = GetString(reader, "FullName"),
-                    PrimaryRole = GetString(reader, "PrimaryRole"),
+                    PrimaryRole = primaryRole,
+                    Professions = ProfessionXmlSerializer.Deserialize(
+                        GetOptionalString(reader, "ProfessionsXml"),
+                        primaryRole),
                     IsActive = GetBool(reader, "IsActive"),
                     IsAssignable = GetBool(reader, "IsAssignable"),
                     DailyCapacityHours = GetNullableDecimal(reader, "DailyCapacityHours")
@@ -194,7 +225,9 @@ namespace ManageR2.Infrastructure.Repositories.SmartAssignment
                     EmployeeId = GetInt(reader, "EmployeeId"),
                     FormattedAddress = GetString(reader, "FormattedAddress"),
                     City = GetString(reader, "City"),
-                    ZoneId = GetNullableInt(reader, "ZoneId")
+                    ZoneId = GetNullableInt(reader, "ZoneId"),
+                    Latitude = GetOptionalNullableDecimal(reader, "Latitude"),
+                    Longitude = GetOptionalNullableDecimal(reader, "Longitude")
                 });
             }
 
@@ -211,7 +244,9 @@ namespace ManageR2.Infrastructure.Repositories.SmartAssignment
                     SiteId = GetInt(reader, "SiteId"),
                     FormattedAddress = GetString(reader, "FormattedAddress"),
                     City = GetString(reader, "City"),
-                    ZoneId = GetNullableInt(reader, "ZoneId")
+                    ZoneId = GetNullableInt(reader, "ZoneId"),
+                    Latitude = GetOptionalNullableDecimal(reader, "Latitude"),
+                    Longitude = GetOptionalNullableDecimal(reader, "Longitude")
                 };
             }
 
@@ -243,7 +278,9 @@ namespace ManageR2.Infrastructure.Repositories.SmartAssignment
                     SiteId = GetNullableInt(reader, "SiteId"),
                     PlannedStartAt = GetNullableDateTime(reader, "PlannedStartAt"),
                     PlannedEndAt = GetNullableDateTime(reader, "PlannedEndAt"),
-                    FormattedAddress = GetString(reader, "FormattedAddress")
+                    FormattedAddress = GetString(reader, "FormattedAddress"),
+                    Latitude = GetOptionalNullableDecimal(reader, "Latitude"),
+                    Longitude = GetOptionalNullableDecimal(reader, "Longitude")
                 });
             }
 
@@ -257,8 +294,11 @@ namespace ManageR2.Infrastructure.Repositories.SmartAssignment
                 result.LocationEvents.Add(new EmployeeLocationEventModel
                 {
                     EmployeeId = GetInt(reader, "EmployeeId"),
+                    SiteId = GetOptionalNullableInt(reader, "SiteId"),
                     FormattedAddress = GetString(reader, "FormattedAddress"),
-                    EventTime = GetDateTime(reader, "EventTime")
+                    EventTime = GetDateTime(reader, "EventTime"),
+                    Latitude = GetOptionalNullableDecimal(reader, "Latitude"),
+                    Longitude = GetOptionalNullableDecimal(reader, "Longitude")
                 });
             }
 
@@ -275,7 +315,9 @@ namespace ManageR2.Infrastructure.Repositories.SmartAssignment
                     TargetSiteId = GetInt(reader, "TargetSiteId"),
                     OriginType = GetString(reader, "OriginType"),
                     EstimatedDistanceKm = GetNullableDecimal(reader, "EstimatedDistanceKm"),
-                    EstimatedTravelMinutes = GetNullableInt(reader, "EstimatedTravelMinutes")
+                    EstimatedTravelMinutes = GetNullableInt(reader, "EstimatedTravelMinutes"),
+                    RoutingProvider = GetOptionalString(reader, "RoutingProvider"),
+                    CalculatedAt = GetOptionalNullableDateTime(reader, "CalculatedAt")
                 });
             }
 
@@ -388,6 +430,24 @@ namespace ManageR2.Infrastructure.Repositories.SmartAssignment
             command.Parameters.AddWithValue("@WorkedAtSiteBefore", (object?)candidate.WorkedAtSiteBefore ?? DBNull.Value);
             command.Parameters.AddWithValue("@RecommendationSummary", (object?)candidate.RecommendationSummary ?? DBNull.Value);
             command.Parameters.AddWithValue("@WarningsJson", (object?)candidate.WarningsJson ?? DBNull.Value);
+            command.Parameters.AddWithValue("@PolicyProfileKey", (object?)candidate.PolicyProfileKey ?? DBNull.Value);
+            command.Parameters.AddWithValue("@PolicyVersionNumber", (object?)candidate.PolicyVersion ?? DBNull.Value);
+            command.Parameters.AddWithValue("@PolicyDisplayName", (object?)candidate.PolicyDisplayName ?? DBNull.Value);
+            command.Parameters.AddWithValue("@PolicySnapshotJson", (object?)candidate.PolicySnapshotJson ?? DBNull.Value);
+
+            await connection.OpenAsync();
+            await command.ExecuteNonQueryAsync();
+        }
+
+        // Publishes a fully persisted run. Until this succeeds, readers ignore its Partial status.
+        public async Task CompleteRecommendationRunAsync(int runId)
+        {
+            using var connection = _db.CreateConnection();
+            using var command = new SqlCommand("Rec_CompleteRecommendationRun", connection)
+            {
+                CommandType = CommandType.StoredProcedure
+            };
+            command.Parameters.Add("@RecommendationRunId", SqlDbType.Int).Value = runId;
 
             await connection.OpenAsync();
             await command.ExecuteNonQueryAsync();
@@ -405,6 +465,34 @@ namespace ManageR2.Infrastructure.Repositories.SmartAssignment
             return reader[columnName] == DBNull.Value
                 ? null
                 : reader[columnName].ToString();
+        }
+
+        private static string? GetOptionalString(SqlDataReader reader, string columnName) =>
+            HasColumn(reader, columnName) ? GetString(reader, columnName) : null;
+
+        private static int? GetOptionalNullableInt(SqlDataReader reader, string columnName) =>
+            HasColumn(reader, columnName) ? GetNullableInt(reader, columnName) : null;
+
+        private static decimal? GetOptionalNullableDecimal(SqlDataReader reader, string columnName) =>
+            HasColumn(reader, columnName) ? GetNullableDecimal(reader, columnName) : null;
+
+        private static DateTime? GetOptionalNullableDateTime(SqlDataReader reader, string columnName) =>
+            HasColumn(reader, columnName) ? GetNullableDateTime(reader, columnName) : null;
+
+        private static bool GetOptionalBool(SqlDataReader reader, string columnName) =>
+            HasColumn(reader, columnName) && GetBool(reader, columnName);
+
+        private static bool HasColumn(SqlDataReader reader, string columnName)
+        {
+            for (var index = 0; index < reader.FieldCount; index++)
+            {
+                if (string.Equals(reader.GetName(index), columnName, StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         // קורא int רגיל

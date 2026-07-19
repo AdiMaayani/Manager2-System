@@ -16,7 +16,12 @@ AS BEGIN SET NOCOUNT ON;
  IF @FromUtc IS NOT NULL AND @ToUtc<=@FromUtc THROW 51231,'Invalid UTC range.',1;
  ;WITH Eligible AS(
   SELECT wi.WorkItemId,wi.Title,wi.Description,wi.TaskCategory,wi.WorkType,wi.Status,wi.Priority,
-   wi.PlannedStart,wi.PlannedEnd,wi.EstimatedHours,wi.IsLocked,wi.CustomerId,c.CustomerName,
+   wi.PlannedStart,wi.PlannedEnd,wi.EstimatedHours,wi.RequiredRole,
+   CASE WHEN EXISTS(SELECT 1 FROM dbo.WorkItemRequiredRoles rr WHERE rr.WorkItemId=wi.WorkItemId)
+    THEN (SELECT rr.RoleName AS [Role] FROM dbo.WorkItemRequiredRoles rr WHERE rr.WorkItemId=wi.WorkItemId
+     ORDER BY rr.RoleName FOR XML PATH(''),ROOT('Roles'),TYPE)
+    ELSE CAST(NULL AS XML) END RequiredRolesXml,
+   wi.IsLocked,wi.CustomerId,c.CustomerName,
    wi.SiteId,s.SiteName,wi.ParentWorkItemId ProjectId,p.Title ProjectTitle,wi.MilestoneId,m.Title MilestoneTitle
   FROM dbo.WorkItems wi LEFT JOIN dbo.Customers c ON c.CustomerId=wi.CustomerId
   LEFT JOIN dbo.Sites s ON s.SiteId=wi.SiteId LEFT JOIN dbo.WorkItems p ON p.WorkItemId=wi.ParentWorkItemId
@@ -33,7 +38,12 @@ AS BEGIN SET NOCOUNT ON;
  ORDER BY PlannedStart,WorkItemId;
  ;WITH Eligible AS(
   SELECT wi.WorkItemId,wi.Title,wi.Description,wi.TaskCategory,wi.WorkType,wi.Status,wi.Priority,
-   wi.PlannedStart,wi.PlannedEnd,wi.EstimatedHours,wi.IsLocked,wi.CustomerId,c.CustomerName,
+   wi.PlannedStart,wi.PlannedEnd,wi.EstimatedHours,wi.RequiredRole,
+   CASE WHEN EXISTS(SELECT 1 FROM dbo.WorkItemRequiredRoles rr WHERE rr.WorkItemId=wi.WorkItemId)
+    THEN (SELECT rr.RoleName AS [Role] FROM dbo.WorkItemRequiredRoles rr WHERE rr.WorkItemId=wi.WorkItemId
+     ORDER BY rr.RoleName FOR XML PATH(''),ROOT('Roles'),TYPE)
+    ELSE CAST(NULL AS XML) END RequiredRolesXml,
+   wi.IsLocked,wi.CustomerId,c.CustomerName,
    wi.SiteId,s.SiteName,wi.ParentWorkItemId ProjectId,p.Title ProjectTitle,wi.MilestoneId,m.Title MilestoneTitle
   FROM dbo.WorkItems wi LEFT JOIN dbo.Customers c ON c.CustomerId=wi.CustomerId LEFT JOIN dbo.Sites s ON s.SiteId=wi.SiteId
   LEFT JOIN dbo.WorkItems p ON p.WorkItemId=wi.ParentWorkItemId LEFT JOIN dbo.ProjectMilestones m ON m.ProjectMilestoneId=wi.MilestoneId
@@ -43,7 +53,7 @@ AS BEGIN SET NOCOUNT ON;
    AND (@Scope NOT IN(N'personal',N'employee') OR EXISTS(SELECT 1 FROM dbo.WorkEmployeeAssignments a WHERE a.WorkItemId=wi.WorkItemId AND a.EmployeeId=CASE WHEN @Scope=N'personal' THEN @CurrentUserEmployeeId ELSE @EmployeeId END))
  ) SELECT *,CAST(NULL AS INT) DerivedDurationMinutes,CAST(CASE WHEN WorkType=N'ServiceCall' THEN 1 ELSE 0 END AS BIT) IsServiceCall
  FROM Eligible WHERE PlannedStart IS NULL OR PlannedEnd IS NULL OR PlannedEnd<=PlannedStart ORDER BY WorkItemId;
- SELECT a.WorkItemId,a.EmployeeId,e.FullName EmployeeName,a.AssignmentRole,a.AssignedHours,a.IsManualAssignment,N'Task' AssignmentSource
+ SELECT a.WorkEmployeeAssignmentId,a.WorkItemId,a.EmployeeId,e.FullName EmployeeName,a.AssignmentRole,a.AssignedHours,a.IsManualAssignment,N'Task' AssignmentSource
  FROM dbo.WorkEmployeeAssignments a JOIN dbo.Employees e ON e.EmployeeId=a.EmployeeId JOIN dbo.WorkItems wi ON wi.WorkItemId=a.WorkItemId
  WHERE wi.IsArchived=0 AND wi.TaskCategory IN(N'Regular',N'Project',N'ServiceCall')
   AND (@Status IS NULL OR wi.Status=@Status) AND (@TaskCategory IS NULL OR wi.TaskCategory=@TaskCategory)
@@ -51,6 +61,12 @@ AS BEGIN SET NOCOUNT ON;
   AND (@Scope NOT IN(N'personal',N'employee') OR EXISTS(SELECT 1 FROM dbo.WorkEmployeeAssignments sx WHERE sx.WorkItemId=wi.WorkItemId AND sx.EmployeeId=CASE WHEN @Scope=N'personal' THEN @CurrentUserEmployeeId ELSE @EmployeeId END))
   AND ((wi.PlannedStart IS NOT NULL AND wi.PlannedEnd>wi.PlannedStart AND (@FromUtc IS NULL OR wi.PlannedStart<@ToUtc) AND (@ToUtc IS NULL OR wi.PlannedEnd>@FromUtc))
        OR (@IncludeUnscheduled=1 AND (wi.PlannedStart IS NULL OR wi.PlannedEnd IS NULL OR wi.PlannedEnd<=wi.PlannedStart)));
- SELECT EmployeeId,FullName,PrimaryRole,IsActive,IsAssignable FROM dbo.Employees WHERE IsActive=1 ORDER BY FullName;
+ SELECT employee.EmployeeId,employee.FullName,employee.PrimaryRole,employee.IsActive,employee.IsAssignable,
+  CASE WHEN EXISTS(SELECT 1 FROM dbo.EmployeeProfessions profession WHERE profession.EmployeeId=employee.EmployeeId)
+   THEN (SELECT profession.RoleName AS [Role] FROM dbo.EmployeeProfessions profession
+    WHERE profession.EmployeeId=employee.EmployeeId ORDER BY profession.RoleName
+    FOR XML PATH(''),ROOT('Roles'),TYPE)
+   ELSE CAST(NULL AS XML) END ProfessionsXml
+ FROM dbo.Employees employee WHERE employee.IsActive=1 ORDER BY employee.FullName;
 END
 GO

@@ -12,7 +12,21 @@ public sealed class UpsertEmployeeRequestDtoValidator : AbstractValidator<Upsert
             .NotEmpty().WithMessage("FullName is required.");
 
         RuleFor(employee => employee.PrimaryRole)
-            .NotEmpty().WithMessage("PrimaryRole is required.");
+            .NotEmpty().WithMessage("PrimaryRole is required.")
+            .MaximumLength(100).WithMessage("PrimaryRole must be at most 100 characters.");
+
+        RuleForEach(employee => employee.Professions!)
+            .NotEmpty().WithMessage("Professions cannot contain blank values.")
+            .MaximumLength(100).WithMessage("Each profession must be at most 100 characters.")
+            .When(employee => employee.Professions is not null);
+
+        RuleFor(employee => employee.Professions)
+            .Must(professions => professions is null || professions
+                .Select(value => value?.Trim())
+                .Where(value => !string.IsNullOrWhiteSpace(value))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .Count() == professions.Count)
+            .WithMessage("Professions cannot contain duplicate values.");
 
         RuleFor(employee => employee.Email!)
             .Must(IsValidEmail).WithMessage("Email is invalid.")

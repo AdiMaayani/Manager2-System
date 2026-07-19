@@ -21,6 +21,7 @@ const fullServiceCall: ServiceCallDetails = {
   actualEnd: '2026-07-01T11:15:00',
   actualHours: 1.5,
   requiredRole: 'טכנאי רשת',
+  requiredRoles: ['טכנאי רשת', 'טכנאי תקשורת'],
   isLocked: true,
   createdAt: '2026-06-30T08:00:00',
   closedAt: null,
@@ -44,7 +45,7 @@ describe('buildServiceCallFormState', () => {
       actualStart: '2026-07-01T09:45',
       actualEnd: '2026-07-01T11:15',
       actualHours: '1.5',
-      requiredRole: 'טכנאי רשת',
+      requiredRoles: ['טכנאי רשת', 'טכנאי תקשורת'],
       isLocked: true,
     });
   });
@@ -72,7 +73,7 @@ describe('buildServiceCallFormState', () => {
       actualStart: '',
       actualEnd: '',
       actualHours: '',
-      requiredRole: '',
+      requiredRoles: [],
       isLocked: false,
     });
   });
@@ -89,6 +90,7 @@ describe('buildServiceCallFormState', () => {
       actualEnd: null,
       actualHours: null,
       requiredRole: null,
+      requiredRoles: null,
     };
 
     const form = buildServiceCallFormState(partial);
@@ -97,6 +99,16 @@ describe('buildServiceCallFormState', () => {
     expect(form.plannedStart).toBe('');
     expect(form.estimatedHours).toBe('');
     expect(form.actualHours).toBe('');
-    expect(form.requiredRole).toBe('');
+    expect(form.requiredRoles).toEqual([]);
+  });
+
+  it('falls back to the legacy required role when the collection is absent', () => {
+    const form = buildServiceCallFormState({
+      ...fullServiceCall,
+      requiredRoles: null,
+      requiredRole: 'טכנאי רשת',
+    });
+
+    expect(form.requiredRoles).toEqual(['טכנאי רשת']);
   });
 });

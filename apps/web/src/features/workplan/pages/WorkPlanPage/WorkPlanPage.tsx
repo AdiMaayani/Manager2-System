@@ -53,6 +53,8 @@ function scheduledToSelection(task: ScheduledTaskBar): WorkPlanTaskSelection {
     estimatedHours: task.estimatedHours,
     priority: task.priority,
     requiredRole: task.requiredRole,
+    requiredRoles: task.requiredRoles,
+    isManualAssignment: task.isManualAssignment ?? null,
   };
 }
 
@@ -187,6 +189,7 @@ export function WorkPlanPage() {
         employeeId: employee.employeeId,
         fullName: employee.fullName,
         primaryRole: employee.primaryRole,
+        professions: employee.professions,
       }));
     return buildWorkPlanEmployeeFilterOptions(activeEmployees, pageState.employeeFilterId);
   }, [employeeLookupQuery.data, pageState.employeeFilterId]);
@@ -194,11 +197,12 @@ export function WorkPlanPage() {
   const newTaskEmployees = useMemo(
     () =>
       (employeeLookupQuery.data ?? [])
-        .filter((employee) => employee.isActive && employee.isAssignable)
+        .filter((employee) => employee.isActive)
         .map((employee) => ({
           employeeId: employee.employeeId,
           fullName: employee.fullName,
           primaryRole: employee.primaryRole,
+          professions: employee.professions,
           isActive: employee.isActive,
           isAssignable: employee.isAssignable,
         })),

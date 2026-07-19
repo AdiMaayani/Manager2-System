@@ -10,6 +10,7 @@ import { Modal } from '@shared/components/Modal';
 import { deleteWorkPlanTaskAsync } from '../../api/workplanApiClient';
 import { invalidateWorkPlanQueries } from '../../hooks/useWorkPlanData';
 import { EditTaskDrawer } from '../EditTaskDrawer';
+import { RecommendationFeedbackPanel } from '../RecommendationFeedbackPanel';
 import {
   getWorkPlanPriorityDisplay,
   getWorkPlanStatusDisplay,
@@ -130,7 +131,11 @@ export function WorkPlanTaskPanel({
       reporterId: workerSelection.reporterId,
       reporterName:
         workerSelection.reporterName || (task.assigneeName !== '—' ? task.assigneeName : ''),
-      reporterRole: workerSelection.reporterRole || task.requiredRole || '',
+      reporterRole:
+        workerSelection.reporterRole
+        || task.requiredRoles?.[0]
+        || task.requiredRole
+        || '',
       relatedWorkerIds: workerSelection.relatedWorkerIds,
       customerName: task.customerName ?? undefined,
       site: task.siteName ?? undefined,
@@ -152,6 +157,45 @@ export function WorkPlanTaskPanel({
 
   const plannedDate = formatPlannedDate(task.plannedStart);
   const description = task.description?.trim();
+  const assignedEmployeeId = task.assigneeEmployeeId
+    ? Number(task.assigneeEmployeeId)
+    : null;
+  const directAssignments = assignments.filter((assignment) =>
+    assignment.workItemId === task.taskId
+    && assignment.assignmentSource === 'Task'
+    && (assignment.employeeId != null || Boolean(assignment.employeeName)));
+  const inheritedAssignment = directAssignments.length === 0
+    && assignedEmployeeId != null
+    && Number.isInteger(assignedEmployeeId)
+    && task.projectId != null
+    ? assignments.find((assignment) =>
+        assignment.workItemId === task.projectId
+        && assignment.employeeId === assignedEmployeeId
+        && assignment.assignmentSource === 'Project')
+    : null;
+  const syntheticAssignment: WorkPlanScheduleAssignment | null = directAssignments.length === 0
+    && !inheritedAssignment
+    && assignedEmployeeId != null
+    && Number.isInteger(assignedEmployeeId)
+    && assignedEmployeeId > 0
+    ? {
+        workEmployeeAssignmentId: null,
+        workItemId: task.projectId ?? 0,
+        employeeId: assignedEmployeeId,
+        employeeName: task.assigneeName,
+        assignmentRole: task.requiredRoles?.[0] ?? task.requiredRole ?? null,
+        assignedHours: null,
+        isManualAssignment: task.isManualAssignment ?? true,
+        assignmentSource: 'Project',
+      }
+    : null;
+  const displayedAssignments = directAssignments.length > 0
+    ? directAssignments
+    : inheritedAssignment
+      ? [inheritedAssignment]
+      : syntheticAssignment
+        ? [syntheticAssignment]
+        : [];
 
   return (
     <>
@@ -183,10 +227,6 @@ export function WorkPlanTaskPanel({
 
           <dl className="workPlanTaskPanel__meta">
             <div className="workPlanTaskPanel__metaRow">
-              <dt>מבצע</dt>
-              <dd>{task.assigneeName}</dd>
-            </div>
-            <div className="workPlanTaskPanel__metaRow">
               <dt>שעות</dt>
               <dd>
                 {formatHourAsTime(task.startHour)} – {formatHourAsTime(task.endHour)}
@@ -204,10 +244,10 @@ export function WorkPlanTaskPanel({
                 <dd>{getWorkPlanPriorityDisplay(task.priority)}</dd>
               </div>
             )}
-            {task.requiredRole && (
+            {((task.requiredRoles?.length ?? 0) > 0 || task.requiredRole) && (
               <div className="workPlanTaskPanel__metaRow">
-                <dt>תפקיד נדרש</dt>
-                <dd>{task.requiredRole}</dd>
+                <dt>מקצועות נדרשים</dt>
+                <dd>{task.requiredRoles?.length ? task.requiredRoles.join(' · ') : task.requiredRole}</dd>
               </div>
             )}
             {task.estimatedHours != null && (
@@ -224,6 +264,41 @@ export function WorkPlanTaskPanel({
               <p className="workPlanTaskPanel__descriptionText">{description}</p>
             </section>
           )}
+
+          <section
+            className="workPlanTaskPanel__assignments"
+            aria-labelledby={`task-${task.taskId}-assignments-title`}
+          >
+            <h4
+              id={`task-${task.taskId}-assignments-title`}
+              className="workPlanTaskPanel__assignmentsTitle"
+            >
+              שיבוץ עובדים
+            </h4>
+            {displayedAssignments.length > 0 ? (
+              <div className="workPlanTaskPanel__assignmentList">
+                {displayedAssignments.map((assignment, index) => {
+                  const assignmentId = assignment.workEmployeeAssignmentId ?? null;
+                  const isDirect = assignment.workItemId === task.taskId
+                    && assignment.assignmentSource === 'Task';
+                  const isReadOnly = !isDirect || assignmentId == null || assignmentId <= 0;
+                  return (
+                    <RecommendationFeedbackPanel
+                      key={assignmentId != null && assignmentId > 0
+                        ? `assignment-${assignmentId}`
+                        : `${assignment.workItemId}:${assignment.employeeId ?? 'none'}:${index}`}
+                      taskId={task.taskId}
+                      assignment={assignment}
+                      canEdit={canEdit}
+                      isReadOnly={isReadOnly || task.isLocked}
+                    />
+                  );
+                })}
+              </div>
+            ) : (
+              <InlineAlert variant="info">לא שובץ עובד למשימה.</InlineAlert>
+            )}
+          </section>
 
           <div className="workPlanTaskPanel__footer">
             <p className={`workPlanTaskPanel__perms workPlanTaskPanel__perms--${permissionTone}`}>
@@ -304,12 +379,15 @@ export function WorkPlanTaskPanel({
       <EditTaskDrawer
         isOpen={isEditOpen}
         task={task}
+        assignments={directAssignments}
+        employees={employees}
         onClose={() => setIsEditOpen(false)}
         onSaved={() => {
           setIsEditOpen(false);
           onTaskUpdated();
         }}
       />
+
     </>
   );
 }

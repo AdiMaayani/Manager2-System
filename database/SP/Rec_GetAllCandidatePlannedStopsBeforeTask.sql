@@ -23,10 +23,14 @@ BEGIN
         ps.FormattedAddress,
         ps.ExternalPlaceRef,
         ps.ZoneId,
+        COALESCE(ps.Latitude, plannedStopSite.Latitude) AS Latitude,
+        COALESCE(ps.Longitude, plannedStopSite.Longitude) AS Longitude,
         ps.StopStatus
     FROM dbo.Rec_EmployeePlannedStops ps
     INNER JOIN dbo.Employees e
         ON e.EmployeeId = ps.EmployeeId
+    LEFT JOIN dbo.Rec_SiteAddressProfile AS plannedStopSite
+        ON plannedStopSite.SiteId = ps.SiteId
     WHERE e.IsActive = 1
       AND e.IsAssignable = 1
       AND ps.PlannedDate = @TaskDate

@@ -33,11 +33,15 @@ BEGIN
         FormattedAddress,
         ExternalPlaceRef,
         ZoneId,
+        COALESCE(LastEvents.Latitude, locationEventSite.Latitude) AS Latitude,
+        COALESCE(LastEvents.Longitude, locationEventSite.Longitude) AS Longitude,
         EventDate,
         EventTime,
         Source,
         Notes
     FROM LastEvents
+    LEFT JOIN dbo.Rec_SiteAddressProfile AS locationEventSite
+        ON locationEventSite.SiteId = LastEvents.SiteId
     WHERE rn = 1
     ORDER BY EmployeeId;
 END

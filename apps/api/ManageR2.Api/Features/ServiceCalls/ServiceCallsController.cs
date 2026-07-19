@@ -3,6 +3,7 @@ using ManageR2.Api.Features.Audit;
 using ManageR2.Api.Features.ServiceCalls.DTOs;
 using ManageR2.Domain.Entities;
 using ManageR2.Domain.Features.WorkItems;
+using ManageR2.Domain.Features.SmartAssignment;
 using ManageR2.Infrastructure.Features.WorkItems.Services;
 using ManageR2.Infrastructure.Repositories;
 using ManageR2.Infrastructure.Services;
@@ -98,10 +99,30 @@ public class ServiceCallsController : ControllerBase
             return NotFound($"Service call with ID {id} was not found.");
         }
 
+        if (existingServiceCall.IsArchived)
+        {
+            return BadRequest(new { message = "Archived service calls cannot be edited or reassigned." });
+        }
+
+        if (existingServiceCall.IsLocked && request.EmployeeReplacements is { Count: > 0 })
+        {
+            return BadRequest(new { message = "Locked service calls cannot be reassigned." });
+        }
+
         try
         {
-            var serviceCall = BuildServiceCall(request, existingServiceCall.Status);
-            var updated = await _workItemRepository.UpdateAsync(id, serviceCall);
+            var serviceCall = BuildServiceCall(request, existingServiceCall);
+            var replacements = (request.EmployeeReplacements ?? new List<ServiceCallEmployeeReplacementRequestDto>())
+                .Select(replacement => (
+                    replacement.WorkEmployeeAssignmentId,
+                    replacement.EmployeeId))
+                .ToList();
+            var updated = replacements.Count > 0
+                ? await _workItemRepository.UpdateWithEmployeeReplacementsAsync(
+                    id,
+                    serviceCall,
+                    replacements)
+                : await _workItemRepository.UpdateAsync(id, serviceCall);
 
             if (!updated)
             {
@@ -116,12 +137,17 @@ public class ServiceCallsController : ControllerBase
                 metadata: new Dictionary<string, object?>
                 {
                     ["status"] = serviceCall.Status,
-                    ["priority"] = serviceCall.Priority
+                    ["priority"] = serviceCall.Priority,
+                    ["employeeReplacementCount"] = replacements.Count
                 }));
 
             return Ok(new { message = "Service call updated successfully." });
         }
         catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
         {
             return BadRequest(new { message = ex.Message });
         }
@@ -167,7 +193,8 @@ public class ServiceCallsController : ControllerBase
             var assigned = await _workItemRepository.AssignEmployeeToWorkAsync(
                 id,
                 request.EmployeeId,
-                request.AssignmentRole);
+                request.AssignmentRole,
+                request.RecommendationRunId);
 
             if (!assigned)
             {
@@ -182,7 +209,11 @@ public class ServiceCallsController : ControllerBase
                 metadata: new Dictionary<string, object?>
                 {
                     ["employeeId"] = request.EmployeeId,
-                    ["assignmentRole"] = request.AssignmentRole
+                    ["assignmentRole"] = request.AssignmentRole,
+                    ["assignmentMethod"] = request.RecommendationRunId.HasValue
+                        ? "SmartAssignment"
+                        : "Manual",
+                    ["recommendationRunId"] = request.RecommendationRunId
                 }));
 
             return Ok(new { message = "Employee assigned to service call successfully." });
@@ -205,7 +236,7 @@ public class ServiceCallsController : ControllerBase
         return workItem;
     }
 
-    private WorkItem BuildServiceCall(CreateServiceCallRequestDto request, string? existingStatus = null)
+    private WorkItem BuildServiceCall(CreateServiceCallRequestDto request, WorkItem? existingServiceCall = null)
     {
         var (plannedStartUtc, plannedEndUtc) = UtcDateTimeNormalizer.NormalizePlannedRange(
             request.PlannedStart,
@@ -222,17 +253,27 @@ public class ServiceCallsController : ControllerBase
 
         _workItemTaskService.ValidateCreateOrUpdate(validationInput, isServiceCallPath: true);
 
+        var requiredRoles = existingServiceCall is null
+            ? ProfessionCollection.Resolve(request.RequiredRoles, request.RequiredRole)
+            : ProfessionCollection.ResolveForUpdate(
+                request.RequiredRoles,
+                request.RequiredRole,
+                existingServiceCall.RequiredRoles,
+                existingServiceCall.RequiredRole,
+                request.RequiredRoleWasProvided);
+
         return _workItemTaskService.ApplyCanonicalFields(new WorkItem
         {
             Title = request.Title.Trim(),
             Description = request.Description,
-            Status = ResolveTaskStatus(request.Status, existingStatus),
+            Status = ResolveTaskStatus(request.Status, existingServiceCall?.Status),
             BillingType = request.BillingType,
             Priority = request.Priority,
             ActualStart = request.ActualStart,
             ActualEnd = request.ActualEnd,
             ActualHours = request.ActualHours,
-            RequiredRole = request.RequiredRole,
+            RequiredRole = requiredRoles.FirstOrDefault(),
+            RequiredRoles = requiredRoles.ToList(),
             IsLocked = request.IsLocked
         }, validationInput);
     }
@@ -265,6 +306,7 @@ public class ServiceCallsController : ControllerBase
             ActualEnd = serviceCall.ActualEnd,
             ActualHours = serviceCall.ActualHours,
             RequiredRole = serviceCall.RequiredRole,
+            RequiredRoles = serviceCall.RequiredRoles,
             IsLocked = serviceCall.IsLocked,
             CreatedAt = serviceCall.CreatedAt,
             ClosedAt = serviceCall.ClosedAt

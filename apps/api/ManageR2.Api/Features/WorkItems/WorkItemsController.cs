@@ -3,6 +3,7 @@ using ManageR2.Api.DTOs;
 using ManageR2.Api.Features.Audit;
 using ManageR2.Domain.Entities;
 using ManageR2.Domain.Features.WorkItems;
+using ManageR2.Domain.Features.SmartAssignment;
 using ManageR2.Infrastructure.Features.WorkItems.Models;
 using ManageR2.Api.Features.WorkItems.Mapping;
 using ManageR2.Infrastructure.Features.WorkItems.Services;
@@ -132,6 +133,7 @@ public class WorkItemsController : ControllerBase
                     PlannedStart = task.PlannedStart,
                     PlannedEnd = task.PlannedEnd,
                     RequiredRole = task.RequiredRole,
+                    RequiredRoles = task.RequiredRoles,
                     Assignments = assignmentsByWorkItemId.GetValueOrDefault(task.WorkItemId) ?? []
                 };
             })
@@ -150,6 +152,7 @@ public class WorkItemsController : ControllerBase
                     PlannedStart = call.PlannedStart,
                     PlannedEnd = call.PlannedEnd,
                     RequiredRole = call.RequiredRole,
+                    RequiredRoles = call.RequiredRoles,
                     Assignments = assignmentsByWorkItemId.GetValueOrDefault(call.WorkItemId) ?? []
                 }))
             .OrderBy(target => target.Title, StringComparer.OrdinalIgnoreCase)
@@ -289,6 +292,7 @@ public class WorkItemsController : ControllerBase
                 PlannedStart = task.PlannedStart,
                 PlannedEnd = task.PlannedEnd,
                 RequiredRole = task.RequiredRole,
+                RequiredRoles = task.RequiredRoles,
                 IsLocked = task.IsLocked,
                 CustomerId = task.CustomerId,
                 SiteId = task.SiteId,
@@ -585,6 +589,9 @@ public class WorkItemsController : ControllerBase
 
             _workItemTaskService.ValidateCreateOrUpdate(validationInput);
 
+            var requiredRoles = ProfessionCollection.Resolve(
+                request.RequiredRoles,
+                request.RequiredRole);
             var task = _workItemTaskService.ApplyCanonicalFields(new WorkItem
             {
                 Title = request.Title,
@@ -592,7 +599,8 @@ public class WorkItemsController : ControllerBase
                 Status = ResolveTaskStatus(request.Status),
                 BillingType = request.BillingType,
                 Priority = request.Priority,
-                RequiredRole = request.RequiredRole,
+                RequiredRole = requiredRoles.FirstOrDefault(),
+                RequiredRoles = requiredRoles.ToList(),
                 DealCloseDate = request.DealCloseDate,
                 FinanceProjectNumber = request.FinanceProjectNumber,
                 InvoiceNumber = request.InvoiceNumber
@@ -650,6 +658,11 @@ public class WorkItemsController : ControllerBase
             return BadRequest("Only Regular and Project tasks can be updated through this endpoint.");
         }
 
+        if (existingTask.IsLocked)
+        {
+            return BadRequest(new { message = "Locked tasks cannot be edited or reassigned." });
+        }
+
         try
         {
             var (plannedStartUtc, plannedEndUtc) = UtcDateTimeNormalizer.NormalizePlannedRange(
@@ -669,6 +682,12 @@ public class WorkItemsController : ControllerBase
 
             _workItemTaskService.ValidateCreateOrUpdate(validationInput);
 
+            var requiredRoles = ProfessionCollection.ResolveForUpdate(
+                request.RequiredRoles,
+                request.RequiredRole,
+                existingTask.RequiredRoles,
+                existingTask.RequiredRole,
+                request.RequiredRoleWasProvided);
             var task = _workItemTaskService.ApplyCanonicalFields(new WorkItem
             {
                 Title = request.Title,
@@ -676,14 +695,28 @@ public class WorkItemsController : ControllerBase
                 Status = ResolveTaskStatus(request.Status, existingTask.Status),
                 BillingType = request.BillingType,
                 Priority = request.Priority,
-                RequiredRole = request.RequiredRole,
+                RequiredRole = requiredRoles.FirstOrDefault(),
+                RequiredRoles = requiredRoles.ToList(),
                 IsLocked = request.IsLocked,
+                ActualStart = existingTask.ActualStart,
+                ActualEnd = existingTask.ActualEnd,
+                ActualHours = existingTask.ActualHours,
                 DealCloseDate = request.DealCloseDate,
                 FinanceProjectNumber = request.FinanceProjectNumber,
                 InvoiceNumber = request.InvoiceNumber
             }, validationInput);
 
-            var updated = await _workItemRepository.UpdateAsync(taskId, task);
+            var replacements = (request.EmployeeReplacements ?? new List<EmployeeAssignmentReplacementRequest>())
+                .Select(replacement => (
+                    replacement.WorkEmployeeAssignmentId,
+                    replacement.EmployeeId))
+                .ToList();
+            var updated = replacements.Count > 0
+                ? await _workItemRepository.UpdateWithEmployeeReplacementsAsync(
+                    taskId,
+                    task,
+                    replacements)
+                : await _workItemRepository.UpdateAsync(taskId, task);
             if (!updated)
             {
                 return BadRequest("Failed to update task.");
@@ -697,12 +730,17 @@ public class WorkItemsController : ControllerBase
                 metadata: new Dictionary<string, object?>
                 {
                     ["taskCategory"] = task.TaskCategory,
-                    ["status"] = task.Status
+                    ["status"] = task.Status,
+                    ["employeeReplacementCount"] = replacements.Count
                 }));
 
             return Ok(new { message = "Task updated successfully." });
         }
         catch (ArgumentException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (InvalidOperationException ex)
         {
             return BadRequest(new { message = ex.Message });
         }
@@ -723,6 +761,8 @@ public class WorkItemsController : ControllerBase
         {
             return NotFound($"Work item with ID {id} was not found.");
         }
+
+        workItem.Status = ResolveTaskStatus(workItem.Status, existingWorkItem.Status);
 
         var updated = await _workItemRepository.UpdateAsync(id, workItem);
 
@@ -821,14 +861,21 @@ public class WorkItemsController : ControllerBase
     // Links an employee to a work item through assignment records.
     public async Task<IActionResult> AssignEmployee(int id, [FromBody] AssignEmployeeRequest request)
     {
-        if (request == null || request.EmployeeId <= 0 || string.IsNullOrWhiteSpace(request.AssignmentRole))
+        if (request == null
+            || request.EmployeeId <= 0
+            || string.IsNullOrWhiteSpace(request.AssignmentRole)
+            || request.RecommendationRunId is <= 0)
         {
             return BadRequest("Valid EmployeeId and AssignmentRole are required.");
         }
 
         try
         {
-            var assigned = await _workItemRepository.AssignEmployeeToWorkAsync(id, request.EmployeeId, request.AssignmentRole);
+            var assigned = await _workItemRepository.AssignEmployeeToWorkAsync(
+                id,
+                request.EmployeeId,
+                request.AssignmentRole,
+                request.RecommendationRunId);
 
             if (!assigned)
             {
@@ -843,10 +890,65 @@ public class WorkItemsController : ControllerBase
                 metadata: new Dictionary<string, object?>
                 {
                     ["employeeId"] = request.EmployeeId,
-                    ["assignmentRole"] = request.AssignmentRole
+                    ["assignmentRole"] = request.AssignmentRole,
+                    ["assignmentMethod"] = request.RecommendationRunId.HasValue
+                        ? "SmartAssignment"
+                        : "Manual",
+                    ["recommendationRunId"] = request.RecommendationRunId
                 }));
 
             return Ok(new { message = "Employee assigned successfully." });
+        }
+        catch (InvalidOperationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [Authorize(Policy = Policies.CanManageWorkPlan)]
+    [HttpPut("{workItemId:int}/employee-assignments/{assignmentId:int}")]
+    public async Task<IActionResult> UpdateEmployeeAssignment(
+        int workItemId,
+        int assignmentId,
+        [FromBody] UpdateEmployeeAssignmentRequest request)
+    {
+        if (workItemId <= 0
+            || assignmentId <= 0
+            || request == null
+            || request.EmployeeId <= 0)
+        {
+            return BadRequest(new
+            {
+                message = "Valid work item, assignment, and employee identifiers are required."
+            });
+        }
+
+        try
+        {
+            var updated = await _workItemRepository.UpdateEmployeeWorkAssignmentAsync(
+                workItemId,
+                assignmentId,
+                request.EmployeeId);
+
+            if (!updated)
+            {
+                return BadRequest(new { message = "Failed to update employee assignment." });
+            }
+
+            await _auditLogService.LogAsync(this.BuildAuditEvent(
+                AuditActions.WorkItemAssignmentUpdated,
+                AuditEntityTypes.WorkItem,
+                $"Employee assignment #{assignmentId} updated for work item #{workItemId}.",
+                entityId: workItemId,
+                metadata: new Dictionary<string, object?>
+                {
+                    ["workEmployeeAssignmentId"] = assignmentId,
+                    ["employeeId"] = request.EmployeeId,
+                    ["assignmentMethod"] = "Manual",
+                    ["smartAssignmentRecommendationCleared"] = true
+                }));
+
+            return Ok(new { message = "Employee assignment updated successfully." });
         }
         catch (InvalidOperationException ex)
         {

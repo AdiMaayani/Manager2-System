@@ -21,6 +21,9 @@ namespace ManageR2.Infrastructure.Models.SmartAssignment
         // רשימת כישורים נדרשים למשימה
         public List<RequiredSkillModel> RequiredSkills { get; set; } = new();
 
+        // False only when the calling contract cannot provide required-skill input (currently draft tasks).
+        public bool RequiredSkillsInputAvailable { get; set; } = true;
+
         // =========================================
         // עובדים
         // =========================================
@@ -70,6 +73,15 @@ namespace ManageR2.Infrastructure.Models.SmartAssignment
 
         // מרחקים וזמני נסיעה
         public List<RouteEstimateModel> RouteEstimates { get; set; } = new();
+
+        // Exact origin selected by the route enricher for each candidate. The scoring
+        // engine consults this map first and retains its legacy resolver as a fallback
+        // for callers/tests that supply precomputed routes without enrichment.
+        public Dictionary<int, string> ResolvedRouteOriginTypes { get; set; } = new();
+
+        // Exact, human-readable address paired with the resolved route origin. This value is used
+        // only for recommendation explainability; coordinates remain internal to routing.
+        public Dictionary<int, string> ResolvedRouteOriginAddresses { get; set; } = new();
 
         // =========================================
         // עומס נוכחי ורציפות (נתונים קיימים מתוך שיבוצים)

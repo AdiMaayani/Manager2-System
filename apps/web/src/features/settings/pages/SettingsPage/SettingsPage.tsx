@@ -18,7 +18,9 @@ import {
 } from '@features/projects/utils/projectDisplayUtils';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@shared/components/Button';
+import { usePermissions } from '@shared/auth/usePermissions';
 import { CompanySettingsForm } from '../../components/CompanySettingsForm';
+import { SmartAssignmentPolicySettings } from '../../components/SmartAssignmentPolicySettings';
 import { SettingsSection } from '../../components/SettingsSection';
 import { useCompanySettings, useUpdateCompanySettings } from '../../hooks/useCompanySettings';
 import { useSettingsLookups } from '../../hooks/useSettingsLookups';
@@ -40,8 +42,10 @@ function renderValue(value?: string | number | null) {
 
 export function SettingsPage() {
   const navigate = useNavigate();
+  const { can } = usePermissions();
   const currentUser = getCurrentUser();
   const isAdmin = currentUser?.roles.includes('Admin') ?? false;
+  const canManageSettings = can('manageSettings');
   const companySettingsQuery = useCompanySettings();
   const updateCompanySettingsMutation = useUpdateCompanySettings();
   const { rolesQuery, departmentsQuery } = useSettingsLookups(isAdmin);
@@ -92,6 +96,15 @@ export function SettingsPage() {
             )}
           </div>
         </SettingsSection>
+
+        <div className="settingsPage__fullWidth">
+          <SettingsSection
+            title="הגדרות שיבוץ חכם"
+            description="ניהול גרסאות של משקלי הציון והעדפות השיבוץ לפי סוג משימה. כל חישובי היחיד, הטיוטה והקבוצה משתמשים במדיניות הפעילה בשרת."
+          >
+            <SmartAssignmentPolicySettings canManage={canManageSettings} />
+          </SettingsSection>
+        </div>
 
         <SettingsSection
           title="פרטי חברה"

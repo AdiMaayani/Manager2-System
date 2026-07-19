@@ -1,0 +1,1 @@
+export { SmartAssignmentWeightSelector } from './SmartAssignmentWeightSelector';
