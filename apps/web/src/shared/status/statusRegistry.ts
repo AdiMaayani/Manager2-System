@@ -57,6 +57,7 @@ const QUOTE: StatusMap = {
 };
 
 const SERVICE_CALL: StatusMap = {
+  Planned: { label: 'מתוכננת', variant: 'primary' },
   Open: { label: 'פתוחה', variant: 'warning' },
   InProgress: { label: 'בטיפול', variant: 'primary' },
   Done: { label: 'בוצעה', variant: 'success' },

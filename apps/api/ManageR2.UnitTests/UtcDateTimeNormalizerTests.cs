@@ -53,4 +53,50 @@ public class UtcDateTimeNormalizerTests
         Assert.Null(startUtc);
         Assert.Null(endUtc);
     }
+
+    [Fact]
+    public void MarkStoredAsUtc_PreservesUtcValues()
+    {
+        var utc = new DateTime(2026, 7, 19, 9, 33, 0, DateTimeKind.Utc);
+
+        var marked = UtcDateTimeNormalizer.MarkStoredAsUtc(utc);
+
+        Assert.Equal(DateTimeKind.Utc, marked.Kind);
+        Assert.Equal(utc, marked);
+    }
+
+    [Fact]
+    public void MarkStoredAsUtc_TreatsUnspecifiedAsUtcWithoutShifting()
+    {
+        var unspecified = new DateTime(2026, 7, 19, 9, 33, 0, DateTimeKind.Unspecified);
+
+        var marked = UtcDateTimeNormalizer.MarkStoredAsUtc(unspecified);
+
+        Assert.Equal(DateTimeKind.Utc, marked.Kind);
+        Assert.Equal(unspecified.Ticks, marked.Ticks);
+    }
+
+    [Fact]
+    public void MarkStoredAsUtc_RejectsLocalKind()
+    {
+        var local = new DateTime(2026, 7, 19, 12, 33, 0, DateTimeKind.Local);
+
+        var ex = Assert.Throws<ArgumentException>(() => UtcDateTimeNormalizer.MarkStoredAsUtc(local));
+        Assert.Contains("DateTimeKind.Local", ex.Message);
+    }
+
+    [Fact]
+    public void MarkStoredAsUtc_OptionalNullRemainsNull()
+    {
+        Assert.Null(UtcDateTimeNormalizer.MarkStoredAsUtc((DateTime?)null));
+    }
+
+    [Fact]
+    public void NormalizeToUtc_StillRejectsOffsetLessUnspecifiedInput()
+    {
+        var unspecified = new DateTime(2026, 7, 19, 12, 33, 0, DateTimeKind.Unspecified);
+
+        var ex = Assert.Throws<ArgumentException>(() => UtcDateTimeNormalizer.NormalizeToUtc(unspecified));
+        Assert.Contains("explicit UTC offset or Z suffix", ex.Message);
+    }
 }

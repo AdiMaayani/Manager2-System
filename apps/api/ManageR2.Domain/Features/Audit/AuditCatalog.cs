@@ -45,7 +45,10 @@ public static class AuditActions
     public const string ServiceCallCreated = "ServiceCallCreated";
     public const string ServiceCallUpdated = "ServiceCallUpdated";
     public const string ServiceCallAssigned = "ServiceCallAssigned";
+    /// <summary>Historical audit action retained for existing rows; new cancellations emit ServiceCallCancelled.</summary>
     public const string ServiceCallClosed = "ServiceCallClosed";
+    public const string ServiceCallCancelled = "ServiceCallCancelled";
+    public const string ServiceCallReopened = "ServiceCallReopened";
 
     // Work items (projects/tasks)
     public const string WorkItemCreated = "WorkItemCreated";

@@ -45,8 +45,14 @@ export function updateServiceCallAsync(
   });
 }
 
-export function closeServiceCallAsync(serviceCallId: number): Promise<ServiceCallMessageResponse> {
+export function cancelServiceCallAsync(serviceCallId: number): Promise<ServiceCallMessageResponse> {
   return apiRequest<ServiceCallMessageResponse>(`/ServiceCalls/${serviceCallId}/close`, {
+    method: 'PUT',
+  });
+}
+
+export function reopenServiceCallAsync(serviceCallId: number): Promise<ServiceCallMessageResponse> {
+  return apiRequest<ServiceCallMessageResponse>(`/ServiceCalls/${serviceCallId}/reopen`, {
     method: 'PUT',
   });
 }

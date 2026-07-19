@@ -19,6 +19,28 @@ public static class UtcDateTimeNormalizer
         return value.HasValue ? NormalizeToUtc(value.Value) : null;
     }
 
+    /// <summary>
+    /// Marks a persisted database DateTime as UTC for API responses.
+    /// SQL Server datetime values are typically Unspecified; treat that wall-clock as UTC
+    /// (do not convert via ToUniversalTime / server-local timezone).
+    /// </summary>
+    public static DateTime MarkStoredAsUtc(DateTime value)
+    {
+        return value.Kind switch
+        {
+            DateTimeKind.Utc => value,
+            DateTimeKind.Unspecified => DateTime.SpecifyKind(value, DateTimeKind.Utc),
+            DateTimeKind.Local => throw new ArgumentException(
+                "Persisted datetime must not use DateTimeKind.Local; expected Unspecified or Utc."),
+            _ => throw new ArgumentException("Unsupported datetime kind.")
+        };
+    }
+
+    public static DateTime? MarkStoredAsUtc(DateTime? value)
+    {
+        return value.HasValue ? MarkStoredAsUtc(value.Value) : null;
+    }
+
     public static (DateTime? StartUtc, DateTime? EndUtc) NormalizePlannedRange(DateTime? start, DateTime? end)
     {
         if (!start.HasValue && !end.HasValue)

@@ -2,6 +2,7 @@ using ManageR2.Api.Authorization;
 using ManageR2.Api.Features.Audit;
 using ManageR2.Api.Features.ServiceCalls.DTOs;
 using ManageR2.Domain.Entities;
+using ManageR2.Domain.Exceptions;
 using ManageR2.Domain.Features.WorkItems;
 using ManageR2.Infrastructure.Features.WorkItems.Services;
 using ManageR2.Infrastructure.Repositories;
@@ -34,7 +35,7 @@ public class ServiceCallsController : ControllerBase
     public async Task<ActionResult<List<ServiceCallResponseDto>>> GetAll()
     {
         var serviceCalls = await _workItemRepository.GetByTypeAsync(WorkItemWorkTypes.ServiceCall);
-        return Ok(serviceCalls.Select(MapToResponse).ToList());
+        return Ok(serviceCalls.Select(ServiceCallResponseMapper.Map).ToList());
     }
 
     [HttpGet("{id:int}")]
@@ -46,7 +47,7 @@ public class ServiceCallsController : ControllerBase
             return NotFound($"Service call with ID {id} was not found.");
         }
 
-        return Ok(MapToResponse(serviceCall));
+        return Ok(ServiceCallResponseMapper.Map(serviceCall));
     }
 
     [Authorize(Policy = Policies.CanManageServiceCalls)]
@@ -100,6 +101,14 @@ public class ServiceCallsController : ControllerBase
 
         try
         {
+            var statusTransitionError = ServiceCallLifecycleRules.ValidateStatusTransitionForUpdate(
+                existingServiceCall.Status,
+                request.Status);
+            if (statusTransitionError != null)
+            {
+                return BadRequest(new { message = statusTransitionError });
+            }
+
             var serviceCall = BuildServiceCall(request, existingServiceCall.Status);
             var updated = await _workItemRepository.UpdateAsync(id, serviceCall);
 
@@ -127,9 +136,13 @@ public class ServiceCallsController : ControllerBase
         }
     }
 
+    /// <summary>
+    /// Cancels a Service Call (Status = Cancelled, ClosedAt = UTC now).
+    /// Route retained as /close for compatibility with existing clients; behavior is cancellation.
+    /// </summary>
     [Authorize(Policy = Policies.CanManageServiceCalls)]
     [HttpPut("{id:int}/close")]
-    public async Task<IActionResult> Close(int id)
+    public async Task<IActionResult> Cancel(int id)
     {
         var existingServiceCall = await GetServiceCallOrNullAsync(id);
         if (existingServiceCall == null)
@@ -137,19 +150,68 @@ public class ServiceCallsController : ControllerBase
             return NotFound($"Service call with ID {id} was not found.");
         }
 
-        var closed = await _workItemRepository.CloseAsync(id);
-        if (!closed)
+        if (!ServiceCallLifecycleRules.CanCancel(existingServiceCall.Status, existingServiceCall.ClosedAt))
         {
-            return BadRequest("Failed to close service call.");
+            return BadRequest(new { message = "לא ניתן לבטל את קריאת השירות במצב הנוכחי." });
         }
 
-        await _auditLogService.LogAsync(this.BuildAuditEvent(
-            AuditActions.ServiceCallClosed,
-            AuditEntityTypes.ServiceCall,
-            $"Service call '{existingServiceCall.Title}' (#{id}) closed.",
-            entityId: id));
+        try
+        {
+            var cancelled = await _workItemRepository.CancelServiceCallAsync(id);
+            if (!cancelled)
+            {
+                return BadRequest(new { message = "ביטול קריאת השירות נכשל." });
+            }
 
-        return Ok(new { message = "Service call closed successfully." });
+            await _auditLogService.LogAsync(this.BuildAuditEvent(
+                AuditActions.ServiceCallCancelled,
+                AuditEntityTypes.ServiceCall,
+                $"Service call '{existingServiceCall.Title}' (#{id}) cancelled.",
+                entityId: id));
+
+            return Ok(new { message = "Service call cancelled successfully." });
+        }
+        catch (UserValidationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+    }
+
+    [Authorize(Policy = Policies.CanManageServiceCalls)]
+    [HttpPut("{id:int}/reopen")]
+    public async Task<IActionResult> Reopen(int id)
+    {
+        var existingServiceCall = await GetServiceCallOrNullAsync(id);
+        if (existingServiceCall == null)
+        {
+            return NotFound($"Service call with ID {id} was not found.");
+        }
+
+        if (!ServiceCallLifecycleRules.CanReopen(existingServiceCall.Status, existingServiceCall.ClosedAt))
+        {
+            return BadRequest(new { message = "לא ניתן לפתוח מחדש את קריאת השירות במצב הנוכחי." });
+        }
+
+        try
+        {
+            var reopened = await _workItemRepository.ReopenServiceCallAsync(id);
+            if (!reopened)
+            {
+                return BadRequest(new { message = "פתיחה מחדש של קריאת השירות נכשלה." });
+            }
+
+            await _auditLogService.LogAsync(this.BuildAuditEvent(
+                AuditActions.ServiceCallReopened,
+                AuditEntityTypes.ServiceCall,
+                $"Service call '{existingServiceCall.Title}' (#{id}) reopened.",
+                entityId: id));
+
+            return Ok(new { message = "Service call reopened successfully." });
+        }
+        catch (UserValidationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
     }
 
     [Authorize(Policy = Policies.CanManageServiceCalls)]
@@ -241,33 +303,4 @@ public class ServiceCallsController : ControllerBase
         string.IsNullOrWhiteSpace(requestedStatus)
             ? (existingStatus ?? WorkItemDefaultStatuses.Planned)
             : requestedStatus;
-
-    private static ServiceCallResponseDto MapToResponse(WorkItem serviceCall)
-    {
-        return new ServiceCallResponseDto
-        {
-            WorkItemId = serviceCall.WorkItemId,
-            Title = serviceCall.Title,
-            Description = serviceCall.Description,
-            WorkType = serviceCall.WorkType ?? WorkItemWorkTypes.ServiceCall,
-            TaskCategory = serviceCall.TaskCategory,
-            Status = serviceCall.Status ?? string.Empty,
-            BillingType = serviceCall.BillingType,
-            CustomerId = serviceCall.CustomerId,
-            CustomerName = serviceCall.CustomerName,
-            SiteId = serviceCall.SiteId,
-            SiteName = serviceCall.SiteName,
-            Priority = serviceCall.Priority,
-            PlannedStart = serviceCall.PlannedStart,
-            PlannedEnd = serviceCall.PlannedEnd,
-            EstimatedHours = serviceCall.EstimatedHours,
-            ActualStart = serviceCall.ActualStart,
-            ActualEnd = serviceCall.ActualEnd,
-            ActualHours = serviceCall.ActualHours,
-            RequiredRole = serviceCall.RequiredRole,
-            IsLocked = serviceCall.IsLocked,
-            CreatedAt = serviceCall.CreatedAt,
-            ClosedAt = serviceCall.ClosedAt
-        };
-    }
 }

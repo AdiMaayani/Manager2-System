@@ -13,14 +13,12 @@ import {
   getSiteAddressProfileOptionalAsync,
 } from '@features/geo';
 import { Drawer, useDrawerMaximize } from '@shared/components/Drawer';
-import { Badge } from '@shared/components/Badge';
 import { Button } from '@shared/components/Button';
 import { DetailsField } from '@shared/components/DetailsField';
 import { DetailsSection } from '@shared/components/DetailsSection';
 import { Input } from '@shared/components/Input';
 import { Select } from '@shared/components/Select';
 import { Textarea } from '@shared/components/Textarea';
-import { Checkbox } from '@shared/components/Checkbox';
 import { InlineAlert } from '@shared/components/InlineAlert';
 import { ConfirmInline } from '@shared/components/ConfirmInline';
 import { StatusBadge } from '@shared/components/StatusBadge';
@@ -34,25 +32,27 @@ import {
   resolveCompatibleServiceCallSiteId,
   resolveServiceCallHistoricalSiteOption,
 } from '../../lib/serviceCallSiteSelection';
+import { resolveDefaultAssignmentRole } from '../../lib/serviceCallAssignmentRole';
+import { formatServiceCallDateTimeForDisplay } from '../../lib/serviceCallDateTime';
 import {
   buildServiceCallFormState,
   type ServiceCallFormState,
 } from '../../lib/serviceCallFormState';
+import {
+  canCancelServiceCall,
+  canReopenServiceCall,
+  isServiceCallCancelled,
+  SERVICE_CALL_CANCELLED_STATUS,
+  SERVICE_CALL_EDIT_STATUS_OPTIONS,
+} from '../../lib/serviceCallLifecycle';
+import { buildServiceCallUpsertRequest } from '../../lib/serviceCallUpsertRequest';
 import type {
   ServiceCallCustomerOption,
   ServiceCallDetails,
   ServiceCallEmployeeOption,
   ServiceCallSiteOption,
-  UpsertServiceCallRequest,
 } from '../../types';
 import './ServiceCallDrawer.css';
-
-const STATUS_OPTIONS = [
-  { value: 'Open', label: 'פתוחה' },
-  { value: 'InProgress', label: 'בטיפול' },
-  { value: 'Done', label: 'בוצעה' },
-  { value: 'Cancelled', label: 'בוטלה' },
-];
 
 const PRIORITY_OPTIONS = [
   { value: '', label: 'ללא עדיפות' },
@@ -78,31 +78,13 @@ interface ServiceCallDrawerProps {
   onSaved: (message: string, savedServiceCall?: ServiceCallDetails) => void;
 }
 
-function nullableString(value: string): string | null {
-  const trimmedValue = value.trim();
-  return trimmedValue || null;
-}
-
-function nullableNumber(value: string): number | null {
-  const trimmedValue = value.trim();
-  if (!trimmedValue) return null;
-  const parsedValue = Number(trimmedValue);
-  return Number.isFinite(parsedValue) && parsedValue >= 0 ? Number(parsedValue.toFixed(2)) : null;
-}
-
 function getBillingTypeLabel(billingType?: string | null): string | undefined {
   if (!billingType) return undefined;
   return BILLING_TYPE_OPTIONS.find((option) => option.value === billingType)?.label ?? billingType;
 }
 
 function formatDateTime(value?: string | null): string | undefined {
-  if (!value) return undefined;
-  const parsedDate = new Date(value);
-  if (Number.isNaN(parsedDate.getTime())) return undefined;
-  return new Intl.DateTimeFormat('he-IL', {
-    dateStyle: 'short',
-    timeStyle: 'short',
-  }).format(parsedDate);
+  return formatServiceCallDateTimeForDisplay(value);
 }
 
 function formatHours(value?: number | null): string | undefined {
@@ -164,7 +146,7 @@ function ServiceCallDrawerContent({
   // not reach edit/close/assign actions (the edit form, which holds those, stays hidden for them).
   const canManage = can('manageServiceCalls');
   const canViewCustomers = can('viewCustomers');
-  const { createMutation, updateMutation, closeMutation, assignEmployeeMutation } =
+  const { createMutation, updateMutation, cancelMutation, reopenMutation, assignEmployeeMutation } =
     useServiceCallMutations();
 
   // Existing service calls open in read-only review mode; create opens editable.
@@ -282,41 +264,33 @@ function ServiceCallDrawerContent({
     if (!Number(form.customerId)) return 'יש לבחור לקוח.';
     if (!Number(form.siteId)) return 'יש לבחור אתר.';
 
-    if (form.estimatedHours.trim() && nullableNumber(form.estimatedHours) == null) {
-      return 'שעות מתוכננות חייבות להיות מספר תקין.';
+    if (form.estimatedHours.trim()) {
+      const estimatedHours = Number(form.estimatedHours.trim());
+      if (!Number.isFinite(estimatedHours) || estimatedHours < 0) {
+        return 'שעות מתוכננות חייבות להיות מספר תקין.';
+      }
     }
 
-    if (form.actualHours.trim() && nullableNumber(form.actualHours) == null) {
-      return 'שעות בפועל חייבות להיות מספר תקין.';
+    if (form.actualHours.trim()) {
+      const actualHours = Number(form.actualHours.trim());
+      if (!Number.isFinite(actualHours) || actualHours < 0) {
+        return 'שעות בפועל חייבות להיות מספר תקין.';
+      }
+    }
+
+    try {
+      buildServiceCallUpsertRequest(form);
+    } catch (err) {
+      return err instanceof Error ? err.message : 'תאריך או שעה אינם תקינים.';
     }
 
     return null;
   }
 
-  function buildRequest(): UpsertServiceCallRequest {
-    return {
-      title: form.title.trim(),
-      description: nullableString(form.description),
-      status: form.status,
-      billingType: form.billingType,
-      customerId: Number(form.customerId),
-      siteId: Number(form.siteId),
-      priority: nullableString(form.priority),
-      plannedStart: nullableString(form.plannedStart),
-      plannedEnd: nullableString(form.plannedEnd),
-      estimatedHours: nullableNumber(form.estimatedHours),
-      actualStart: nullableString(form.actualStart),
-      actualEnd: nullableString(form.actualEnd),
-      actualHours: nullableNumber(form.actualHours),
-      requiredRole: nullableString(form.requiredRole),
-      isLocked: form.isLocked,
-    };
-  }
-
   // The update API returns only a message, so review mode shows the request
   // values merged into the known record until the detail query refreshes.
   function buildUpdatedServiceCallFallback(existing: ServiceCallDetails): ServiceCallDetails {
-    const request = buildRequest();
+    const request = buildServiceCallUpsertRequest(form);
     const selectedCustomer = customers.find(
       (customer) => customer.customerId === request.customerId,
     );
@@ -340,10 +314,11 @@ function ServiceCallDrawerContent({
     setError(null);
 
     try {
+      const request = buildServiceCallUpsertRequest(form);
       if (isExistingServiceCall) {
         await updateMutation.mutateAsync({
           id: currentServiceCall!.workItemId,
-          request: buildRequest(),
+          request,
         });
         setIsEditing(false);
         onSaved(
@@ -353,7 +328,7 @@ function ServiceCallDrawerContent({
       } else {
         // The create API returns only the new id, so the drawer closes instead
         // of inventing a review view from unsaved values.
-        await createMutation.mutateAsync(buildRequest());
+        await createMutation.mutateAsync(request);
         onSaved('קריאת השירות נוצרה בהצלחה.');
         onClose();
       }
@@ -362,16 +337,29 @@ function ServiceCallDrawerContent({
     }
   }
 
-  async function handleCloseServiceCall() {
+  async function handleCancelServiceCall() {
     if (!isExistingServiceCall || !currentServiceCall) return;
 
     setError(null);
     try {
-      await closeMutation.mutateAsync(currentServiceCall.workItemId);
-      onSaved('קריאת השירות נסגרה בהצלחה.');
-      onClose();
+      await cancelMutation.mutateAsync(currentServiceCall.workItemId);
+      await serviceCallDetailsQuery.refetch();
+      onSaved('קריאת השירות בוטלה בהצלחה.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'סגירת קריאת השירות נכשלה');
+      setError(err instanceof Error ? err.message : 'ביטול קריאת השירות נכשל');
+    }
+  }
+
+  async function handleReopenServiceCall() {
+    if (!isExistingServiceCall || !currentServiceCall) return;
+
+    setError(null);
+    try {
+      await reopenMutation.mutateAsync(currentServiceCall.workItemId);
+      await serviceCallDetailsQuery.refetch();
+      onSaved('קריאת השירות נפתחה מחדש בהצלחה.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'פתיחה מחדש של קריאת השירות נכשלה');
     }
   }
 
@@ -401,7 +389,8 @@ function ServiceCallDrawerContent({
   const isSaving =
     createMutation.isPending ||
     updateMutation.isPending ||
-    closeMutation.isPending ||
+    cancelMutation.isPending ||
+    reopenMutation.isPending ||
     assignEmployeeMutation.isPending;
 
   const title = !isExistingServiceCall
@@ -410,7 +399,16 @@ function ServiceCallDrawerContent({
       ? `עריכת קריאת שירות — ${currentServiceCall?.title ?? ''}`
       : `פרטי קריאת שירות — ${currentServiceCall?.title ?? ''}`;
 
-  // Edit mode keeps only save/cancel; closing the call lives in the read-only footer.
+  const showCancelAction =
+    isExistingServiceCall &&
+    canManage &&
+    canCancelServiceCall(currentServiceCall?.status, currentServiceCall?.closedAt);
+  const showReopenAction =
+    isExistingServiceCall &&
+    canManage &&
+    canReopenServiceCall(currentServiceCall?.status, currentServiceCall?.closedAt);
+
+  // Edit mode keeps only save/cancel; lifecycle actions live in the read-only footer.
   const editFooter = (
     <div className="serviceCallDrawer__footerContent">
       {error && <InlineAlert variant="danger">{error}</InlineAlert>}
@@ -426,17 +424,28 @@ function ServiceCallDrawerContent({
   );
 
   const reviewFooter =
-    isExistingServiceCall && canManage && !currentServiceCall?.closedAt ? (
+    showCancelAction || showReopenAction ? (
       <div className="serviceCallDrawer__footerContent">
         {error && <InlineAlert variant="danger">{error}</InlineAlert>}
         <div className="serviceCallDrawer__dangerActions">
-          <ConfirmInline
-            triggerLabel="סגירת קריאה"
-            message="לסגור את הקריאה?"
-            confirmLabel="אישור סגירה"
-            onConfirm={handleCloseServiceCall}
-            isPending={isSaving}
-          />
+          {showCancelAction && (
+            <ConfirmInline
+              triggerLabel="ביטול קריאה"
+              message="לבטל את קריאת השירות? הפעולה תסמן את הקריאה כבוטלה ותשמור חותמת ביטול."
+              confirmLabel="אישור ביטול"
+              onConfirm={handleCancelServiceCall}
+              isPending={isSaving}
+            />
+          )}
+          {showReopenAction && (
+            <ConfirmInline
+              triggerLabel="פתיחה מחדש"
+              message="לפתוח מחדש את קריאת השירות? חותמת הביטול תימחק והסטטוס יחזור לפתוחה."
+              confirmLabel="אישור פתיחה מחדש"
+              onConfirm={handleReopenServiceCall}
+              isPending={isSaving}
+            />
+          )}
         </div>
       </div>
     ) : undefined;
@@ -494,8 +503,12 @@ function ServiceCallDrawerContent({
                 required
                 value={form.status}
                 onChange={(event) => setField('status', event.target.value)}
+                disabled={isServiceCallCancelled(form.status)}
               >
-                {STATUS_OPTIONS.map((option) => (
+                {isServiceCallCancelled(form.status) && (
+                  <option value={SERVICE_CALL_CANCELLED_STATUS}>בוטלה</option>
+                )}
+                {SERVICE_CALL_EDIT_STATUS_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
@@ -527,12 +540,6 @@ function ServiceCallDrawerContent({
                 ))}
               </Select>
             </div>
-
-            <Checkbox
-              label="נעול לעריכה תפעולית"
-              checked={form.isLocked}
-              onChange={(event) => setField('isLocked', event.target.checked)}
-            />
           </DetailsSection>
 
           <DetailsSection title="לקוח ואתר">
@@ -688,16 +695,19 @@ function ServiceCallDrawerContent({
             </div>
           </DetailsSection>
 
-          <DetailsSection title="שיבוץ ותפקיד">
+          <DetailsSection title="דרישה מקצועית">
             <div className="serviceCallDrawer__grid">
               <Input
-                label="תפקיד נדרש"
+                label="התמחות נדרשת לקריאה"
                 value={form.requiredRole}
                 onChange={(event) => setField('requiredRole', event.target.value)}
+                helpText="לדוגמה: חשמלאי, מתקין או טכנאי רשת"
               />
             </div>
+          </DetailsSection>
 
-            {isExistingServiceCall && (
+          {isExistingServiceCall && (
+            <DetailsSection title="שיבוץ עובד">
               <div
                 className="serviceCallDrawer__assignAction"
                 role="group"
@@ -719,7 +729,20 @@ function ServiceCallDrawerContent({
                   <Select
                     label="עובד"
                     value={employeeIdToAssign}
-                    onChange={(event) => setEmployeeIdToAssign(event.target.value)}
+                    onChange={(event) => {
+                      const nextEmployeeId = event.target.value;
+                      setEmployeeIdToAssign(nextEmployeeId);
+                      const selectedEmployee = assignableEmployees.find(
+                        (employee) => String(employee.employeeId) === nextEmployeeId,
+                      );
+                      setAssignmentRole((current) =>
+                        resolveDefaultAssignmentRole({
+                          currentAssignmentRole: current,
+                          requiredRole: form.requiredRole,
+                          employeePrimaryRole: selectedEmployee?.primaryRole,
+                        }),
+                      );
+                    }}
                   >
                     <option value="">בחר עובד</option>
                     {assignableEmployees.map((employee) => (
@@ -731,9 +754,10 @@ function ServiceCallDrawerContent({
                   </Select>
 
                   <Input
-                    label="תפקיד בשיוך"
+                    label="תפקיד העובד בקריאה"
                     value={assignmentRole}
                     onChange={(event) => setAssignmentRole(event.target.value)}
+                    helpText="התפקיד שהעובד יבצע בקריאה זו, ולא תפקידו הקבוע במערכת."
                   />
                 </div>
                 <div>
@@ -747,8 +771,8 @@ function ServiceCallDrawerContent({
                   </Button>
                 </div>
               </div>
-            )}
-          </DetailsSection>
+            </DetailsSection>
+          )}
 
           <DetailsSection title="תיאור">
             <Textarea
@@ -831,14 +855,6 @@ function ServiceCallReviewDetails({
               }
             />
             <DetailsField label="סוג חיוב" value={getBillingTypeLabel(serviceCall.billingType)} />
-            <DetailsField
-              label="נעילה תפעולית"
-              value={
-                <Badge variant={serviceCall.isLocked ? 'warning' : 'neutral'}>
-                  {serviceCall.isLocked ? 'נעולה' : 'לא נעולה'}
-                </Badge>
-              }
-            />
           </div>
         </DetailsSection>
       </div>
@@ -894,7 +910,7 @@ function ServiceCallReviewDetails({
           <DetailsField label="סיום בפועל" value={formatDateTime(serviceCall.actualEnd)} />
           <DetailsField label="שעות מתוכננות" value={formatHours(serviceCall.estimatedHours)} />
           <DetailsField label="שעות בפועל" value={formatHours(serviceCall.actualHours)} />
-          <DetailsField label="תפקיד נדרש" value={serviceCall.requiredRole} />
+          <DetailsField label="התמחות נדרשת לקריאה" value={serviceCall.requiredRole} />
         </div>
       </DetailsSection>
 
@@ -906,10 +922,12 @@ function ServiceCallReviewDetails({
         )}
       </DetailsSection>
 
-      <DetailsSection title="היסטוריה">
+      <DetailsSection title="מחזור חיים">
         <div className="serviceCallDrawer__detailsGrid">
           <DetailsField label="נוצרה בתאריך" value={formatDateTime(serviceCall.createdAt)} />
-          <DetailsField label="נסגרה בתאריך" value={formatDateTime(serviceCall.closedAt)} />
+          {serviceCall.closedAt ? (
+            <DetailsField label="בוטלה בתאריך" value={formatDateTime(serviceCall.closedAt)} />
+          ) : null}
         </div>
       </DetailsSection>
     </div>
