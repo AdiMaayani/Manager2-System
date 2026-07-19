@@ -100,7 +100,7 @@ export function SettingsPage() {
         <div className="settingsPage__fullWidth">
           <SettingsSection
             title="הגדרות שיבוץ חכם"
-            description="ניהול גרסאות של משקלי הציון והעדפות השיבוץ לפי סוג משימה. כל חישובי היחיד, הטיוטה והקבוצה משתמשים במדיניות הפעילה בשרת."
+            description="ניהול גרסאות של משקלי הציון והעדפות השיבוץ לפי סוג משימה. כל חישובי היחיד, הטיוטה והקבוצה משתמשים במדיניות הפעילה."
           >
             <SmartAssignmentPolicySettings canManage={canManageSettings} />
           </SettingsSection>

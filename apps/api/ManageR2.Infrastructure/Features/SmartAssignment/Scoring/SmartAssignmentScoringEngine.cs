@@ -30,6 +30,7 @@ public sealed class SmartAssignmentScoringEngine : ISmartAssignmentScoringEngine
 
         var candidates = input.Employees
             .Where(employee => employee.IsActive)
+            .DistinctBy(employee => employee.EmployeeId)
             .Select(employee => EvaluateCandidate(input, employee, policy, context))
             .ToList();
 

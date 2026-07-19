@@ -752,6 +752,42 @@ public class SmartAssignmentScoringEngineTests
         Assert.True(candidate.IsEligible);
     }
 
+    [Fact]
+    public void Evaluate_DeduplicatesCandidatesByEmployeeIdKeepingFirstOccurrence()
+    {
+        var input = CreateInput(employeeIds: [1, 1, 2]);
+        // Two rows share EmployeeId 1; the first occurrence must win deterministically.
+        input.Employees[0].FullName = "First occurrence";
+        input.Employees[1].FullName = "Second occurrence";
+        // An inactive employee must still be excluded regardless of de-duplication.
+        input.Employees.Add(new EmployeeCandidateModel
+        {
+            EmployeeId = 3,
+            FullName = "Inactive",
+            PrimaryRole = "Technician",
+            IsActive = false,
+            IsAssignable = true,
+            DailyCapacityHours = 8m
+        });
+
+        var candidates = Evaluate(input).Candidates;
+        var employeeIds = candidates.Select(c => c.EmployeeId).ToList();
+
+        // Exactly one result per active EmployeeId: duplicate 1 collapsed, inactive 3 excluded.
+        Assert.Equal(2, candidates.Count);
+        Assert.Single(candidates, c => c.EmployeeId == 1);
+        Assert.Contains(2, employeeIds);
+        Assert.DoesNotContain(3, employeeIds);
+
+        // First occurrence is used deterministically.
+        var deduplicated = candidates.Single(c => c.EmployeeId == 1);
+        Assert.Equal("First occurrence", deduplicated.FullName);
+
+        // Unique candidates retain deterministic, contiguous ranking (score tie → EmployeeId ascending).
+        Assert.Equal(1, candidates.Single(c => c.EmployeeId == 1).RankOrder);
+        Assert.Equal(2, candidates.Single(c => c.EmployeeId == 2).RankOrder);
+    }
+
     private static void AssertDecisionSupport(EmployeeCandidateModel candidate)
     {
         Assert.True(candidate.IsEligible);

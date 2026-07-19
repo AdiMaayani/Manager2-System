@@ -537,7 +537,7 @@ function EmployeeDrawerContent({ employee, canEdit, onClose, onSaved }: Employee
             <ValidatedAddressField
               value={addressState}
               onChange={setAddressState}
-              helpText="כתובת הבסיס אופצionalית. בחרו הצעה מהרשימה לאימות."
+              helpText="כתובת הבסיס אופציונלית. בחרו הצעה מהרשימה לאימות."
             />
           </DetailsSection>
         </div>
