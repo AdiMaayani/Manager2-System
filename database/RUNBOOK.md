@@ -191,7 +191,7 @@ canonical `SP/` files. These same files are **re-deployed after the migrations i
 the deployment that determines the final procedure bodies.
 
 ### Step 5 — Required recent migrations (idempotent, **order-sensitive**)
-Run these seven, **in this order**:
+Run these ten, **in this order**:
 
 1. `migrations/2026-06-14_users_login_lockout.sql` — adds 2 `Users` columns + 3 `sp_Users_*` SPs.
 2. `migrations/2026-06-15_customer_systems_vault.sql` — adds 3 Vault tables + 11 Vault SPs.
@@ -201,6 +201,16 @@ Run these seven, **in this order**:
 6. `migrations/2026-06-17_dashboard_command_center.sql` — adds six read-only `sp_Dashboard_*` procedures that back `GET /api/dashboard`. Additive and order-independent (only references baseline tables for reads).
 7. `migrations/2026-06-19_workplan_reports_overhaul.sql` — adds the WorkPlan/report foundation,
    guarded legacy backfills, and empty migration-control/audit tables. Stop on unknown report status.
+8. `migrations/2026-07-18_smart_assignment_policy_profiles.sql` — creates `Rec_SmartAssignmentPolicyProfiles` + `Rec_SmartAssignmentPolicyVersions` (seeded), the immutable-version trigger, and adds the policy columns (`PolicyProfileKey`, `PolicyVersionNumber`, `PolicyDisplayName`, `PolicySnapshotJson`) to `Rec_TaskAssignmentRecommendations`.
+9. `migrations/2026-07-19_smart_assignment_multi_role_feedback.sql` — creates `EmployeeProfessions`, `WorkItemRequiredRoles`, and `Rec_RecommendationFeedback`, plus planned-stop/location coordinate columns. **Requires #8 first** (asserts the policy columns exist, else `THROW 53304`).
+10. `migrations/2026-07-19_smart_assignment_assignment_feedback_link.sql` — adds `WorkEmployeeAssignments.SmartAssignmentRecommendationId` (+FK/index) and switches recommendation feedback to one shared row per recommendation. **Requires #9 first** (asserts `Rec_RecommendationFeedback` exists, else `THROW 54102`).
+
+> ⚠️ **Smart Assignment migration order is #8 → #9 → #10 and is NOT discoverable from filenames.**
+> A naive alphabetical filename sort runs `2026-07-19_smart_assignment_assignment_feedback_link`
+> **before** `2026-07-19_smart_assignment_multi_role_feedback` (because "assignment" < "multi"), which
+> is **wrong**: the assignment-feedback-link migration depends on `Rec_RecommendationFeedback` created by
+> the multi-role-feedback migration and will `THROW 54102` if run first. Always use the explicit order
+> above (`policy_profiles` → `multi_role_feedback` → `assignment_feedback_link`), never a glob sort.
 
 > ℹ️ **The audit-log migration (#3) is order-independent** — it only adds new objects and references
 > the existing baseline `Users` table for display joins. It is placed between the Vault and Smart
@@ -269,6 +279,11 @@ sqlcmd -S $server -d $db -b -i "$root\schema\tables.sql"
 Get-ChildItem "$root\functions\*.sql" | ForEach-Object { sqlcmd -S $server -d $db -b -i $_.FullName }
 
 # 3) stored procedures (skip the two dated historical files)
+# NOTE: sp_AssignEmployeeToWork.sql and sp_UpdateEmployeeWorkAssignment.sql reference
+#       WorkEmployeeAssignments.SmartAssignmentRecommendationId, which is created later by
+#       migration 2026-07-19_smart_assignment_assignment_feedback_link.sql (step 4). CREATE OR ALTER
+#       uses deferred name resolution, so creating them here is safe, but they must NOT be executed
+#       before that migration runs. Step 4.5 re-deploys the SP folder after the migrations.
 Get-ChildItem "$root\SP\*.sql" -Exclude '2026-*' | ForEach-Object { sqlcmd -S $server -d $db -b -i $_.FullName }
 
 # 4) required migrations — EXPLICIT order (do NOT sort the folder alphabetically)
@@ -280,6 +295,10 @@ $migrations = @(
   "$root\migrations\2026-06-15_smart_assignment_factor_activation.sql",
   "$root\migrations\2026-06-17_dashboard_command_center.sql"
   "$root\migrations\2026-06-19_workplan_reports_overhaul.sql"
+  # Smart Assignment — EXPLICIT dependency order (NOT alphabetical): policy_profiles → multi_role_feedback → assignment_feedback_link
+  "$root\migrations\2026-07-18_smart_assignment_policy_profiles.sql"
+  "$root\migrations\2026-07-19_smart_assignment_multi_role_feedback.sql"
+  "$root\migrations\2026-07-19_smart_assignment_assignment_feedback_link.sql"
 )
 $migrations | ForEach-Object { sqlcmd -S $server -d $db -b -i $_ }
 
@@ -508,10 +527,13 @@ migration-delivered objects above, which the ordered build applies.
   lifecycle, employees CRUD, service calls, project equipment/BOQ/drawings, sites deactivate, inventory,
   and internal work context. For a **fresh** build, the `SP/` files are authoritative; the matching
   migrations are redundant-but-safe.
-- **`Rec_GetTaskRecommendationInput`** exists in `SP/` **and** is re-defined by the factor-activation
-  migration — both now emit result sets 13/14, so they agree. **`Rec_GetDraftTaskRecommendationInput`**
-  exists **only** in migrations (persistence defines 12 result sets, factor activation redefines 14) —
-  authoritative = factor activation (run last).
+- **`Rec_GetTaskRecommendationInput`** is defined by exactly **one** canonical file,
+  `SP/Rec_GetTaskRecommendationInput.sql` (the 2026-06-15 factor-activation migration also contains a
+  historical copy; both agree on result sets 13/14). `SP/Rec_GetDraftTaskRecommendationInput.sql` no
+  longer duplicates it — that canonical file now defines **only** `Rec_GetDraftTaskRecommendationInput`,
+  removing the earlier deployment-order-dependent duplicate body.
+- **`Rec_GetDraftTaskRecommendationInput`** is canonical in `SP/Rec_GetDraftTaskRecommendationInput.sql`
+  (Step 5.5 re-deploys it last, so it is authoritative over the historical migration copies).
 - **Risky / do-not-run-blindly:**
   - `SP/2026-04-20_seed_WorkPlanAlgorithmDemoData.sql` — **not idempotent**; mutates specific
     employee/work-item rows for a demo scenario. Do not run against real data.
@@ -537,6 +559,11 @@ migration-delivered objects above, which the ordered build applies.
      2026-06-15_audit_log_core.sql
      2026-06-15_smart_assignment_persistence_explainability.sql
      2026-06-15_smart_assignment_factor_activation.sql      (must be last of the SA pair)
+     2026-06-17_dashboard_command_center.sql
+     2026-06-19_workplan_reports_overhaul.sql
+     2026-07-18_smart_assignment_policy_profiles.sql
+     2026-07-19_smart_assignment_multi_role_feedback.sql        (after policy_profiles)
+     2026-07-19_smart_assignment_assignment_feedback_link.sql   (LAST — after multi_role_feedback; NOT alphabetical)
 5b. Re-run SP/*.sql        (exclude SP/2026-*)  <- AFTER migrations, so canonical bodies win
 6. Run  seed/2026-06-14_permission_roles.sql
         seed/initial_admin/00_seed_initial_admin.sql
