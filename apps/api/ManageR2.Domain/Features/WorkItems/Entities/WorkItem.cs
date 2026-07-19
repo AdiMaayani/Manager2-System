@@ -20,6 +20,7 @@ public class WorkItem
     public DateTime? PlannedStart { get; set; }
     public DateTime? PlannedEnd { get; set; }
     public string? RequiredRole { get; set; }
+    public List<string> RequiredRoles { get; set; } = new();
     public bool IsLocked { get; set; }
 
     public int? CustomerId { get; set; }
