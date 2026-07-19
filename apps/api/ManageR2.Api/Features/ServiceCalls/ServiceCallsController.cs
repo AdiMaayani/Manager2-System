@@ -34,7 +34,7 @@ public class ServiceCallsController : ControllerBase
     public async Task<ActionResult<List<ServiceCallResponseDto>>> GetAll()
     {
         var serviceCalls = await _workItemRepository.GetByTypeAsync(WorkItemWorkTypes.ServiceCall);
-        return Ok(serviceCalls.Select(MapToResponse).ToList());
+        return Ok(serviceCalls.Select(ServiceCallResponseMapper.Map).ToList());
     }
 
     [HttpGet("{id:int}")]
@@ -46,7 +46,7 @@ public class ServiceCallsController : ControllerBase
             return NotFound($"Service call with ID {id} was not found.");
         }
 
-        return Ok(MapToResponse(serviceCall));
+        return Ok(ServiceCallResponseMapper.Map(serviceCall));
     }
 
     [Authorize(Policy = Policies.CanManageServiceCalls)]
@@ -241,33 +241,4 @@ public class ServiceCallsController : ControllerBase
         string.IsNullOrWhiteSpace(requestedStatus)
             ? (existingStatus ?? WorkItemDefaultStatuses.Planned)
             : requestedStatus;
-
-    private static ServiceCallResponseDto MapToResponse(WorkItem serviceCall)
-    {
-        return new ServiceCallResponseDto
-        {
-            WorkItemId = serviceCall.WorkItemId,
-            Title = serviceCall.Title,
-            Description = serviceCall.Description,
-            WorkType = serviceCall.WorkType ?? WorkItemWorkTypes.ServiceCall,
-            TaskCategory = serviceCall.TaskCategory,
-            Status = serviceCall.Status ?? string.Empty,
-            BillingType = serviceCall.BillingType,
-            CustomerId = serviceCall.CustomerId,
-            CustomerName = serviceCall.CustomerName,
-            SiteId = serviceCall.SiteId,
-            SiteName = serviceCall.SiteName,
-            Priority = serviceCall.Priority,
-            PlannedStart = serviceCall.PlannedStart,
-            PlannedEnd = serviceCall.PlannedEnd,
-            EstimatedHours = serviceCall.EstimatedHours,
-            ActualStart = serviceCall.ActualStart,
-            ActualEnd = serviceCall.ActualEnd,
-            ActualHours = serviceCall.ActualHours,
-            RequiredRole = serviceCall.RequiredRole,
-            IsLocked = serviceCall.IsLocked,
-            CreatedAt = serviceCall.CreatedAt,
-            ClosedAt = serviceCall.ClosedAt
-        };
-    }
 }

@@ -49,7 +49,26 @@ describe('buildServiceCallFormState', () => {
     });
   });
 
-  it('truncates datetime values to the minute for datetime-local inputs', () => {
+  it('keeps existing isLocked: true when seeding the form', () => {
+    expect(buildServiceCallFormState(fullServiceCall).isLocked).toBe(true);
+  });
+
+  it('populates Israel local inputs from existing UTC API values', () => {
+    const form = buildServiceCallFormState({
+      ...fullServiceCall,
+      plannedStart: '2026-07-19T06:30:00.000Z',
+      plannedEnd: '2026-07-19T08:00:00Z',
+      actualStart: '2026-07-19T06:45:00+00:00',
+      actualEnd: '2026-07-19T08:15:00.000Z',
+    });
+
+    expect(form.plannedStart).toBe('2026-07-19T09:30');
+    expect(form.plannedEnd).toBe('2026-07-19T11:00');
+    expect(form.actualStart).toBe('2026-07-19T09:45');
+    expect(form.actualEnd).toBe('2026-07-19T11:15');
+  });
+
+  it('keeps legacy offset-less API values unshifted for datetime-local inputs', () => {
     const form = buildServiceCallFormState(fullServiceCall);
     expect(form.plannedStart).toBe('2026-07-01T09:30');
     expect(form.plannedStart).not.toContain(':00:00');
@@ -76,6 +95,11 @@ describe('buildServiceCallFormState', () => {
       isLocked: false,
     });
   });
+
+  it('defaults isLocked to false in create mode', () => {
+    expect(buildServiceCallFormState(null).isLocked).toBe(false);
+  });
+
 
   it('treats missing optional numeric and date fields as empty strings', () => {
     const partial: ServiceCallDetails = {
