@@ -12,10 +12,68 @@ CREATE OR ALTER PROCEDURE dbo.sp_CreateWorkItem
     @ActualStart DATETIME2=NULL, @ActualEnd DATETIME2=NULL,
     @ActualHours DECIMAL(10,2)=NULL, @Priority NVARCHAR(20)=NULL,
     @RequiredRole NVARCHAR(100)=NULL, @IsLocked BIT=0,
-    @TaskCategory NVARCHAR(20)=NULL, @MilestoneId INT=NULL
+    @TaskCategory NVARCHAR(20)=NULL, @MilestoneId INT=NULL,
+    @RequiredRolesXml XML=NULL
 AS
 BEGIN
     SET NOCOUNT ON;
+    SET XACT_ABORT ON;
+
+    DECLARE @RawRequiredRoles TABLE
+    (
+        SortOrdinal INT IDENTITY(1, 1) NOT NULL,
+        RoleName NVARCHAR(100) NOT NULL
+    );
+    DECLARE @NormalizedRequiredRoles TABLE
+    (
+        RoleName NVARCHAR(100) NOT NULL PRIMARY KEY,
+        SortOrdinal INT NOT NULL
+    );
+    DECLARE @ResolvedRequiredRole NVARCHAR(100);
+    DECLARE @NewWorkItemId INT;
+
+    IF @RequiredRolesXml IS NOT NULL AND @RequiredRolesXml.exist('/Roles') = 0
+        THROW 53330, 'RequiredRolesXml must have a Roles root element.', 1;
+
+    IF @RequiredRolesXml IS NOT NULL
+       AND EXISTS
+       (
+           SELECT 1
+           FROM @RequiredRolesXml.nodes('/Roles/Role') AS requiredRole(roleNode)
+           WHERE LEN(requiredRole.roleNode.value('(text())[1]', 'nvarchar(4000)')) > 100
+       )
+    BEGIN
+        THROW 53331, 'A required role cannot exceed 100 characters.', 1;
+    END;
+
+    IF @RequiredRolesXml IS NOT NULL
+    BEGIN
+        INSERT INTO @RawRequiredRoles (RoleName)
+        SELECT CONVERT(NVARCHAR(100), LTRIM(RTRIM(requiredRole.roleNode.value('(text())[1]', 'nvarchar(4000)'))))
+        FROM @RequiredRolesXml.nodes('/Roles/Role') AS requiredRole(roleNode)
+        WHERE DATALENGTH(LTRIM(RTRIM(requiredRole.roleNode.value('(text())[1]', 'nvarchar(4000)')))) > 0;
+    END
+    ELSE IF NULLIF(LTRIM(RTRIM(@RequiredRole)), N'') IS NOT NULL
+    BEGIN
+        INSERT INTO @RawRequiredRoles (RoleName)
+        VALUES (LTRIM(RTRIM(@RequiredRole)));
+    END;
+
+    INSERT INTO @NormalizedRequiredRoles (RoleName, SortOrdinal)
+    SELECT rawRole.RoleName, rawRole.SortOrdinal
+    FROM @RawRequiredRoles AS rawRole
+    WHERE NOT EXISTS
+    (
+        SELECT 1
+        FROM @RawRequiredRoles AS earlierRole
+        WHERE earlierRole.SortOrdinal < rawRole.SortOrdinal
+          AND earlierRole.RoleName = rawRole.RoleName
+    );
+
+    SELECT TOP (1) @ResolvedRequiredRole = RoleName
+    FROM @NormalizedRequiredRoles
+    ORDER BY SortOrdinal, RoleName;
+
     DECLARE @Category NVARCHAR(20)=NULLIF(LTRIM(RTRIM(@TaskCategory)),N'');
     DECLARE @DerivedWorkType NVARCHAR(50);
 
@@ -50,12 +108,31 @@ BEGIN
 
     DECLARE @DerivedHours DECIMAL(5,2)=CASE WHEN @PlannedStart IS NULL THEN NULL
         ELSE CAST(DATEDIFF(MINUTE,@PlannedStart,@PlannedEnd)/60.0 AS DECIMAL(5,2)) END;
-    INSERT dbo.WorkItems(Title,WorkType,TaskCategory,Status,BillingType,Description,CustomerId,SiteId,
-        CreatedAt,ParentWorkItemId,MilestoneId,DealCloseDate,FinanceProjectNumber,InvoiceNumber,
-        PlannedStart,PlannedEnd,EstimatedHours,ActualStart,ActualEnd,ActualHours,Priority,RequiredRole,IsLocked)
-    VALUES(@Title,@DerivedWorkType,@Category,@Status,@BillingType,@Description,@CustomerId,@SiteId,
-        SYSUTCDATETIME(),@ParentWorkItemId,@MilestoneId,@DealCloseDate,@FinanceProjectNumber,@InvoiceNumber,
-        @PlannedStart,@PlannedEnd,@DerivedHours,@ActualStart,@ActualEnd,@ActualHours,@Priority,@RequiredRole,@IsLocked);
-    SELECT CAST(SCOPE_IDENTITY() AS INT) AS NewWorkItemId;
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        INSERT dbo.WorkItems(Title,WorkType,TaskCategory,Status,BillingType,Description,CustomerId,SiteId,
+            CreatedAt,ParentWorkItemId,MilestoneId,DealCloseDate,FinanceProjectNumber,InvoiceNumber,
+            PlannedStart,PlannedEnd,EstimatedHours,ActualStart,ActualEnd,ActualHours,Priority,RequiredRole,IsLocked)
+        VALUES(@Title,@DerivedWorkType,@Category,@Status,@BillingType,@Description,@CustomerId,@SiteId,
+            SYSUTCDATETIME(),@ParentWorkItemId,@MilestoneId,@DealCloseDate,@FinanceProjectNumber,@InvoiceNumber,
+            @PlannedStart,@PlannedEnd,@DerivedHours,@ActualStart,@ActualEnd,@ActualHours,@Priority,@ResolvedRequiredRole,@IsLocked);
+
+        SET @NewWorkItemId = CONVERT(INT, SCOPE_IDENTITY());
+
+        INSERT INTO dbo.WorkItemRequiredRoles (WorkItemId, RoleName, CreatedAtUtc)
+        SELECT @NewWorkItemId, requiredRole.RoleName, SYSUTCDATETIME()
+        FROM @NormalizedRequiredRoles AS requiredRole;
+
+        COMMIT TRANSACTION;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+
+        THROW;
+    END CATCH;
+
+    SELECT @NewWorkItemId AS NewWorkItemId;
 END
 GO

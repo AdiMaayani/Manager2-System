@@ -32,7 +32,7 @@ BEGIN
         @TaskId,
         @RequestedByUserId,
         @AlgorithmVersion,
-        N'Completed',
+        N'Partial',
         @InputSnapshotJson,
         SYSUTCDATETIME()
     );

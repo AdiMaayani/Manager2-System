@@ -21,6 +21,8 @@ BEGIN
         p.City,
         p.Country,
         p.ZoneId,
+        p.Latitude,
+        p.Longitude,
         wz.ZoneName
     FROM dbo.Rec_SiteAddressProfile p
     INNER JOIN dbo.Sites s

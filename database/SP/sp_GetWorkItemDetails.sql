@@ -10,7 +10,12 @@ BEGIN
   wi.ParentWorkItemId,p.Title AS ProjectTitle,wi.MilestoneId,m.Title AS MilestoneTitle,
   wi.DealCloseDate,wi.FinanceProjectNumber,wi.InvoiceNumber,wi.PlannedStart,wi.PlannedEnd,
   wi.EstimatedHours,wi.ActualStart,wi.ActualEnd,wi.ActualHours,wi.Priority,wi.RequiredRole,
-  wi.IsLocked,wi.IsArchived,wi.ArchivedAt
+  wi.IsLocked,wi.IsArchived,wi.ArchivedAt,
+  CASE WHEN EXISTS(SELECT 1 FROM dbo.WorkItemRequiredRoles requiredRole WHERE requiredRole.WorkItemId=wi.WorkItemId)
+   THEN (SELECT requiredRole.RoleName AS [Role] FROM dbo.WorkItemRequiredRoles requiredRole
+    WHERE requiredRole.WorkItemId=wi.WorkItemId ORDER BY requiredRole.RoleName
+    FOR XML PATH(''),ROOT('Roles'),TYPE)
+   ELSE CAST(NULL AS XML) END AS RequiredRolesXml
  FROM dbo.WorkItems wi LEFT JOIN dbo.Customers c ON c.CustomerId=wi.CustomerId
  LEFT JOIN dbo.Sites s ON s.SiteId=wi.SiteId LEFT JOIN dbo.WorkItems p ON p.WorkItemId=wi.ParentWorkItemId
  LEFT JOIN dbo.ProjectMilestones m ON m.ProjectMilestoneId=wi.MilestoneId

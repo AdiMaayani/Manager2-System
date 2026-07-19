@@ -24,7 +24,19 @@ BEGIN
         wi.ParentWorkItemId,
         wi.DealCloseDate,
         wi.FinanceProjectNumber,
-        wi.InvoiceNumber
+        wi.InvoiceNumber,
+        wi.RequiredRole,
+        CASE WHEN EXISTS
+        (
+            SELECT 1 FROM dbo.WorkItemRequiredRoles AS requiredRole
+            WHERE requiredRole.WorkItemId = wi.WorkItemId
+        ) THEN (
+            SELECT requiredRole.RoleName AS [Role]
+            FROM dbo.WorkItemRequiredRoles AS requiredRole
+            WHERE requiredRole.WorkItemId = wi.WorkItemId
+            ORDER BY requiredRole.RoleName
+            FOR XML PATH(''), ROOT('Roles'), TYPE
+        ) ELSE CAST(NULL AS XML) END AS RequiredRolesXml
     FROM dbo.WorkItems wi
     LEFT JOIN dbo.Customers c
         ON wi.CustomerId = c.CustomerId

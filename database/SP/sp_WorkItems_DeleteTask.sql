@@ -129,8 +129,17 @@ BEGIN
         DELETE FROM dbo.Rec_WorkItemRequiredSkills
         WHERE WorkItemId = @WorkItemId;
 
+        DELETE FROM dbo.WorkItemRequiredRoles
+        WHERE WorkItemId = @WorkItemId;
+
         DELETE FROM dbo.Rec_WorkItemAlgorithmProfile
         WHERE WorkItemId = @WorkItemId;
+
+        DELETE feedback
+        FROM dbo.Rec_RecommendationFeedback AS feedback
+        INNER JOIN dbo.Rec_TaskAssignmentRecommendations AS recommendation
+            ON recommendation.RecommendationId = feedback.RecommendationId
+        WHERE recommendation.TaskId = @WorkItemId;
 
         DELETE FROM dbo.Rec_TaskAssignmentRecommendations
         WHERE TaskId = @WorkItemId;
