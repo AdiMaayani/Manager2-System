@@ -4,6 +4,11 @@
   gap: var(--spacing-lg);
 }
 
+.settingsPage__fullWidth {
+  grid-column: 1 / -1;
+  min-width: 0;
+}
+
 .settingsPage__overviewGrid,
 .settingsPage__readonlyGrid,
 .settingsPage__catalogGrid,
