@@ -100,6 +100,14 @@ describe('buildServiceCallFormState', () => {
     expect(buildServiceCallFormState(null).isLocked).toBe(false);
   });
 
+  it('preserves Planned status when seeding an existing Service Call', () => {
+    const form = buildServiceCallFormState({
+      ...fullServiceCall,
+      status: 'Planned',
+    });
+
+    expect(form.status).toBe('Planned');
+  });
 
   it('treats missing optional numeric and date fields as empty strings', () => {
     const partial: ServiceCallDetails = {

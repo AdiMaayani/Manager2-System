@@ -1,12 +1,13 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   assignEmployeeToServiceCallAsync,
-  closeServiceCallAsync,
+  cancelServiceCallAsync,
   createServiceCallAsync,
   getServiceCallCustomersAsync,
   getServiceCallEmployeesAsync,
   getServiceCallsAsync,
   getServiceCallSitesAsync,
+  reopenServiceCallAsync,
   updateServiceCallAsync,
 } from '../api/serviceCallsApiClient';
 import type { AssignServiceCallEmployeeRequest, UpsertServiceCallRequest } from '../types';
@@ -68,8 +69,13 @@ export function useServiceCallMutations() {
     onSuccess: invalidateServiceCalls,
   });
 
-  const closeMutation = useMutation({
-    mutationFn: (id: number) => closeServiceCallAsync(id),
+  const cancelMutation = useMutation({
+    mutationFn: (id: number) => cancelServiceCallAsync(id),
+    onSuccess: invalidateServiceCalls,
+  });
+
+  const reopenMutation = useMutation({
+    mutationFn: (id: number) => reopenServiceCallAsync(id),
     onSuccess: invalidateServiceCalls,
   });
 
@@ -84,5 +90,11 @@ export function useServiceCallMutations() {
     onSuccess: invalidateServiceCalls,
   });
 
-  return { createMutation, updateMutation, closeMutation, assignEmployeeMutation };
+  return {
+    createMutation,
+    updateMutation,
+    cancelMutation,
+    reopenMutation,
+    assignEmployeeMutation,
+  };
 }

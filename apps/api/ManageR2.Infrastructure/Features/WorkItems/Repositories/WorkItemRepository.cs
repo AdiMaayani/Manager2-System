@@ -1,5 +1,6 @@
 using System.Data;
 using ManageR2.Domain.Entities;
+using ManageR2.Domain.Exceptions;
 using ManageR2.Infrastructure.DAL;
 using ManageR2.Infrastructure.Features.WorkItems.Models;
 using ManageR2.Infrastructure.Models;
@@ -191,7 +192,7 @@ public class WorkItemRepository : IWorkItemRepository
 
     public async Task<bool> CloseAsync(int workItemId)
     {
-        // Soft-close flow handled in DB to keep status logic centralized.
+        // Generic WorkItem close path (Work Plan / WorkItemsController). Unchanged contract.
         await using var connection = _dbServices.CreateConnection();
         await using var command = new SqlCommand("sp_CloseWorkItem", connection)
         {
@@ -206,6 +207,84 @@ public class WorkItemRepository : IWorkItemRepository
         var rowsAffected = result != null ? Convert.ToInt32(result) : 0;
 
         return rowsAffected > 0;
+    }
+
+    public async Task<bool> CancelServiceCallAsync(int workItemId)
+    {
+        try
+        {
+            await using var connection = _dbServices.CreateConnection();
+            await using var command = new SqlCommand("sp_CancelServiceCall", connection)
+            {
+                CommandType = CommandType.StoredProcedure
+            };
+
+            command.Parameters.AddWithValue("@WorkItemId", workItemId);
+
+            await connection.OpenAsync();
+
+            var result = await command.ExecuteScalarAsync();
+            var rowsAffected = result != null ? Convert.ToInt32(result) : 0;
+
+            return rowsAffected > 0;
+        }
+        catch (SqlException ex) when (ex.Number == 51201)
+        {
+            throw new UserValidationException("קריאת השירות לא נמצאה.", ex);
+        }
+        catch (SqlException ex) when (ex.Number == 51202)
+        {
+            throw new UserValidationException("פריט העבודה אינו קריאת שירות.", ex);
+        }
+        catch (SqlException ex) when (ex.Number == 51203)
+        {
+            throw new UserValidationException(
+                "לא ניתן לבטל את קריאת השירות במצב הנוכחי.",
+                ex);
+        }
+        catch (SqlException ex)
+        {
+            throw new UserValidationException("ביטול קריאת השירות נכשל.", ex);
+        }
+    }
+
+    public async Task<bool> ReopenServiceCallAsync(int workItemId)
+    {
+        try
+        {
+            await using var connection = _dbServices.CreateConnection();
+            await using var command = new SqlCommand("sp_ReopenServiceCall", connection)
+            {
+                CommandType = CommandType.StoredProcedure
+            };
+
+            command.Parameters.AddWithValue("@WorkItemId", workItemId);
+
+            await connection.OpenAsync();
+
+            var result = await command.ExecuteScalarAsync();
+            var rowsAffected = result != null ? Convert.ToInt32(result) : 0;
+
+            return rowsAffected > 0;
+        }
+        catch (SqlException ex) when (ex.Number == 51201)
+        {
+            throw new UserValidationException("קריאת השירות לא נמצאה.", ex);
+        }
+        catch (SqlException ex) when (ex.Number == 51202)
+        {
+            throw new UserValidationException("פריט העבודה אינו קריאת שירות.", ex);
+        }
+        catch (SqlException ex) when (ex.Number == 51204)
+        {
+            throw new UserValidationException(
+                "לא ניתן לפתוח מחדש את קריאת השירות במצב הנוכחי.",
+                ex);
+        }
+        catch (SqlException ex)
+        {
+            throw new UserValidationException("פתיחה מחדש של קריאת השירות נכשלה.", ex);
+        }
     }
 
     public async Task<DeleteWorkPlanTaskResult> DeleteWorkPlanTaskAsync(int workItemId)

@@ -38,6 +38,13 @@ import {
   buildServiceCallFormState,
   type ServiceCallFormState,
 } from '../../lib/serviceCallFormState';
+import {
+  canCancelServiceCall,
+  canReopenServiceCall,
+  isServiceCallCancelled,
+  SERVICE_CALL_CANCELLED_STATUS,
+  SERVICE_CALL_EDIT_STATUS_OPTIONS,
+} from '../../lib/serviceCallLifecycle';
 import { buildServiceCallUpsertRequest } from '../../lib/serviceCallUpsertRequest';
 import type {
   ServiceCallCustomerOption,
@@ -46,13 +53,6 @@ import type {
   ServiceCallSiteOption,
 } from '../../types';
 import './ServiceCallDrawer.css';
-
-const STATUS_OPTIONS = [
-  { value: 'Open', label: 'פתוחה' },
-  { value: 'InProgress', label: 'בטיפול' },
-  { value: 'Done', label: 'בוצעה' },
-  { value: 'Cancelled', label: 'בוטלה' },
-];
 
 const PRIORITY_OPTIONS = [
   { value: '', label: 'ללא עדיפות' },
@@ -146,7 +146,7 @@ function ServiceCallDrawerContent({
   // not reach edit/close/assign actions (the edit form, which holds those, stays hidden for them).
   const canManage = can('manageServiceCalls');
   const canViewCustomers = can('viewCustomers');
-  const { createMutation, updateMutation, closeMutation, assignEmployeeMutation } =
+  const { createMutation, updateMutation, cancelMutation, reopenMutation, assignEmployeeMutation } =
     useServiceCallMutations();
 
   // Existing service calls open in read-only review mode; create opens editable.
@@ -337,16 +337,29 @@ function ServiceCallDrawerContent({
     }
   }
 
-  async function handleCloseServiceCall() {
+  async function handleCancelServiceCall() {
     if (!isExistingServiceCall || !currentServiceCall) return;
 
     setError(null);
     try {
-      await closeMutation.mutateAsync(currentServiceCall.workItemId);
-      onSaved('קריאת השירות נסגרה בהצלחה.');
-      onClose();
+      await cancelMutation.mutateAsync(currentServiceCall.workItemId);
+      await serviceCallDetailsQuery.refetch();
+      onSaved('קריאת השירות בוטלה בהצלחה.');
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'סגירת קריאת השירות נכשלה');
+      setError(err instanceof Error ? err.message : 'ביטול קריאת השירות נכשל');
+    }
+  }
+
+  async function handleReopenServiceCall() {
+    if (!isExistingServiceCall || !currentServiceCall) return;
+
+    setError(null);
+    try {
+      await reopenMutation.mutateAsync(currentServiceCall.workItemId);
+      await serviceCallDetailsQuery.refetch();
+      onSaved('קריאת השירות נפתחה מחדש בהצלחה.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'פתיחה מחדש של קריאת השירות נכשלה');
     }
   }
 
@@ -376,7 +389,8 @@ function ServiceCallDrawerContent({
   const isSaving =
     createMutation.isPending ||
     updateMutation.isPending ||
-    closeMutation.isPending ||
+    cancelMutation.isPending ||
+    reopenMutation.isPending ||
     assignEmployeeMutation.isPending;
 
   const title = !isExistingServiceCall
@@ -385,7 +399,16 @@ function ServiceCallDrawerContent({
       ? `עריכת קריאת שירות — ${currentServiceCall?.title ?? ''}`
       : `פרטי קריאת שירות — ${currentServiceCall?.title ?? ''}`;
 
-  // Edit mode keeps only save/cancel; closing the call lives in the read-only footer.
+  const showCancelAction =
+    isExistingServiceCall &&
+    canManage &&
+    canCancelServiceCall(currentServiceCall?.status, currentServiceCall?.closedAt);
+  const showReopenAction =
+    isExistingServiceCall &&
+    canManage &&
+    canReopenServiceCall(currentServiceCall?.status, currentServiceCall?.closedAt);
+
+  // Edit mode keeps only save/cancel; lifecycle actions live in the read-only footer.
   const editFooter = (
     <div className="serviceCallDrawer__footerContent">
       {error && <InlineAlert variant="danger">{error}</InlineAlert>}
@@ -401,17 +424,28 @@ function ServiceCallDrawerContent({
   );
 
   const reviewFooter =
-    isExistingServiceCall && canManage && !currentServiceCall?.closedAt ? (
+    showCancelAction || showReopenAction ? (
       <div className="serviceCallDrawer__footerContent">
         {error && <InlineAlert variant="danger">{error}</InlineAlert>}
         <div className="serviceCallDrawer__dangerActions">
-          <ConfirmInline
-            triggerLabel="סגירת קריאה"
-            message="לסגור את הקריאה?"
-            confirmLabel="אישור סגירה"
-            onConfirm={handleCloseServiceCall}
-            isPending={isSaving}
-          />
+          {showCancelAction && (
+            <ConfirmInline
+              triggerLabel="ביטול קריאה"
+              message="לבטל את קריאת השירות? הפעולה תסמן את הקריאה כבוטלה ותשמור חותמת ביטול."
+              confirmLabel="אישור ביטול"
+              onConfirm={handleCancelServiceCall}
+              isPending={isSaving}
+            />
+          )}
+          {showReopenAction && (
+            <ConfirmInline
+              triggerLabel="פתיחה מחדש"
+              message="לפתוח מחדש את קריאת השירות? חותמת הביטול תימחק והסטטוס יחזור לפתוחה."
+              confirmLabel="אישור פתיחה מחדש"
+              onConfirm={handleReopenServiceCall}
+              isPending={isSaving}
+            />
+          )}
         </div>
       </div>
     ) : undefined;
@@ -469,8 +503,12 @@ function ServiceCallDrawerContent({
                 required
                 value={form.status}
                 onChange={(event) => setField('status', event.target.value)}
+                disabled={isServiceCallCancelled(form.status)}
               >
-                {STATUS_OPTIONS.map((option) => (
+                {isServiceCallCancelled(form.status) && (
+                  <option value={SERVICE_CALL_CANCELLED_STATUS}>בוטלה</option>
+                )}
+                {SERVICE_CALL_EDIT_STATUS_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value}>
                     {option.label}
                   </option>
@@ -869,10 +907,12 @@ function ServiceCallReviewDetails({
         )}
       </DetailsSection>
 
-      <DetailsSection title="היסטוריה">
+      <DetailsSection title="מחזור חיים">
         <div className="serviceCallDrawer__detailsGrid">
           <DetailsField label="נוצרה בתאריך" value={formatDateTime(serviceCall.createdAt)} />
-          <DetailsField label="נסגרה בתאריך" value={formatDateTime(serviceCall.closedAt)} />
+          {serviceCall.closedAt ? (
+            <DetailsField label="בוטלה בתאריך" value={formatDateTime(serviceCall.closedAt)} />
+          ) : null}
         </div>
       </DetailsSection>
     </div>

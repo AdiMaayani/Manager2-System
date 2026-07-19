@@ -18,6 +18,8 @@ namespace ManageR2.Infrastructure.Repositories
         Task<bool> UpdateAsync(int id, WorkItem workItem);
 
         Task<bool> CloseAsync(int id);
+        Task<bool> CancelServiceCallAsync(int id);
+        Task<bool> ReopenServiceCallAsync(int id);
         Task<DeleteWorkPlanTaskResult> DeleteWorkPlanTaskAsync(int workItemId);
 
         Task<bool> AssignEmployeeToWorkAsync(int workItemId, int employeeId, string assignmentRole);
