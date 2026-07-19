@@ -8,6 +8,8 @@ public class EmployeeDto
 
     public string PrimaryRole { get; set; } = string.Empty;
 
+    public List<string> Professions { get; set; } = new();
+
     public string? Phone { get; set; }
 
     public string? Email { get; set; }
@@ -31,6 +33,8 @@ public class EmployeeLookupDto
 
     public string PrimaryRole { get; set; } = string.Empty;
 
+    public List<string> Professions { get; set; } = new();
+
     public decimal? DailyCapacityHours { get; set; }
 
     public bool IsAssignable { get; set; }
@@ -43,6 +47,9 @@ public class UpsertEmployeeRequestDto
     public string FullName { get; set; } = string.Empty;
 
     public string PrimaryRole { get; set; } = string.Empty;
+
+    // Null means a legacy client; the server then uses PrimaryRole as the single profession.
+    public List<string>? Professions { get; set; }
 
     public string? Phone { get; set; }
 

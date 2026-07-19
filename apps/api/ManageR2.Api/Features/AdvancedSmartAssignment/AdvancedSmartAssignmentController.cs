@@ -29,12 +29,14 @@ namespace ManageR2.Api.Controllers
         /// </summary>
         // GET: ranked candidates for assignment planning UI (domain models mapped to slim API DTOs).
         [HttpGet("{workItemId}")]
-        public async Task<IActionResult> GetRecommendations(int workItemId)
+        public async Task<IActionResult> GetRecommendations(
+            int workItemId,
+            CancellationToken cancellationToken = default)
         {
             // קבלת התוצאה המלאה מהאלגוריתם
             // Unhandled exceptions intentionally propagate to the global exception handler, which returns a
             // safe RFC7807 ProblemDetails response instead of leaking raw exception messages to clients.
-            var candidates = await _service.GetRecommendationsAsync(workItemId);
+            var candidates = await _service.GetRecommendationsAsync(workItemId, cancellationToken);
 
             // מיפוי ל-DTO (רק מה שצריך למנהל)
             // Map service candidates to API DTO: hides internal scoring breakdown, keeps rank and eligibility.
@@ -48,6 +50,7 @@ namespace ManageR2.Api.Controllers
                     EmployeeId = c.EmployeeId,
                     FullName = c.FullName,
                     PrimaryRole = c.PrimaryRole,
+                    Professions = c.Professions,
 
                     // ציון כולל בלבד
                     TotalScore = c.TotalScore,
@@ -58,8 +61,38 @@ namespace ManageR2.Api.Controllers
 
                     // סטטוס תצוגה נוח
                     Status = c.IsEligible
-                        ? "כשיר"
-                        : (string.IsNullOrWhiteSpace(c.ExclusionReason) ? "לא כשיר" : c.ExclusionReason)
+                        ? "ניתן לבחירה"
+                        : (string.IsNullOrWhiteSpace(c.ExclusionReason) ? "לא זמין לבחירה" : c.ExclusionReason),
+                    RecommendationSummary = c.RecommendationSummary,
+                    Factors = c.Factors.Select(factor => new RecommendationFactorDto
+                    {
+                        Key = factor.Key,
+                        Label = factor.Label,
+                        Score = factor.Score,
+                        WeightPercent = factor.WeightPercent,
+                        WeightedContribution = factor.WeightedContribution,
+                        Explanation = factor.Explanation,
+                        DataSource = factor.DataSource,
+                        HasData = factor.HasData,
+                        IsDefaulted = factor.IsDefaulted,
+                        MissingInputCodes = factor.MissingInputCodes,
+                        SourceValues = factor.SourceValues
+                    }).ToList(),
+                    RejectionReasons = c.RejectionReasons.Select(reason => new RecommendationRejectionDto
+                    {
+                        Code = reason.Code,
+                        Explanation = reason.Explanation
+                    }).ToList(),
+                    MissingInputCodes = c.MissingInputCodes,
+                    PolicyProfileKey = c.PolicyProfileKey,
+                    PolicyVersion = c.PolicyVersion,
+                    PolicyDisplayName = c.PolicyDisplayName,
+                    RequiredRoles = c.RequiredRoles,
+                    MatchedRoles = c.MatchedRoles,
+                    MissingRoles = c.MissingRoles,
+                    OriginTypeUsed = c.OriginTypeUsed,
+                    TravelMinutes = c.TravelMinutes,
+                    DistanceKm = c.DistanceKm
                 })
                 // ודא מיון לפי הדירוג (אם כבר ממוין אצלך זה לא מזיק)
                 .OrderBy(x => x.RankOrder ?? int.MaxValue)
