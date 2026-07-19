@@ -6,6 +6,7 @@ import { Button } from '@shared/components/Button';
 import { ErrorState } from '@shared/components/ErrorState';
 import { InlineAlert } from '@shared/components/InlineAlert';
 import { PageSpinner } from '@shared/components/PageSpinner';
+import { StatusBadge } from '@shared/components/StatusBadge';
 import {
   useAssignProjectTeam,
   useCreateProject,
@@ -48,6 +49,7 @@ import type {
 import { syncProjectEmployeeAssignmentsAsync } from '../../api/projectsApiClient';
 import {
   createEmptyOverviewForm,
+  getProjectNumber,
   overviewFormFromLifecycle,
 } from '../../utils/projectDisplayUtils';
 import { resolveProjectDrawerTab } from '../../utils/projectDrawerTabs';
@@ -107,7 +109,9 @@ export function ProjectDrawer({
   // with an effect; an invalid request falls back to the overview tab.
   const activeTab = resolveProjectDrawerTab(initialTab);
   const [isEditMode, setIsEditMode] = useState(isCreateMode);
-  const [isMaximized, setIsMaximized] = useState(false);
+  // Project records carry six tabs (several of them tables/forms), so the drawer opens at its
+  // roomier footprint by default; the header toggle still lets a user shrink it back down.
+  const [isMaximized, setIsMaximized] = useState(true);
   const [overviewForm, setOverviewForm] = useState<ProjectOverviewForm>(
     createEmptyOverviewForm(),
   );
@@ -163,7 +167,7 @@ export function ProjectDrawer({
       if (isCancelled) return;
 
       setIsEditMode(isCreateMode);
-      setIsMaximized(false);
+      setIsMaximized(true);
       setSaveError(null);
 
       if (isCreateMode) {
@@ -433,6 +437,14 @@ export function ProjectDrawer({
 
   const headerActions = useMemo(() => (
     <div className="projectDrawer__headerActions">
+      {!isCreateMode && lifecycle && (
+        <div className="projectDrawer__headerMeta">
+          <span className="projectDrawer__headerNumber">
+            {getProjectNumber(lifecycle.project.workItemId)}
+          </span>
+          <StatusBadge domain="project" status={lifecycle.project.status} />
+        </div>
+      )}
       {isCreateMode && (
         <span className="projectDrawer__editIndicator">מצב יצירה</span>
       )}
@@ -445,7 +457,7 @@ export function ProjectDrawer({
         </Button>
       )}
     </div>
-  ), [isCreateMode, isEditMode]);
+  ), [isCreateMode, isEditMode, lifecycle]);
 
   const footerActions = useMemo(() => {
     if (!isEditMode) return null;

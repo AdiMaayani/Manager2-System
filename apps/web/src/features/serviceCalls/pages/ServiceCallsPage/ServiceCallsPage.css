@@ -1,2 +1,17 @@
-/* ServiceCallsPage now composes shared FilterBar/FilterField, Select, InlineAlert,
-   and DataTable, so no page-specific styles are required. */
+/* Equal-width status SegmentedControl — list filter only.
+   min-width: 0 lets flex items shrink past label min-content so five options
+   share the row evenly inside the FilterField. */
+.serviceCallsPage__statusControl {
+  width: 100%;
+  min-width: 300px;
+}
+
+.serviceCallsPage__statusControl .segmented {
+  display: flex;
+  width: 100%;
+}
+
+.serviceCallsPage__statusControl .segmented__item {
+  flex: 1 1 0;
+  min-width: 0;
+}

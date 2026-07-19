@@ -7,25 +7,39 @@
 .customerSitesSection__list {
   display: flex;
   flex-direction: column;
-  gap: var(--spacing-sm);
   margin: 0;
   padding: 0;
   list-style: none;
 }
 
+/* Visually aligned with .customerDrawer__relatedItem (the pattern already used for the
+   projects/quotes/service-calls/contacts lists in the same drawer): border-separated rows
+   with matching padding, radius, and a subtle hover cue instead of a bare border-bottom. */
 .customerSitesSection__site {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--spacing-md);
-  padding: var(--spacing-sm) 0;
-  border-bottom: 1px solid var(--color-neutral-200);
+  padding: var(--spacing-sm) var(--spacing-xs);
+  border-bottom: 1px solid var(--color-neutral-100);
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast);
+}
+
+.customerSitesSection__site:last-child {
+  border-bottom: none;
+}
+
+.customerSitesSection__site:hover,
+.customerSitesSection__site:focus-within {
+  background: var(--color-neutral-50);
 }
 
 .customerSitesSection__siteInfo {
   display: flex;
   flex-direction: column;
   gap: var(--spacing-xs);
+  min-width: 0;
 }
 
 .customerSitesSection__siteActions {
@@ -39,7 +53,8 @@
   align-items: center;
   gap: var(--spacing-sm);
   color: var(--color-neutral-900);
-  font-weight: var(--font-weight-semibold);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-medium);
 }
 
 .customerSitesSection__primaryTag {
@@ -52,8 +67,8 @@
 }
 
 .customerSitesSection__address {
-  color: var(--color-neutral-600);
-  font-size: var(--font-size-sm);
+  color: var(--color-neutral-500);
+  font-size: var(--font-size-xs);
 }
 
 .customerSitesSection__manage {

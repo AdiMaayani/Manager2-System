@@ -12,7 +12,25 @@
   border: 1px solid var(--color-neutral-200);
   border-radius: var(--radius-lg);
   background: #fff;
-  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.04);
+  box-shadow: var(--shadow-card);
+}
+
+/* The General card carries the identity fields (title/customer/status/billing), so it gets a
+   stronger border accent and spans the full width to read as the primary card in the grid. */
+.projectOverviewTab__card--primary {
+  grid-column: 1 / -1;
+  border-color: var(--color-primary-200);
+}
+
+.projectOverviewTab__card--primary .projectOverviewTab__cardTitle {
+  color: var(--color-primary-700);
+}
+
+/* Lets the primary card's fields sit side-by-side across the extra width instead of stacking. */
+.projectOverviewTab__primaryGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: var(--spacing-md) var(--spacing-lg);
 }
 
 .projectOverviewTab__cardHeader {
@@ -179,9 +197,10 @@
   font-size: var(--font-size-base);
 }
 
-@media (max-width: 720px) {
+@media (max-width: 768px) {
   .projectOverviewTab__teamAdd,
-  .projectOverviewTab__fieldWithAction {
+  .projectOverviewTab__fieldWithAction,
+  .projectOverviewTab__primaryGrid {
     grid-template-columns: 1fr;
   }
 

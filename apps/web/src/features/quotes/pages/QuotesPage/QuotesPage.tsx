@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Plus } from 'lucide-react';
 import {
@@ -29,13 +29,23 @@ const STATUS_FILTER_ITEMS: SegmentItem<QuoteStatus | ''>[] = [
   ...QUOTE_STATUS_OPTIONS.map((status) => ({ id: status, label: getQuoteStatusLabel(status) })),
 ];
 
+// Falls back to "all" for a missing/unrecognized URL value instead of silently filtering to an
+// empty list, so stale or hand-edited links stay usable. Accepts the literal "all" value in
+// addition to a canonical QuoteStatus, even though the app itself omits the parameter for "all".
+function resolveStatusFilterParam(value: string | null): QuoteStatus | '' {
+  if (value && (QUOTE_STATUS_OPTIONS as string[]).includes(value)) return value as QuoteStatus;
+  return '';
+}
+
 export function QuotesPage() {
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [search, setSearch] = useState('');
-  const [debouncedSearch, setDebouncedSearch] = useState('');
-  const [customerId, setCustomerId] = useState('');
-  const [status, setStatus] = useState<QuoteStatus | ''>('');
+  const [search, setSearch] = useState(() => searchParams.get('search') ?? '');
+  const [debouncedSearch, setDebouncedSearch] = useState(() => searchParams.get('search') ?? '');
+  const [customerId, setCustomerId] = useState(() => searchParams.get('customerId') ?? '');
+  const [status, setStatus] = useState<QuoteStatus | ''>(() =>
+    resolveStatusFilterParam(searchParams.get('status')),
+  );
 
   // The query string is the single source of truth for the drawer and the (control-less) project
   // filter, so both are derived from the current URL on every render — no effect or lazy initializer
@@ -48,10 +58,36 @@ export function QuotesPage() {
 
   const { data: customerOptions } = useQuoteCustomerOptions();
 
+  // Filters persist to the URL the same way the Projects/Service Calls/Customers/Contacts list
+  // pages do. Only the named keys are updated, so quoteId/projectId and any unrelated params are
+  // always preserved untouched.
+  const updateSearchParams = useCallback(
+    (updates: Record<string, string | null>) => {
+      setSearchParams((current) => {
+        const next = new URLSearchParams(current);
+        Object.entries(updates).forEach(([key, value]) => {
+          if (value) {
+            next.set(key, value);
+          } else {
+            next.delete(key);
+          }
+        });
+        return next;
+      });
+    },
+    [setSearchParams],
+  );
+
+  // Debounce keeps the existing 300ms-after-typing-stops filtering behavior (avoiding a request per
+  // keystroke); the URL's search param is updated on the same delay so it always reflects the value
+  // actually being filtered on, without adding a history entry per keystroke.
   useEffect(() => {
-    const timeoutId = window.setTimeout(() => setDebouncedSearch(search), 300);
+    const timeoutId = window.setTimeout(() => {
+      setDebouncedSearch(search);
+      updateSearchParams({ search: search.trim() || null });
+    }, 300);
     return () => window.clearTimeout(timeoutId);
-  }, [search]);
+  }, [search, updateSearchParams]);
 
   const filters: QuoteFilters = useMemo(
     () => ({
@@ -76,14 +112,10 @@ export function QuotesPage() {
 
   function resetFilters() {
     setSearch('');
+    setDebouncedSearch('');
     setCustomerId('');
     setStatus('');
-    // The project filter lives in the URL; clearing filters must remove it there too.
-    if (searchParams.has('projectId')) {
-      const next = new URLSearchParams(searchParams);
-      next.delete('projectId');
-      setSearchParams(next, { replace: true });
-    }
+    updateSearchParams({ search: null, status: null, customerId: null, projectId: null });
   }
 
   function closeDrawer() {
@@ -91,7 +123,7 @@ export function QuotesPage() {
   }
 
   return (
-    <PageShell title="הצעות מחיר">
+    <PageShell title="הצעות מחיר" wide>
       <FilterBar
         actions={
           <>
@@ -112,23 +144,37 @@ export function QuotesPage() {
         <FilterField label="חיפוש" grow>
           <Input
             placeholder="מספר הצעה, לקוח, פרויקט..."
+            aria-label="חיפוש הצעות מחיר"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
         </FilterField>
 
         <FilterField label="סטטוס">
-          <SegmentedControl
-            items={STATUS_FILTER_ITEMS}
-            value={status}
-            onChange={setStatus}
-            ariaLabel="סינון לפי סטטוס"
-            size="sm"
-          />
+          <div className="quotesPage__statusControl">
+            <SegmentedControl
+              items={STATUS_FILTER_ITEMS}
+              value={status}
+              onChange={(value) => {
+                setStatus(value);
+                updateSearchParams({ status: value || null });
+              }}
+              ariaLabel="סינון לפי סטטוס"
+              size="sm"
+            />
+          </div>
         </FilterField>
 
         <FilterField label="לקוח">
-          <Select value={customerId} onChange={(event) => setCustomerId(event.target.value)}>
+          <Select
+            value={customerId}
+            aria-label="סינון לפי לקוח"
+            onChange={(event) => {
+              const value = event.target.value;
+              setCustomerId(value);
+              updateSearchParams({ customerId: value || null });
+            }}
+          >
             <option value="">כל הלקוחות</option>
             {(customerOptions ?? []).map((customer) => (
               <option key={customer.customerId} value={customer.customerId}>
