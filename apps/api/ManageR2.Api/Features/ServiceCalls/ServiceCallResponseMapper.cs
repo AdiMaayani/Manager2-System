@@ -33,6 +33,7 @@ public static class ServiceCallResponseMapper
             ActualEnd = UtcDateTimeNormalizer.MarkStoredAsUtc(serviceCall.ActualEnd),
             ActualHours = serviceCall.ActualHours,
             RequiredRole = serviceCall.RequiredRole,
+            RequiredRoles = serviceCall.RequiredRoles,
             IsLocked = serviceCall.IsLocked,
             CreatedAt = UtcDateTimeNormalizer.MarkStoredAsUtc(serviceCall.CreatedAt),
             ClosedAt = UtcDateTimeNormalizer.MarkStoredAsUtc(serviceCall.ClosedAt)

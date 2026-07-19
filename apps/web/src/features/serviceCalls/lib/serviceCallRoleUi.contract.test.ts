@@ -14,7 +14,7 @@ const drawerSource = readFileSync(
 describe('ServiceCallDrawer role UX contract', () => {
   it('uses clarified professional-requirement and assignment labels', () => {
     expect(drawerSource).toContain('דרישה מקצועית');
-    expect(drawerSource).toContain('התמחות נדרשת לקריאה');
+    expect(drawerSource).toContain('מקצועות נדרשים');
     expect(drawerSource).toContain('שיבוץ עובד');
     expect(drawerSource).toContain('תפקיד העובד בקריאה');
   });
@@ -31,6 +31,6 @@ describe('ServiceCallDrawer role UX contract', () => {
   it('defaults a blank assignment role when an employee is selected', () => {
     expect(drawerSource).toContain('resolveDefaultAssignmentRole');
     expect(drawerSource).toContain('employeePrimaryRole: selectedEmployee?.primaryRole');
-    expect(drawerSource).toContain('requiredRole: form.requiredRole');
+    expect(drawerSource).toContain('requiredRole: legacyRequiredRole(form.requiredRoles)');
   });
 });

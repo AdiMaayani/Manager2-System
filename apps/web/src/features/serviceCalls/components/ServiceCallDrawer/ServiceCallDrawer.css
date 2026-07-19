@@ -213,3 +213,56 @@
     align-items: flex-start;
   }
 }
+
+.serviceCallDrawer__professionsField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.serviceCallDrawer__professionChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.serviceCallDrawer__professionChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-primary-200);
+  border-radius: var(--radius-full);
+  background: var(--color-primary-50);
+  color: var(--color-primary-900);
+  font-size: var(--font-size-sm);
+}
+
+.serviceCallDrawer__legacyProfession {
+  padding: 1px var(--spacing-xs);
+  border-radius: var(--radius-sm);
+  background: var(--color-primary-100);
+  color: var(--color-primary-700);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.serviceCallDrawer__professionRemove {
+  padding: 2px var(--spacing-xs);
+  border-radius: var(--radius-sm);
+  color: var(--color-primary-700);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.serviceCallDrawer__professionRemove:hover {
+  background: var(--color-primary-100);
+}
+
+.serviceCallDrawer__professionRemove:focus-visible {
+  outline: 2px solid var(--color-primary-500);
+  outline-offset: 1px;
+}
