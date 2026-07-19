@@ -23,6 +23,8 @@ public sealed class WorkPlanScheduledTaskResult
     public DateTime? PlannedEnd { get; set; }
     public int? DerivedDurationMinutes { get; set; }
     public decimal? EstimatedHours { get; set; }
+    public string? RequiredRole { get; set; }
+    public List<string> RequiredRoles { get; set; } = new();
     public bool IsLocked { get; set; }
     public bool IsArchived { get; set; }
     public int? CustomerId { get; set; }
@@ -41,6 +43,7 @@ public sealed class WorkPlanEmployeeResult
     public int EmployeeId { get; set; }
     public string FullName { get; set; } = string.Empty;
     public string? PrimaryRole { get; set; }
+    public List<string> Professions { get; set; } = new();
     public bool IsActive { get; set; }
     public bool IsAssignable { get; set; }
 }

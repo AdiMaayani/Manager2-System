@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using ManageR2.Domain.Features.SmartAssignment;
 
 namespace ManageR2.Infrastructure.Models
 {
@@ -11,6 +12,9 @@ namespace ManageR2.Infrastructure.Models
         public DateTime? PlanningDate { get; set; }
         public bool IncludeLockedTasks { get; set; }
         public bool SaveRun { get; set; }
+
+        // Optional request-scoped override. The persisted policy remains the baseline and is not updated.
+        public SmartAssignmentWeights? WeightsOverride { get; set; }
 
         // Set by the controller from the JWT so persisted runs record who requested them.
         public int? RequestedByUserId { get; set; }
@@ -30,6 +34,7 @@ namespace ManageR2.Infrastructure.Models
         public int WorkItemId { get; set; }
         public string TaskTitle { get; set; } = string.Empty;
         public string? RequiredRole { get; set; }
+        public List<string> RequiredRoles { get; set; } = new();
         public string? Priority { get; set; }
         public decimal? EstimatedHours { get; set; }
         public DateTime? PlannedStart { get; set; }
@@ -43,6 +48,7 @@ namespace ManageR2.Infrastructure.Models
         public int EmployeeId { get; set; }
         public string EmployeeName { get; set; } = string.Empty;
         public string? PrimaryRole { get; set; }
+        public List<string> Professions { get; set; } = new();
         public bool IsAssignable { get; set; }
         public bool IsActive { get; set; }
         public decimal? CapacityHours { get; set; }
@@ -68,6 +74,7 @@ namespace ManageR2.Infrastructure.Models
         public int ViolationsCount { get; set; }
         public int WarningsCount { get; set; }
         public string Message { get; set; } = string.Empty;
+        public List<string> CompatibilityWarnings { get; set; } = new List<string>();
         public List<SmartAssignmentRecommendationModel> Recommendations { get; set; } = new List<SmartAssignmentRecommendationModel>();
         public List<SmartAssignmentEmployeeLoadModel> EmployeeLoad { get; set; } = new List<SmartAssignmentEmployeeLoadModel>();
         public List<SmartAssignmentTaskResultModel> TaskResults { get; set; } = new List<SmartAssignmentTaskResultModel>();
@@ -86,6 +93,14 @@ namespace ManageR2.Infrastructure.Models
         public List<string> Violations { get; set; } = new List<string>();
         public List<string> Warnings { get; set; } = new List<string>();
         public List<string> Reasons { get; set; } = new List<string>();
+
+        // Present only when no eligible recommendation exists. It is never assignable or counted as a recommendation.
+        public ManageR2.Infrastructure.Models.SmartAssignment.EmployeeCandidateModel? BestIneligibleAlternative { get; set; }
+
+        public string? PolicyProfileKey { get; set; }
+        public int? PolicyVersion { get; set; }
+        public string? PolicyDisplayName { get; set; }
+        public List<string> RequiredRoles { get; set; } = new();
 
         // Explainability for the recommended employee (factor scores/weights/explanations/data sources).
         public List<ManageR2.Infrastructure.Models.SmartAssignment.RecommendationFactorModel> Factors { get; set; }
