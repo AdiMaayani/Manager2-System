@@ -17,19 +17,36 @@ import {
   type PlannedScheduleParts,
 } from '../../lib/taskScheduleUtils';
 import { updateServiceCallAsync } from '@features/serviceCalls/api/serviceCallsApiClient';
-import { getWorkItemByIdAsync, updateWorkItemAsync } from '../../api/workplanApiClient';
+import {
+  getWorkItemByIdAsync,
+  updateWorkItemAsync,
+} from '../../api/workplanApiClient';
 import { useEmployeePrimaryRoles } from '@features/employees/hooks/useEmployeePrimaryRoles';
 import { invalidateWorkPlanQueries } from '../../hooks/useWorkPlanData';
+import {
+  addRequiredProfession,
+  isRequiredProfessionSelected,
+  legacyRequiredRole,
+  normalizeRequiredProfessions,
+  removeRequiredProfession,
+} from '../../lib/requiredProfessions';
 import {
   normalizeWorkPlanPriorityCode,
   WORKPLAN_PRIORITY_OPTIONS,
 } from '../../constants';
-import type { WorkItemResponse, WorkPlanTaskSelection } from '../../types';
+import type {
+  WorkItemResponse,
+  WorkPlanEmployee,
+  WorkPlanScheduleAssignment,
+  WorkPlanTaskSelection,
+} from '../../types';
 import './EditTaskDrawer.css';
 
 interface EditTaskDrawerProps {
   isOpen: boolean;
   task: WorkPlanTaskSelection | null;
+  assignments: WorkPlanScheduleAssignment[];
+  employees: WorkPlanEmployee[];
   onClose: () => void;
   onSaved?: () => void;
 }
@@ -44,6 +61,7 @@ interface EditableTaskFieldsSource {
   status?: string | null;
   priority?: string | null;
   requiredRole?: string | null;
+  requiredRoles?: string[] | null;
   taskCategory?: string | null;
 }
 
@@ -54,7 +72,14 @@ function validatePlannedUtcRange(parts: PlannedScheduleParts): {
   return buildPlannedUtcRangeFromParts(parts);
 }
 
-export function EditTaskDrawer({ isOpen, task, onClose, onSaved }: EditTaskDrawerProps) {
+export function EditTaskDrawer({
+  isOpen,
+  task,
+  assignments,
+  employees,
+  onClose,
+  onSaved,
+}: EditTaskDrawerProps) {
   // Mount the drawer content only while open, and key it by the task id (with a safe fallback when
   // no task is selected), so maximize state resets on reopen and when switching tasks while open —
   // no effect copies isOpen into state. The hook lives above EditTaskForm, so it still survives the
@@ -65,6 +90,8 @@ export function EditTaskDrawer({ isOpen, task, onClose, onSaved }: EditTaskDrawe
     <EditTaskDrawerContent
       key={task?.taskId ?? 'new'}
       task={task}
+      assignments={assignments}
+      employees={employees}
       onClose={onClose}
       onSaved={onSaved}
     />
@@ -73,11 +100,19 @@ export function EditTaskDrawer({ isOpen, task, onClose, onSaved }: EditTaskDrawe
 
 interface EditTaskDrawerContentProps {
   task: WorkPlanTaskSelection | null;
+  assignments: WorkPlanScheduleAssignment[];
+  employees: WorkPlanEmployee[];
   onClose: () => void;
   onSaved?: () => void;
 }
 
-function EditTaskDrawerContent({ task, onClose, onSaved }: EditTaskDrawerContentProps) {
+function EditTaskDrawerContent({
+  task,
+  assignments,
+  employees,
+  onClose,
+  onSaved,
+}: EditTaskDrawerContentProps) {
   const { isMaximized, toggleMaximize } = useDrawerMaximize();
 
   const workItemQuery = useQuery({
@@ -140,6 +175,8 @@ function EditTaskDrawerContent({ task, onClose, onSaved }: EditTaskDrawerContent
       taskId={task.taskId}
       initialValues={workItemQuery.data ?? task}
       workItem={workItemQuery.data ?? null}
+      assignments={assignments}
+      employees={employees}
       onClose={onClose}
       onSaved={onSaved}
     />
@@ -155,8 +192,138 @@ interface EditTaskFormProps {
   // Full work item is required for saving: the backend PUT replaces every
   // column, so untouched fields must be echoed back from this record.
   workItem: WorkItemResponse | null;
+  assignments: WorkPlanScheduleAssignment[];
+  employees: WorkPlanEmployee[];
   onClose: () => void;
   onSaved?: () => void;
+}
+
+function getEmployeeProfessions(
+  employee?: WorkPlanEmployee | null,
+  fallbackRole?: string | null,
+): string[] {
+  const professions = (employee?.professions ?? [])
+    .map((profession) => profession.trim())
+    .filter(Boolean);
+  if (professions.length > 0) return Array.from(new Set(professions));
+  const primaryRole = employee?.primaryRole?.trim();
+  if (primaryRole) return [primaryRole];
+  const normalizedFallbackRole = fallbackRole?.trim();
+  return normalizedFallbackRole ? [normalizedFallbackRole] : [];
+}
+
+function formatEmployeeProfessions(
+  employee?: WorkPlanEmployee | null,
+  fallbackRole?: string | null,
+): string {
+  const professions = getEmployeeProfessions(employee, fallbackRole);
+  return professions.length > 0 ? professions.join(' · ') : 'לא הוגדרו מקצועות';
+}
+
+interface AssignmentReplacementEditorProps {
+  assignment: WorkPlanScheduleAssignment;
+  employees: WorkPlanEmployee[];
+  unavailableEmployeeIds: ReadonlySet<number>;
+  selectedEmployeeId: number | null;
+  onSelectedEmployeeChange: (employeeId: number | null) => void;
+}
+
+function AssignmentReplacementEditor({
+  assignment,
+  employees,
+  unavailableEmployeeIds,
+  selectedEmployeeId,
+  onSelectedEmployeeChange,
+}: AssignmentReplacementEditorProps) {
+  const [isReplacementOpen, setIsReplacementOpen] = useState(false);
+  const currentEmployee = employees.find(
+    (employee) => employee.employeeId === assignment.employeeId,
+  );
+  const activeEmployees = useMemo(
+    () => employees
+      .filter((employee) =>
+        employee.isActive
+        && employee.employeeId > 0
+        && employee.employeeId !== assignment.employeeId
+        && !unavailableEmployeeIds.has(employee.employeeId))
+      .sort((left, right) => left.fullName.localeCompare(right.fullName, 'he')),
+    [assignment.employeeId, employees, unavailableEmployeeIds],
+  );
+  const selectedEmployee = activeEmployees.find(
+    (employee) => employee.employeeId === selectedEmployeeId,
+  );
+  const hasAlternative = activeEmployees.length > 0;
+
+  return (
+    <div className="editTaskDrawer__assignmentEditor">
+      <div className="editTaskDrawer__currentEmployee">
+        <div className="editTaskDrawer__employeeCard">
+          <span>עובד משובץ כעת</span>
+          <strong>{assignment.employeeName || `עובד #${assignment.employeeId ?? ''}`}</strong>
+          <p>מקצועות: {formatEmployeeProfessions(currentEmployee, assignment.assignmentRole)}</p>
+        </div>
+        {!isReplacementOpen && (
+          <Button
+            type="button"
+            variant="secondary"
+            size="sm"
+            onClick={() => setIsReplacementOpen(true)}
+          >
+            החלף עובד
+          </Button>
+        )}
+      </div>
+
+      {isReplacementOpen && (
+        <div className="editTaskDrawer__replacementControls">
+          {hasAlternative ? (
+            <>
+              <Select
+                label="בחר עובד מחליף"
+                value={selectedEmployeeId == null ? '' : String(selectedEmployeeId)}
+                onChange={(event) => {
+                  const parsedEmployeeId = Number(event.target.value);
+                  onSelectedEmployeeChange(
+                    Number.isInteger(parsedEmployeeId) && parsedEmployeeId > 0
+                      ? parsedEmployeeId
+                      : null,
+                  );
+                }}
+              >
+                <option value="">בחר עובד פעיל</option>
+                {activeEmployees.map((employee) => (
+                  <option key={employee.employeeId} value={employee.employeeId}>
+                    {employee.fullName || `עובד #${employee.employeeId}`}
+                  </option>
+                ))}
+              </Select>
+              {selectedEmployee && (
+                <div className="editTaskDrawer__selectedEmployee" aria-live="polite">
+                  <strong>עובד מחליף: {selectedEmployee.fullName}</strong>
+                  <p>מקצועות: {formatEmployeeProfessions(selectedEmployee)}</p>
+                </div>
+              )}
+            </>
+          ) : (
+            <InlineAlert variant="warning">
+              אין עובד פעיל נוסף שניתן לבחור עבור שיוך זה.
+            </InlineAlert>
+          )}
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={() => {
+              onSelectedEmployeeChange(null);
+              setIsReplacementOpen(false);
+            }}
+          >
+            בטל החלפה
+          </Button>
+        </div>
+      )}
+    </div>
+  );
 }
 
 function EditTaskForm({
@@ -166,6 +333,8 @@ function EditTaskForm({
   taskId,
   initialValues,
   workItem,
+  assignments,
+  employees,
   onClose,
   onSaved,
 }: EditTaskFormProps) {
@@ -186,10 +355,50 @@ function EditTaskForm({
   const [priority, setPriority] = useState<string>(
     normalizeWorkPlanPriorityCode(initialValues.priority) ?? WORKPLAN_PRIORITY_OPTIONS[1].code,
   );
-  const [requiredRole, setRequiredRole] = useState(initialValues.requiredRole || '');
+  const [requiredRoles, setRequiredRoles] = useState<string[]>(() =>
+    normalizeRequiredProfessions(
+      initialValues.requiredRoles?.length
+        ? initialValues.requiredRoles
+        : initialValues.requiredRole
+          ? [initialValues.requiredRole]
+          : [],
+    ),
+  );
   const [error, setError] = useState<string | null>(null);
+  const [replacementEmployeeIds, setReplacementEmployeeIds] = useState<
+    Record<number, number | null>
+  >({});
 
   const rolesQuery = useEmployeePrimaryRoles(isOpen);
+  const availableRoles = useMemo(
+    () =>
+      (rolesQuery.data ?? []).filter(
+        (role) => !isRequiredProfessionSelected(requiredRoles, role),
+      ),
+    [requiredRoles, rolesQuery.data],
+  );
+  const directAssignments = useMemo(
+    () => assignments.filter((assignment) =>
+      assignment.workItemId === taskId
+      && assignment.assignmentSource === 'Task'
+      && (assignment.workEmployeeAssignmentId ?? 0) > 0),
+    [assignments, taskId],
+  );
+  const assignedEmployeeIds = useMemo(
+    () => new Set(
+      directAssignments
+        .map((assignment) => assignment.employeeId)
+        .filter((employeeId): employeeId is number => employeeId != null && employeeId > 0),
+    ),
+    [directAssignments],
+  );
+  const selectedReplacementEmployeeIds = useMemo(
+    () => new Set(
+      Object.values(replacementEmployeeIds)
+        .filter((employeeId): employeeId is number => employeeId != null && employeeId > 0),
+    ),
+    [replacementEmployeeIds],
+  );
 
   const scheduleParts = useMemo(
     (): PlannedScheduleParts => ({
@@ -214,6 +423,29 @@ function EditTaskForm({
 
       if (!title.trim()) throw new Error('יש להזין כותרת משימה');
       const plannedTimeRange = validatePlannedUtcRange(scheduleParts);
+      const requiredRole = legacyRequiredRole(requiredRoles);
+      const replacements = directAssignments.flatMap((assignment) => {
+        const assignmentId = assignment.workEmployeeAssignmentId ?? 0;
+        const replacementEmployeeId = replacementEmployeeIds[assignmentId] ?? null;
+        return replacementEmployeeId != null && replacementEmployeeId !== assignment.employeeId
+          ? [{ assignmentId, replacementEmployeeId }]
+          : [];
+      });
+      const uniqueReplacementEmployeeIds = new Set(
+        replacements.map((replacement) => replacement.replacementEmployeeId),
+      );
+      if (uniqueReplacementEmployeeIds.size !== replacements.length) {
+        throw new Error('לא ניתן לבחור את אותו עובד חלופי עבור יותר משיוך אחד.');
+      }
+      if (replacements.some((replacement) => !employees.some(
+        (employee) => employee.employeeId === replacement.replacementEmployeeId && employee.isActive,
+      ))) {
+        throw new Error('ניתן לבחור רק עובד פעיל כעובד חלופי.');
+      }
+      const employeeReplacements = replacements.map((replacement) => ({
+        workEmployeeAssignmentId: replacement.assignmentId,
+        employeeId: replacement.replacementEmployeeId,
+      }));
 
       if (isServiceCall) {
         await updateServiceCallAsync(taskId, {
@@ -225,8 +457,13 @@ function EditTaskForm({
           priority: priority || null,
           plannedStart: plannedTimeRange.plannedStart,
           plannedEnd: plannedTimeRange.plannedEnd,
-          requiredRole: requiredRole || null,
+          requiredRole,
+          requiredRoles,
           isLocked: workItem.isLocked,
+          actualStart: workItem.actualStart ?? null,
+          actualEnd: workItem.actualEnd ?? null,
+          actualHours: workItem.actualHours ?? null,
+          employeeReplacements,
         });
       } else {
         await updateWorkItemAsync(taskId, {
@@ -242,7 +479,8 @@ function EditTaskForm({
           plannedStart: plannedTimeRange.plannedStart,
           plannedEnd: plannedTimeRange.plannedEnd,
           priority: priority || null,
-          requiredRole: requiredRole || null,
+          requiredRole,
+          requiredRoles,
           isLocked: workItem.isLocked,
           dealCloseDate: workItem.dealCloseDate ?? null,
           financeProjectNumber: workItem.financeProjectNumber ?? null,
@@ -250,14 +488,20 @@ function EditTaskForm({
           actualStart: workItem.actualStart ?? null,
           actualEnd: workItem.actualEnd ?? null,
           actualHours: workItem.actualHours ?? null,
+          employeeReplacements,
         });
       }
     },
     onSuccess: async () => {
-      await invalidateWorkPlanQueries(queryClient, workItem?.parentWorkItemId);
-      if (isServiceCall) {
-        await queryClient.invalidateQueries({ queryKey: ['serviceCalls'] });
-      }
+      await Promise.all([
+        invalidateWorkPlanQueries(queryClient, workItem?.parentWorkItemId),
+        queryClient.invalidateQueries({
+          queryKey: ['smartAssignment', 'assignment-feedback', taskId],
+        }),
+        ...(isServiceCall
+          ? [queryClient.invalidateQueries({ queryKey: ['serviceCalls'] })]
+          : []),
+      ]);
       onSaved?.();
       onClose();
     },
@@ -267,6 +511,14 @@ function EditTaskForm({
   });
 
   const isBusy = saveMutation.isPending;
+
+  function addProfession(value: string) {
+    setRequiredRoles((current) => addRequiredProfession(current, value));
+  }
+
+  function removeProfession(value: string) {
+    setRequiredRoles((current) => removeRequiredProfession(current, value));
+  }
 
   const footer = (
     <div className="editTaskDrawer__footerContent">
@@ -374,21 +626,94 @@ function EditTaskForm({
                 </option>
               ))}
             </Select>
-            <ListSelect
-              label="תפקיד נדרש"
-              value={requiredRole}
-              onChange={setRequiredRole}
-              placeholder="בחר תפקיד"
-              disabled={rolesQuery.isLoading || rolesQuery.isError}
-              options={[
-                { value: '', label: rolesQuery.isLoading ? 'טוען תפקידים…' : 'בחר תפקיד' },
-                ...(rolesQuery.data ?? []).map((option) => ({ value: option, label: option })),
-              ]}
-            />
+            <div className="editTaskDrawer__professionsField">
+              <ListSelect
+                label="מקצועות נדרשים"
+                value=""
+                onChange={addProfession}
+                placeholder={rolesQuery.isLoading ? 'טוען מקצועות…' : 'בחר מקצוע להוספה'}
+                searchable
+                searchPlaceholder="חיפוש מקצוע..."
+                emptyMessage="אין מקצועות נוספים לבחירה."
+                disabled={rolesQuery.isLoading || rolesQuery.isError}
+                options={
+                  availableRoles.length === 0
+                    ? [
+                        {
+                          value: '__none__',
+                          label: rolesQuery.isLoading
+                            ? 'טוען מקצועות…'
+                            : 'אין מקצועות נוספים לבחירה',
+                          disabled: true,
+                        },
+                      ]
+                    : availableRoles.map((option) => ({ value: option, label: option }))
+                }
+              />
+              {requiredRoles.length > 0 && (
+                <ul className="editTaskDrawer__professionChips" aria-label="מקצועות שנבחרו">
+                  {requiredRoles.map((role) => (
+                    <li key={role} className="editTaskDrawer__professionChip">
+                      <span>{role}</span>
+                      <button
+                        type="button"
+                        className="editTaskDrawer__professionRemove"
+                        onClick={() => removeProfession(role)}
+                        aria-label={`הסר את המקצוע ${role}`}
+                      >
+                        הסר
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
           {rolesQuery.isError && (
             <InlineAlert variant="danger">
-              טעינת תפקידים נכשלה. יש לפרוס את sp_Employees_GetDistinctPrimaryRoles בבסיס הנתונים.
+              <span>טעינת המקצועות נכשלה.</span>
+              <Button type="button" variant="secondary" onClick={() => rolesQuery.refetch()}>
+                נסה שוב
+              </Button>
+            </InlineAlert>
+          )}
+        </section>
+
+        <section className="editTaskDrawer__section">
+          <h3 className="editTaskDrawer__sectionTitle">שיוך עובדים</h3>
+          <p className="editTaskDrawer__hint">
+            לעדכון הנתונים לחץ שמור.
+          </p>
+          {directAssignments.length > 0 ? (
+            <div className="editTaskDrawer__assignmentEditors">
+              {directAssignments.map((assignment, index) => {
+                const assignmentId = assignment.workEmployeeAssignmentId ?? 0;
+                const selectedEmployeeId = replacementEmployeeIds[assignmentId] ?? null;
+                const unavailableEmployeeIds = new Set([
+                  ...assignedEmployeeIds,
+                  ...selectedReplacementEmployeeIds,
+                ]);
+                if (selectedEmployeeId != null) unavailableEmployeeIds.delete(selectedEmployeeId);
+                return (
+                  <AssignmentReplacementEditor
+                    key={`${assignmentId || index}:${assignment.employeeId ?? 'none'}`}
+                    assignment={assignment}
+                    employees={employees}
+                    unavailableEmployeeIds={unavailableEmployeeIds}
+                    selectedEmployeeId={selectedEmployeeId}
+                    onSelectedEmployeeChange={(employeeId) => {
+                      setReplacementEmployeeIds((current) => ({
+                        ...current,
+                        [assignmentId]: employeeId,
+                      }));
+                    }}
+                  />
+                );
+              })}
+            </div>
+          ) : (
+            <InlineAlert variant="info">
+              אין למשימה שיוך עובד ישיר שניתן להחליף.
             </InlineAlert>
           )}
         </section>

@@ -24,13 +24,23 @@ export function buildInsightMap(
       warningCount += 1;
     }
 
-    if (task.requiredRole && assignment.employeeId) {
+    const requiredRoles = task.requiredRoles?.length
+      ? task.requiredRoles
+      : task.requiredRole
+        ? [task.requiredRole]
+        : [];
+    if (requiredRoles.length > 0 && assignment.employeeId) {
       const employee = employeeById.get(assignment.employeeId);
-      if (
-        employee?.primaryRole &&
-        !employee.primaryRole.includes(task.requiredRole) &&
-        task.requiredRole !== employee.primaryRole
-      ) {
+      const employeeRoles = employee?.professions?.length
+        ? employee.professions
+        : employee?.primaryRole
+          ? [employee.primaryRole]
+          : [];
+      const employeeRoleKeys = new Set(
+        employeeRoles.map((role) => role.trim().normalize('NFKC').toLocaleLowerCase('he-IL')),
+      );
+      if (requiredRoles.some((role) =>
+        !employeeRoleKeys.has(role.trim().normalize('NFKC').toLocaleLowerCase('he-IL')))) {
         warningCount += 1;
       }
     }

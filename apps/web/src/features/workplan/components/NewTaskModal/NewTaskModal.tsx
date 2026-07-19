@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { ChevronDown, Flag, MapPin, Plus } from 'lucide-react';
 import { Drawer } from '@shared/components/Drawer';
 import { Button } from '@shared/components/Button';
 import { Input } from '@shared/components/Input';
@@ -25,6 +26,8 @@ import {
   assignEmployeeToWorkItemAsync,
   createWorkItemAsync,
   getDraftRecommendationsAsync,
+  getSmartAssignmentRecommendationsAsync,
+  saveSmartAssignmentFeedbackAsync,
 } from '../../api/workplanApiClient';
 import { useEmployeePrimaryRoles } from '@features/employees/hooks/useEmployeePrimaryRoles';
 import { invalidateWorkPlanQueries } from '../../hooks/useWorkPlanData';
@@ -36,11 +39,40 @@ import {
   getServiceCallCustomersAsync,
   getServiceCallSitesAsync,
 } from '@features/serviceCalls/api/serviceCallsApiClient';
+import {
+  canSelectRecommendationCandidate,
+  getCandidateNotices,
+  getRecommendationCandidateLabel,
+  getRecommendationFactorExplanation,
+  getRecommendationRouteEndpoints,
+  getWeightedRecommendationFactors,
+  rankRecommendationCandidates,
+  toggleExpandedRecommendation,
+} from '../../lib/smartAssignmentRecommendationPresentation';
+import {
+  DEFAULT_SMART_ASSIGNMENT_WEIGHTS,
+  cloneSmartAssignmentWeights,
+  getSmartAssignmentWeightsError,
+  type SmartAssignmentWeightPresetKey,
+} from '../../lib/smartAssignmentWeights';
+import {
+  addRequiredProfession,
+  isRequiredProfessionSelected,
+  legacyRequiredRole,
+  removeRequiredProfession,
+} from '../../lib/requiredProfessions';
 import type {
   DraftRecommendationCandidate,
+  SmartAssignmentWeights,
   WorkPlanEmployee,
   WorkPlanProjectFilter,
 } from '../../types';
+import { SmartAssignmentWeightSelector } from '../SmartAssignmentWeightSelector';
+import {
+  DraftRecommendationRatingDialog,
+  type DraftRecommendationRatingValue,
+} from '../DraftRecommendationRatingDialog';
+import { buildSmartAssignmentFeedbackRequest } from '../../lib/smartAssignmentFeedback';
 import './NewTaskModal.css';
 
 const TASK_CATEGORY_OPTIONS: Array<{ id: TaskCategory; label: string }> = [
@@ -92,8 +124,12 @@ function getStepsForCategory(category: TaskCategory): Array<{ id: WizardStep; la
 
 function formatRecommendationScore(score?: number | null): string {
   if (score == null || Number.isNaN(Number(score))) return '—';
-  const numericScore = Number(score);
-  return `${Math.round(numericScore <= 1 ? numericScore * 100 : numericScore)}%`;
+  return `${new Intl.NumberFormat('he-IL', { maximumFractionDigits: 1 }).format(Number(score))}%`;
+}
+
+function formatRecommendationContribution(contribution?: number | null): string {
+  if (contribution == null || Number.isNaN(Number(contribution))) return '—';
+  return `${new Intl.NumberFormat('he-IL', { maximumFractionDigits: 2 }).format(Number(contribution))} נק׳`;
 }
 
 export function NewTaskModal({
@@ -122,18 +158,31 @@ export function NewTaskModal({
   const [plannedEndDate, setPlannedEndDate] = useState('');
   const [plannedEndTime, setPlannedEndTime] = useState('');
   const [priority, setPriority] = useState<string>(WORKPLAN_PRIORITY_OPTIONS[1].code);
-  const [requiredRole, setRequiredRole] = useState('');
+  const [requiredRoles, setRequiredRoles] = useState<string[]>([]);
   const [employeeId, setEmployeeId] = useState('');
   const [draftCandidates, setDraftCandidates] = useState<DraftRecommendationCandidate[] | null>(
     null,
   );
-  const [draftMessage, setDraftMessage] = useState<string | null>(null);
+  const [smartWeights, setSmartWeights] = useState<SmartAssignmentWeights>(() =>
+    cloneSmartAssignmentWeights(DEFAULT_SMART_ASSIGNMENT_WEIGHTS));
+  const [smartWeightPreset, setSmartWeightPreset] =
+    useState<SmartAssignmentWeightPresetKey>('balanced');
   const [acceptedRecommendation, setAcceptedRecommendation] = useState<{
     employeeId: number;
     employeeName: string;
   } | null>(null);
+  const [recommendationRatings, setRecommendationRatings] = useState<
+    Record<number, DraftRecommendationRatingValue>
+  >({});
+  const [ratingCandidateId, setRatingCandidateId] = useState<number | null>(null);
+  const [postSaveWarning, setPostSaveWarning] = useState<string | null>(null);
+  const [taskWasSaved, setTaskWasSaved] = useState(false);
   const [isSmartLoading, setIsSmartLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const recommendationRequestIdRef = useRef(0);
+  const recommendationAbortControllerRef = useRef<AbortController | null>(null);
+  const recommendationAccordionId = useId();
+  const [expandedCandidateId, setExpandedCandidateId] = useState<number | null>(null);
 
   const customersQuery = useQuery({
     queryKey: ['serviceCallCustomers'],
@@ -171,9 +220,9 @@ export function NewTaskModal({
     [scheduleParts],
   );
 
-  const assignableEmployees = useMemo(
+  const activeEmployees = useMemo(
     () =>
-      employees.filter((e) => e.isActive && e.isAssignable && e.employeeId > 0),
+      employees.filter((employee) => employee.isActive && employee.employeeId > 0),
     [employees],
   );
 
@@ -183,9 +232,33 @@ export function NewTaskModal({
     return sites.filter((s) => String(s.customerId) === customerId);
   }, [sitesQuery.data, customerId]);
 
-  const primaryRoles = primaryRolesQuery.data ?? [];
+  const availablePrimaryRoles = useMemo(
+    () =>
+      (primaryRolesQuery.data ?? []).filter(
+        (role) => !isRequiredProfessionSelected(requiredRoles, role),
+      ),
+    [primaryRolesQuery.data, requiredRoles],
+  );
+  const rankedCandidates = useMemo(
+    () => rankRecommendationCandidates(draftCandidates ?? []),
+    [draftCandidates],
+  );
+  const ratingCandidate = useMemo(
+    () => rankedCandidates.find((candidate) => candidate.employeeId === ratingCandidateId) ?? null,
+    [rankedCandidates, ratingCandidateId],
+  );
+  const smartWeightsError = useMemo(
+    () => getSmartAssignmentWeightsError(smartWeights),
+    [smartWeights],
+  );
+
+  useEffect(
+    () => () => recommendationAbortControllerRef.current?.abort(),
+    [],
+  );
 
   function resetForm() {
+    recommendationRequestIdRef.current += 1;
     setIsMaximized(false);
     setStep('category');
     setTaskCategory(TASK_CATEGORIES.Project);
@@ -200,19 +273,33 @@ export function NewTaskModal({
     setPlannedEndDate('');
     setPlannedEndTime('');
     setPriority(WORKPLAN_PRIORITY_OPTIONS[1].code);
-    setRequiredRole('');
+    setRequiredRoles([]);
     setEmployeeId('');
     setDraftCandidates(null);
-    setDraftMessage(null);
+    setSmartWeights(cloneSmartAssignmentWeights(DEFAULT_SMART_ASSIGNMENT_WEIGHTS));
+    setSmartWeightPreset('balanced');
     setAcceptedRecommendation(null);
+    setRecommendationRatings({});
+    setRatingCandidateId(null);
+    setPostSaveWarning(null);
+    setTaskWasSaved(false);
     setIsSmartLoading(false);
     setError(null);
+    setExpandedCandidateId(null);
+    recommendationAbortControllerRef.current?.abort();
+    recommendationAbortControllerRef.current = null;
   }
 
   function clearRecommendationState() {
+    recommendationAbortControllerRef.current?.abort();
+    recommendationAbortControllerRef.current = null;
+    recommendationRequestIdRef.current += 1;
     setDraftCandidates(null);
-    setDraftMessage(null);
     setAcceptedRecommendation(null);
+    setRecommendationRatings({});
+    setRatingCandidateId(null);
+    setIsSmartLoading(false);
+    setExpandedCandidateId(null);
   }
 
   function buildPlannedUtcRange(): { plannedStart: string; plannedEnd: string } {
@@ -260,11 +347,29 @@ export function NewTaskModal({
   }
 
   async function handleRunSmartRecommendation() {
+    let plannedStart: string;
+    let plannedEnd: string;
+
     try {
       validateScheduleStep();
-      const { plannedStart, plannedEnd } = buildPlannedUtcRange();
-      setIsSmartLoading(true);
-      setError(null);
+      if (smartWeightsError) throw new Error(smartWeightsError);
+      ({ plannedStart, plannedEnd } = buildPlannedUtcRange());
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'יש להשלים את נתוני המשימה לפני ההרצה.');
+      return;
+    }
+
+    recommendationAbortControllerRef.current?.abort();
+    const abortController = new AbortController();
+    recommendationAbortControllerRef.current = abortController;
+    const requestId = recommendationRequestIdRef.current + 1;
+    recommendationRequestIdRef.current = requestId;
+    setIsSmartLoading(true);
+    setError(null);
+    setExpandedCandidateId(null);
+
+    try {
+      const requiredRole = legacyRequiredRole(requiredRoles);
 
       const result = await getDraftRecommendationsAsync({
         taskCategory,
@@ -274,28 +379,113 @@ export function NewTaskModal({
         plannedStart,
         plannedEnd,
         priority: priority || null,
-        requiredRole: requiredRole || null,
-      });
+        requiredRole,
+        requiredRoles,
+        weights: smartWeights,
+      }, abortController.signal);
+
+      if (requestId !== recommendationRequestIdRef.current) return;
 
       setDraftCandidates(result.candidates);
-      setDraftMessage(result.message);
+      setRecommendationRatings({});
+      setRatingCandidateId(null);
       if (result.candidates.length === 0) {
-        setError('לא נמצאו עובדים מתאימים. ניתן לבחור עובד ידנית ולשמור.');
+        setError('לא נמצאו עובדים זמינים להצגה. ניתן לבחור עובד ידנית ולשמור.');
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'הרצת שיבוץ חכם נכשלה');
+      if (err instanceof DOMException && err.name === 'AbortError') return;
+      if (requestId === recommendationRequestIdRef.current) {
+        setError('לא הצלחנו להריץ את השיבוץ החכם. נסו שוב בעוד כמה רגעים.');
+      }
     } finally {
-      setIsSmartLoading(false);
+      if (requestId === recommendationRequestIdRef.current) {
+        setIsSmartLoading(false);
+      }
+      if (recommendationAbortControllerRef.current === abortController) {
+        recommendationAbortControllerRef.current = null;
+      }
     }
   }
 
   function handleAcceptRecommendation(candidate: DraftRecommendationCandidate) {
+    if (!canSelectRecommendationCandidate(candidate)) return;
     setEmployeeId(String(candidate.employeeId));
     setAcceptedRecommendation({
       employeeId: candidate.employeeId,
       employeeName: candidate.fullName ?? `עובד #${candidate.employeeId}`,
     });
     setError(null);
+  }
+
+  async function persistDraftRecommendationContext(
+    workItemId: number,
+    ratings: ReadonlyArray<readonly [number, DraftRecommendationRatingValue]>,
+    shouldPersistSmartContext: boolean,
+  ): Promise<{ recommendationRunId: number | null; warning: string | null }> {
+    if (ratings.length === 0 && !shouldPersistSmartContext) {
+      return { recommendationRunId: null, warning: null };
+    }
+
+    let run;
+    try {
+      run = await getSmartAssignmentRecommendationsAsync({
+        workItemIds: [workItemId],
+        includeLockedTasks: true,
+        saveRun: true,
+        weights: smartWeights,
+      });
+    } catch {
+      return {
+        recommendationRunId: null,
+        warning: shouldPersistSmartContext
+          ? 'המשימה נשמרה, אך לא הצלחנו לשמור את הקשר לשיבוץ החכם. שיוך העובד יישמר כשיבוץ ידני ודירוגי ההמלצה לא יישמרו.'
+          : 'המשימה נשמרה ושויכה, אך לא הצלחנו לשמור את דירוגי ההמלצה.',
+      };
+    }
+
+    const recommendationRunId = run.recommendationRunId;
+    if (recommendationRunId == null || recommendationRunId <= 0) {
+      return {
+        recommendationRunId: null,
+        warning: shouldPersistSmartContext
+          ? 'המשימה נשמרה, אך לא התקבל מזהה תקין לריצת השיבוץ החכם. שיוך העובד יישמר כשיבוץ ידני ודירוגי ההמלצה לא יישמרו.'
+          : 'המשימה נשמרה ושויכה, אך לא הצלחנו לשמור את דירוגי ההמלצה.',
+      };
+    }
+
+    if (ratings.length === 0) {
+      return { recommendationRunId, warning: null };
+    }
+
+    const taskResult = run.taskResults.find((result) => result.workItemId === workItemId);
+    if (
+      !taskResult?.policyProfileKey
+      || taskResult.policyVersion == null
+      || taskResult.policyVersion <= 0
+    ) {
+      return {
+        recommendationRunId,
+        warning: 'המשימה וריצת השיבוץ נשמרו, אך חסרו פרטי מדיניות ולכן דירוגי ההמלצה לא נשמרו.',
+      };
+    }
+
+    try {
+      await Promise.all(ratings.map(([recommendedEmployeeId, value]) =>
+        saveSmartAssignmentFeedbackAsync(buildSmartAssignmentFeedbackRequest({
+          recommendationRunId,
+          workItemId,
+          recommendedEmployeeId,
+          policyProfileKey: taskResult.policyProfileKey!,
+          policyVersion: taskResult.policyVersion!,
+        }, value.rating, value.comment))));
+
+      return { recommendationRunId, warning: null };
+    } catch {
+      return {
+        recommendationRunId,
+        warning: 'המשימה וריצת השיבוץ נשמרו, אך לא הצלחנו לשמור את דירוגי ההמלצה.',
+      };
+    }
   }
 
   const mutation = useMutation({
@@ -307,6 +497,12 @@ export function NewTaskModal({
       }
 
       const { plannedStart, plannedEnd } = buildPlannedUtcRange();
+      const requiredRole = legacyRequiredRole(requiredRoles);
+      const ratingEntries = Object.entries(recommendationRatings).map(
+        ([candidateEmployeeId, value]) => [Number(candidateEmployeeId), value] as const,
+      );
+      const selectedFromSmartRecommendation =
+        acceptedRecommendation?.employeeId === parsedEmployeeId;
       let workItemId: number;
 
       if (taskCategory === TASK_CATEGORIES.ServiceCall) {
@@ -319,14 +515,11 @@ export function NewTaskModal({
           priority,
           plannedStart,
           plannedEnd,
-          requiredRole: requiredRole || null,
+          requiredRole,
+          requiredRoles,
           isLocked: false,
         });
         workItemId = created.workItemId;
-        await assignEmployeeToServiceCallAsync(workItemId, {
-          employeeId: parsedEmployeeId,
-          assignmentRole: requiredRole || 'Executor',
-        });
       } else {
         const created = await createWorkItemAsync({
           title: title.trim(),
@@ -338,25 +531,67 @@ export function NewTaskModal({
           plannedStart,
           plannedEnd,
           priority,
-          requiredRole: requiredRole || null,
+          requiredRole,
+          requiredRoles,
         });
         workItemId = created.workItemId ?? 0;
         if (!workItemId) throw new Error('השרת לא החזיר מזהה משימה תקין');
-        await assignEmployeeToWorkItemAsync(workItemId, {
-          employeeId: parsedEmployeeId,
-          assignmentRole: requiredRole || 'Executor',
-        });
       }
 
-      return { workItemId, projectId: parsedProjectId };
+      // Persist a recommendation run before assigning the selected employee. Assignment changes workload
+      // and continuity inputs, and a smart source is recorded only when this context was persisted.
+      const recommendationPersistence = await persistDraftRecommendationContext(
+        workItemId,
+        ratingEntries,
+        selectedFromSmartRecommendation,
+      );
+      const recommendationRunId = selectedFromSmartRecommendation
+        ? recommendationPersistence.recommendationRunId
+        : null;
+
+      let assignmentWarning: string | null = null;
+      try {
+        if (taskCategory === TASK_CATEGORIES.ServiceCall) {
+          await assignEmployeeToServiceCallAsync(workItemId, {
+            employeeId: parsedEmployeeId,
+            assignmentRole: requiredRole || 'Executor',
+            ...(recommendationRunId != null ? { recommendationRunId } : {}),
+          });
+        } else {
+          await assignEmployeeToWorkItemAsync(workItemId, {
+            employeeId: parsedEmployeeId,
+            assignmentRole: requiredRole || 'Executor',
+            ...(recommendationRunId != null ? { recommendationRunId } : {}),
+          });
+        }
+      } catch {
+        assignmentWarning = 'המשימה נשמרה, אך שיוך העובד נכשל. ניתן לשייך עובד מתוך המשימה שנוצרה.';
+      }
+
+      const postSaveWarning = [assignmentWarning, recommendationPersistence.warning]
+        .filter(Boolean)
+        .join(' ');
+
+      return {
+        workItemId,
+        projectId: parsedProjectId,
+        isServiceCall: taskCategory === TASK_CATEGORIES.ServiceCall,
+        postSaveWarning: postSaveWarning || null,
+      };
     },
     onSuccess: async (result) => {
-      resetForm();
-      onClose();
       await invalidateWorkPlanQueries(queryClient, result.projectId);
-      if (taskCategory === TASK_CATEGORIES.ServiceCall) {
+      if (result.isServiceCall) {
         await queryClient.invalidateQueries({ queryKey: ['serviceCalls'] });
       }
+      if (result.postSaveWarning) {
+        setTaskWasSaved(true);
+        setPostSaveWarning(result.postSaveWarning);
+        setError(null);
+        return;
+      }
+      resetForm();
+      onClose();
     },
     onError: (err) => {
       setError(err instanceof Error ? err.message : 'יצירת המשימה נכשלה');
@@ -364,8 +599,14 @@ export function NewTaskModal({
   });
 
   function handleClose() {
+    if (mutation.isPending) return;
     resetForm();
     onClose();
+  }
+
+  function handleDrawerClose() {
+    if (ratingCandidate) return;
+    handleClose();
   }
 
   function handleCategoryChange(next: TaskCategory) {
@@ -402,15 +643,27 @@ export function NewTaskModal({
     }
   }
 
-  function renderRequiredRoleSelect() {
+  function addProfession(value: string) {
+    const next = addRequiredProfession(requiredRoles, value);
+    if (next.length === requiredRoles.length) return;
+    setRequiredRoles(next);
+    clearRecommendationState();
+  }
+
+  function removeProfession(value: string) {
+    setRequiredRoles((current) => removeRequiredProfession(current, value));
+    clearRecommendationState();
+  }
+
+  function renderRequiredProfessionsField() {
     if (primaryRolesQuery.isLoading) {
       return (
         <ListSelect
-          label="תפקיד נדרש"
+          label="מקצועות נדרשים"
           value=""
           disabled
           onChange={() => undefined}
-          options={[{ value: '', label: 'טוען תפקידים...' }]}
+          options={[{ value: '', label: 'טוען מקצועות...' }]}
         />
       );
     }
@@ -419,55 +672,235 @@ export function NewTaskModal({
       return (
         <div className="newTaskModal__field">
           <InlineAlert variant="danger">
-            טעינת תפקידים נכשלה. יש לפרוס את sp_Employees_GetDistinctPrimaryRoles בבסיס הנתונים.
+            טעינת רשימת המקצועות נכשלה.
           </InlineAlert>
-          <ListSelect
-            label="תפקיד נדרש"
-            value={requiredRole}
-            onChange={(value) => {
-              setRequiredRole(value);
-              clearRecommendationState();
-            }}
-            options={[{ value: '', label: 'בחר תפקיד' }]}
-          />
+          <Button type="button" variant="secondary" onClick={() => primaryRolesQuery.refetch()}>
+            נסה שוב
+          </Button>
         </div>
       );
     }
 
     return (
-      <ListSelect
-        label="תפקיד נדרש"
-        value={requiredRole}
-        onChange={(value) => {
-          setRequiredRole(value);
-          clearRecommendationState();
-        }}
-        placeholder="בחר תפקיד"
-        options={[
-          { value: '', label: 'בחר תפקיד' },
-          ...(primaryRoles.length === 0
-            ? [{ value: '__none__', label: 'אין תפקידים זמינים', disabled: true }]
-            : primaryRoles.map((role) => ({ value: role, label: role }))),
-        ]}
-      />
+      <div className="newTaskModal__professionsField">
+        <div
+          className="newTaskModal__professionAddPrompt"
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          <span className="newTaskModal__professionAddIcon" aria-hidden="true">
+            <Plus size={18} />
+          </span>
+          <span>
+            {requiredRoles.length === 0
+              ? 'ניתן להוסיף מספר מקצועות — בחרו מקצוע מהרשימה.'
+              : requiredRoles.length === 1
+                ? 'נבחר מקצוע אחד. ניתן להוסיף מקצוע נוסף.'
+                : `נבחרו ${requiredRoles.length} מקצועות. ניתן להוסיף מקצוע נוסף.`}
+          </span>
+        </div>
+        <ListSelect
+          label="מקצועות נדרשים"
+          value=""
+          onChange={addProfession}
+          placeholder={requiredRoles.length === 0 ? 'הוסף מקצוע נדרש' : 'הוסף מקצוע נוסף'}
+          searchable
+          searchPlaceholder="חיפוש מקצוע..."
+          emptyMessage="אין מקצועות נוספים לבחירה."
+          options={
+            availablePrimaryRoles.length === 0
+              ? [{ value: '__none__', label: 'אין מקצועות נוספים לבחירה', disabled: true }]
+              : availablePrimaryRoles.map((role) => ({ value: role, label: role }))
+          }
+        />
+        {requiredRoles.length > 0 ? (
+          <ul className="newTaskModal__professionChips" aria-label="מקצועות שנבחרו">
+            {requiredRoles.map((role) => (
+              <li key={role} className="newTaskModal__professionChip">
+                <span>{role}</span>
+                <button
+                  type="button"
+                  className="newTaskModal__professionRemove"
+                  onClick={() => removeProfession(role)}
+                  aria-label={`הסר את המקצוע ${role}`}
+                >
+                  הסר
+                </button>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="newTaskModal__fieldHint">לא נבחרו מקצועות חובה.</p>
+        )}
+      </div>
+    );
+  }
+
+  function renderRecommendationCandidate(
+    candidate: DraftRecommendationCandidate,
+    index: number,
+    total: number,
+  ) {
+    const isExpanded = expandedCandidateId === candidate.employeeId;
+    const notices = getCandidateNotices(candidate);
+    const displayedFactors = getWeightedRecommendationFactors(candidate.factors);
+    const triggerId = `${recommendationAccordionId}-${candidate.employeeId}-trigger`;
+    const panelId = `${recommendationAccordionId}-${candidate.employeeId}-panel`;
+
+    return (
+      <article className="newTaskModal__recommendation" key={candidate.employeeId}>
+        <div className="newTaskModal__candidateRow">
+          <button
+            id={triggerId}
+            type="button"
+            className="newTaskModal__candidateToggle"
+            aria-expanded={isExpanded}
+            aria-controls={panelId}
+            onClick={() => setExpandedCandidateId((current) =>
+              toggleExpandedRecommendation(current, candidate.employeeId))}
+          >
+            <span className="newTaskModal__candidateIdentity">
+              <strong className="newTaskModal__recommendationName">
+                {candidate.fullName ?? `עובד #${candidate.employeeId}`}
+              </strong>
+              <span className="newTaskModal__relativeRank">
+                {getRecommendationCandidateLabel(index, total)}
+              </span>
+            </span>
+            <span className="newTaskModal__candidateSummary">
+              {candidate.totalScore != null && (
+                <span className="newTaskModal__score" dir="ltr">
+                  {formatRecommendationScore(candidate.totalScore)}
+                </span>
+              )}
+              <ChevronDown
+                size={18}
+                className="newTaskModal__candidateChevron"
+                aria-hidden="true"
+              />
+            </span>
+          </button>
+          <Button
+            type="button"
+            size="sm"
+            variant={
+              acceptedRecommendation?.employeeId === candidate.employeeId
+                ? 'secondary'
+                : 'primary'
+            }
+            onClick={() => handleAcceptRecommendation(candidate)}
+            disabled={mutation.isPending}
+          >
+            {acceptedRecommendation?.employeeId === candidate.employeeId ? 'נבחר' : 'בחר עובד'}
+          </Button>
+        </div>
+
+        <div
+          id={panelId}
+          role="region"
+          aria-labelledby={triggerId}
+          hidden={!isExpanded}
+          className="newTaskModal__candidateDetails"
+        >
+          {notices.length > 0 && (
+            <ul className="newTaskModal__reasons">
+              {notices.map((notice, index) => (
+                <li key={`${notice}-${index}`} className="newTaskModal__warning">
+                  {notice}
+                </li>
+              ))}
+            </ul>
+          )}
+          {displayedFactors.length > 0 && (
+            <div>
+              <h5 className="newTaskModal__contributionsTitle">פירוט חמשת גורמי החישוב</h5>
+              <ul className="newTaskModal__factors">
+                {displayedFactors.map((factor) => {
+                  const routeEndpoints = getRecommendationRouteEndpoints(factor);
+                  return (
+                    <li className="newTaskModal__factor" key={factor.key}>
+                      <div className="newTaskModal__factorHead">
+                        <span className="newTaskModal__factorLabel">{factor.label}</span>
+                        <span className="newTaskModal__factorMetrics">
+                          <span>ציון <b dir="ltr">{formatRecommendationScore(factor.score)}</b></span>
+                          <span>משקל <b dir="ltr">{formatRecommendationScore(factor.weightPercent)}</b></span>
+                          <span>תרומה <b dir="ltr">{formatRecommendationContribution(factor.weightedContribution)}</b></span>
+                        </span>
+                      </div>
+                      {routeEndpoints && (
+                        <div
+                          className="newTaskModal__routeEndpoints"
+                          role="group"
+                          aria-label="מוצא ויעד לחישוב הנסיעה"
+                        >
+                          <div className="newTaskModal__routeEndpoint">
+                            <MapPin size={18} aria-hidden="true" />
+                            <span>
+                              <span className="newTaskModal__routeEndpointLabel">מוצא העובד</span>
+                              <strong>
+                                {routeEndpoints.originFormattedAddress ?? 'כתובת מוצא לא זמינה'}
+                              </strong>
+                            </span>
+                          </div>
+                          <div className="newTaskModal__routeEndpoint">
+                            <Flag size={18} aria-hidden="true" />
+                            <span>
+                              <span className="newTaskModal__routeEndpointLabel">יעד המשימה</span>
+                              <strong>
+                                {routeEndpoints.destinationFormattedAddress ?? 'כתובת יעד לא זמינה'}
+                              </strong>
+                            </span>
+                          </div>
+                        </div>
+                      )}
+                      <span className="newTaskModal__factorExplain">
+                        {getRecommendationFactorExplanation(candidate, factor)}
+                        {factor.isDefaulted ? ' · נעשה שימוש בערך ברירת מחדל' : ''}
+                      </span>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
+          )}
+          <div className="newTaskModal__ratingAction">
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              onClick={() => setRatingCandidateId(candidate.employeeId)}
+              disabled={mutation.isPending}
+            >
+              דירוג המלצה
+            </Button>
+            {recommendationRatings[candidate.employeeId] && (
+              <span className="newTaskModal__ratingStatus" aria-live="polite">
+                דורג {recommendationRatings[candidate.employeeId].rating}/10
+              </span>
+            )}
+          </div>
+        </div>
+      </article>
     );
   }
 
   return (
-    <Drawer
-      isOpen={isOpen}
-      onClose={handleClose}
-      title="משימה חדשה"
-      isMaximized={isMaximized}
-      onToggleMaximize={() => setIsMaximized((v) => !v)}
-    >
-      <form
-        className="newTaskModal"
-        onSubmit={(e) => {
-          e.preventDefault();
-          mutation.mutate();
-        }}
+    <>
+      <Drawer
+        isOpen={isOpen}
+        onClose={handleDrawerClose}
+        title="משימה חדשה"
+        isMaximized={isMaximized}
+        onToggleMaximize={() => setIsMaximized((v) => !v)}
       >
+        <form
+          className="newTaskModal"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!taskWasSaved) mutation.mutate();
+          }}
+        >
         <ol className="newTaskModal__steps" aria-label="שלבי יצירת משימה">
           {wizardSteps.map((item, index) => (
             <li
@@ -483,7 +916,11 @@ export function NewTaskModal({
           ))}
         </ol>
 
-        <div className="newTaskModal__body">
+        <div
+          className="newTaskModal__body"
+          aria-busy={mutation.isPending}
+          inert={mutation.isPending ? true : undefined}
+        >
           {step === 'category' && (
             <section className="newTaskModal__section">
               <h3 className="newTaskModal__sectionTitle">{currentStepLabel}</h3>
@@ -504,12 +941,15 @@ export function NewTaskModal({
                 rows={3}
               />
               <div className="newTaskModal__grid">
-                <Select label="דחיפות" value={priority} onChange={(e) => setPriority(e.target.value)}>
+                <Select label="דחיפות" value={priority} onChange={(e) => {
+                  setPriority(e.target.value);
+                  clearRecommendationState();
+                }}>
                   {WORKPLAN_PRIORITY_OPTIONS.map((o) => (
                     <option key={o.code} value={o.code}>{o.display}</option>
                   ))}
                 </Select>
-                {renderRequiredRoleSelect()}
+                {renderRequiredProfessionsField()}
               </div>
               {taskCategory === TASK_CATEGORIES.Project && (
                 <>
@@ -619,9 +1059,14 @@ export function NewTaskModal({
                 }}
               >
                 <option value="">בחר עובד</option>
-                {assignableEmployees.map((e) => (
+                {activeEmployees.map((e) => (
                   <option key={e.employeeId} value={e.employeeId}>
-                    {e.fullName}{e.primaryRole ? ` · ${e.primaryRole}` : ''}
+                    {e.fullName}
+                    {(e.professions?.length ?? 0) > 0
+                      ? ` · ${e.professions!.join(', ')}`
+                      : e.primaryRole
+                        ? ` · ${e.primaryRole}`
+                        : ''}
                   </option>
                 ))}
               </Select>
@@ -634,130 +1079,118 @@ export function NewTaskModal({
               <div className="newTaskModal__smartHead">
                 <h4 className="newTaskModal__sectionTitle">שיבוץ חכם</h4>
                 <p className="newTaskModal__hint">
-                  ניתן להריץ שיבוץ חכם ללא בחירת עובד מראש. בחירת עובד מומלץ תתבצע רק בלחיצה מפורשת.
+                  ניתן להריץ שיבוץ חכם ללא בחירת עובד מראש. הבחירה הסופית נשארת בידיכם.
                 </p>
               </div>
 
-              {isSmartLoading && (
-                <div className="newTaskModal__smartLoading">
-                  <PageSpinner />
-                </div>
-              )}
-
-              {!isSmartLoading && draftMessage && (
-                <p className="newTaskModal__smartMessage">{draftMessage}</p>
-              )}
-
-              {!isSmartLoading &&
-                draftCandidates?.map((candidate) => (
-                  <div className="newTaskModal__recommendation" key={candidate.employeeId}>
-                    <div className="newTaskModal__recommendationHead">
-                      <div className="newTaskModal__recommendationWho">
-                        <span className="newTaskModal__recommendationLabel">מומלץ</span>
-                        <strong className="newTaskModal__recommendationName">
-                          {candidate.fullName ?? `עובד #${candidate.employeeId}`}
-                        </strong>
-                      </div>
-                      {candidate.totalScore != null && (
-                        <span className="newTaskModal__score">
-                          {formatRecommendationScore(candidate.totalScore)}
-                        </span>
-                      )}
-                    </div>
-
-                    {candidate.recommendationSummary && (
-                      <p className="newTaskModal__hint">{candidate.recommendationSummary}</p>
-                    )}
-
-                    {candidate.warnings.length > 0 && (
-                      <ul className="newTaskModal__reasons">
-                        {candidate.warnings.map((warning) => (
-                          <li key={warning} className="newTaskModal__warning">
-                            {warning}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-
-                    {candidate.factors.length > 0 && (
-                      <ul className="newTaskModal__factors">
-                        {candidate.factors.map((factor) => (
-                          <li className="newTaskModal__factor" key={factor.key}>
-                            <div className="newTaskModal__factorHead">
-                              <span className="newTaskModal__factorLabel">{factor.label}</span>
-                              <span className="newTaskModal__factorScore">
-                                {formatRecommendationScore(factor.score)}
-                              </span>
-                            </div>
-                            <span className="newTaskModal__factorExplain">{factor.explanation}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-
-                    <Button
-                      type="button"
-                      variant={
-                        acceptedRecommendation?.employeeId === candidate.employeeId
-                          ? 'secondary'
-                          : 'primary'
-                      }
-                      onClick={() => handleAcceptRecommendation(candidate)}
-                      disabled={!candidate.isEligible}
-                    >
-                      {acceptedRecommendation?.employeeId === candidate.employeeId
-                        ? 'נבחר'
-                        : 'בחר עובד מומלץ'}
-                    </Button>
-                  </div>
-                ))}
+              <SmartAssignmentWeightSelector
+                value={smartWeights}
+                preset={smartWeightPreset}
+                onPresetChange={setSmartWeightPreset}
+                onChange={(weights) => {
+                  setSmartWeights(weights);
+                  clearRecommendationState();
+                  setError(null);
+                }}
+                disabled={isSmartLoading || mutation.isPending}
+              />
 
               <div className="newTaskModal__smartRun">
                 <Button
                   type="button"
                   variant="secondary"
                   onClick={handleRunSmartRecommendation}
-                  disabled={isSmartLoading}
+                  disabled={isSmartLoading || mutation.isPending || Boolean(smartWeightsError)}
                 >
                   {draftCandidates ? 'הרץ שיבוץ חכם מחדש' : 'הרץ שיבוץ חכם'}
                 </Button>
+              </div>
+
+              <div
+                className="newTaskModal__smartResults"
+                aria-live="polite"
+                aria-busy={isSmartLoading}
+              >
+                {isSmartLoading && (
+                  <div className="newTaskModal__smartLoading">
+                    <PageSpinner />
+                  </div>
+                )}
+
+                {!isSmartLoading && rankedCandidates.length > 0 && (
+                  <section className="newTaskModal__candidateGroup" aria-labelledby="rankedCandidatesTitle">
+                    <div className="newTaskModal__candidateGroupHead">
+                      <h5 id="rankedCandidatesTitle">דירוג העובדים</h5>
+                      <span>{rankedCandidates.length}</span>
+                    </div>
+                    <p className="newTaskModal__hint">
+                      הציון הוא כלי תומך החלטה. ניתן לבחור כל עובד ברשימה, גם כשהציון נמוך.
+                    </p>
+                    {rankedCandidates.map((candidate, index) =>
+                      renderRecommendationCandidate(candidate, index, rankedCandidates.length))}
+                  </section>
+                )}
               </div>
             </section>
           )}
         </div>
 
-        <div className="newTaskModal__footer">
-          {error && <InlineAlert variant="danger">{error}</InlineAlert>}
-          <div className="newTaskModal__actions">
-            {!isFirstStep && (
-              <Button type="button" variant="secondary" onClick={handleGoBack}>
-                חזור
-              </Button>
-            )}
-            {!isLastStep && (
-              <Button type="button" onClick={handleGoNext}>
-                המשך
-              </Button>
-            )}
-            {isLastStep && (
-              <>
-                <Button type="submit" isLoading={mutation.isPending}>
-                  שמור משימה
-                </Button>
-                <Button
-                  type="button"
-                  variant="secondary"
-                  onClick={handleRunSmartRecommendation}
-                  disabled={isSmartLoading}
-                >
-                  {draftCandidates ? 'הרץ שיבוץ חכם מחדש' : 'הרץ שיבוץ חכם'}
-                </Button>
-              </>
-            )}
-            <Button type="button" variant="secondary" onClick={handleClose}>ביטול</Button>
+          <div className="newTaskModal__footer">
+            {error && <InlineAlert variant="danger">{error}</InlineAlert>}
+            {postSaveWarning && <InlineAlert variant="warning">{postSaveWarning}</InlineAlert>}
+            <div className="newTaskModal__actions">
+              {taskWasSaved ? (
+                <Button type="button" onClick={handleClose}>סגור</Button>
+              ) : (
+                <>
+                  {!isFirstStep && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={handleGoBack}
+                      disabled={mutation.isPending}
+                    >
+                      חזור
+                    </Button>
+                  )}
+                  {!isLastStep && (
+                    <Button type="button" onClick={handleGoNext} disabled={mutation.isPending}>
+                      המשך
+                    </Button>
+                  )}
+                  {isLastStep && (
+                    <Button type="submit" isLoading={mutation.isPending}>
+                      שמור משימה
+                    </Button>
+                  )}
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={handleClose}
+                    disabled={mutation.isPending}
+                  >
+                    ביטול
+                  </Button>
+                </>
+              )}
+            </div>
           </div>
-        </div>
-      </form>
-    </Drawer>
+        </form>
+      </Drawer>
+      <DraftRecommendationRatingDialog
+        isOpen={ratingCandidate != null}
+        candidate={ratingCandidate}
+        value={ratingCandidate ? recommendationRatings[ratingCandidate.employeeId] : null}
+        onClose={() => setRatingCandidateId(null)}
+        onSave={(value) => {
+          if (!ratingCandidate) return;
+          setRecommendationRatings((current) => ({
+            ...current,
+            [ratingCandidate.employeeId]: value,
+          }));
+          setRatingCandidateId(null);
+        }}
+      />
+    </>
   );
 }

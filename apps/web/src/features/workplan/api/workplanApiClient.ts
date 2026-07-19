@@ -5,8 +5,12 @@ import type {
   CreateTaskRequest,
   DraftRecommendationRequest,
   DraftRecommendationResponse,
+  ReplaceEmployeeAssignmentRequest,
   SmartAssignmentRequest,
   SmartAssignmentResponse,
+  SmartAssignmentAssignmentFeedback,
+  SmartAssignmentFeedbackRecord,
+  SmartAssignmentFeedbackRequest,
   UpdateTaskRequest,
   WorkItemResponse,
   WorkPlanEmployee,
@@ -61,6 +65,7 @@ export async function getWorkPlanEmployeesAsync(): Promise<WorkPlanEmployee[]> {
       employeeId: Number(employee.employeeId),
       fullName: String(employee.fullName ?? ''),
       primaryRole: String(employee.primaryRole ?? ''),
+      professions: mapStringArray(employee.professions),
       dailyCapacityHours:
         employee.dailyCapacityHours != null ? Number(employee.dailyCapacityHours) : null,
       isAssignable: employee.isAssignable !== false,
@@ -79,27 +84,49 @@ export async function getSmartAssignmentRecommendationsAsync(
 
 export async function getDraftRecommendationsAsync(
   request: DraftRecommendationRequest,
+  signal?: AbortSignal,
 ): Promise<DraftRecommendationResponse> {
   const response = await apiRequest<Record<string, unknown>>('/SmartAssignment/recommend-draft', {
     method: 'POST',
     body: JSON.stringify(request),
+    signal,
   });
   return mapDraftRecommendationResponse(response);
 }
 
 function mapRecommendationFactor(raw: Record<string, unknown>) {
+  const sourceValues =
+    typeof raw.sourceValues === 'object' && raw.sourceValues !== null && !Array.isArray(raw.sourceValues)
+      ? (raw.sourceValues as Record<string, unknown>)
+      : undefined;
+
   return {
     key: String(raw.key ?? ''),
     label: String(raw.label ?? ''),
     score: raw.score != null ? Number(raw.score) : null,
     weightPercent: Number(raw.weightPercent ?? 0),
+    weightedContribution:
+      raw.weightedContribution != null ? Number(raw.weightedContribution) : null,
     explanation: String(raw.explanation ?? ''),
     dataSource: String(raw.dataSource ?? ''),
     hasData: raw.hasData === true,
+    isDefaulted: raw.isDefaulted === true,
+    missingInputCodes: Array.isArray(raw.missingInputCodes)
+      ? raw.missingInputCodes.map(String)
+      : [],
+    sourceValues,
   };
 }
 
-function mapDraftRecommendationResponse(response: Record<string, unknown>): DraftRecommendationResponse {
+function mapStringArray(value: unknown): string[] {
+  return Array.isArray(value)
+    ? value.filter((item): item is string => typeof item === 'string')
+    : [];
+}
+
+export function mapDraftRecommendationResponse(
+  response: Record<string, unknown>,
+): DraftRecommendationResponse {
   const candidates = Array.isArray(response.candidates)
     ? response.candidates.map((candidate) => {
         const raw = candidate as Record<string, unknown>;
@@ -108,12 +135,32 @@ function mapDraftRecommendationResponse(response: Record<string, unknown>): Draf
           employeeId: Number(raw.employeeId),
           fullName: raw.fullName as string | null,
           primaryRole: raw.primaryRole as string | null,
+          professions: mapStringArray(raw.professions),
+          requiredRoles: mapStringArray(raw.requiredRoles),
+          matchedRoles: mapStringArray(raw.matchedRoles),
+          missingRoles: mapStringArray(raw.missingRoles),
           totalScore: raw.totalScore != null ? Number(raw.totalScore) : null,
           isEligible: raw.isEligible === true,
           exclusionReason: raw.exclusionReason as string | null,
           status: String(raw.status ?? ''),
           recommendationSummary: raw.recommendationSummary as string | null,
           warnings: Array.isArray(raw.warnings) ? raw.warnings.map(String) : [],
+          rejectionReasonCodes: Array.isArray(raw.rejectionReasons)
+            ? raw.rejectionReasons
+                .map((reason) => (reason as Record<string, unknown>)?.code)
+                .filter((code): code is string => typeof code === 'string' && code.length > 0)
+            : Array.isArray(raw.rejectionReasonCodes)
+              ? raw.rejectionReasonCodes.map(String)
+              : [],
+          missingInputCodes: Array.isArray(raw.missingInputCodes)
+            ? raw.missingInputCodes.map(String)
+            : [],
+          policyProfileKey: raw.policyProfileKey as string | null,
+          policyVersion: raw.policyVersion != null ? Number(raw.policyVersion) : null,
+          policyDisplayName: raw.policyDisplayName as string | null,
+          originTypeUsed: raw.originTypeUsed as string | null,
+          travelMinutes: raw.travelMinutes != null ? Number(raw.travelMinutes) : null,
+          distanceKm: raw.distanceKm != null ? Number(raw.distanceKm) : null,
           factors: Array.isArray(raw.factors)
             ? raw.factors.map((factor) => mapRecommendationFactor(factor as Record<string, unknown>))
             : [],
@@ -126,6 +173,27 @@ function mapDraftRecommendationResponse(response: Record<string, unknown>): Draf
     message: String(response.message ?? ''),
     candidates,
   };
+}
+
+export function saveSmartAssignmentFeedbackAsync(
+  request: SmartAssignmentFeedbackRequest,
+): Promise<SmartAssignmentFeedbackRecord> {
+  return apiRequest<SmartAssignmentFeedbackRecord>('/SmartAssignment/feedback', {
+    method: 'POST',
+    body: JSON.stringify(request),
+  });
+}
+
+export function getSmartAssignmentAssignmentFeedbackAsync(
+  workItemId: number,
+  assignedEmployeeId: number,
+): Promise<SmartAssignmentAssignmentFeedback> {
+  const params = new URLSearchParams({
+    assignedEmployeeId: String(assignedEmployeeId),
+  });
+  return apiRequest<SmartAssignmentAssignmentFeedback>(
+    `/SmartAssignment/work-items/${workItemId}/assignment-feedback?${params.toString()}`,
+  );
 }
 
 export function getEmployeePrimaryRolesAsync(): Promise<string[]> {
@@ -151,6 +219,20 @@ export async function assignEmployeeToWorkItemAsync(
   });
 }
 
+export async function replaceEmployeeAssignmentAsync(
+  workItemId: number,
+  assignmentId: number,
+  request: ReplaceEmployeeAssignmentRequest,
+): Promise<AssignEmployeeResponse> {
+  return apiRequest<AssignEmployeeResponse>(
+    `/WorkItems/${workItemId}/employee-assignments/${assignmentId}`,
+    {
+      method: 'PUT',
+      body: JSON.stringify(request),
+    },
+  );
+}
+
 export async function getWorkItemByIdAsync(workItemId: number): Promise<WorkItemResponse> {
   return apiRequest<WorkItemResponse>(`/WorkItems/${workItemId}`);
 }
@@ -165,11 +247,8 @@ export async function updateWorkItemAsync(
   workItemId: number,
   request: UpdateTaskRequest,
 ): Promise<{ message?: string }> {
-  return apiRequest<{ message?: string }>(`/WorkItems/${workItemId}`, {
+  return apiRequest<{ message?: string }>(`/WorkItems/task/${workItemId}`, {
     method: 'PUT',
-    body: JSON.stringify({
-      workItemId,
-      ...request,
-    }),
+    body: JSON.stringify(request),
   });
 }
