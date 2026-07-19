@@ -34,6 +34,10 @@ namespace ManageR2.Infrastructure.Models.SmartAssignment
         // תפקיד נדרש לביצוע המשימה (לדוגמה: טכנאי בכיר)
         public string? RequiredRole { get; set; }
 
+        // Additive canonical collection. When absent in an older database result, the repository
+        // falls back to RequiredRole.
+        public List<string> RequiredRoles { get; set; } = new();
+
         // האם המשימה נעולה (true = לא ניתן לשנות/לשבץ)
         public bool IsLocked { get; set; }
 
@@ -100,6 +104,12 @@ namespace ManageR2.Infrastructure.Models.SmartAssignment
 
         // מזהה חיצוני מה-API (PlaceId וכדומה)
         public string? ManualOriginExternalPlaceRef { get; set; }
+
+        // Validated manual-origin coordinates. If the override flag is set but either
+        // coordinate is absent/invalid, routing intentionally does not fall back.
+        public decimal? ManualOriginLatitude { get; set; }
+
+        public decimal? ManualOriginLongitude { get; set; }
 
         // עיר של הכתובת
         public string? ManualOriginCity { get; set; }

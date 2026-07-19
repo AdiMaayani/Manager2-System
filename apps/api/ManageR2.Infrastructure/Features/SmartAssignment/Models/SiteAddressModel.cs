@@ -16,5 +16,8 @@
 
         // מזהה אזור עבודה של האתר
         public int? ZoneId { get; set; }
+
+        public decimal? Latitude { get; set; }
+        public decimal? Longitude { get; set; }
     }
 }

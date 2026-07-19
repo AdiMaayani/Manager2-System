@@ -10,10 +10,15 @@ namespace ManageR2.Infrastructure.Models.SmartAssignment
         // מזהה העובד
         public int EmployeeId { get; set; }
 
+        public int? SiteId { get; set; }
+
         // כתובת מסודרת של מיקום העובד באירוע
         public string? FormattedAddress { get; set; }
 
         // זמן האירוע
         public DateTime EventTime { get; set; }
+
+        public decimal? Latitude { get; set; }
+        public decimal? Longitude { get; set; }
     }
 }

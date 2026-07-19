@@ -23,5 +23,8 @@
 
         // זמן נסיעה מוערך בדקות
         public int? EstimatedTravelMinutes { get; set; }
+
+        public string? RoutingProvider { get; set; }
+        public DateTime? CalculatedAt { get; set; }
     }
 }
