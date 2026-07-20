@@ -655,7 +655,8 @@ public class WorkItemsController : ControllerBase
         }
 
         if (existingTask.IsArchived ||
-            string.Equals(existingTask.WorkType, WorkItemWorkTypes.ServiceCall, StringComparison.Ordinal))
+            string.Equals(existingTask.WorkType, WorkItemWorkTypes.ServiceCall, StringComparison.Ordinal) ||
+            string.Equals(existingTask.WorkType, WorkItemWorkTypes.Project, StringComparison.OrdinalIgnoreCase))
         {
             return BadRequest("Only Regular and Project tasks can be updated through this endpoint.");
         }
@@ -762,6 +763,20 @@ public class WorkItemsController : ControllerBase
         if (existingWorkItem == null)
         {
             return NotFound($"Work item with ID {id} was not found.");
+        }
+
+        // GAP-009: Project classification is immutable on normal Project edit.
+        if (string.Equals(existingWorkItem.WorkType, WorkItemWorkTypes.Project, StringComparison.OrdinalIgnoreCase))
+        {
+            if (IsProjectReclassificationAttempt(workItem))
+            {
+                return BadRequest(new { message = "Reclassifying a Project is not allowed." });
+            }
+
+            workItem.WorkType = WorkItemWorkTypes.Project;
+            workItem.TaskCategory = null;
+            workItem.ParentWorkItemId = null;
+            workItem.MilestoneId = null;
         }
 
         workItem.Status = ResolveTaskStatus(workItem.Status, existingWorkItem.Status);
@@ -1092,6 +1107,21 @@ public class WorkItemsController : ControllerBase
         string.IsNullOrWhiteSpace(requestedStatus)
             ? (existingStatus ?? WorkItemDefaultStatuses.Planned)
             : requestedStatus;
+
+    // Any non-Project WorkType or supplied TaskCategory would re-derive classification in sp_UpdateWorkItem.
+    private static bool IsProjectReclassificationAttempt(WorkItem workItem)
+    {
+        if (!string.IsNullOrWhiteSpace(workItem.WorkType)
+            && !string.Equals(
+                workItem.WorkType.Trim(),
+                WorkItemWorkTypes.Project,
+                StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        return !string.IsNullOrWhiteSpace(workItem.TaskCategory);
+    }
 
     private int? GetCurrentEmployeeId()
     {
