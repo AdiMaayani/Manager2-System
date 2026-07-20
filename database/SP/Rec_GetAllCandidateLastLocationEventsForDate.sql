@@ -25,25 +25,25 @@ BEGIN
           AND le.EventDate = @EventDate
     )
     SELECT
-        EmployeeLocationEventId,
-        EmployeeId,
-        WorkItemId,
-        SiteId,
-        EventType,
-        InputAddress,
-        FormattedAddress,
-        ExternalPlaceRef,
-        ZoneId,
+        LastEvents.EmployeeLocationEventId,
+        LastEvents.EmployeeId,
+        LastEvents.WorkItemId,
+        LastEvents.SiteId,
+        LastEvents.EventType,
+        LastEvents.InputAddress,
+        LastEvents.FormattedAddress,
+        LastEvents.ExternalPlaceRef,
+        LastEvents.ZoneId,
         COALESCE(LastEvents.Latitude, locationEventSite.Latitude) AS Latitude,
         COALESCE(LastEvents.Longitude, locationEventSite.Longitude) AS Longitude,
-        EventDate,
-        EventTime,
-        Source,
-        Notes
+        LastEvents.EventDate,
+        LastEvents.EventTime,
+        LastEvents.Source,
+        LastEvents.Notes
     FROM LastEvents
     LEFT JOIN dbo.Rec_SiteAddressProfile AS locationEventSite
         ON locationEventSite.SiteId = LastEvents.SiteId
-    WHERE rn = 1
-    ORDER BY EmployeeId;
+    WHERE LastEvents.rn = 1
+    ORDER BY LastEvents.EmployeeId;
 END
 GO

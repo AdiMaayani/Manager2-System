@@ -133,6 +133,7 @@ BEGIN
         Description NVARCHAR(1000) NULL,
         SortOrder INT NOT NULL CONSTRAINT DF_ProjectMilestones_SortOrder DEFAULT (0),
         Status NVARCHAR(50) NOT NULL CONSTRAINT DF_ProjectMilestones_Status DEFAULT (N'Planned'),
+        ManagerEmployeeId INT NULL,
         PlannedStart DATETIME2(7) NULL,
         PlannedEnd DATETIME2(7) NULL,
         ActualStart DATETIME2(7) NULL,
@@ -162,6 +163,16 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.Project
     CREATE INDEX IX_ProjectMilestones_Project_Sort ON dbo.ProjectMilestones(ProjectId, IsActive, SortOrder, ProjectMilestoneId);
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.ProjectMilestones') AND name=N'UX_ProjectMilestones_LegacyWorkItemId')
     CREATE UNIQUE INDEX UX_ProjectMilestones_LegacyWorkItemId ON dbo.ProjectMilestones(LegacyWorkItemId) WHERE LegacyWorkItemId IS NOT NULL;
+GO
+/* Nullable milestone manager. Legacy milestones may have no manager; the Update SP accepts NULL while
+   the Create SP requires a manager for new milestones. Guarded/additive so an already-existing
+   ProjectMilestones table (created before this column existed) is corrected in place. */
+IF COL_LENGTH(N'dbo.ProjectMilestones', N'ManagerEmployeeId') IS NULL
+    ALTER TABLE dbo.ProjectMilestones ADD ManagerEmployeeId INT NULL;
+GO
+IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name=N'FK_ProjectMilestones_ManagerEmployee')
+    ALTER TABLE dbo.ProjectMilestones WITH CHECK ADD CONSTRAINT FK_ProjectMilestones_ManagerEmployee
+        FOREIGN KEY(ManagerEmployeeId) REFERENCES dbo.Employees(EmployeeId);
 GO
 IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name=N'FK_WorkItems_Milestone')
     ALTER TABLE dbo.WorkItems WITH CHECK ADD CONSTRAINT FK_WorkItems_Milestone
