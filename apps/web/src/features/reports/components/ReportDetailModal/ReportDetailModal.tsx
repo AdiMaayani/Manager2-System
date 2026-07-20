@@ -11,6 +11,7 @@ import { Input } from '@shared/components/Input';
 import { Textarea } from '@shared/components/Textarea';
 import {
   canAmendReport,
+  canDeleteReport,
   canEditReportAttachments,
   canEditReportInventory,
   canEditReportText,
@@ -78,6 +79,8 @@ export function ReportDetailModal({
   const canEditInventory = canEditReportInventory(report?.lifecycleStatus);
   const canEditAttachments = canEditReportAttachments(report?.lifecycleStatus);
   const canEditText = canEditReportText(report?.lifecycleStatus);
+  const canDelete = canDeleteReport(report?.lifecycleStatus);
+  const hasAttachments = (report?.attachments.length ?? 0) > 0;
 
   const invalidateDetail = useCallback(async () => {
     if (reportId == null) return;
@@ -428,7 +431,18 @@ export function ReportDetailModal({
                   צור דיווח מתקן
                 </Button>
               )}
-              {canEditText && (
+              {canDelete && hasAttachments && (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  onClick={() =>
+                    setDeleteError('יש למחוק את הקבצים המצורפים לפני מחיקת הדיווח.')
+                  }
+                >
+                  מחיקה
+                </Button>
+              )}
+              {canDelete && !hasAttachments && (
                 <ConfirmInline
                   triggerLabel="מחיקה"
                   message="למחוק את הדיווח? פעולה זו אינה הפיכה."

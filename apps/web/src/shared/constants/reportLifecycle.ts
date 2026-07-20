@@ -53,3 +53,8 @@ export function canReverseReport(lifecycleStatus?: string | null): boolean {
 export function canAmendReport(lifecycleStatus?: string | null): boolean {
   return lifecycleStatus === REPORT_LIFECYCLE_STATUSES.Reversed;
 }
+
+/** Physical delete is allowed only for Draft lifecycle reports (not Finalized/Reversed). */
+export function canDeleteReport(lifecycleStatus?: string | null): boolean {
+  return lifecycleStatus === REPORT_LIFECYCLE_STATUSES.Draft;
+}

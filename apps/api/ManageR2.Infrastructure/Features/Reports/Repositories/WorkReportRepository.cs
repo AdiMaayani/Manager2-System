@@ -1,4 +1,6 @@
 using System.Data;
+using System.Globalization;
+using ManageR2.Domain.Exceptions;
 using ManageR2.Domain.Features.Reports;
 using ManageR2.Infrastructure.DAL;
 using ManageR2.Infrastructure.Models;
@@ -166,21 +168,42 @@ public class WorkReportRepository : IWorkReportRepository
 
     public async Task<bool> DeleteAsync(int workReportId)
     {
-        await using var connection = _dbServices.CreateConnection();
-        await using var command = new SqlCommand("dbo.sp_WorkReports_Delete", connection)
+        try
         {
-            CommandType = CommandType.StoredProcedure
-        };
+            await using var connection = _dbServices.CreateConnection();
+            await using var command = new SqlCommand("dbo.sp_WorkReports_Delete", connection)
+            {
+                CommandType = CommandType.StoredProcedure
+            };
 
-        command.Parameters.AddWithValue("@WorkReportId", workReportId);
+            command.Parameters.AddWithValue("@WorkReportId", workReportId);
 
-        await connection.OpenAsync();
-        var result = await command.ExecuteScalarAsync();
-        var rowsAffected = result != null && result != DBNull.Value
-            ? Convert.ToInt32(result)
-            : 0;
+            await connection.OpenAsync();
+            var result = await command.ExecuteScalarAsync();
+            var rowsAffected = result != null && result != DBNull.Value
+                ? Convert.ToInt32(result)
+                : 0;
 
-        return rowsAffected > 0;
+            return rowsAffected > 0;
+        }
+        catch (SqlException ex) when (ex.Number == 51370)
+        {
+            throw new UserValidationException("ניתן למחוק רק דיווח במצב טיוטת מלאי.", ex);
+        }
+        catch (SqlException ex) when (ex.Number == 51371)
+        {
+            throw new UserValidationException("יש למחוק את הקבצים המצורפים לפני מחיקת הדיווח.", ex);
+        }
+        catch (SqlException ex) when (ex.Number == 51372)
+        {
+            throw new UserValidationException("לא ניתן למחוק דיווח שכבר נוצרו עבורו תנועות מלאי.", ex);
+        }
+        catch (SqlException ex) when (ex.Number == 547)
+        {
+            throw new UserValidationException(
+                "לא ניתן למחוק את הדיווח משום שקיימים רשומות מקושרות שלא ניתן להסיר בבטחה.",
+                ex);
+        }
     }
 
     public async Task<WorkReportLifecycleResultModel?> FinalizeAsync(int workReportId, int? finalizedByUserId)
@@ -628,7 +651,23 @@ public class WorkReportRepository : IWorkReportRepository
             return null;
         }
 
-        return DateTime.TryParse(date, out var parsedDate) ? parsedDate : null;
+        var trimmedDate = date.Trim();
+        if (DateTime.TryParseExact(
+                trimmedDate,
+                new[] { "yyyy-MM-dd", "yyyy-MM-ddTHH:mm:ss", "yyyy-MM-ddTHH:mm:ss.fff", "yyyy-MM-ddTHH:mm:ssZ" },
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AllowWhiteSpaces | DateTimeStyles.AssumeUniversal | DateTimeStyles.AdjustToUniversal,
+                out var parsedDate)
+            || DateTime.TryParse(
+                trimmedDate,
+                CultureInfo.InvariantCulture,
+                DateTimeStyles.AllowWhiteSpaces,
+                out parsedDate))
+        {
+            return parsedDate;
+        }
+
+        throw new UserValidationException("תאריך הדיווח אינו תקין.");
     }
 
     private static string? GetStringValue(SqlDataReader reader, string columnName)
