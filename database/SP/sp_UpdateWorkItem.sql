@@ -73,8 +73,8 @@ BEGIN
     FROM @NormalizedRequiredRoles
     ORDER BY SortOrdinal, RoleName;
 
-    DECLARE @OldParent INT,@OldMilestone INT,@OldCategory NVARCHAR(20),@OldStatus NVARCHAR(100);
-    SELECT @OldParent=ParentWorkItemId,@OldMilestone=MilestoneId,@OldCategory=TaskCategory,@OldStatus=Status
+    DECLARE @OldParent INT,@OldMilestone INT,@OldCategory NVARCHAR(20),@OldStatus NVARCHAR(100),@OldWorkType NVARCHAR(50);
+    SELECT @OldParent=ParentWorkItemId,@OldMilestone=MilestoneId,@OldCategory=TaskCategory,@OldStatus=Status,@OldWorkType=WorkType
     FROM dbo.WorkItems WHERE WorkItemId=@WorkItemId;
     IF @@ROWCOUNT=0 THROW 51110, 'Work item not found.', 1;
     DECLARE @Parent INT=CASE WHEN @ParentWorkItemId=-1 THEN @OldParent ELSE @ParentWorkItemId END;
@@ -84,6 +84,9 @@ BEGIN
     DECLARE @ResolvedStatus NVARCHAR(100)=COALESCE(NULLIF(LTRIM(RTRIM(@Status)),N''),@OldStatus);
     DECLARE @DerivedWorkType NVARCHAR(50)=CASE @Category WHEN N'Regular' THEN N'Task' WHEN N'Project' THEN N'Task' WHEN N'ServiceCall' THEN N'ServiceCall' ELSE CASE WHEN @WorkType=N'Project' THEN N'Project' END END;
     IF @DerivedWorkType IS NULL THROW 51111, 'Invalid TaskCategory/WorkType.', 1;
+    -- GAP-009: existing Project containers cannot be reclassified through a normal update.
+    IF @OldWorkType=N'Project' AND @DerivedWorkType<>N'Project'
+        THROW 51122, 'Reclassifying a Project is not allowed.', 1;
     IF @DerivedWorkType=N'Project' AND (@Parent IS NOT NULL OR @Milestone IS NOT NULL) THROW 51120, 'Project containers cannot have a parent or milestone.', 1;
     IF @Category=N'Regular' AND (@Parent IS NOT NULL OR @Milestone IS NOT NULL) THROW 51112, 'Regular tasks cannot have a project or milestone.', 1;
     IF @Category=N'ServiceCall' AND (@Parent IS NOT NULL OR @Milestone IS NOT NULL) THROW 51117, 'Service calls cannot have a project parent or milestone.', 1;
