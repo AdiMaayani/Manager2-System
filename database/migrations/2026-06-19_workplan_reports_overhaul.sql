@@ -5,6 +5,21 @@
     archive the INTERNAL container, or shift planned datetimes. Those operations are
     isolated in operator-gated packages documented in database/RUNBOOK.md.
 */
+/* Required SQL Server session SET options. This script creates filtered indexes
+   (e.g. IX_WorkItems_MilestoneId, UX_ProjectMilestones_LegacyWorkItemId,
+   IX_WorkReports_AmendsWorkReportId, IX_WorkReports_WorkItemId,
+   UX_InventoryStockMovements_Line_Type). Filtered-index DDL fails unless these
+   options are correct, and sqlcmd defaults QUOTED_IDENTIFIER OFF. Establishing them
+   here (before any DDL) makes the migration self-contained regardless of client
+   (sqlcmd with or without -I, SSMS, Azure Data Studio). Session SET options persist
+   across the GO batch separators below on the same connection. */
+SET ANSI_NULLS ON;
+SET QUOTED_IDENTIFIER ON;
+SET ANSI_PADDING ON;
+SET ANSI_WARNINGS ON;
+SET ARITHABORT ON;
+SET CONCAT_NULL_YIELDS_NULL ON;
+SET NUMERIC_ROUNDABORT OFF;
 SET NOCOUNT ON;
 SET XACT_ABORT ON;
 GO

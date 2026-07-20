@@ -215,7 +215,7 @@ folder is deployed once in step 5.
 5. `migrations/2026-06-15_smart_assignment_persistence_explainability.sql` — adds `Rec_GetDraftTaskRecommendationInput`, updates `Rec_GetLatestRecommendationsForTask`. Run **before** factor activation (#6).
 6. `migrations/2026-06-15_smart_assignment_factor_activation.sql` — updates `Rec_GetTaskRecommendationInput` **and** `Rec_GetDraftTaskRecommendationInput` to emit result sets 13 (current load) + 14 (continuity). Must run **after** #5.
 7. `migrations/2026-06-17_dashboard_command_center.sql` — adds six read-only `sp_Dashboard_*` procedures that back `GET /api/dashboard`. Additive and order-independent (only references baseline tables for reads).
-8. `migrations/2026-06-19_workplan_reports_overhaul.sql` — adds the WorkPlan/report foundation, guarded legacy backfills, and empty migration-control/audit tables. Stop on unknown report status.
+8. `migrations/2026-06-19_workplan_reports_overhaul.sql` — adds the WorkPlan/report foundation, guarded legacy backfills, and empty migration-control/audit tables. Stop on unknown report status. Creates **filtered indexes**, so it sets the required session options (`SET QUOTED_IDENTIFIER ON;` etc.) at the top of the script; run it with `sqlcmd -I` (the helper does) or in SSMS, never with `QUOTED_IDENTIFIER OFF`.
 9. `migrations/2026-06-19_workitems_check_constraints_null_semantics_fix.sql` — replaces the two WorkItems type/category CHECK constraints with NULL-safe `CASE ... ELSE 0 END = 1` expressions (`WITH NOCHECK`, no data mutation). **Run immediately after the WorkPlan/report foundation (#8).**
 10. `migrations/2026-06-20_geo_rec_tables_canonical.sql` — creates `Rec_EmployeeBaseAddress`, `Rec_SiteAddressProfile`, `Rec_RouteEstimates` only when missing, and adds `Latitude`/`Longitude` (`DECIMAL(9,6)`) coordinate columns. **Required for a fresh build:** the coordinate columns are **not** in the baseline geo tables.
 11. `migrations/2026-06-20_geo_address_coordinates.sql` — verifies (and, on older DBs, adds) the `DECIMAL(9,6)` coordinate columns on the geo profile tables. Must run **after** #10.
@@ -288,15 +288,38 @@ active admin. Skip for a clean/empty demo.
 
 ### PowerShell helper (explicit, correct order)
 ```powershell
+$ErrorActionPreference = 'Stop'
 $server = 'localhost'
 $db     = 'ManageR2_Dev'
 $root   = '.\database'
 
-# 1) baseline schema (empty DB only)
-sqlcmd -S $server -d $db -b -i "$root\schema\tables.sql"
+# Reusable runner. Every SQL file goes through this so the behaviour is identical everywhere:
+#   -I  uppercase: establishes QUOTED_IDENTIFIER ON for the connection (required by filtered indexes,
+#       indexed views, and computed-column indexes; sqlcmd otherwise defaults QUOTED_IDENTIFIER OFF).
+#   -b  makes sqlcmd return a non-zero exit code on the first SQL error.
+# IMPORTANT: -b alone does NOT stop a PowerShell pipeline — sqlcmd is a native exe, so a non-zero exit
+# code does not throw. We MUST check $LASTEXITCODE after every invocation and abort the whole process,
+# otherwise the build would silently continue after a failed file.
+function Invoke-ManageR2SqlFile {
+    param(
+        [Parameter(Mandatory)] [string] $Label,
+        [Parameter(Mandatory)] [string] $Path
+    )
+    Write-Host "==> [$Label] $Path"
+    sqlcmd -S $server -d $db -b -I -i $Path
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "FAILED [$Label] exit code $LASTEXITCODE : $Path" -ForegroundColor Red
+        exit $LASTEXITCODE   # stop the ENTIRE fresh build at the first failed file
+    }
+}
 
-# 2) functions
-Get-ChildItem "$root\functions\*.sql" | ForEach-Object { sqlcmd -S $server -d $db -b -i $_.FullName }
+# 1) baseline schema (empty DB only)
+Invoke-ManageR2SqlFile -Label 'schema' -Path "$root\schema\tables.sql"
+
+# 2) functions (deterministic order)
+Get-ChildItem "$root\functions\*.sql" | Sort-Object Name | ForEach-Object {
+    Invoke-ManageR2SqlFile -Label 'function' -Path $_.FullName
+}
 
 # 3) required migrations — EXPLICIT dependency order (do NOT sort the folder; a glob sort is wrong)
 $migrations = @(
@@ -315,7 +338,9 @@ $migrations = @(
   "$root\migrations\2026-07-19_smart_assignment_multi_role_feedback.sql",
   "$root\migrations\2026-07-19_smart_assignment_assignment_feedback_link.sql"
 )
-$migrations | ForEach-Object { sqlcmd -S $server -d $db -b -i $_ }
+foreach ($migration in $migrations) {
+    Invoke-ManageR2SqlFile -Label 'migration' -Path $migration
+}
 
 # 4) canonical stored procedures — ONCE, AFTER the migrations. Exclude exactly the two dated historical
 #    files by name (do NOT exclude by a '2026-*' glob — that would also skip future dated SP files).
@@ -329,13 +354,28 @@ $excludedSpFiles = @(
 Get-ChildItem "$root\SP\*.sql" |
   Where-Object { $excludedSpFiles -notcontains $_.Name } |
   Sort-Object Name |
-  ForEach-Object { sqlcmd -S $server -d $db -b -i $_.FullName }
+  ForEach-Object { Invoke-ManageR2SqlFile -Label 'stored-procedure' -Path $_.FullName }
 
 # 5) required seeds
-sqlcmd -S $server -d $db -b -i "$root\seed\2026-06-14_permission_roles.sql"
-sqlcmd -S $server -d $db -b -i "$root\seed\initial_admin\00_seed_initial_admin.sql"
+Invoke-ManageR2SqlFile -Label 'seed' -Path "$root\seed\2026-06-14_permission_roles.sql"
+Invoke-ManageR2SqlFile -Label 'seed' -Path "$root\seed\initial_admin\00_seed_initial_admin.sql"
+
+# Any ad-hoc verification query must use the SAME failure check (note -I and -b), e.g.:
+# sqlcmd -S $server -d $db -b -I -Q "SELECT COUNT(*) FROM sys.tables;"
+# if ($LASTEXITCODE -ne 0) { Write-Host "FAILED [verify] exit code $LASTEXITCODE" -ForegroundColor Red; exit $LASTEXITCODE }
 ```
-> `-b` makes `sqlcmd` stop on the first error so a broken deploy fails loudly.
+> **Why `-I` (uppercase).** Filtered indexes — and indexed views / computed-column indexes — can only be
+> created when `QUOTED_IDENTIFIER` is `ON`. `sqlcmd` defaults `QUOTED_IDENTIFIER` **OFF** (unlike SSMS,
+> which defaults it ON), so without `-I` the WorkPlan/report migration fails with
+> *"CREATE INDEX failed because the following SET options have incorrect settings: 'QUOTED_IDENTIFIER'."*
+> Passing `-I` establishes that connection option for every file.
+> **Belt-and-braces:** the SQL scripts that create filtered indexes also set the required options
+> **inside the script** (`SET QUOTED_IDENTIFIER ON;` etc.), so manual SSMS/Azure Data Studio execution
+> is correct even without relying on the client default.
+> **Why the `$LASTEXITCODE` check.** `-b` only sets a non-zero **exit code**; because `sqlcmd` is a
+> native executable, that does **not** stop a PowerShell pipeline on its own. `Invoke-ManageR2SqlFile`
+> checks `$LASTEXITCODE` after each file and calls `exit`, so the first failed file halts the whole
+> build and prints the exact failing label and path.
 > Never execute `igroup30_prod.sql`; it is read-only reference material.
 > Hebrew seed files are UTF-8 **with BOM**; `sqlcmd` auto-detects the BOM (force with `-f 65001` if needed).
 
