@@ -19,6 +19,9 @@ IF OBJECT_ID(N'dbo.__GeoAssertColumn', N'P') IS NOT NULL
     DROP PROCEDURE dbo.__GeoAssertColumn;
 GO
 
+-- For datetime2(n), the fractional-seconds precision is the column's SCALE (sys.columns.scale),
+-- not sys.columns.precision. datetime2(0) assertions must pass @Scale = 0 and must NOT assert
+-- @Precision = 0. Decimal columns still validate both @Precision and @Scale.
 CREATE PROCEDURE dbo.__GeoAssertColumn
     @TableName SYSNAME,
     @ColumnName SYSNAME,
@@ -177,9 +180,9 @@ BEGIN
     EXEC dbo.__GeoAssertColumn @TableName = N'Rec_EmployeeBaseAddress', @ColumnName = N'StateOrRegion', @TypeName = N'nvarchar', @IsNullable = 1;
     EXEC dbo.__GeoAssertColumn @TableName = N'Rec_EmployeeBaseAddress', @ColumnName = N'Country', @TypeName = N'nvarchar', @IsNullable = 1;
     EXEC dbo.__GeoAssertColumn @TableName = N'Rec_EmployeeBaseAddress', @ColumnName = N'ZoneId', @TypeName = N'int', @IsNullable = 1;
-    EXEC dbo.__GeoAssertColumn @TableName = N'Rec_EmployeeBaseAddress', @ColumnName = N'ValidatedAt', @TypeName = N'datetime2', @Precision = 0, @Scale = 0, @IsNullable = 1;
-    EXEC dbo.__GeoAssertColumn @TableName = N'Rec_EmployeeBaseAddress', @ColumnName = N'CreatedAt', @TypeName = N'datetime2', @Precision = 0, @Scale = 0, @IsNullable = 0;
-    EXEC dbo.__GeoAssertColumn @TableName = N'Rec_EmployeeBaseAddress', @ColumnName = N'UpdatedAt', @TypeName = N'datetime2', @Precision = 0, @Scale = 0, @IsNullable = 1;
+    EXEC dbo.__GeoAssertColumn @TableName = N'Rec_EmployeeBaseAddress', @ColumnName = N'ValidatedAt', @TypeName = N'datetime2', @Scale = 0, @IsNullable = 1;
+    EXEC dbo.__GeoAssertColumn @TableName = N'Rec_EmployeeBaseAddress', @ColumnName = N'CreatedAt', @TypeName = N'datetime2', @Scale = 0, @IsNullable = 0;
+    EXEC dbo.__GeoAssertColumn @TableName = N'Rec_EmployeeBaseAddress', @ColumnName = N'UpdatedAt', @TypeName = N'datetime2', @Scale = 0, @IsNullable = 1;
     EXEC dbo.__GeoEnsureCoordinateColumn @TableName = N'Rec_EmployeeBaseAddress', @ColumnName = N'Latitude';
     EXEC dbo.__GeoEnsureCoordinateColumn @TableName = N'Rec_EmployeeBaseAddress', @ColumnName = N'Longitude';
 END
@@ -245,9 +248,9 @@ BEGIN
     EXEC dbo.__GeoAssertColumn @TableName = N'Rec_SiteAddressProfile', @ColumnName = N'StateOrRegion', @TypeName = N'nvarchar', @IsNullable = 1;
     EXEC dbo.__GeoAssertColumn @TableName = N'Rec_SiteAddressProfile', @ColumnName = N'Country', @TypeName = N'nvarchar', @IsNullable = 1;
     EXEC dbo.__GeoAssertColumn @TableName = N'Rec_SiteAddressProfile', @ColumnName = N'ZoneId', @TypeName = N'int', @IsNullable = 1;
-    EXEC dbo.__GeoAssertColumn @TableName = N'Rec_SiteAddressProfile', @ColumnName = N'ValidatedAt', @TypeName = N'datetime2', @Precision = 0, @Scale = 0, @IsNullable = 1;
-    EXEC dbo.__GeoAssertColumn @TableName = N'Rec_SiteAddressProfile', @ColumnName = N'CreatedAt', @TypeName = N'datetime2', @Precision = 0, @Scale = 0, @IsNullable = 0;
-    EXEC dbo.__GeoAssertColumn @TableName = N'Rec_SiteAddressProfile', @ColumnName = N'UpdatedAt', @TypeName = N'datetime2', @Precision = 0, @Scale = 0, @IsNullable = 1;
+    EXEC dbo.__GeoAssertColumn @TableName = N'Rec_SiteAddressProfile', @ColumnName = N'ValidatedAt', @TypeName = N'datetime2', @Scale = 0, @IsNullable = 1;
+    EXEC dbo.__GeoAssertColumn @TableName = N'Rec_SiteAddressProfile', @ColumnName = N'CreatedAt', @TypeName = N'datetime2', @Scale = 0, @IsNullable = 0;
+    EXEC dbo.__GeoAssertColumn @TableName = N'Rec_SiteAddressProfile', @ColumnName = N'UpdatedAt', @TypeName = N'datetime2', @Scale = 0, @IsNullable = 1;
     EXEC dbo.__GeoEnsureCoordinateColumn @TableName = N'Rec_SiteAddressProfile', @ColumnName = N'Latitude';
     EXEC dbo.__GeoEnsureCoordinateColumn @TableName = N'Rec_SiteAddressProfile', @ColumnName = N'Longitude';
 END
@@ -304,7 +307,7 @@ BEGIN
     EXEC dbo.__GeoAssertColumn @TableName = N'Rec_RouteEstimates', @ColumnName = N'RoutingMode', @TypeName = N'nvarchar', @IsNullable = 0;
     EXEC dbo.__GeoAssertColumn @TableName = N'Rec_RouteEstimates', @ColumnName = N'EstimatedDistanceKm', @TypeName = N'decimal', @Precision = 10, @Scale = 2, @IsNullable = 1;
     EXEC dbo.__GeoAssertColumn @TableName = N'Rec_RouteEstimates', @ColumnName = N'EstimatedTravelMinutes', @TypeName = N'int', @IsNullable = 1;
-    EXEC dbo.__GeoAssertColumn @TableName = N'Rec_RouteEstimates', @ColumnName = N'CalculatedAt', @TypeName = N'datetime2', @Precision = 0, @Scale = 0, @IsNullable = 0;
+    EXEC dbo.__GeoAssertColumn @TableName = N'Rec_RouteEstimates', @ColumnName = N'CalculatedAt', @TypeName = N'datetime2', @Scale = 0, @IsNullable = 0;
     EXEC dbo.__GeoAssertColumn @TableName = N'Rec_RouteEstimates', @ColumnName = N'IsCurrent', @TypeName = N'bit', @IsNullable = 0;
 
     EXEC dbo.__GeoEnsureIndex
