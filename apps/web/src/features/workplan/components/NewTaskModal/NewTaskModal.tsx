@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChevronDown, Flag, MapPin, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { Drawer } from '@shared/components/Drawer';
 import { Button } from '@shared/components/Button';
 import { Input } from '@shared/components/Input';
@@ -41,14 +41,10 @@ import {
 } from '@features/serviceCalls/api/serviceCallsApiClient';
 import {
   canSelectRecommendationCandidate,
-  getCandidateNotices,
-  getRecommendationCandidateLabel,
-  getRecommendationFactorExplanation,
-  getRecommendationRouteEndpoints,
-  getWeightedRecommendationFactors,
   rankRecommendationCandidates,
   toggleExpandedRecommendation,
 } from '../../lib/smartAssignmentRecommendationPresentation';
+import { RecommendationCandidateCard } from '../RecommendationCandidateCard';
 import {
   DEFAULT_SMART_ASSIGNMENT_WEIGHTS,
   cloneSmartAssignmentWeights,
@@ -120,16 +116,6 @@ function getStepsForCategory(category: TaskCategory): Array<{ id: WizardStep; la
         { id: 'assignment', label: 'שיוך עובד' },
       ];
   }
-}
-
-function formatRecommendationScore(score?: number | null): string {
-  if (score == null || Number.isNaN(Number(score))) return '—';
-  return `${new Intl.NumberFormat('he-IL', { maximumFractionDigits: 1 }).format(Number(score))}%`;
-}
-
-function formatRecommendationContribution(contribution?: number | null): string {
-  if (contribution == null || Number.isNaN(Number(contribution))) return '—';
-  return `${new Intl.NumberFormat('he-IL', { maximumFractionDigits: 2 }).format(Number(contribution))} נק׳`;
 }
 
 export function NewTaskModal({
@@ -742,146 +728,23 @@ export function NewTaskModal({
     index: number,
     total: number,
   ) {
-    const isExpanded = expandedCandidateId === candidate.employeeId;
-    const notices = getCandidateNotices(candidate);
-    const displayedFactors = getWeightedRecommendationFactors(candidate.factors);
-    const triggerId = `${recommendationAccordionId}-${candidate.employeeId}-trigger`;
-    const panelId = `${recommendationAccordionId}-${candidate.employeeId}-panel`;
-
     return (
-      <article className="newTaskModal__recommendation" key={candidate.employeeId}>
-        <div className="newTaskModal__candidateRow">
-          <button
-            id={triggerId}
-            type="button"
-            className="newTaskModal__candidateToggle"
-            aria-expanded={isExpanded}
-            aria-controls={panelId}
-            onClick={() => setExpandedCandidateId((current) =>
-              toggleExpandedRecommendation(current, candidate.employeeId))}
-          >
-            <span className="newTaskModal__candidateIdentity">
-              <strong className="newTaskModal__recommendationName">
-                {candidate.fullName ?? `עובד #${candidate.employeeId}`}
-              </strong>
-              <span className="newTaskModal__relativeRank">
-                {getRecommendationCandidateLabel(index, total)}
-              </span>
-            </span>
-            <span className="newTaskModal__candidateSummary">
-              {candidate.totalScore != null && (
-                <span className="newTaskModal__score" dir="ltr">
-                  {formatRecommendationScore(candidate.totalScore)}
-                </span>
-              )}
-              <ChevronDown
-                size={18}
-                className="newTaskModal__candidateChevron"
-                aria-hidden="true"
-              />
-            </span>
-          </button>
-          <Button
-            type="button"
-            size="sm"
-            variant={
-              acceptedRecommendation?.employeeId === candidate.employeeId
-                ? 'secondary'
-                : 'primary'
-            }
-            onClick={() => handleAcceptRecommendation(candidate)}
-            disabled={mutation.isPending}
-          >
-            {acceptedRecommendation?.employeeId === candidate.employeeId ? 'נבחר' : 'בחר עובד'}
-          </Button>
-        </div>
-
-        <div
-          id={panelId}
-          role="region"
-          aria-labelledby={triggerId}
-          hidden={!isExpanded}
-          className="newTaskModal__candidateDetails"
-        >
-          {notices.length > 0 && (
-            <ul className="newTaskModal__reasons">
-              {notices.map((notice, index) => (
-                <li key={`${notice}-${index}`} className="newTaskModal__warning">
-                  {notice}
-                </li>
-              ))}
-            </ul>
-          )}
-          {displayedFactors.length > 0 && (
-            <div>
-              <h5 className="newTaskModal__contributionsTitle">פירוט חמשת גורמי החישוב</h5>
-              <ul className="newTaskModal__factors">
-                {displayedFactors.map((factor) => {
-                  const routeEndpoints = getRecommendationRouteEndpoints(factor);
-                  return (
-                    <li className="newTaskModal__factor" key={factor.key}>
-                      <div className="newTaskModal__factorHead">
-                        <span className="newTaskModal__factorLabel">{factor.label}</span>
-                        <span className="newTaskModal__factorMetrics">
-                          <span>ציון <b dir="ltr">{formatRecommendationScore(factor.score)}</b></span>
-                          <span>משקל <b dir="ltr">{formatRecommendationScore(factor.weightPercent)}</b></span>
-                          <span>תרומה <b dir="ltr">{formatRecommendationContribution(factor.weightedContribution)}</b></span>
-                        </span>
-                      </div>
-                      {routeEndpoints && (
-                        <div
-                          className="newTaskModal__routeEndpoints"
-                          role="group"
-                          aria-label="מוצא ויעד לחישוב הנסיעה"
-                        >
-                          <div className="newTaskModal__routeEndpoint">
-                            <MapPin size={18} aria-hidden="true" />
-                            <span>
-                              <span className="newTaskModal__routeEndpointLabel">מוצא העובד</span>
-                              <strong>
-                                {routeEndpoints.originFormattedAddress ?? 'כתובת מוצא לא זמינה'}
-                              </strong>
-                            </span>
-                          </div>
-                          <div className="newTaskModal__routeEndpoint">
-                            <Flag size={18} aria-hidden="true" />
-                            <span>
-                              <span className="newTaskModal__routeEndpointLabel">יעד המשימה</span>
-                              <strong>
-                                {routeEndpoints.destinationFormattedAddress ?? 'כתובת יעד לא זמינה'}
-                              </strong>
-                            </span>
-                          </div>
-                        </div>
-                      )}
-                      <span className="newTaskModal__factorExplain">
-                        {getRecommendationFactorExplanation(candidate, factor)}
-                        {factor.isDefaulted ? ' · נעשה שימוש בערך ברירת מחדל' : ''}
-                      </span>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          )}
-          <div className="newTaskModal__ratingAction">
-            <Button
-              type="button"
-              size="sm"
-              variant="secondary"
-              onClick={() => setRatingCandidateId(candidate.employeeId)}
-              disabled={mutation.isPending}
-            >
-              דירוג המלצה
-            </Button>
-            {recommendationRatings[candidate.employeeId] && (
-              <span className="newTaskModal__ratingStatus" aria-live="polite">
-                דורג {recommendationRatings[candidate.employeeId].rating}/10
-              </span>
-            )}
-          </div>
-        </div>
-      </article>
+      <RecommendationCandidateCard
+        key={candidate.employeeId}
+        candidate={candidate}
+        index={index}
+        total={total}
+        accordionId={recommendationAccordionId}
+        isExpanded={expandedCandidateId === candidate.employeeId}
+        onToggleExpand={(employeeId) =>
+          setExpandedCandidateId((current) => toggleExpandedRecommendation(current, employeeId))}
+        isSelected={acceptedRecommendation?.employeeId === candidate.employeeId}
+        onSelect={handleAcceptRecommendation}
+        selectDisabled={mutation.isPending}
+        ratingValue={recommendationRatings[candidate.employeeId] ?? null}
+        onOpenRating={(employeeId) => setRatingCandidateId(employeeId)}
+        ratingDisabled={mutation.isPending}
+      />
     );
   }
 

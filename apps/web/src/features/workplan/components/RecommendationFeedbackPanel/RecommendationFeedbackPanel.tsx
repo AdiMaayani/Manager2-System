@@ -9,6 +9,7 @@ import {
 } from '../../api/workplanApiClient';
 import {
   buildSmartAssignmentFeedbackRequest,
+  canQueryAssignmentFeedback,
   getAssignmentFeedbackContext,
   smartAssignmentFeedbackQueryKey,
 } from '../../lib/smartAssignmentFeedback';
@@ -175,6 +176,13 @@ export function RecommendationFeedbackPanel({
   const isDirectAssignment = assignment.workItemId === taskId
     && assignment.assignmentSource === 'Task';
   const isSmartAssignment = isDirectAssignment && assignment.isManualAssignment === false;
+  const canLoadAssignmentFeedback = canQueryAssignmentFeedback({
+    taskId,
+    assignmentWorkItemId: assignment.workItemId,
+    assignmentSource: assignment.assignmentSource,
+    isManualAssignment: assignment.isManualAssignment,
+    assignedEmployeeId,
+  });
 
   const queryKey = useMemo(
     () => smartAssignmentFeedbackQueryKey(taskId, assignedEmployeeId ?? 0),
@@ -184,10 +192,7 @@ export function RecommendationFeedbackPanel({
   const feedbackQuery = useQuery({
     queryKey,
     queryFn: () => getSmartAssignmentAssignmentFeedbackAsync(taskId, assignedEmployeeId!),
-    enabled: isSmartAssignment
-      && taskId > 0
-      && assignedEmployeeId != null
-      && assignedEmployeeId > 0,
+    enabled: canLoadAssignmentFeedback,
     retry: false,
   });
 

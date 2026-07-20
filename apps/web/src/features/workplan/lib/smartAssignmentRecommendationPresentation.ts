@@ -1,4 +1,45 @@
-import type { DraftRecommendationCandidate, RecommendationFactor } from '../types';
+import type {
+  DraftRecommendationCandidate,
+  RecommendationFactor,
+  SmartAssignmentCandidate,
+} from '../types';
+
+/**
+ * Adapts a saved-run recommendation candidate (from POST /api/SmartAssignment/recommend) to the
+ * draft candidate shape so the shared presentation helpers and candidate card can render it. The
+ * only structural difference is rejection reasons, which the saved contract carries as objects.
+ */
+export function toDraftRecommendationCandidate(
+  candidate: SmartAssignmentCandidate,
+): DraftRecommendationCandidate {
+  return {
+    rankOrder: candidate.rankOrder ?? null,
+    employeeId: candidate.employeeId,
+    fullName: candidate.fullName ?? null,
+    primaryRole: candidate.primaryRole ?? null,
+    professions: candidate.professions ?? [],
+    requiredRoles: candidate.requiredRoles ?? [],
+    matchedRoles: candidate.matchedRoles ?? [],
+    missingRoles: candidate.missingRoles ?? [],
+    totalScore: candidate.totalScore ?? null,
+    isEligible: candidate.isEligible,
+    exclusionReason: candidate.exclusionReason ?? null,
+    status: candidate.status,
+    recommendationSummary: candidate.recommendationSummary ?? null,
+    warnings: candidate.warnings ?? [],
+    rejectionReasonCodes: (candidate.rejectionReasons ?? [])
+      .map((reason) => reason.code)
+      .filter((code): code is string => typeof code === 'string' && code.length > 0),
+    missingInputCodes: candidate.missingInputCodes ?? [],
+    policyProfileKey: candidate.policyProfileKey ?? null,
+    policyVersion: candidate.policyVersion ?? null,
+    policyDisplayName: candidate.policyDisplayName ?? null,
+    originTypeUsed: candidate.originTypeUsed ?? null,
+    travelMinutes: candidate.travelMinutes ?? null,
+    distanceKm: candidate.distanceKm ?? null,
+    factors: candidate.factors ?? [],
+  };
+}
 
 const WEIGHTED_FACTOR_KEYS = new Set([
   'professional',
@@ -52,6 +93,20 @@ export function rankRecommendationCandidates(
       return scoreDifference || left.index - right.index;
     })
     .map(({ candidate }) => candidate);
+}
+
+/** Keeps the first candidate per EmployeeId, preserving input order (defensive de-duplication). */
+export function dedupeCandidatesByEmployeeId(
+  candidates: readonly DraftRecommendationCandidate[],
+): DraftRecommendationCandidate[] {
+  const seenEmployeeIds = new Set<number>();
+  const uniqueCandidates: DraftRecommendationCandidate[] = [];
+  for (const candidate of candidates) {
+    if (seenEmployeeIds.has(candidate.employeeId)) continue;
+    seenEmployeeIds.add(candidate.employeeId);
+    uniqueCandidates.push(candidate);
+  }
+  return uniqueCandidates;
 }
 
 export function getRecommendationCandidateLabel(index: number, total: number): string {

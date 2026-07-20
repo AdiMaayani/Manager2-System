@@ -163,6 +163,29 @@ public class SmartAssignmentBatchServiceTests
     }
 
     [Fact]
+    public async Task GenerateRecommendationsAsync_SurfacesFullRankedCandidateListPerTask()
+    {
+        var harness = CreateHarness(
+            [CreateWorkItem(1, TaskStart)],
+            inputFactory: workItem =>
+                CreateRecommendationInputWithEmployees(workItem, Enumerable.Range(1, 5)));
+
+        var result = await harness.Service.GenerateRecommendationsAsync(new SmartAssignmentRequestModel
+        {
+            WorkItemIds = [1]
+        });
+
+        var taskResult = Assert.Single(result.TaskResults);
+        Assert.Equal(5, taskResult.Candidates.Count);
+        // The top candidate matches the single recommended employee.
+        Assert.Equal(taskResult.RecommendedEmployeeId, taskResult.Candidates[0].EmployeeId);
+        // Every candidate is unique by employee id.
+        Assert.Equal(
+            taskResult.Candidates.Select(candidate => candidate.EmployeeId).Distinct().Count(),
+            taskResult.Candidates.Count);
+    }
+
+    [Fact]
     public async Task GenerateRecommendationsAsync_SaveFailureDoesNotPublishPartialRun()
     {
         var harness = CreateHarness([CreateWorkItem(1, TaskStart)]);

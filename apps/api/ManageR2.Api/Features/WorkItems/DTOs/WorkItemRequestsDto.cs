@@ -82,6 +82,11 @@ public class AssignEmployeeRequest
 public class UpdateEmployeeAssignmentRequest
 {
     public int EmployeeId { get; set; }
+
+    // When supplied, the replacement is recorded as a Smart Assignment: the recommendation run is
+    // resolved for this work item + replacement employee and stored, and IsManualAssignment is cleared.
+    // When null, the existing manual replacement behavior is preserved.
+    public int? RecommendationRunId { get; set; }
 }
 
 public class EmployeeAssignmentReplacementRequest

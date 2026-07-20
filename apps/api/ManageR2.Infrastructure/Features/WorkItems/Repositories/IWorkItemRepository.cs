@@ -34,7 +34,8 @@ namespace ManageR2.Infrastructure.Repositories
         Task<bool> UpdateEmployeeWorkAssignmentAsync(
             int workItemId,
             int workEmployeeAssignmentId,
-            int employeeId);
+            int employeeId,
+            int? recommendationRunId = null);
         Task<bool> AssignContractorToWorkAsync(int workItemId, int contractorId, string assignmentRole);
         Task<bool> SyncEmployeeAssignmentsByWorkItemIdAsync(int workItemId, IReadOnlyCollection<(int EmployeeId, string AssignmentRole)> assignments);
 

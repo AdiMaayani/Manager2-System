@@ -6,7 +6,11 @@ GO
 CREATE OR ALTER PROCEDURE dbo.sp_UpdateEmployeeWorkAssignment
     @WorkItemId INT,
     @WorkEmployeeAssignmentId INT,
-    @EmployeeId INT
+    @EmployeeId INT,
+    -- Optional. When supplied, the replacement is recorded as a Smart Assignment: the completed
+    -- recommendation for this run + work item + replacement employee is resolved and stored, and
+    -- IsManualAssignment is cleared. When NULL, the manual replacement behavior is preserved.
+    @RecommendationRunId INT = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -15,12 +19,17 @@ BEGIN
     DECLARE @ExistingEmployeeId INT;
     DECLARE @WorkItemIsArchived BIT;
     DECLARE @WorkItemIsLocked BIT;
+    DECLARE @SmartAssignmentRecommendationId INT = NULL;
+    DECLARE @IsManualAssignment BIT = 1;
     DECLARE @RowsAffected INT = 0;
 
     IF @WorkItemId IS NULL OR @WorkItemId < 1
        OR @WorkEmployeeAssignmentId IS NULL OR @WorkEmployeeAssignmentId < 1
        OR @EmployeeId IS NULL OR @EmployeeId < 1
         THROW 55000, 'Work item, assignment, and employee identifiers must be positive.', 1;
+
+    IF @RecommendationRunId IS NOT NULL AND @RecommendationRunId < 1
+        THROW 55009, 'RecommendationRunId must be positive when supplied.', 1;
 
     BEGIN TRY
         BEGIN TRANSACTION;
@@ -81,12 +90,32 @@ BEGIN
             THROW 55006, 'The replacement employee is already assigned to this work item.', 1;
         END;
 
+        -- Smart replacement: resolve the exact recommendation using the same invariants as
+        -- sp_AssignEmployeeToWork (matching run, work item, replacement employee, completed run).
+        IF @RecommendationRunId IS NOT NULL
+        BEGIN
+            SELECT @SmartAssignmentRecommendationId = recommendation.RecommendationId
+            FROM dbo.Rec_TaskAssignmentRecommendations AS recommendation
+            INNER JOIN dbo.Rec_RecommendationRuns AS recommendationRun
+                ON recommendationRun.RecommendationRunId = recommendation.RecommendationRunId
+            WHERE recommendation.RecommendationRunId = @RecommendationRunId
+              AND recommendation.TaskId = @WorkItemId
+              AND recommendation.EmployeeId = @EmployeeId
+              AND recommendationRun.RunStatus = N'Completed'
+              AND (recommendationRun.TaskId IS NULL OR recommendationRun.TaskId = @WorkItemId);
+
+            IF @SmartAssignmentRecommendationId IS NULL
+                THROW 55010, 'The completed recommendation run does not contain this work item and replacement employee.', 1;
+
+            SET @IsManualAssignment = 0;
+        END;
+
         UPDATE dbo.WorkEmployeeAssignments
         SET
             EmployeeId = @EmployeeId,
             AssignedAt = SYSUTCDATETIME(),
-            IsManualAssignment = 1,
-            SmartAssignmentRecommendationId = NULL
+            IsManualAssignment = @IsManualAssignment,
+            SmartAssignmentRecommendationId = @SmartAssignmentRecommendationId
         WHERE WorkEmployeeAssignmentId = @WorkEmployeeAssignmentId
           AND WorkItemId = @WorkItemId;
 

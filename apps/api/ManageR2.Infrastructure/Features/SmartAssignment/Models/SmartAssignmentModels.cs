@@ -105,6 +105,11 @@ namespace ManageR2.Infrastructure.Models
         // Explainability for the recommended employee (factor scores/weights/explanations/data sources).
         public List<ManageR2.Infrastructure.Models.SmartAssignment.RecommendationFactorModel> Factors { get; set; }
             = new List<ManageR2.Infrastructure.Models.SmartAssignment.RecommendationFactorModel>();
+
+        // Full ranked active-employee list (same ordering persisted for the saved run) so a saved-task
+        // rerun can present every candidate for selection, not just the single top recommendation.
+        public List<ManageR2.Infrastructure.Models.SmartAssignment.EmployeeCandidateModel> Candidates { get; set; }
+            = new List<ManageR2.Infrastructure.Models.SmartAssignment.EmployeeCandidateModel>();
     }
 
     // Alternate compact recommendation row shape (work item + ids + score) if used by older engine paths.

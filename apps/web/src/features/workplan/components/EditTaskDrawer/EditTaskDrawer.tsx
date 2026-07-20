@@ -19,6 +19,7 @@ import {
 import { updateServiceCallAsync } from '@features/serviceCalls/api/serviceCallsApiClient';
 import {
   getWorkItemByIdAsync,
+  replaceEmployeeAssignmentAsync,
   updateWorkItemAsync,
 } from '../../api/workplanApiClient';
 import { useEmployeePrimaryRoles } from '@features/employees/hooks/useEmployeePrimaryRoles';
@@ -34,6 +35,22 @@ import {
   normalizeWorkPlanPriorityCode,
   WORKPLAN_PRIORITY_OPTIONS,
 } from '../../constants';
+import {
+  cancelStaleAssignmentFeedbackQueries,
+  purgeStaleAssignmentFeedbackQueries,
+} from '../../lib/smartAssignmentFeedback';
+import {
+  buildPendingAssignmentReplacements,
+  canExposeSavedTaskSmartRerun,
+  getSmartPendingReplacements,
+  hasUnsavedRecommendationAffectingChanges,
+  toManualEmployeeReplacementRequests,
+  type StagedSmartReplacement,
+} from '../../lib/smartRerunAssignment';
+import {
+  SmartRerunPanel,
+  type StagedSmartRerunSelection,
+} from '../SmartRerunPanel';
 import type {
   WorkItemResponse,
   WorkPlanEmployee,
@@ -47,6 +64,7 @@ interface EditTaskDrawerProps {
   task: WorkPlanTaskSelection | null;
   assignments: WorkPlanScheduleAssignment[];
   employees: WorkPlanEmployee[];
+  canEdit?: boolean;
   onClose: () => void;
   onSaved?: () => void;
 }
@@ -77,6 +95,7 @@ export function EditTaskDrawer({
   task,
   assignments,
   employees,
+  canEdit = true,
   onClose,
   onSaved,
 }: EditTaskDrawerProps) {
@@ -92,6 +111,7 @@ export function EditTaskDrawer({
       task={task}
       assignments={assignments}
       employees={employees}
+      canEdit={canEdit}
       onClose={onClose}
       onSaved={onSaved}
     />
@@ -102,6 +122,7 @@ interface EditTaskDrawerContentProps {
   task: WorkPlanTaskSelection | null;
   assignments: WorkPlanScheduleAssignment[];
   employees: WorkPlanEmployee[];
+  canEdit: boolean;
   onClose: () => void;
   onSaved?: () => void;
 }
@@ -110,6 +131,7 @@ function EditTaskDrawerContent({
   task,
   assignments,
   employees,
+  canEdit,
   onClose,
   onSaved,
 }: EditTaskDrawerContentProps) {
@@ -172,11 +194,13 @@ function EditTaskDrawerContent({
       isOpen
       isMaximized={isMaximized}
       onToggleMaximize={toggleMaximize}
+      task={task}
       taskId={task.taskId}
       initialValues={workItemQuery.data ?? task}
       workItem={workItemQuery.data ?? null}
       assignments={assignments}
       employees={employees}
+      canEdit={canEdit}
       onClose={onClose}
       onSaved={onSaved}
     />
@@ -187,6 +211,7 @@ interface EditTaskFormProps {
   isOpen: boolean;
   isMaximized: boolean;
   onToggleMaximize: () => void;
+  task: WorkPlanTaskSelection;
   taskId: number;
   initialValues: EditableTaskFieldsSource;
   // Full work item is required for saving: the backend PUT replaces every
@@ -194,6 +219,7 @@ interface EditTaskFormProps {
   workItem: WorkItemResponse | null;
   assignments: WorkPlanScheduleAssignment[];
   employees: WorkPlanEmployee[];
+  canEdit: boolean;
   onClose: () => void;
   onSaved?: () => void;
 }
@@ -330,11 +356,13 @@ function EditTaskForm({
   isOpen,
   isMaximized,
   onToggleMaximize,
+  task,
   taskId,
   initialValues,
   workItem,
   assignments,
   employees,
+  canEdit,
   onClose,
   onSaved,
 }: EditTaskFormProps) {
@@ -345,6 +373,7 @@ function EditTaskForm({
   );
   const isServiceCall =
     workItem?.taskCategory === 'ServiceCall' || workItem?.workType === 'ServiceCall';
+  const isLocked = Boolean(workItem?.isLocked ?? task.isLocked);
 
   const [title, setTitle] = useState(initialValues.title || '');
   const [description, setDescription] = useState(initialValues.description || '');
@@ -368,6 +397,8 @@ function EditTaskForm({
   const [replacementEmployeeIds, setReplacementEmployeeIds] = useState<
     Record<number, number | null>
   >({});
+  const [stagedSmartReplacement, setStagedSmartReplacement] =
+    useState<StagedSmartReplacement | null>(null);
 
   const rolesQuery = useEmployeePrimaryRoles(isOpen);
   const availableRoles = useMemo(
@@ -384,6 +415,7 @@ function EditTaskForm({
       && (assignment.workEmployeeAssignmentId ?? 0) > 0),
     [assignments, taskId],
   );
+  const primaryAssignment = directAssignments[0] ?? null;
   const assignedEmployeeIds = useMemo(
     () => new Set(
       directAssignments
@@ -415,37 +447,126 @@ function EditTaskForm({
     [scheduleParts],
   );
 
+  const isRecommendationInputDirty = useMemo(
+    () => hasUnsavedRecommendationAffectingChanges({
+      persisted: {
+        plannedStart: initialValues.plannedStart,
+        plannedEnd: initialValues.plannedEnd,
+        priority: initialValues.priority,
+        requiredRole: initialValues.requiredRole,
+        requiredRoles: initialValues.requiredRoles,
+      },
+      scheduleParts,
+      priority,
+      requiredRoles,
+    }),
+    [
+      initialValues.plannedEnd,
+      initialValues.plannedStart,
+      initialValues.priority,
+      initialValues.requiredRole,
+      initialValues.requiredRoles,
+      priority,
+      requiredRoles,
+      scheduleParts,
+    ],
+  );
+
+  const showSmartRerun = canExposeSavedTaskSmartRerun({
+    canEdit,
+    isLocked,
+    hasDirectAssignment: primaryAssignment != null,
+  });
+
+  const stagedSmartRerunSelection: StagedSmartRerunSelection | null =
+    stagedSmartReplacement && primaryAssignment
+      ? {
+          employeeId: stagedSmartReplacement.employeeId,
+          employeeName: employees.find(
+            (employee) => employee.employeeId === stagedSmartReplacement.employeeId,
+          )?.fullName
+            ?? `עובד #${stagedSmartReplacement.employeeId}`,
+          recommendationRunId: stagedSmartReplacement.recommendationRunId,
+        }
+      : null;
+
+  function clearSmartStagingForAssignment(assignmentId: number) {
+    setStagedSmartReplacement((current) =>
+      current?.assignmentId === assignmentId ? null : current);
+  }
+
+  function handleStageSmartSelection(selection: StagedSmartRerunSelection | null) {
+    if (!primaryAssignment || (primaryAssignment.workEmployeeAssignmentId ?? 0) <= 0) {
+      setStagedSmartReplacement(null);
+      return;
+    }
+
+    const assignmentId = primaryAssignment.workEmployeeAssignmentId!;
+    if (!selection) {
+      setStagedSmartReplacement(null);
+      return;
+    }
+
+    // Selecting the currently assigned employee must not stage a replacement.
+    if (selection.employeeId === primaryAssignment.employeeId) {
+      setReplacementEmployeeIds((current) => ({
+        ...current,
+        [assignmentId]: null,
+      }));
+      setStagedSmartReplacement(null);
+      return;
+    }
+
+    setReplacementEmployeeIds((current) => ({
+      ...current,
+      [assignmentId]: selection.employeeId,
+    }));
+    setStagedSmartReplacement({
+      assignmentId,
+      employeeId: selection.employeeId,
+      recommendationRunId: selection.recommendationRunId,
+    });
+  }
+
   const saveMutation = useMutation({
     mutationFn: async () => {
       if (!workItem) {
         throw new Error('לא נטענו נתוני המשימה');
       }
+      if (isLocked || !canEdit) {
+        throw new Error('אין הרשאה לשמור שינויים במשימה זו.');
+      }
 
       if (!title.trim()) throw new Error('יש להזין כותרת משימה');
       const plannedTimeRange = validatePlannedUtcRange(scheduleParts);
       const requiredRole = legacyRequiredRole(requiredRoles);
-      const replacements = directAssignments.flatMap((assignment) => {
-        const assignmentId = assignment.workEmployeeAssignmentId ?? 0;
-        const replacementEmployeeId = replacementEmployeeIds[assignmentId] ?? null;
-        return replacementEmployeeId != null && replacementEmployeeId !== assignment.employeeId
-          ? [{ assignmentId, replacementEmployeeId }]
-          : [];
+      const pendingReplacements = buildPendingAssignmentReplacements({
+        directAssignments,
+        replacementEmployeeIds,
+        stagedSmartReplacement,
       });
       const uniqueReplacementEmployeeIds = new Set(
-        replacements.map((replacement) => replacement.replacementEmployeeId),
+        pendingReplacements.map((replacement) =>
+          replacement.kind === 'smart'
+            ? replacement.request.employeeId
+            : replacement.employeeId),
       );
-      if (uniqueReplacementEmployeeIds.size !== replacements.length) {
+      if (uniqueReplacementEmployeeIds.size !== pendingReplacements.length) {
         throw new Error('לא ניתן לבחור את אותו עובד חלופי עבור יותר משיוך אחד.');
       }
-      if (replacements.some((replacement) => !employees.some(
-        (employee) => employee.employeeId === replacement.replacementEmployeeId && employee.isActive,
-      ))) {
+      if (pendingReplacements.some((replacement) => {
+        const employeeId = replacement.kind === 'smart'
+          ? replacement.request.employeeId
+          : replacement.employeeId;
+        return !employees.some(
+          (employee) => employee.employeeId === employeeId && employee.isActive,
+        );
+      })) {
         throw new Error('ניתן לבחור רק עובד פעיל כעובד חלופי.');
       }
-      const employeeReplacements = replacements.map((replacement) => ({
-        workEmployeeAssignmentId: replacement.assignmentId,
-        employeeId: replacement.replacementEmployeeId,
-      }));
+
+      const manualEmployeeReplacements = toManualEmployeeReplacementRequests(pendingReplacements);
+      const smartReplacements = getSmartPendingReplacements(pendingReplacements);
 
       if (isServiceCall) {
         await updateServiceCallAsync(taskId, {
@@ -463,7 +584,7 @@ function EditTaskForm({
           actualStart: workItem.actualStart ?? null,
           actualEnd: workItem.actualEnd ?? null,
           actualHours: workItem.actualHours ?? null,
-          employeeReplacements,
+          employeeReplacements: manualEmployeeReplacements,
         });
       } else {
         await updateWorkItemAsync(taskId, {
@@ -488,20 +609,47 @@ function EditTaskForm({
           actualStart: workItem.actualStart ?? null,
           actualEnd: workItem.actualEnd ?? null,
           actualHours: workItem.actualHours ?? null,
-          employeeReplacements,
+          employeeReplacements: manualEmployeeReplacements,
         });
       }
+
+      for (const smartReplacement of smartReplacements) {
+        await replaceEmployeeAssignmentAsync(
+          taskId,
+          smartReplacement.assignmentId,
+          smartReplacement.request,
+        );
+      }
+
+      return pendingReplacements;
     },
-    onSuccess: async () => {
+    onSuccess: async (pendingReplacements) => {
+      const previousEmployeeIds = pendingReplacements.map(
+        (replacement) => replacement.previousEmployeeId,
+      );
+      const nextEmployeeIds = pendingReplacements.map((replacement) =>
+        replacement.kind === 'smart'
+          ? replacement.request.employeeId
+          : replacement.employeeId);
+
+      await cancelStaleAssignmentFeedbackQueries(queryClient, {
+        workItemId: taskId,
+        previousEmployeeIds,
+      });
+
       await Promise.all([
         invalidateWorkPlanQueries(queryClient, workItem?.parentWorkItemId),
-        queryClient.invalidateQueries({
-          queryKey: ['smartAssignment', 'assignment-feedback', taskId],
-        }),
         ...(isServiceCall
           ? [queryClient.invalidateQueries({ queryKey: ['serviceCalls'] })]
           : []),
       ]);
+
+      purgeStaleAssignmentFeedbackQueries(queryClient, {
+        workItemId: taskId,
+        previousEmployeeIds,
+        nextEmployeeIds,
+      });
+
       onSaved?.();
       onClose();
     },
@@ -528,7 +676,7 @@ function EditTaskForm({
           type="button"
           onClick={() => saveMutation.mutate()}
           isLoading={saveMutation.isPending}
-          disabled={isBusy || !workItem}
+          disabled={isBusy || !workItem || isLocked || !canEdit}
         >
           שמור
         </Button>
@@ -702,6 +850,7 @@ function EditTaskForm({
                     unavailableEmployeeIds={unavailableEmployeeIds}
                     selectedEmployeeId={selectedEmployeeId}
                     onSelectedEmployeeChange={(employeeId) => {
+                      clearSmartStagingForAssignment(assignmentId);
                       setReplacementEmployeeIds((current) => ({
                         ...current,
                         [assignmentId]: employeeId,
@@ -715,6 +864,16 @@ function EditTaskForm({
             <InlineAlert variant="info">
               אין למשימה שיוך עובד ישיר שניתן להחליף.
             </InlineAlert>
+          )}
+
+          {showSmartRerun && (
+            <SmartRerunPanel
+              task={task}
+              isRecommendationInputDirty={isRecommendationInputDirty}
+              stagedSelection={stagedSmartRerunSelection}
+              onStageSelection={handleStageSmartSelection}
+              disabled={isBusy || !workItem}
+            />
           )}
         </section>
       </div>

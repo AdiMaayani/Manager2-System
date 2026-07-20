@@ -1,5 +1,6 @@
 using ManageR2.Api.DTOs;
 using ManageR2.Infrastructure.Features.WorkItems.Models;
+using ManageR2.Infrastructure.Features.WorkItems.Services;
 using ManageR2.Infrastructure.Models;
 
 namespace ManageR2.Api.Features.WorkItems.Mapping;
@@ -55,8 +56,10 @@ public static class WorkPlanScheduleDtoFactory
             WorkType = task.WorkType,
             Status = task.Status,
             Priority = task.Priority,
-            PlannedStart = task.PlannedStart,
-            PlannedEnd = task.PlannedEnd,
+            // SQL stores UTC wall-clock with Kind=Unspecified; mark UTC so JSON serializes a Z suffix
+            // and the client converts back to Israel local instead of reading the value as local time.
+            PlannedStart = UtcDateTimeNormalizer.MarkStoredAsUtc(task.PlannedStart),
+            PlannedEnd = UtcDateTimeNormalizer.MarkStoredAsUtc(task.PlannedEnd),
             DerivedDurationMinutes = task.DerivedDurationMinutes,
             EstimatedHours = task.EstimatedHours,
             RequiredRole = task.RequiredRole,
