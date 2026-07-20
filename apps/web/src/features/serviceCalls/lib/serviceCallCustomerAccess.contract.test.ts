@@ -31,4 +31,9 @@ describe('ServiceCallDrawer Customer access contract', () => {
     expect(drawerSource).toContain("'view'");
     expect(drawerSource).toContain("'manageSites'");
   });
+
+  it('gates ניהול אתרי הלקוח on manageSites (aligned with CanManageSites)', () => {
+    expect(drawerSource).toContain("can('manageSites')");
+    expect(drawerSource).toContain('canManageSites &&');
+  });
 });

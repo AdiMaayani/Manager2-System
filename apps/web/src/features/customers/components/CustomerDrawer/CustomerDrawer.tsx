@@ -116,9 +116,10 @@ interface CustomerDrawerContentProps {
 function CustomerDrawerContent({ customer, onClose, onSaved }: CustomerDrawerContentProps) {
   const isExistingCustomer = customer != null;
   const { can } = usePermissions();
-  // View-only roles (e.g. ProjectManager) can open a customer for review but must not reach the
-  // edit/deactivate UI, which would only 403 on save. The API still enforces this server-side.
+  // Customer edit/deactivate stays on manageCustomers. Sites are a separate backend policy
+  // (CanManageSites), so ProjectManager can manage sites without editing the customer record.
   const canManage = can('manageCustomers');
+  const canManageSites = can('manageSites');
   const { createMutation, updateMutation, deactivateMutation } = useCustomerMutations();
 
   // Existing customers open in read-only review mode; create opens editable.
@@ -291,7 +292,7 @@ function CustomerDrawerContent({ customer, onClose, onSaved }: CustomerDrawerCon
       footer={isEditing ? editFooter : reviewFooter}
     >
       {!isEditing && isExistingCustomer ? (
-        <CustomerReviewDetails customer={customer} canManage={canManage} />
+        <CustomerReviewDetails customer={customer} canManageSites={canManageSites} />
       ) : (
         <div className="customerDrawer customerDrawer--edit">
           <DetailsSection title="פרטים כלליים">
@@ -368,10 +369,10 @@ function CustomerDrawerContent({ customer, onClose, onSaved }: CustomerDrawerCon
 
 interface CustomerReviewDetailsProps {
   customer: Customer;
-  canManage: boolean;
+  canManageSites: boolean;
 }
 
-function CustomerReviewDetails({ customer, canManage }: CustomerReviewDetailsProps) {
+function CustomerReviewDetails({ customer, canManageSites }: CustomerReviewDetailsProps) {
   const areRelatedQueriesEnabled = true;
 
   const projectsQuery = useQuery({
@@ -573,7 +574,7 @@ function CustomerReviewDetails({ customer, canManage }: CustomerReviewDetailsPro
         <RelatedOverflowNote total={relatedContacts.length} />
       </RelatedSection>
 
-      <CustomerSitesSection customerId={customer.customerId} canManage={canManage} />
+      <CustomerSitesSection customerId={customer.customerId} canManage={canManageSites} />
     </div>
   );
 }

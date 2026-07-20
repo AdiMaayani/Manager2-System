@@ -36,6 +36,10 @@ import {
 } from '../../api/reportsApiClient';
 import { ReportDetailModal } from '../../components/ReportDetailModal';
 import {
+  buildReportDetailSearchParams,
+  parseReportIdParam,
+} from '@shared/lib/reportDeepLink';
+import {
   ReportFormAttachmentsSection,
   type PendingAttachment,
 } from '../../components/ReportFormAttachmentsSection';
@@ -245,11 +249,12 @@ export function ReportsPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const quickParam = searchParams.get('quick') === '1';
   const requestedWorkItemId = searchParams.get('workItemId');
+  // ?reportId is the detail-modal source of truth (deep links from the dashboard, back/forward).
+  const selectedReportId = parseReportIdParam(searchParams.get('reportId'));
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isQuickReportPrefill, setIsQuickReportPrefill] = useState(false);
   const [quickReportError, setQuickReportError] = useState<string | null>(null);
   const [isFormMaximized, setIsFormMaximized] = useState(false);
-  const [selectedReportId, setSelectedReportId] = useState<number | null>(null);
   const [formMode, setFormMode] = useState<ReportFormMode>('create');
   const [editingReportId, setEditingReportId] = useState<number | null>(null);
   const [form, setForm] = useState<ReportFormState>(() => createInitialFormState());
@@ -261,7 +266,7 @@ export function ReportsPage() {
   const hasHandledQuickReportPrefill = useRef(false);
   const hasUserEditedReportForm = useRef(false);
 
-  // List filters only — never touch quick / workItemId / unrelated params.
+  // List filters only — never touch quick / workItemId / reportId / unrelated params.
   const updateListFilterParams = useCallback(
     (updates: Partial<Record<'search' | 'status' | 'customer', string | null>>) => {
       setSearchParams(
@@ -279,6 +284,16 @@ export function ReportsPage() {
           return next;
         },
         { replace: true },
+      );
+    },
+    [setSearchParams],
+  );
+
+  const setSelectedReportId = useCallback(
+    (reportId: number | null, options?: { replace?: boolean }) => {
+      setSearchParams(
+        (prev) => buildReportDetailSearchParams(prev, reportId),
+        { replace: options?.replace ?? false },
       );
     },
     [setSearchParams],
@@ -513,7 +528,7 @@ export function ReportsPage() {
 
   function openEditModal(report: WorkReportDetails) {
     hasUserEditedReportForm.current = false;
-    setSelectedReportId(null);
+    setSelectedReportId(null, { replace: true });
     setForm(createFormStateFromReport(report));
     setPendingInventoryLines([]);
     setPendingAttachments([]);
@@ -1151,7 +1166,7 @@ export function ReportsPage() {
         onClose={() => setSelectedReportId(null)}
         onEdit={openEditModal}
         onDeleted={async () => {
-          setSelectedReportId(null);
+          setSelectedReportId(null, { replace: true });
           setPageMessage('הדיווח נמחק בהצלחה.');
           await queryClient.invalidateQueries({ queryKey: ['reports'] });
         }}
