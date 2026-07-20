@@ -22,6 +22,7 @@ import { Badge } from '@shared/components/Badge';
 import { KpiCard } from '../../components/KpiCard';
 import { DashboardPanel } from '../../components/DashboardPanel';
 import { useDashboard } from '../../hooks/useDashboard';
+import { resolveDashboardActionRoute } from '../../lib/resolveDashboardActionRoute';
 import type {
   DashboardActivity,
   DashboardKpi,
@@ -165,6 +166,7 @@ export function DashboardPage() {
 
   const renderRecommendation = (item: DashboardRecommendation) => {
     const icon = RECOMMENDATION_ICONS[item.type] ?? <Lightbulb />;
+    const actionRoute = resolveDashboardActionRoute(item);
     return (
       <li key={item.id} className={`recoItem recoItem--${item.severity}`}>
         <span className="recoItem__icon" aria-hidden="true">
@@ -181,8 +183,8 @@ export function DashboardPage() {
             {formatDate(item.relevantDate) && <span>{formatDate(item.relevantDate)}</span>}
           </div>
         </div>
-        {item.actionRoute && (
-          <Link className="recoItem__action" to={item.actionRoute}>
+        {actionRoute && (
+          <Link className="recoItem__action" to={actionRoute}>
             {item.actionLabel}
           </Link>
         )}

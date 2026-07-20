@@ -78,6 +78,7 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
     useState<NestedCustomerDrawerIntent>('closed');
   const { can } = usePermissions();
   const canViewCustomers = can('viewCustomers');
+  const canManageSites = can('manageSites');
 
   const project = lifecycle?.project;
   const projectId = project?.workItemId;
@@ -274,7 +275,7 @@ export const ProjectOverviewTab = memo(function ProjectOverviewTab({
   const showOpenCustomerRecord =
     canViewCustomers && customerAccessId > 0;
   const showManageCustomerSites =
-    isEditMode && canViewCustomers && form.customerId > 0;
+    isEditMode && canManageSites && form.customerId > 0;
 
   const customerLoadStatus = (
     <>

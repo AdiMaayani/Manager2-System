@@ -28,4 +28,10 @@ describe('ProjectOverviewTab Customer access contract', () => {
     expect(overviewTabSource).toContain('getCustomerByIdAsync');
     expect(overviewTabSource).toContain("['customers', 'detail', detailCustomerId]");
   });
+
+  it('gates ניהול אתרי הלקוח on manageSites (aligned with CanManageSites)', () => {
+    expect(overviewTabSource).toContain("can('manageSites')");
+    expect(overviewTabSource).toContain('canManageSites');
+    expect(overviewTabSource).toContain('showManageCustomerSites');
+  });
 });

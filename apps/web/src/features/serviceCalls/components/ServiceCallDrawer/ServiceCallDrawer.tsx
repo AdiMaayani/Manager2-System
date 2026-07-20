@@ -160,6 +160,7 @@ function ServiceCallDrawerContent({
   // not reach edit/close/assign actions (the edit form, which holds those, stays hidden for them).
   const canManage = can('manageServiceCalls');
   const canViewCustomers = can('viewCustomers');
+  const canManageSites = can('manageSites');
   const { createMutation, updateMutation, cancelMutation, reopenMutation, assignEmployeeMutation } =
     useServiceCallMutations();
 
@@ -648,17 +649,19 @@ function ServiceCallDrawerContent({
                   >
                     פתח תיק לקוח
                   </Button>
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    onClick={() => {
-                      if (customerAccessId <= 0) return;
-                      setCustomerDrawerIntent('manageSites');
-                    }}
-                    disabled={isLoadingCustomerDetail}
-                  >
-                    ניהול אתרי הלקוח
-                  </Button>
+                  {canManageSites && (
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      onClick={() => {
+                        if (customerAccessId <= 0) return;
+                        setCustomerDrawerIntent('manageSites');
+                      }}
+                      disabled={isLoadingCustomerDetail}
+                    >
+                      ניהול אתרי הלקוח
+                    </Button>
+                  )}
                 </div>
                 {isLoadingCustomerDetail && (
                   <p className="serviceCallDrawer__hint">טוען פרטי לקוח…</p>

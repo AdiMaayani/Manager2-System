@@ -22,6 +22,7 @@ export type Permission =
   | 'lookupEmployees'
   // Actions (write/management) — kept aligned with the backend policies
   | 'manageCustomers'
+  | 'manageSites'
   | 'manageContacts'
   | 'manageProjects'
   | 'manageWorkPlan'
@@ -60,6 +61,7 @@ const ALL_PERMISSIONS: Permission[] = [
   'viewAuditLog',
   'lookupEmployees',
   'manageCustomers',
+  'manageSites',
   'manageContacts',
   'manageProjects',
   'manageWorkPlan',
@@ -92,6 +94,7 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     'viewAuditLog',
     'lookupEmployees',
     'manageCustomers',
+    'manageSites',
     'manageContacts',
     'manageProjects',
     'manageWorkPlan',
@@ -112,6 +115,8 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     'viewContacts',
     'viewReports',
     'lookupEmployees',
+    // Sites write access matches backend CanManageSites (PM may manage sites without managing customers).
+    'manageSites',
     'manageProjects',
     'manageWorkPlan',
     'manageServiceCalls',
@@ -130,6 +135,7 @@ const ROLE_PERMISSIONS: Record<string, Permission[]> = {
     'viewReports',
     'lookupEmployees',
     'manageCustomers',
+    'manageSites',
     'manageContacts',
     'manageQuotes',
     'manageServiceCalls',
