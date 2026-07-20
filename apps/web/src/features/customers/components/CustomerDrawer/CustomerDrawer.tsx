@@ -14,6 +14,7 @@ import { InlineAlert } from '@shared/components/InlineAlert';
 import { ConfirmInline } from '@shared/components/ConfirmInline';
 import { usePermissions } from '@shared/auth/usePermissions';
 import { getProjectsListAsync } from '@features/projects/api/projectsApiClient';
+import { filterRelatedProjectsByCustomerId } from '@features/projects/utils/relatedProjectsByCustomer';
 import { getQuotesAsync } from '@features/quotes/api/quotesApiClient';
 import {
   getQuoteStatusBadgeVariant,
@@ -397,11 +398,9 @@ function CustomerReviewDetails({ customer, canManage }: CustomerReviewDetailsPro
     enabled: areRelatedQueriesEnabled,
   });
 
-  // ProjectListItem carries customerName only (no customerId), so projects are
-  // matched by the customer's exact name.
-  const customerName = customer.customerName.trim();
-  const relatedProjects = (projectsQuery.data ?? []).filter(
-    (project) => project.customerName?.trim() === customerName,
+  const relatedProjects = filterRelatedProjectsByCustomerId(
+    projectsQuery.data ?? [],
+    customer.customerId,
   );
   const relatedQuotes = quotesQuery.data ?? [];
   const relatedServiceCalls = (serviceCallsQuery.data ?? []).filter(

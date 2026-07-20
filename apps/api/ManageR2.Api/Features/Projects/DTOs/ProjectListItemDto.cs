@@ -10,6 +10,8 @@ public class ProjectListItemDto
 
     public string Title { get; set; } = string.Empty;
 
+    public int? CustomerId { get; set; }
+
     public string CustomerName { get; set; } = string.Empty;
 
     public string ProjectManagerName { get; set; } = "-";

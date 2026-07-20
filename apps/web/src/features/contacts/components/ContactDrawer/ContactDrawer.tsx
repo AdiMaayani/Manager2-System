@@ -16,6 +16,7 @@ import { ConfirmInline } from '@shared/components/ConfirmInline';
 import { usePermissions } from '@shared/auth/usePermissions';
 import { getCustomersAsync } from '@features/customers';
 import { getProjectsListAsync, getSitesAsync } from '@features/projects/api/projectsApiClient';
+import { filterRelatedProjectsByCustomerId } from '@features/projects/utils/relatedProjectsByCustomer';
 import { useContactMutations } from '../../hooks/useContacts';
 import type { Contact, CreateContactRequest } from '../../types';
 import './ContactDrawer.css';
@@ -475,14 +476,10 @@ function ContactReviewDetails({ contact }: ContactReviewDetailsProps) {
     (customer) => customer.customerId === contact.customerId,
   );
 
-  // ProjectListItem carries customerName only (no customerId), so projects are
-  // matched by the linked customer's exact name.
-  const linkedCustomerName = linkedCustomer?.customerName.trim();
-  const relatedProjects = linkedCustomerName
-    ? (projectsQuery.data ?? []).filter(
-        (project) => project.customerName?.trim() === linkedCustomerName,
-      )
-    : [];
+  const relatedProjects = filterRelatedProjectsByCustomerId(
+    projectsQuery.data ?? [],
+    contact.customerId ?? 0,
+  );
   const relatedSites = (sitesQuery.data ?? []).filter(
     (site) => site.customerId === contact.customerId,
   );

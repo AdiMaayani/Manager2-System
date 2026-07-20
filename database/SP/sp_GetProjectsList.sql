@@ -10,6 +10,7 @@ BEGIN
     SELECT
         wi.WorkItemId,
         wi.Title,
+        wi.CustomerId,
         c.CustomerName,
         wi.Status,
         wi.BillingType,

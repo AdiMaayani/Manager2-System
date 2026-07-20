@@ -25,10 +25,27 @@ BEGIN
     END;
 
     IF @ProjectId IS NOT NULL AND NOT EXISTS (
-        SELECT 1 FROM dbo.WorkItems WHERE WorkItemId = @ProjectId AND WorkType = 'Project'
+        SELECT 1
+        FROM dbo.WorkItems
+        WHERE WorkItemId = @ProjectId
+          AND WorkType = 'Project'
+          AND IsArchived = 0
     )
     BEGIN
         THROW 51301, 'Project was not found.', 1;
+    END;
+
+    -- ProjectId may be null; when supplied it must belong to the quote's customer.
+    IF @ProjectId IS NOT NULL AND NOT EXISTS (
+        SELECT 1
+        FROM dbo.WorkItems
+        WHERE WorkItemId = @ProjectId
+          AND WorkType = 'Project'
+          AND IsArchived = 0
+          AND CustomerId = @CustomerId
+    )
+    BEGIN
+        THROW 51309, 'Project does not belong to the selected customer.', 1;
     END;
 
     IF @NormalizedStatus NOT IN (N'Draft', N'Sent', N'Tracking', N'Approved', N'Rejected')

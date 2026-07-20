@@ -70,5 +70,6 @@ export interface QuoteCustomerOption {
 export interface QuoteProjectOption {
   workItemId: number;
   title: string;
+  customerId?: number | null;
   customerName?: string | null;
 }

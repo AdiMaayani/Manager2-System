@@ -54,6 +54,7 @@ public class WorkItemsController : ControllerBase
             WorkItemId = project.WorkItemId,
             ProjectNumber = $"P-{project.WorkItemId}",
             Title = project.Title,
+            CustomerId = project.CustomerId,
             CustomerName = project.CustomerName,
             ProjectManagerName = string.IsNullOrWhiteSpace(project.ProjectManagerName)
                 ? "-"
