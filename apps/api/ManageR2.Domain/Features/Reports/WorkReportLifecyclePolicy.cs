@@ -21,6 +21,9 @@ public static class WorkReportLifecyclePolicy
     public static bool CanAmend(string? lifecycleStatus) =>
         string.Equals(lifecycleStatus, WorkReportLifecycleStatuses.Reversed, StringComparison.Ordinal);
 
+    public static bool CanDelete(string? lifecycleStatus) =>
+        string.Equals(lifecycleStatus, WorkReportLifecycleStatuses.Draft, StringComparison.Ordinal);
+
     public static bool IsReadOnly(string? lifecycleStatus) =>
         string.Equals(lifecycleStatus, WorkReportLifecycleStatuses.Reversed, StringComparison.Ordinal);
 }

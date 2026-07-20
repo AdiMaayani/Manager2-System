@@ -5,9 +5,9 @@ namespace ManageR2.UnitTests;
 public class WorkReportLifecyclePolicyTests
 {
     [Theory]
-    [InlineData(WorkReportLifecycleStatuses.Draft, true, true, true, true, false, false)]
-    [InlineData(WorkReportLifecycleStatuses.Finalized, false, true, true, false, true, false)]
-    [InlineData(WorkReportLifecycleStatuses.Reversed, false, false, false, false, false, true)]
+    [InlineData(WorkReportLifecycleStatuses.Draft, true, true, true, true, false, false, true)]
+    [InlineData(WorkReportLifecycleStatuses.Finalized, false, true, true, false, true, false, false)]
+    [InlineData(WorkReportLifecycleStatuses.Reversed, false, false, false, false, false, true, false)]
     public void Policy_EnforcesLifecycleEditabilityRules(
         string lifecycleStatus,
         bool canEditInventory,
@@ -15,7 +15,8 @@ public class WorkReportLifecyclePolicyTests
         bool canEditText,
         bool canFinalize,
         bool canReverse,
-        bool isReadOnly)
+        bool isReadOnly,
+        bool canDelete)
     {
         Assert.Equal(canEditInventory, WorkReportLifecyclePolicy.CanEditInventory(lifecycleStatus));
         Assert.Equal(canEditAttachments, WorkReportLifecyclePolicy.CanEditAttachments(lifecycleStatus));
@@ -23,6 +24,7 @@ public class WorkReportLifecyclePolicyTests
         Assert.Equal(canFinalize, WorkReportLifecyclePolicy.CanFinalize(lifecycleStatus));
         Assert.Equal(canReverse, WorkReportLifecyclePolicy.CanReverse(lifecycleStatus));
         Assert.Equal(isReadOnly, WorkReportLifecyclePolicy.IsReadOnly(lifecycleStatus));
+        Assert.Equal(canDelete, WorkReportLifecyclePolicy.CanDelete(lifecycleStatus));
     }
 
     [Theory]

@@ -60,6 +60,7 @@ import {
   type QuickReportPrefill,
 } from '../../quickReportPrefill';
 import { shouldApplyQuickReportAsyncResult } from '../../quickReportWorkers';
+import { validateWorkReportRequest } from '../../lib/workReportValidation';
 import { getWorkItemByIdAsync } from '@features/workplan/api/workplanApiClient';
 
 const LIST_STATUS_OPTIONS = ['הוגש', 'טיוטה'];
@@ -569,21 +570,27 @@ export function ReportsPage() {
 
   const saveReport = useMutation({
     mutationFn: async (submitStatus: SubmitStatus) => {
-      const isDraft = submitStatus === 'טיוטה';
       const workItemId = parseNullableInt(form.workItemId);
-
-      if (!form.date) throw new Error('יש להזין תאריך דיווח');
-      if (!isDraft) {
-        if (!workItemId) throw new Error('יש לבחור משימה או קריאת שירות');
-        if (!form.reporterId) throw new Error('יש לבחור מדווח');
-        if (!form.start || !form.end) throw new Error('יש להזין שעות עבודה');
-        if (!form.summary.trim()) throw new Error('יש להזין סיכום עבודה');
-      }
 
       const parentProjectId =
         form.reportType === 'project'
           ? parseNullableInt(form.projectId) ?? selectedTarget?.projectId ?? null
           : null;
+
+      const reporterId = parseNullableInt(form.reporterId);
+      const validationError = validateWorkReportRequest({
+        reportType: form.reportType,
+        date: form.date,
+        status: submitStatus,
+        workItemId,
+        projectId: form.reportType === 'regular' ? null : parentProjectId,
+        serviceCallId: form.reportType === 'service_call' ? workItemId : null,
+        reporterId,
+        start: form.start || null,
+        end: form.end || null,
+        summary: form.summary,
+      });
+      if (validationError) throw new Error(validationError);
 
       const payload: CreateWorkReportRequest = {
         reportType: form.reportType,
@@ -605,7 +612,7 @@ export function ReportsPage() {
         end: form.end || null,
         summary: form.summary.trim() || null,
         notes: form.notes || null,
-        reporterId: parseNullableInt(form.reporterId),
+        reporterId,
         reporterName: selectedReporter?.fullName || null,
         role: form.role || selectedReporter?.primaryRole || null,
         status: submitStatus,

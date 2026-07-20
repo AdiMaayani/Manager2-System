@@ -2,6 +2,7 @@ using ManageR2.Api.Authorization;
 using ManageR2.Api.DTOs;
 using ManageR2.Api.Features.Reports.DTOs;
 using ManageR2.Api.Features.Reports.Services;
+using ManageR2.Domain.Exceptions;
 using ManageR2.Domain.Features.Reports;
 using ManageR2.Infrastructure.Models;
 using ManageR2.Infrastructure.Repositories;
@@ -107,13 +108,48 @@ public class ReportsController : ControllerBase
             return NotFound(new { message = $"Report with id {id} was not found." });
         }
 
-        var wasDeleted = await _workReportRepository.DeleteAsync(id);
-        if (!wasDeleted)
+        if (!WorkReportLifecyclePolicy.CanDelete(existingReport.LifecycleStatus))
         {
-            return BadRequest(new { message = "Failed to delete report." });
+            return BadRequest(new { message = "ניתן למחוק רק דיווח במצב טיוטת מלאי." });
         }
 
-        return NoContent();
+        if (existingReport.Attachments.Count > 0)
+        {
+            return BadRequest(new { message = "יש למחוק את הקבצים המצורפים לפני מחיקת הדיווח." });
+        }
+
+        try
+        {
+            var wasDeleted = await _workReportRepository.DeleteAsync(id);
+            if (!wasDeleted)
+            {
+                return BadRequest(new { message = "מחיקת הדיווח נכשלה." });
+            }
+
+            return NoContent();
+        }
+        catch (UserValidationException ex)
+        {
+            return BadRequest(new { message = ex.Message });
+        }
+        catch (Exception ex) when (
+            ex.Message.Contains("51370", StringComparison.Ordinal)
+            || ex.Message.Contains("Only Draft", StringComparison.Ordinal))
+        {
+            return BadRequest(new { message = "ניתן למחוק רק דיווח במצב טיוטת מלאי." });
+        }
+        catch (Exception ex) when (
+            ex.Message.Contains("51371", StringComparison.Ordinal)
+            || ex.Message.Contains("attachments", StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new { message = "יש למחוק את הקבצים המצורפים לפני מחיקת הדיווח." });
+        }
+        catch (Exception ex) when (
+            ex.Message.Contains("51372", StringComparison.Ordinal)
+            || ex.Message.Contains("stock movements", StringComparison.OrdinalIgnoreCase))
+        {
+            return BadRequest(new { message = "לא ניתן למחוק דיווח שכבר נוצרו עבורו תנועות מלאי." });
+        }
     }
 
     [Authorize(Policy = Policies.CanEditReports)]
