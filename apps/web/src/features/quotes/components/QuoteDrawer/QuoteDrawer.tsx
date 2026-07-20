@@ -20,6 +20,10 @@ import {
 } from '../../hooks/useQuotes';
 import type { QuoteDetails, QuoteStatus, SaveQuoteRequest } from '../../types';
 import { formatCurrency, formatDate, formatNumber } from '../../utils/format';
+import {
+  applyQuoteCustomerChange,
+  filterQuoteProjectsByCustomerId,
+} from '../../utils/quoteProjectSelection';
 import { QuoteStatusBadge } from '../QuoteStatusBadge';
 import { QuoteLineItemsEditor, type QuoteLineFormState } from '../QuoteLineItemsEditor';
 import './QuoteDrawer.css';
@@ -292,6 +296,11 @@ function QuoteDrawerContent({ quoteId, onClose, onSaved, initialProjectId }: Quo
     [customerOptions, form.customerId],
   );
 
+  const customerProjectOptions = useMemo(
+    () => filterQuoteProjectsByCustomerId(projectOptions ?? [], Number(form.customerId) || 0),
+    [projectOptions, form.customerId],
+  );
+
   const isQuoteReady = !isExistingQuote || quote != null;
 
   const title = !isExistingQuote
@@ -383,7 +392,11 @@ function QuoteDrawerContent({ quoteId, onClose, onSaved, initialProjectId }: Quo
                 label="לקוח"
                 required
                 value={form.customerId}
-                onChange={(event) => setField('customerId', event.target.value)}
+                onChange={(event) => {
+                  setForm((current) =>
+                    applyQuoteCustomerChange(current, event.target.value, projectOptions ?? []),
+                  );
+                }}
               >
                 <option value="">בחרו לקוח</option>
                 {activeCustomers.map((customer) => (
@@ -399,7 +412,7 @@ function QuoteDrawerContent({ quoteId, onClose, onSaved, initialProjectId }: Quo
                 onChange={(event) => setField('projectId', event.target.value)}
               >
                 <option value="">ללא פרויקט</option>
-                {(projectOptions ?? []).map((project) => (
+                {customerProjectOptions.map((project) => (
                   <option key={project.workItemId} value={project.workItemId}>
                     {project.title}
                     {project.customerName ? ` — ${project.customerName}` : ''}

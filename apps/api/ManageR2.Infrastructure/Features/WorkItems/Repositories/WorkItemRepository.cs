@@ -915,6 +915,7 @@ public class WorkItemRepository : IWorkItemRepository
             {
                 WorkItemId = GetIntValue(reader, "WorkItemId"),
                 Title = GetStringValue(reader, "Title") ?? string.Empty,
+                CustomerId = GetNullableIntValue(reader, "CustomerId"),
                 CustomerName = GetStringValue(reader, "CustomerName") ?? string.Empty,
                 ProjectManagerName = GetStringValue(reader, "ProjectManagerName") ?? "-",
                 Status = GetStringValue(reader, "Status") ?? string.Empty,

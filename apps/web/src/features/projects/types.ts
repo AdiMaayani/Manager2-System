@@ -2,6 +2,7 @@ export interface ProjectListItem {
   workItemId: number;
   projectNumber: string;
   title: string;
+  customerId?: number | null;
   customerName: string;
   projectManagerName: string;
   status: string;

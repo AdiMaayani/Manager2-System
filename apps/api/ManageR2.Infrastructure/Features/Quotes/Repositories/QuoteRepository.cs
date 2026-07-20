@@ -139,6 +139,11 @@ public class QuoteRepository : IQuoteRepository
                 throw;
             }
         }
+        catch (SqlException ex) when (ex.Number == 51309)
+        {
+            _logger.LogWarning(ex, "CreateAsync rejected ProjectId that does not belong to CustomerId.");
+            throw new UserValidationException("Project does not belong to the selected customer.", ex);
+        }
         catch (SqlException ex)
         {
             _logger.LogError(ex, "CreateAsync failed with SQL error for Quotes.");
@@ -178,6 +183,14 @@ public class QuoteRepository : IQuoteRepository
                 await transaction.RollbackAsync();
                 throw;
             }
+        }
+        catch (SqlException ex) when (ex.Number == 51309)
+        {
+            _logger.LogWarning(
+                ex,
+                "UpdateAsync rejected ProjectId that does not belong to CustomerId for QuoteId={QuoteId}.",
+                quote.QuoteId);
+            throw new UserValidationException("Project does not belong to the selected customer.", ex);
         }
         catch (SqlException ex)
         {
