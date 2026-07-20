@@ -113,14 +113,15 @@ The 4 tables and (originally) 17 procedures that were first delivered **only in 
 > `sp_AuditLog_Create`, `sp_AuditLog_GetList` (the 2026-06-18 search version), and the 6 `sp_Dashboard_*`
 > procedures — now also have standalone canonical files under `database/SP`. Their **migrations remain
 > required** for the tables, columns, and indexes they create; the canonical `SP/` files own the final
-> procedure bodies and are (re-)deployed **after** all migrations (see
+> procedure bodies and are deployed **once, after** all migrations (see
 > [§4](#4-database-build-fresh-database)).
 
-The pre-overhaul repo + required migrations reproduce the earlier dump, and the 2026-06-19 foundation
-plus the 2026-06-20 geo migrations add the remaining tables and canonical procedures, so the expected
-post-foundation totals are **50 tables / 170 procedures** (verified against the schema snapshot). An
-approved timezone conversion later adds 2 audit tables (52 total); its default diagnostics-only run
-adds nothing.
+The pre-overhaul repo + required migrations reproduce the earlier dump. After the complete current
+fresh build (baseline + all 14 required migrations + the single canonical SP deployment), the expected
+table total is **55 tables**. The exact stored-procedure total is **not asserted here** — it is left
+for a clean fresh build to measure and record; use the named critical-procedure checks in
+[§7](#7-final-verification--ssms-queries) for correctness in the meantime. An approved timezone
+conversion later adds 2 audit tables (**57 total**); its default diagnostics-only run adds nothing.
 
 ---
 
@@ -142,18 +143,24 @@ adds nothing.
 |---|---|---|---|
 | `schema/tables.sql` | One-time baseline (plain `CREATE TABLE`) | No (run against an **empty** DB only) | Fresh build, step 1 |
 | `functions/*.sql` | Canonical programmability (`CREATE OR ALTER`) | Yes | Every build |
-| `SP/*.sql` (excl. `2026-*`) | Canonical programmability (`CREATE OR ALTER`) | Yes | Every build |
+| `SP/*.sql` (excl. `2026-*`) | Canonical programmability (`CREATE OR ALTER`) | Yes | **After all migrations** (fresh build, step 5); redeploy on every build |
+| `migrations/2026-06-11_project_inventory_drawings_files.sql` | **Required** migration | Yes (`COL_LENGTH`/`IF NOT EXISTS` guards) | Fresh build + existing DBs (adds `ProjectBoqItems`/`ProjectEquipmentItems` inventory links + drawing-file metadata columns **not** in the baseline) |
 | `migrations/2026-06-14_users_login_lockout.sql` | **Required** migration | Yes (`IF NOT EXISTS` + `CREATE OR ALTER`) | Fresh build + existing DBs |
 | `migrations/2026-06-15_customer_systems_vault.sql` | **Required** migration | Yes | Fresh build + existing DBs |
+| `migrations/2026-06-15_audit_log_core.sql` | **Required** migration | Yes (`IF NOT EXISTS` + `CREATE OR ALTER`) | Fresh build + existing DBs (independent; additive only) |
 | `migrations/2026-06-15_smart_assignment_persistence_explainability.sql` | **Required** migration | Yes | Fresh build + existing DBs (run **before** factor activation) |
 | `migrations/2026-06-15_smart_assignment_factor_activation.sql` | **Required** migration | Yes | Fresh build + existing DBs (run **after** persistence) |
-| `migrations/2026-06-15_audit_log_core.sql` | **Required** migration | Yes (`IF NOT EXISTS` + `CREATE OR ALTER`) | Fresh build + existing DBs (independent; additive only) |
 | `migrations/2026-06-17_dashboard_command_center.sql` | **Required** migration | Yes (`CREATE OR ALTER`) | Fresh build + existing DBs (independent; read-only SPs only) |
 | `migrations/2026-06-19_workplan_reports_overhaul.sql` | **Required foundation** | Yes (guarded additive DDL/backfill) | Fresh build + existing DBs; after earlier required migrations |
-| `migrations/2026-06-19_workitems_check_constraints_null_semantics_fix.sql` | **Required corrective** | Yes (drop/recreate two CHECK constraints) | After foundation; before INTERNAL migration on DBs that already ran foundation |
+| `migrations/2026-06-19_workitems_check_constraints_null_semantics_fix.sql` | **Required corrective** | Yes (drop/recreate two CHECK constraints) | Fresh build + existing DBs; **immediately after** the WorkPlan/report foundation |
+| `migrations/2026-06-20_geo_rec_tables_canonical.sql` | **Required** migration | Yes (creates geo tables only when missing; adds `Latitude`/`Longitude` when missing) | Fresh build + existing DBs (adds coordinate columns **not** in the baseline geo tables) |
+| `migrations/2026-06-20_geo_address_coordinates.sql` | **Required** migration | Yes (verifies/adds `DECIMAL(9,6)` coordinate columns) | Fresh build + existing DBs; **after** the geo canonical migration |
+| `migrations/2026-07-18_smart_assignment_policy_profiles.sql` | **Required** migration | Yes | Fresh build + existing DBs |
+| `migrations/2026-07-19_smart_assignment_multi_role_feedback.sql` | **Required** migration | Yes | Fresh build + existing DBs (**after** policy profiles) |
+| `migrations/2026-07-19_smart_assignment_assignment_feedback_link.sql` | **Required** migration | Yes | Fresh build + existing DBs (**after** multi-role feedback) |
 | `migrations/2026-06-19_legacy_data_migration.sql` | Read-only diagnostics | Yes | Existing populated DBs after foundation |
 | `migrations/2026-06-19_planned_datetime_utc.sql` | Read-only by default; operator-gated conversion | Yes | Existing populated DBs after foundation |
-| other `migrations/2026-06-0x_*.sql` | Historical (folded into baseline) | Yes | Only to upgrade an **older** DB; redundant for a fresh build |
+| other `migrations/*.sql` (earlier 2026-06-0x feature scripts, `2026-06-18_*`, legacy/diagnostic 2026-06-19 scripts) | Upgrade-only migration | Yes | **Not part of the required fresh-build order**; retained to upgrade **older** DBs |
 | `seed/2026-06-14_permission_roles.sql` | **Required** seed (role catalog) | Yes | Fresh build |
 | `seed/initial_admin/00_seed_initial_admin.sql` | **Required** seed (first login) | Yes | Fresh build |
 | `seed/2026-06-07_dev_realistic/0x..10` | Optional dev demo data | Yes (re-runnable) | Demo dataset only — **never production** (it deletes operational data) |
@@ -165,8 +172,20 @@ adds nothing.
 
 ## 4. Database build (fresh database)
 
-Run the steps **in this exact order**. Steps 1–4 build schema + programmability; step 5 applies the
-required recent migrations; step 6 seeds the role catalog and first admin.
+Run the steps **in this exact order**. Steps 1–3 build the empty database, baseline schema, and
+functions; step 4 applies **all 14 required migrations** in strict dependency order; step 5 deploys
+the canonical stored-procedure folder **once, after the migrations**; step 6 seeds the role catalog
+and first admin.
+
+> ⚠️ **Why stored procedures deploy *after* the migrations.** An earlier version of this runbook
+> deployed `SP/*.sql` before the migrations and re-deployed them afterwards. That order is **wrong**
+> and fails on a real SQL Server: several canonical procedures (for example
+> `sp_AssignEmployeeToWork.sql` and `sp_UpdateEmployeeWorkAssignment.sql`) reference
+> `WorkEmployeeAssignments.SmartAssignmentRecommendationId`, a **column added by migration
+> `2026-07-19_smart_assignment_assignment_feedback_link.sql`**. SQL Server may defer a reference to a
+> **missing table**, but it does **not** defer a reference to a **missing column on an existing
+> table** — so creating those procedures before that column exists raises an error and aborts the
+> deploy. Deploy the SP folder exactly **once, after every migration has run**.
 
 ### Step 1 — Create / select the database (one-time)
 ```sql
@@ -183,67 +202,68 @@ Run `database/schema/tables.sql` → creates 38 tables + indexes, PKs, FKs, defa
 ### Step 3 — Functions (idempotent)
 Run every file in `database/functions/` (order irrelevant). → `funcParseTaskPriority`, `funcParseTaskStatus`.
 
-### Step 4 — Stored procedures (idempotent)
-Run every `database/SP/*.sql` **except** the two `2026-04-20_*` files. Order irrelevant
-(`CREATE OR ALTER` does not require referenced objects to exist at create time). This now includes the
-22 formerly migration-only procedures (11 Vault, 3 login-lockout, 2 AuditLog, 6 Dashboard) that have
-canonical `SP/` files. These same files are **re-deployed after the migrations in Step 5.5**, which is
-the deployment that determines the final procedure bodies.
+### Step 4 — Required migrations (idempotent, **order-sensitive**)
+Run all **14** required migrations, **in this exact order**. The order is **not** discoverable from a
+filename sort — always use the explicit list below. Do **not** deploy any canonical `SP/*.sql` file
+before this step (see the "Why stored procedures deploy after the migrations" note above); the SP
+folder is deployed once in step 5.
 
-### Step 5 — Required recent migrations (idempotent, **order-sensitive**)
-Run these ten, **in this order**:
+1. `migrations/2026-06-11_project_inventory_drawings_files.sql` — links `ProjectBoqItems`/`ProjectEquipmentItems` rows to `InventoryItems`, adds optional BOQ unit pricing, and adds server-side drawing-file metadata columns. **Required for a fresh build:** these columns are **not** in the baseline `schema/tables.sql`.
+2. `migrations/2026-06-14_users_login_lockout.sql` — adds 2 `Users` columns + 3 `sp_Users_*` SPs.
+3. `migrations/2026-06-15_customer_systems_vault.sql` — adds 3 Vault tables + 11 Vault SPs.
+4. `migrations/2026-06-15_audit_log_core.sql` — adds the `AuditLog` table (+2 indexes) and SPs `sp_AuditLog_Create`, `sp_AuditLog_GetList`. Additive and independent of the Smart Assignment migrations.
+5. `migrations/2026-06-15_smart_assignment_persistence_explainability.sql` — adds `Rec_GetDraftTaskRecommendationInput`, updates `Rec_GetLatestRecommendationsForTask`. Run **before** factor activation (#6).
+6. `migrations/2026-06-15_smart_assignment_factor_activation.sql` — updates `Rec_GetTaskRecommendationInput` **and** `Rec_GetDraftTaskRecommendationInput` to emit result sets 13 (current load) + 14 (continuity). Must run **after** #5.
+7. `migrations/2026-06-17_dashboard_command_center.sql` — adds six read-only `sp_Dashboard_*` procedures that back `GET /api/dashboard`. Additive and order-independent (only references baseline tables for reads).
+8. `migrations/2026-06-19_workplan_reports_overhaul.sql` — adds the WorkPlan/report foundation, guarded legacy backfills, and empty migration-control/audit tables. Stop on unknown report status.
+9. `migrations/2026-06-19_workitems_check_constraints_null_semantics_fix.sql` — replaces the two WorkItems type/category CHECK constraints with NULL-safe `CASE ... ELSE 0 END = 1` expressions (`WITH NOCHECK`, no data mutation). **Run immediately after the WorkPlan/report foundation (#8).**
+10. `migrations/2026-06-20_geo_rec_tables_canonical.sql` — creates `Rec_EmployeeBaseAddress`, `Rec_SiteAddressProfile`, `Rec_RouteEstimates` only when missing, and adds `Latitude`/`Longitude` (`DECIMAL(9,6)`) coordinate columns. **Required for a fresh build:** the coordinate columns are **not** in the baseline geo tables.
+11. `migrations/2026-06-20_geo_address_coordinates.sql` — verifies (and, on older DBs, adds) the `DECIMAL(9,6)` coordinate columns on the geo profile tables. Must run **after** #10.
+12. `migrations/2026-07-18_smart_assignment_policy_profiles.sql` — creates `Rec_SmartAssignmentPolicyProfiles` + `Rec_SmartAssignmentPolicyVersions` (seeded), the immutable-version trigger, and adds the policy columns (`PolicyProfileKey`, `PolicyVersionNumber`, `PolicyDisplayName`, `PolicySnapshotJson`) to `Rec_TaskAssignmentRecommendations`.
+13. `migrations/2026-07-19_smart_assignment_multi_role_feedback.sql` — creates `EmployeeProfessions`, `WorkItemRequiredRoles`, and `Rec_RecommendationFeedback`, plus planned-stop/location coordinate columns. **Requires #12 first** (asserts the policy columns exist, else `THROW 53304`).
+14. `migrations/2026-07-19_smart_assignment_assignment_feedback_link.sql` — adds `WorkEmployeeAssignments.SmartAssignmentRecommendationId` (+FK/index) and switches recommendation feedback to one shared row per recommendation. **Requires #13 first** (asserts `Rec_RecommendationFeedback` exists, else `THROW 54102`).
 
-1. `migrations/2026-06-14_users_login_lockout.sql` — adds 2 `Users` columns + 3 `sp_Users_*` SPs.
-2. `migrations/2026-06-15_customer_systems_vault.sql` — adds 3 Vault tables + 11 Vault SPs.
-3. `migrations/2026-06-15_audit_log_core.sql` — adds the `AuditLog` table (+2 indexes) and SPs `sp_AuditLog_Create`, `sp_AuditLog_GetList`. Additive and independent of the Smart Assignment migrations.
-4. `migrations/2026-06-15_smart_assignment_persistence_explainability.sql` — adds `Rec_GetDraftTaskRecommendationInput`, updates `Rec_GetLatestRecommendationsForTask`.
-5. `migrations/2026-06-15_smart_assignment_factor_activation.sql` — updates `Rec_GetTaskRecommendationInput` **and** `Rec_GetDraftTaskRecommendationInput` to emit result sets 13 (current load) + 14 (continuity).
-6. `migrations/2026-06-17_dashboard_command_center.sql` — adds six read-only `sp_Dashboard_*` procedures that back `GET /api/dashboard`. Additive and order-independent (only references baseline tables for reads).
-7. `migrations/2026-06-19_workplan_reports_overhaul.sql` — adds the WorkPlan/report foundation,
-   guarded legacy backfills, and empty migration-control/audit tables. Stop on unknown report status.
-8. `migrations/2026-07-18_smart_assignment_policy_profiles.sql` — creates `Rec_SmartAssignmentPolicyProfiles` + `Rec_SmartAssignmentPolicyVersions` (seeded), the immutable-version trigger, and adds the policy columns (`PolicyProfileKey`, `PolicyVersionNumber`, `PolicyDisplayName`, `PolicySnapshotJson`) to `Rec_TaskAssignmentRecommendations`.
-9. `migrations/2026-07-19_smart_assignment_multi_role_feedback.sql` — creates `EmployeeProfessions`, `WorkItemRequiredRoles`, and `Rec_RecommendationFeedback`, plus planned-stop/location coordinate columns. **Requires #8 first** (asserts the policy columns exist, else `THROW 53304`).
-10. `migrations/2026-07-19_smart_assignment_assignment_feedback_link.sql` — adds `WorkEmployeeAssignments.SmartAssignmentRecommendationId` (+FK/index) and switches recommendation feedback to one shared row per recommendation. **Requires #9 first** (asserts `Rec_RecommendationFeedback` exists, else `THROW 54102`).
-
-> ⚠️ **Smart Assignment migration order is #8 → #9 → #10 and is NOT discoverable from filenames.**
-> A naive alphabetical filename sort runs `2026-07-19_smart_assignment_assignment_feedback_link`
-> **before** `2026-07-19_smart_assignment_multi_role_feedback` (because "assignment" < "multi"), which
-> is **wrong**: the assignment-feedback-link migration depends on `Rec_RecommendationFeedback` created by
-> the multi-role-feedback migration and will `THROW 54102` if run first. Always use the explicit order
-> above (`policy_profiles` → `multi_role_feedback` → `assignment_feedback_link`), never a glob sort.
-
-> ℹ️ **The audit-log migration (#3) is order-independent** — it only adds new objects and references
-> the existing baseline `Users` table for display joins. It is placed between the Vault and Smart
-> Assignment migrations here purely for readability; it can run any time after the baseline schema.
-
-> ⚠️ **Order matters between #4 and #5.** Both `CREATE OR ALTER` `Rec_GetDraftTaskRecommendationInput`.
-> #4 defines it with 12 result sets; #5 defines it with 14. The factor-activation version (14) must be
-> applied **last**, so **run #4 before #5**. A naive alphabetical filename sort runs `factor_activation`
-> **before** `persistence_explainability` (because "f" < "p") — which is **wrong** and silently downgrades
-> the draft procedure back to 12 result sets (workload/continuity factors then read as neutral on the
-> New-Task draft flow, with no error). Always use the explicit order above, not a glob sort.
+> ⚠️ **Two dependency chains are NOT discoverable from filenames — never use a glob/alphabetical sort:**
+> - **Smart-assignment draft factors:** `persistence_explainability` (#5) must run **before**
+>   `factor_activation` (#6). Both `CREATE OR ALTER` `Rec_GetDraftTaskRecommendationInput` (#5 with 12
+>   result sets, #6 with 14); the factor-activation version must be applied **last**. "f" < "p", so an
+>   alphabetical sort reverses them and silently downgrades the draft procedure back to 12 result sets
+>   (workload/continuity factors then read as neutral on the New-Task draft flow, with no error).
+> - **Smart-assignment feedback chain:** the order is `policy_profiles` (#12) → `multi_role_feedback`
+>   (#13) → `assignment_feedback_link` (#14). "assignment" < "multi", so an alphabetical sort runs
+>   `assignment_feedback_link` first and it `THROW 54102`s because `Rec_RecommendationFeedback` does
+>   not yet exist.
 >
-> **Verify #4 won:** the SSMS query in [§7](#7-final-verification--ssms-queries) checks that
-> `Rec_GetDraftTaskRecommendationInput`'s definition contains the `13. CURRENT LOAD` / `14. CONTINUITY` blocks.
->
-> **Definitive fix:** Step 5.5 re-deploys the canonical `SP/Rec_GetDraftTaskRecommendationInput.sql`
-> (and `SP/Rec_GetTaskRecommendationInput.sql`) **after** the migrations, so the canonical `SP/` body is
-> always the final one regardless of migration filename ordering. The explicit order above still matters
-> for any run that stops before Step 5.5.
+> Always use the explicit numbered order above.
 
-> The other `migrations/2026-06-0x_*.sql` files (company settings, reports lifecycle, employees CRUD,
-> service calls, project equipment/BOQ/drawings, sites deactivate, inventory, quotes, internal work
-> context, project file refs) are **already folded into `schema/tables.sql` + `SP/`** and are **not
-> needed** for a fresh build. They remain for upgrading older databases and are idempotent.
+> ℹ️ Several migrations are individually order-independent (the audit-log migration only adds new
+> objects and reads the baseline `Users` table for display joins; the dashboard migration only adds
+> read-only SPs). They are listed above purely to give one unambiguous sequence — running the whole
+> list top to bottom is always correct.
 
-### Step 5.5 — Re-deploy the canonical stored-procedure folder (idempotent, **required**)
-Run every `database/SP/*.sql` again (still **excluding** the two `2026-04-20_*` files) **after** all of
-the Step 5 migrations. This guarantees the final installed body of every procedure comes from the
-canonical `database/SP` files, so no migration that also `CREATE OR ALTER`s a procedure can leave an
-older final body behind (for example the smart-assignment draft procedure, or any of the 22 formerly
-migration-only procedures now canonicalized under `SP/`). The migrations are still required for the
-tables, columns, indexes, constraints, and data transformations they perform — re-deploying the SP
-folder does **not** replace them.
+> **Verify factor activation won:** the SSMS query in [§7](#7-final-verification--ssms-queries) checks
+> that `Rec_GetDraftTaskRecommendationInput`'s definition contains the `13. CURRENT LOAD` /
+> `14. CONTINUITY` blocks. Because Step 5 deploys the canonical `SP/Rec_GetDraftTaskRecommendationInput.sql`
+> **after** all migrations, the canonical body is always the final one regardless of migration ordering.
+
+> The remaining files under `migrations/` — the earlier 2026-06-0x feature scripts (company settings,
+> reports lifecycle, employees CRUD, service calls, project equipment/BOQ, sites deactivate, inventory,
+> quotes, internal work context), `2026-06-18_*`, and the legacy/diagnostic 2026-06-19 scripts
+> (`legacy_data_migration*`, `planned_datetime_utc`) — are **not** part of the required fresh-build
+> order. They are retained to upgrade **older** databases and are idempotent.
+
+### Step 5 — Canonical stored procedures (idempotent, run **after** all migrations)
+Run every `database/SP/*.sql` **except** the two `2026-04-20_*` files
+(`2026-04-20_workplan_algorithm_data_model_extension.sql` and
+`2026-04-20_seed_WorkPlanAlgorithmDemoData.sql`). Order within the folder is irrelevant
+(`CREATE OR ALTER`). This is the **single** SP deployment for a fresh build, and it runs **after**
+Step 4 so that every table and column a procedure references already exists — SQL Server defers a
+missing table reference but **not** a missing column on an existing table (see the "Why stored
+procedures deploy after the migrations" note above). It installs the final canonical body of every
+procedure, including the 22 formerly migration-only procedures (11 Vault, 3 login-lockout, 2 AuditLog,
+6 Dashboard) that now have canonical `SP/` files. The migrations remain required for the tables,
+columns, indexes, constraints, and data transformations they perform — deploying the SP folder does
+**not** replace them.
 
 ### Step 6 — Required seeds (idempotent)
 1. `seed/2026-06-14_permission_roles.sql` — inserts roles `SeniorManagement`, `ProjectManager`,
@@ -272,44 +292,51 @@ $server = 'localhost'
 $db     = 'ManageR2_Dev'
 $root   = '.\database'
 
-# 1) schema (empty DB only)
+# 1) baseline schema (empty DB only)
 sqlcmd -S $server -d $db -b -i "$root\schema\tables.sql"
 
 # 2) functions
 Get-ChildItem "$root\functions\*.sql" | ForEach-Object { sqlcmd -S $server -d $db -b -i $_.FullName }
 
-# 3) stored procedures (skip the two dated historical files)
-# NOTE: sp_AssignEmployeeToWork.sql and sp_UpdateEmployeeWorkAssignment.sql reference
-#       WorkEmployeeAssignments.SmartAssignmentRecommendationId, which is created later by
-#       migration 2026-07-19_smart_assignment_assignment_feedback_link.sql (step 4). CREATE OR ALTER
-#       uses deferred name resolution, so creating them here is safe, but they must NOT be executed
-#       before that migration runs. Step 4.5 re-deploys the SP folder after the migrations.
-Get-ChildItem "$root\SP\*.sql" -Exclude '2026-*' | ForEach-Object { sqlcmd -S $server -d $db -b -i $_.FullName }
-
-# 4) required migrations — EXPLICIT order (do NOT sort the folder alphabetically)
+# 3) required migrations — EXPLICIT dependency order (do NOT sort the folder; a glob sort is wrong)
 $migrations = @(
+  "$root\migrations\2026-06-11_project_inventory_drawings_files.sql",
   "$root\migrations\2026-06-14_users_login_lockout.sql",
   "$root\migrations\2026-06-15_customer_systems_vault.sql",
   "$root\migrations\2026-06-15_audit_log_core.sql",
   "$root\migrations\2026-06-15_smart_assignment_persistence_explainability.sql",
   "$root\migrations\2026-06-15_smart_assignment_factor_activation.sql",
-  "$root\migrations\2026-06-17_dashboard_command_center.sql"
-  "$root\migrations\2026-06-19_workplan_reports_overhaul.sql"
-  # Smart Assignment — EXPLICIT dependency order (NOT alphabetical): policy_profiles → multi_role_feedback → assignment_feedback_link
-  "$root\migrations\2026-07-18_smart_assignment_policy_profiles.sql"
-  "$root\migrations\2026-07-19_smart_assignment_multi_role_feedback.sql"
+  "$root\migrations\2026-06-17_dashboard_command_center.sql",
+  "$root\migrations\2026-06-19_workplan_reports_overhaul.sql",
+  "$root\migrations\2026-06-19_workitems_check_constraints_null_semantics_fix.sql",
+  "$root\migrations\2026-06-20_geo_rec_tables_canonical.sql",
+  "$root\migrations\2026-06-20_geo_address_coordinates.sql",
+  "$root\migrations\2026-07-18_smart_assignment_policy_profiles.sql",
+  "$root\migrations\2026-07-19_smart_assignment_multi_role_feedback.sql",
   "$root\migrations\2026-07-19_smart_assignment_assignment_feedback_link.sql"
 )
 $migrations | ForEach-Object { sqlcmd -S $server -d $db -b -i $_ }
 
-# 4.5) re-deploy the canonical SP folder AFTER the migrations so the canonical bodies are the final ones
-Get-ChildItem "$root\SP\*.sql" -Exclude '2026-*' | ForEach-Object { sqlcmd -S $server -d $db -b -i $_.FullName }
+# 4) canonical stored procedures — ONCE, AFTER the migrations. Exclude exactly the two dated historical
+#    files by name (do NOT exclude by a '2026-*' glob — that would also skip future dated SP files).
+#    SQL Server defers a missing TABLE reference, but NOT a missing COLUMN on an existing table, so
+#    procedures that read migration-added columns (e.g. WorkEmployeeAssignments.SmartAssignmentRecommendationId)
+#    must be created only after the migrations above have run.
+$excludedSpFiles = @(
+  '2026-04-20_workplan_algorithm_data_model_extension.sql',
+  '2026-04-20_seed_WorkPlanAlgorithmDemoData.sql'
+)
+Get-ChildItem "$root\SP\*.sql" |
+  Where-Object { $excludedSpFiles -notcontains $_.Name } |
+  Sort-Object Name |
+  ForEach-Object { sqlcmd -S $server -d $db -b -i $_.FullName }
 
 # 5) required seeds
 sqlcmd -S $server -d $db -b -i "$root\seed\2026-06-14_permission_roles.sql"
 sqlcmd -S $server -d $db -b -i "$root\seed\initial_admin\00_seed_initial_admin.sql"
 ```
 > `-b` makes `sqlcmd` stop on the first error so a broken deploy fails loudly.
+> Never execute `igroup30_prod.sql`; it is read-only reference material.
 > Hebrew seed files are UTF-8 **with BOM**; `sqlcmd` auto-detects the BOM (force with `-f 65001` if needed).
 
 ### Existing-database upgrade (not a fresh build)
@@ -405,14 +432,17 @@ npm run build      # production build of apps/web
 Run these against the target database after [§4](#4-database-build-fresh-database).
 
 ```sql
--- (a) Object counts after the 2026-06-19 foundation — expect 50 / 170 / 2 / 0.
--- After an approved timezone conversion, USER_TABLE becomes 52.
+-- (a) Object counts after the complete current fresh build (baseline + all 14 migrations + one SP deploy).
+-- Expect USER_TABLE = 55, SQL_SCALAR_FUNCTION = 2, VIEW = 0.
+-- SQL_STORED_PROCEDURE is INFORMATIONAL: record the value a clean fresh build produces here; do not
+-- treat any hard-coded procedure count as authoritative. Rely on the named checks (d)/(e) for correctness.
+-- After an approved timezone conversion, USER_TABLE becomes 57.
 SELECT type_desc, COUNT(*) AS Cnt
 FROM sys.objects
 WHERE is_ms_shipped = 0 AND schema_id = SCHEMA_ID('dbo')
   AND type_desc IN ('USER_TABLE','SQL_STORED_PROCEDURE','SQL_SCALAR_FUNCTION','VIEW')
 GROUP BY type_desc ORDER BY type_desc;
--- USER_TABLE = 50, SQL_STORED_PROCEDURE = 170, SQL_SCALAR_FUNCTION = 2, VIEW = 0
+-- USER_TABLE = 55, SQL_SCALAR_FUNCTION = 2, VIEW = 0, SQL_STORED_PROCEDURE = (informational — record from a clean build)
 
 -- (b) Customer Systems Vault tables exist (expect 3 rows)
 SELECT name FROM sys.tables
@@ -435,7 +465,7 @@ ORDER BY name;
 SELECT
   CASE WHEN OBJECT_DEFINITION(OBJECT_ID('dbo.Rec_GetDraftTaskRecommendationInput')) LIKE '%13. CURRENT LOAD%'
         AND OBJECT_DEFINITION(OBJECT_ID('dbo.Rec_GetDraftTaskRecommendationInput')) LIKE '%14. CONTINUITY%'
-       THEN 'PASS — factor activation applied' ELSE 'FAIL — re-run factor_activation migration' END AS DraftProcState;
+       THEN 'PASS — factor activation applied' ELSE 'FAIL — inspect or redeploy the canonical Rec_GetDraftTaskRecommendationInput procedure' END AS DraftProcState;
 
 -- (f) Roles exist (expect Admin + 5 = 6)
 SELECT RoleName, IsActive FROM dbo.Roles ORDER BY RoleName;
@@ -467,8 +497,8 @@ ORDER BY OccurredAtUtc DESC, AuditLogId DESC;
 ```
 
 ### Final verification checklist
-- [ ] **Tables exist** — query (a) returns `USER_TABLE = 50` after foundation (`52` after approved timezone conversion).
-- [ ] **Important SPs exist** — query (d) returns all 9; query (a) returns `SQL_STORED_PROCEDURE = 170`.
+- [ ] **Tables exist** — query (a) returns `USER_TABLE = 55` for the complete fresh build (`57` after approved timezone conversion).
+- [ ] **Important SPs exist** — query (d) returns all 9; query (a)'s `SQL_STORED_PROCEDURE` count is informational (record the value from a clean fresh build; correctness is confirmed by the named checks, not a hard-coded total).
 - [ ] **Vault tables + lockout columns** — queries (b) = 3 rows, (c) = 2 rows.
 - [ ] **Smart Assignment SPs exist & factor activation applied** — query (e) = `PASS`.
 - [ ] **Audit log objects exist** — query (i) = 1 row (`AuditLog`); query (j) = 2 rows (`sp_AuditLog_Create`, `sp_AuditLog_GetList`).
@@ -509,9 +539,10 @@ Comparison of the repository scripts against the attached `igroup30_prod.sql` du
 2. **`schema/tables.sql` does not contain** the 3 Vault tables, the `AuditLog` table, or the `Users`
    lockout columns — these are intentionally delivered by migrations (the baseline snapshot predates them).
    Not a defect; just means migrations are mandatory for a fresh build. **No schema edit made.**
-3. **Same-day SA migration ordering** (`persistence_explainability` before `factor_activation`) is
-   **not** discoverable from filenames (alphabetical sort reverses them). Documented as an explicit
-   ordered list in [§4 step 5](#step-5--required-recent-migrations-idempotent-order-sensitive). **No file renamed.**
+3. **Same-day SA migration ordering** (`persistence_explainability` before `factor_activation`; and
+   `policy_profiles` → `multi_role_feedback` → `assignment_feedback_link`) is **not** discoverable from
+   filenames (alphabetical sort reverses them). Documented as an explicit ordered list in
+   [§4 step 4](#step-4--required-migrations-idempotent-order-sensitive). **No file renamed.**
 
 Nothing in the repo conflicts with the dump's object definitions; the only gaps are the
 migration-delivered objects above, which the ordered build applies.
@@ -523,17 +554,21 @@ migration-delivered objects above, which the ordered build applies.
 - **Quotes SPs** appear both in `SP/sp_Quotes_*.sql` (canonical) and inside `migrations/2026-06-04_quotes_mvp.sql`.
   Authoritative = the `SP/` files (and the baseline `Quotes`/`QuoteLineItems` tables in `schema/tables.sql`).
   The migration is idempotent and only needed to upgrade a pre-quotes database.
-- The same "canonical `SP/` file + idempotent migration copy" pattern applies to company settings, reports
-  lifecycle, employees CRUD, service calls, project equipment/BOQ/drawings, sites deactivate, inventory,
-  and internal work context. For a **fresh** build, the `SP/` files are authoritative; the matching
-  migrations are redundant-but-safe.
+- The "canonical `SP/` file + idempotent migration copy" pattern applies to company settings, reports
+  lifecycle, employees CRUD, service calls, sites deactivate, inventory, and internal work context: for a
+  **fresh** build the `SP/` files are authoritative and those matching migrations are upgrade-only (safe
+  to skip on a fresh build).
+  **Exception — do not skip the structural project migration:**
+  `migrations/2026-06-11_project_inventory_drawings_files.sql` is **required** for a fresh build because it
+  adds `ProjectBoqItems`/`ProjectEquipmentItems` inventory-link columns and drawing-file metadata columns that
+  are **not** in the baseline `schema/tables.sql`. It is a structural migration, not an SP duplicate.
 - **`Rec_GetTaskRecommendationInput`** is defined by exactly **one** canonical file,
   `SP/Rec_GetTaskRecommendationInput.sql` (the 2026-06-15 factor-activation migration also contains a
   historical copy; both agree on result sets 13/14). `SP/Rec_GetDraftTaskRecommendationInput.sql` no
   longer duplicates it — that canonical file now defines **only** `Rec_GetDraftTaskRecommendationInput`,
   removing the earlier deployment-order-dependent duplicate body.
 - **`Rec_GetDraftTaskRecommendationInput`** is canonical in `SP/Rec_GetDraftTaskRecommendationInput.sql`
-  (Step 5.5 re-deploys it last, so it is authoritative over the historical migration copies).
+  (Step 5 deploys it after all migrations, so it is authoritative over the historical migration copies).
 - **Risky / do-not-run-blindly:**
   - `SP/2026-04-20_seed_WorkPlanAlgorithmDemoData.sql` — **not idempotent**; mutates specific
     employee/work-item rows for a demo scenario. Do not run against real data.
@@ -552,19 +587,22 @@ migration-delivered objects above, which the ordered build applies.
 1. CREATE DATABASE [ManageR2_Dev]; USE [ManageR2_Dev];
 2. Run  schema/tables.sql
 3. Run  functions/*.sql
-4. Run  SP/*.sql            (exclude SP/2026-*)
-5. Run  migrations, in order:
+4. Run  migrations, in this exact order (NOT alphabetical):
+     2026-06-11_project_inventory_drawings_files.sql
      2026-06-14_users_login_lockout.sql
      2026-06-15_customer_systems_vault.sql
      2026-06-15_audit_log_core.sql
      2026-06-15_smart_assignment_persistence_explainability.sql
-     2026-06-15_smart_assignment_factor_activation.sql      (must be last of the SA pair)
+     2026-06-15_smart_assignment_factor_activation.sql          (must be after persistence_explainability)
      2026-06-17_dashboard_command_center.sql
      2026-06-19_workplan_reports_overhaul.sql
+     2026-06-19_workitems_check_constraints_null_semantics_fix.sql   (immediately after the foundation)
+     2026-06-20_geo_rec_tables_canonical.sql
+     2026-06-20_geo_address_coordinates.sql                     (after geo_rec_tables_canonical)
      2026-07-18_smart_assignment_policy_profiles.sql
      2026-07-19_smart_assignment_multi_role_feedback.sql        (after policy_profiles)
-     2026-07-19_smart_assignment_assignment_feedback_link.sql   (LAST — after multi_role_feedback; NOT alphabetical)
-5b. Re-run SP/*.sql        (exclude SP/2026-*)  <- AFTER migrations, so canonical bodies win
+     2026-07-19_smart_assignment_assignment_feedback_link.sql   (LAST of the SA chain — after multi_role_feedback; NOT alphabetical)
+5. Run  SP/*.sql            (exclude SP/2026-*)  <- ONCE, AFTER the migrations, so canonical bodies win
 6. Run  seed/2026-06-14_permission_roles.sql
         seed/initial_admin/00_seed_initial_admin.sql
 7. Set secrets: ConnectionStrings:DefaultConnection, Jwt:Key (>=32), CustomerSystemsVault:EncryptionKey (base64 32B)
