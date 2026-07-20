@@ -45,6 +45,50 @@
   font-weight: var(--font-weight-medium);
 }
 
+.editTaskDrawer__professionsField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.editTaskDrawer__professionChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.editTaskDrawer__professionChip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-xs);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-primary-200);
+  border-radius: var(--radius-full);
+  background: var(--color-primary-50);
+  color: var(--color-primary-900);
+  font-size: var(--font-size-sm);
+}
+
+.editTaskDrawer__professionRemove {
+  padding: 2px var(--spacing-xs);
+  border-radius: var(--radius-sm);
+  color: var(--color-primary-700);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.editTaskDrawer__professionRemove:hover {
+  background: var(--color-primary-100);
+}
+
+.editTaskDrawer__professionRemove:focus-visible {
+  outline: 2px solid var(--color-primary-500);
+  outline-offset: 1px;
+}
+
 .editTaskDrawer__select,
 .editTaskDrawer__textarea {
   width: 100%;
@@ -105,4 +149,87 @@
   color: var(--color-warning-600);
   font-size: var(--font-size-sm);
   line-height: 1.6;
+}
+
+.editTaskDrawer__assignmentEditors {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+}
+
+.editTaskDrawer__assignmentEditor {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-md);
+  background: var(--color-neutral-50);
+}
+
+.editTaskDrawer__currentEmployee {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-md);
+  width: 100%;
+}
+
+.editTaskDrawer__employeeCard {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  min-width: 0;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-neutral-200);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.editTaskDrawer__employeeCard > span,
+.editTaskDrawer__employeeCard > p {
+  color: var(--color-neutral-600);
+  font-size: var(--font-size-sm);
+}
+
+.editTaskDrawer__employeeCard > strong,
+.editTaskDrawer__employeeCard > p {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.editTaskDrawer__replacementControls {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  width: 100%;
+  padding-top: var(--spacing-md);
+  border-top: 1px solid var(--color-neutral-200);
+}
+
+.editTaskDrawer__replacementControls > .formField {
+  align-self: stretch;
+}
+
+.editTaskDrawer__selectedEmployee {
+  width: 100%;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border: 1px solid var(--color-primary-300);
+  border-radius: var(--radius-md);
+  background: var(--color-primary-50);
+}
+
+.editTaskDrawer__selectedEmployee > p {
+  margin: var(--spacing-xs) 0 0;
+  color: var(--color-neutral-600);
+  font-size: var(--font-size-sm);
+}
+
+@media (max-width: 640px) {
+  .editTaskDrawer__currentEmployee {
+    align-items: stretch;
+    flex-direction: column;
+  }
 }

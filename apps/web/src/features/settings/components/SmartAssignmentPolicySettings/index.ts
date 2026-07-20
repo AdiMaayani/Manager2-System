@@ -1,0 +1,1 @@
+export { SmartAssignmentPolicySettings } from './SmartAssignmentPolicySettings';

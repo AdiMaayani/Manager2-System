@@ -1,5 +1,6 @@
 import type { ServiceCallDetails } from '../types';
 import { apiDateTimeToDateTimeLocal } from './serviceCallDateTime';
+import { normalizeRequiredProfessions } from '@features/workplan/lib/requiredProfessions';
 
 export interface ServiceCallFormState {
   title: string;
@@ -15,7 +16,7 @@ export interface ServiceCallFormState {
   actualStart: string;
   actualEnd: string;
   actualHours: string;
-  requiredRole: string;
+  requiredRoles: string[];
   isLocked: boolean;
 }
 
@@ -40,7 +41,13 @@ export function buildServiceCallFormState(
     actualStart: apiDateTimeToDateTimeLocal(serviceCall?.actualStart),
     actualEnd: apiDateTimeToDateTimeLocal(serviceCall?.actualEnd),
     actualHours: serviceCall?.actualHours != null ? String(serviceCall.actualHours) : '',
-    requiredRole: serviceCall?.requiredRole ?? '',
+    requiredRoles: normalizeRequiredProfessions(
+      serviceCall?.requiredRoles?.length
+        ? serviceCall.requiredRoles
+        : serviceCall?.requiredRole
+          ? [serviceCall.requiredRole]
+          : [],
+    ),
     isLocked: serviceCall?.isLocked ?? false,
   };
 }

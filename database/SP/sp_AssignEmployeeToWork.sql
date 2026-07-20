@@ -6,10 +6,13 @@ GO
 CREATE OR ALTER PROCEDURE [dbo].[sp_AssignEmployeeToWork]
     @WorkItemId INT,
     @EmployeeId INT,
-    @AssignmentRole NVARCHAR(100)
+    @AssignmentRole NVARCHAR(100),
+    @RecommendationRunId INT = NULL
 AS
 BEGIN
     SET NOCOUNT ON;
+
+    DECLARE @SmartAssignmentRecommendationId INT;
 
     IF NOT EXISTS (
         SELECT 1
@@ -34,6 +37,30 @@ BEGIN
         THROW 50003, 'Assignment role is required.', 1;
     END
 
+
+    IF @RecommendationRunId IS NOT NULL
+    BEGIN
+        IF @RecommendationRunId < 1
+        BEGIN
+            THROW 50005, 'RecommendationRunId must be positive when supplied.', 1;
+        END
+
+        SELECT @SmartAssignmentRecommendationId = recommendation.RecommendationId
+        FROM dbo.Rec_TaskAssignmentRecommendations AS recommendation
+        INNER JOIN dbo.Rec_RecommendationRuns AS recommendationRun
+            ON recommendationRun.RecommendationRunId = recommendation.RecommendationRunId
+        WHERE recommendation.RecommendationRunId = @RecommendationRunId
+          AND recommendation.TaskId = @WorkItemId
+          AND recommendation.EmployeeId = @EmployeeId
+          AND recommendationRun.RunStatus = N'Completed'
+          AND (recommendationRun.TaskId IS NULL OR recommendationRun.TaskId = @WorkItemId);
+
+        IF @SmartAssignmentRecommendationId IS NULL
+        BEGIN
+            THROW 50006, 'The completed recommendation run does not contain this task and employee.', 1;
+        END
+    END
+
     IF EXISTS (
         SELECT 1
         FROM dbo.WorkEmployeeAssignments
@@ -50,7 +77,8 @@ BEGIN
         EmployeeId,
         AssignmentRole,
         AssignedHours,
-        IsManualAssignment
+        IsManualAssignment,
+        SmartAssignmentRecommendationId
     )
     VALUES
     (
@@ -58,7 +86,8 @@ BEGIN
         @EmployeeId,
         @AssignmentRole,
         NULL,
-        1
+        CASE WHEN @SmartAssignmentRecommendationId IS NULL THEN 1 ELSE 0 END,
+        @SmartAssignmentRecommendationId
     );
 
     SELECT @@ROWCOUNT;

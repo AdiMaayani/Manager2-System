@@ -20,6 +20,8 @@ namespace ManageR2.Infrastructure.Models
     // Assignment row model returned from work plan assignment query.
     public class WorkPlanAssignmentResult
     {
+        public int? WorkEmployeeAssignmentId { get; set; }
+
         public int WorkItemId { get; set; }
 
         public int? EmployeeId { get; set; }

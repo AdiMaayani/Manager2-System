@@ -57,7 +57,3 @@ BEGIN
     END
 END;
 GO
-USE [master]
-GO
-ALTER DATABASE [igroup30_prod] SET  READ_WRITE
-GO

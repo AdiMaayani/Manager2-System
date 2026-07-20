@@ -7,4 +7,8 @@ public interface ISmartAssignmentService
 {
     // Runs recommendation engine for many tasks (project or explicit ids) and returns run summary + per-task rows.
     Task<SmartAssignmentRunResultModel> GenerateRecommendationsAsync(SmartAssignmentRequestModel request);
+
+    Task<SmartAssignmentRunResultModel> GenerateRecommendationsAsync(
+        SmartAssignmentRequestModel request,
+        CancellationToken cancellationToken);
 }

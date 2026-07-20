@@ -2,6 +2,7 @@ export interface Employee {
   employeeId: number;
   fullName: string;
   primaryRole: string;
+  professions?: string[] | null;
   phone?: string;
   email?: string;
   dailyCapacityHours?: number | null;
@@ -15,6 +16,7 @@ export interface EmployeeLookupItem {
   employeeId: number;
   fullName: string;
   primaryRole: string;
+  professions?: string[] | null;
   dailyCapacityHours?: number | null;
   isAssignable: boolean;
   isActive: boolean;
@@ -23,6 +25,7 @@ export interface EmployeeLookupItem {
 export interface UpsertEmployeeRequest {
   fullName: string;
   primaryRole: string;
+  professions?: string[] | null;
   phone?: string;
   email?: string;
   dailyCapacityHours?: number | null;

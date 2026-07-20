@@ -41,10 +41,11 @@ namespace ManageR2.Api.DTOs
         public string Status { get; set; } = string.Empty;
         public string? BillingType { get; set; }
         public decimal? EstimatedHours { get; set; }
+        public string? RequiredRole { get; set; }
+        public List<string> RequiredRoles { get; set; } = new();
         public string? Priority { get; set; }
         public DateTime? PlannedStart { get; set; }
         public DateTime? PlannedEnd { get; set; }
-        public string? RequiredRole { get; set; }
         public bool IsLocked { get; set; }
         public int? CustomerId { get; set; }
         public int? SiteId { get; set; }
@@ -90,6 +91,8 @@ namespace ManageR2.Api.DTOs
         public DateTime? PlannedEnd { get; set; }
         public int? DerivedDurationMinutes { get; set; }
         public decimal? EstimatedHours { get; set; }
+        public string? RequiredRole { get; set; }
+        public List<string> RequiredRoles { get; set; } = new();
         public bool IsLocked { get; set; }
         public int? CustomerId { get; set; }
         public string? CustomerName { get; set; }
@@ -105,6 +108,7 @@ namespace ManageR2.Api.DTOs
 
     public class WorkPlanTaskAssignmentDto
     {
+        public int WorkEmployeeAssignmentId { get; set; }
         public int? EmployeeId { get; set; }
         public string? EmployeeName { get; set; }
         public string? AssignmentRole { get; set; }
@@ -118,6 +122,7 @@ namespace ManageR2.Api.DTOs
         public int EmployeeId { get; set; }
         public string FullName { get; set; } = string.Empty;
         public string? PrimaryRole { get; set; }
+        public List<string> Professions { get; set; } = new();
         public bool IsActive { get; set; }
         public bool IsAssignable { get; set; }
     }

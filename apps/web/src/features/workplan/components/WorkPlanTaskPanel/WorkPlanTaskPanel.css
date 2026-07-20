@@ -99,6 +99,25 @@
   white-space: pre-wrap;
 }
 
+.workPlanTaskPanel__assignments {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
+.workPlanTaskPanel__assignmentsTitle {
+  margin: 0;
+  color: var(--color-neutral-900);
+  font-size: var(--font-size-base);
+  font-weight: var(--font-weight-semibold);
+}
+
+.workPlanTaskPanel__assignmentList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-sm);
+}
+
 .workPlanTaskPanel__footer {
   position: sticky;
   bottom: 0;

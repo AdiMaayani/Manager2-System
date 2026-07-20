@@ -1,5 +1,7 @@
 using System.Data;
 using ManageR2.Domain.Entities;
+using ManageR2.Domain.Features.SmartAssignment;
+using ManageR2.Infrastructure.Models.SmartAssignment;
 using ManageR2.Infrastructure.DAL;
 using Microsoft.Data.SqlClient;
 
@@ -136,6 +138,8 @@ public class EmployeeRepository : IEmployeeRepository
     {
         command.Parameters.AddWithValue("@FullName", employee.FullName);
         command.Parameters.AddWithValue("@PrimaryRole", employee.PrimaryRole);
+        command.Parameters.Add("@ProfessionsXml", SqlDbType.Xml).Value = ProfessionXmlSerializer.Serialize(
+            ProfessionCollection.ResolveEmployeeProfessions(employee.Professions, employee.PrimaryRole));
         command.Parameters.AddWithValue("@Phone", (object?)employee.Phone ?? DBNull.Value);
         command.Parameters.AddWithValue("@Email", (object?)employee.Email ?? DBNull.Value);
         command.Parameters.AddWithValue("@DailyCapacityHours", employee.DailyCapacityHours.HasValue ? employee.DailyCapacityHours.Value : DBNull.Value);
@@ -146,11 +150,19 @@ public class EmployeeRepository : IEmployeeRepository
     // Reader → Employee; keeps Infrastructure aligned with Employees table columns.
     private static Employee MapEmployee(SqlDataReader reader)
     {
+        var primaryRole = reader["PrimaryRole"]?.ToString() ?? string.Empty;
+        var professions = HasColumn(reader, "ProfessionsXml")
+            ? ProfessionXmlSerializer.Deserialize(reader["ProfessionsXml"] == DBNull.Value
+                ? null
+                : reader["ProfessionsXml"]?.ToString(), primaryRole)
+            : ProfessionCollection.ResolveEmployeeProfessions(null, primaryRole).ToList();
+
         return new Employee
         {
             EmployeeId = reader["EmployeeId"] != DBNull.Value ? Convert.ToInt32(reader["EmployeeId"]) : 0,
             FullName = reader["FullName"]?.ToString() ?? string.Empty,
-            PrimaryRole = reader["PrimaryRole"]?.ToString() ?? string.Empty,
+            PrimaryRole = primaryRole,
+            Professions = professions,
             Phone = reader["Phone"] != DBNull.Value ? reader["Phone"]?.ToString() : null,
             Email = reader["Email"] != DBNull.Value ? reader["Email"]?.ToString() : null,
             DailyCapacityHours = reader["DailyCapacityHours"] != DBNull.Value ? Convert.ToDecimal(reader["DailyCapacityHours"]) : null,
@@ -158,5 +170,18 @@ public class EmployeeRepository : IEmployeeRepository
             IsActive = reader["IsActive"] != DBNull.Value && Convert.ToBoolean(reader["IsActive"]),
             CreatedAt = reader["CreatedAt"] != DBNull.Value ? Convert.ToDateTime(reader["CreatedAt"]) : DateTime.MinValue
         };
+    }
+
+    private static bool HasColumn(SqlDataReader reader, string columnName)
+    {
+        for (var index = 0; index < reader.FieldCount; index++)
+        {
+            if (string.Equals(reader.GetName(index), columnName, StringComparison.OrdinalIgnoreCase))
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 }

@@ -1,6 +1,7 @@
 using ManageR2.Api.Authorization;
 using ManageR2.Api.DTOs;
 using ManageR2.Domain.Entities;
+using ManageR2.Domain.Features.SmartAssignment;
 using ManageR2.Infrastructure.Repositories;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -88,7 +89,7 @@ public class EmployeesController : ControllerBase
             return NotFound(new { message = $"Employee with id {id} was not found." });
         }
 
-        var employee = ToEntity(dto);
+        var employee = ToEntity(dto, existingEmployee);
         employee.EmployeeId = id;
 
         var wasUpdated = await _employeeRepository.UpdateAsync(employee);
@@ -128,6 +129,7 @@ public class EmployeesController : ControllerBase
             EmployeeId = employee.EmployeeId,
             FullName = employee.FullName,
             PrimaryRole = employee.PrimaryRole,
+            Professions = employee.Professions,
             Phone = employee.Phone,
             Email = employee.Email,
             DailyCapacityHours = employee.DailyCapacityHours,
@@ -144,18 +146,37 @@ public class EmployeesController : ControllerBase
             EmployeeId = employee.EmployeeId,
             FullName = employee.FullName,
             PrimaryRole = employee.PrimaryRole,
+            Professions = employee.Professions,
             DailyCapacityHours = employee.DailyCapacityHours,
             IsAssignable = employee.IsAssignable,
             IsActive = employee.IsActive
         };
     }
 
-    private static Employee ToEntity(UpsertEmployeeRequestDto dto)
+    private static Employee ToEntity(UpsertEmployeeRequestDto dto, Employee? existingEmployee = null)
     {
+        var primaryRole = dto.PrimaryRole.Trim();
+        var suppliedProfessions = dto.Professions;
+        if (suppliedProfessions is null && existingEmployee is not null)
+        {
+            // A legacy update does not know about the additive collection. Preserve secondary
+            // professions while replacing the old primary role with the newly submitted one.
+            suppliedProfessions = existingEmployee.Professions
+                .Where(role => !string.Equals(
+                    role?.Trim(),
+                    existingEmployee.PrimaryRole?.Trim(),
+                    StringComparison.OrdinalIgnoreCase))
+                .Append(primaryRole)
+                .ToList();
+        }
+
         return new Employee
         {
             FullName = dto.FullName.Trim(),
-            PrimaryRole = dto.PrimaryRole.Trim(),
+            PrimaryRole = primaryRole,
+            Professions = ProfessionCollection.ResolveEmployeeProfessions(
+                suppliedProfessions,
+                primaryRole).ToList(),
             Phone = CleanOptionalValue(dto.Phone),
             Email = CleanOptionalValue(dto.Email),
             DailyCapacityHours = dto.DailyCapacityHours,

@@ -1,6 +1,8 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using ManageR2.Domain.Exceptions;
 using ManageR2.Domain.Features.Geo;
@@ -10,7 +12,7 @@ using Microsoft.Extensions.Logging;
 
 namespace ManageR2.Infrastructure.Features.Geo.Clients;
 
-public class GeoapifyClient
+public class GeoapifyClient : IGeoRoutingClient
 {
     private readonly HttpClient _httpClient;
     private readonly string _apiKey;
@@ -34,7 +36,7 @@ public class GeoapifyClient
         var encodedText = Uri.EscapeDataString(text.Trim());
         var path = $"v1/geocode/autocomplete?text={encodedText}&filter=countrycode:il&lang=he&limit=5&apiKey={_apiKey}";
 
-        var response = await SendGeoapifyRequestAsync(path, "autocomplete", cancellationToken);
+        using var response = await SendGeoapifyRequestAsync(path, "autocomplete", cancellationToken);
         var payload = await response.Content.ReadFromJsonAsync<GeoapifyResponse>(cancellationToken: cancellationToken);
 
         return payload?.Features?
@@ -56,20 +58,20 @@ public class GeoapifyClient
     {
         if (string.IsNullOrWhiteSpace(text))
         {
-            return Invalid("לא הוזנה כתובת.");
+            return Invalid("ÿÿ ÿÿÿÿÿ ÿÿÿÿÿ.");
         }
         EnsureConfigured();
 
         var encodedText = Uri.EscapeDataString(text.Trim());
         var path = $"v1/geocode/search?text={encodedText}&filter=countrycode:il&lang=he&limit=5&apiKey={_apiKey}";
 
-        var response = await SendGeoapifyRequestAsync(path, "validate", cancellationToken);
+        using var response = await SendGeoapifyRequestAsync(path, "validate", cancellationToken);
         var payload = await response.Content.ReadFromJsonAsync<GeoapifyResponse>(cancellationToken: cancellationToken);
         var features = payload?.Features ?? [];
 
         if (features.Count == 0)
         {
-            return Invalid("לא נמצאה כתובת מתאימה.");
+            return Invalid("ÿÿ ÿÿÿÿÿ ÿÿÿÿÿ ÿÿÿÿÿÿ.");
         }
 
         var userTypedHouseNumber = ContainsDigit(text);
@@ -78,6 +80,59 @@ public class GeoapifyClient
             .First();
 
         return BuildValidatedAddress(bestMatch.Properties, userTypedHouseNumber);
+    }
+
+    public async Task<GeoRouteResultModel?> GetDrivingRouteAsync(
+        GeoCoordinateModel origin,
+        GeoCoordinateModel destination,
+        CancellationToken cancellationToken)
+    {
+        ValidateCoordinate(origin, nameof(origin));
+        ValidateCoordinate(destination, nameof(destination));
+        EnsureConfigured();
+
+        var waypoints = string.Join(
+            '|',
+            FormatWaypoint(origin),
+            FormatWaypoint(destination));
+        var path = $"v1/routing?waypoints={Uri.EscapeDataString(waypoints)}&mode=drive&apiKey={_apiKey}";
+
+        using var response = await SendGeoapifyRequestAsync(path, "routing", cancellationToken);
+        GeoapifyRoutingResponse? payload;
+        try
+        {
+            payload = await response.Content.ReadFromJsonAsync<GeoapifyRoutingResponse>(
+                cancellationToken: cancellationToken);
+        }
+        catch (JsonException ex)
+        {
+            throw new GeoProviderUnavailableException("Geoapify returned malformed routing data.", ex);
+        }
+        catch (NotSupportedException ex)
+        {
+            throw new GeoProviderUnavailableException("Geoapify returned unsupported routing data.", ex);
+        }
+
+        var route = payload?.Features?.FirstOrDefault()?.Properties;
+        if (route is null)
+        {
+            return null;
+        }
+
+        if (!route.Distance.HasValue ||
+            !route.Time.HasValue ||
+            !double.IsFinite(route.Distance.Value) ||
+            !double.IsFinite(route.Time.Value) ||
+            route.Distance.Value < 0d ||
+            route.Time.Value < 0d)
+        {
+            throw new GeoProviderUnavailableException("Geoapify returned invalid routing distance or duration.");
+        }
+
+        return new GeoRouteResultModel(
+            route.Distance.Value,
+            route.Time.Value,
+            AddressValidationConstants.Providers.Geoapify);
     }
 
     private async Task<HttpResponseMessage> SendGeoapifyRequestAsync(
@@ -101,11 +156,13 @@ public class GeoapifyClient
 
             if (response.StatusCode == HttpStatusCode.TooManyRequests)
             {
+                response.Dispose();
                 throw new GeoProviderUnavailableException("Geoapify rate limit reached.");
             }
 
             if (!response.IsSuccessStatusCode)
             {
+                response.Dispose();
                 throw new GeoProviderUnavailableException($"Geoapify returned status {(int)response.StatusCode}.");
             }
 
@@ -132,17 +189,17 @@ public class GeoapifyClient
 
         if (string.IsNullOrWhiteSpace(properties.City))
         {
-            messages.Add("לא זוהתה עיר.");
+            messages.Add("ÿÿ ÿÿÿÿÿ ÿÿÿ.");
         }
 
         if (string.IsNullOrWhiteSpace(properties.Street))
         {
-            messages.Add("לא זוהה רחוב.");
+            messages.Add("ÿÿ ÿÿÿÿ ÿÿÿÿ.");
         }
 
         if (userTypedHouseNumber && string.IsNullOrWhiteSpace(properties.HouseNumber))
         {
-            messages.Add("הוזן מספר בית, אך Geoapify לא זיהה מספר בית תקני.");
+            messages.Add("ÿÿÿÿ ÿÿÿÿ ÿÿÿ, ÿÿ Geoapify ÿÿ ÿÿÿÿ ÿÿÿÿ ÿÿÿ ÿÿÿÿ.");
         }
 
         return new ValidatedAddressModel
@@ -159,7 +216,7 @@ public class GeoapifyClient
             Longitude = properties.Lon,
             ValidationScore = score,
             ValidationMessage = messages.Count == 0
-                ? "הכתובת אומתה בהצלחה."
+                ? "ÿÿÿÿÿÿ ÿÿÿÿÿ ÿÿÿÿÿÿ."
                 : string.Join(" ", messages)
         };
     }
@@ -188,12 +245,25 @@ public class GeoapifyClient
 
     private static bool ContainsDigit(string value) => value.Any(char.IsDigit);
 
+    private static void ValidateCoordinate(GeoCoordinateModel coordinate, string parameterName)
+    {
+        if (!coordinate.IsValid)
+        {
+            throw new ArgumentOutOfRangeException(parameterName, "Latitude or longitude is outside the valid range.");
+        }
+    }
+
+    private static string FormatWaypoint(GeoCoordinateModel coordinate) =>
+        string.Create(
+            CultureInfo.InvariantCulture,
+            $"{coordinate.Latitude:0.########},{coordinate.Longitude:0.########}");
+
     private void EnsureConfigured()
     {
         if (string.IsNullOrWhiteSpace(_apiKey))
         {
             _logger.LogWarning("Geoapify request skipped because the provider is not configured");
-            throw new GeoProviderUnavailableException("Address autocomplete is not configured.");
+            throw new GeoProviderUnavailableException("Geoapify is not configured.");
         }
     }
 
@@ -211,6 +281,27 @@ public class GeoapifyClient
     {
         [JsonPropertyName("features")]
         public List<GeoapifyFeature>? Features { get; set; }
+    }
+
+    private class GeoapifyRoutingResponse
+    {
+        [JsonPropertyName("features")]
+        public List<GeoapifyRoutingFeature>? Features { get; set; }
+    }
+
+    private class GeoapifyRoutingFeature
+    {
+        [JsonPropertyName("properties")]
+        public GeoapifyRoutingProperties? Properties { get; set; }
+    }
+
+    private class GeoapifyRoutingProperties
+    {
+        [JsonPropertyName("distance")]
+        public double? Distance { get; set; }
+
+        [JsonPropertyName("time")]
+        public double? Time { get; set; }
     }
 
     private class GeoapifyFeature

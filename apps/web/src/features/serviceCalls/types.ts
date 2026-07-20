@@ -17,6 +17,7 @@ export interface ServiceCallListItem {
   actualEnd?: string | null;
   actualHours?: number | null;
   requiredRole?: string | null;
+  requiredRoles?: string[] | null;
   isLocked: boolean;
   createdAt: string;
   closedAt?: string | null;
@@ -39,12 +40,20 @@ export interface UpsertServiceCallRequest {
   actualEnd?: string | null;
   actualHours?: number | null;
   requiredRole?: string | null;
+  requiredRoles?: string[] | null;
   isLocked: boolean;
+  employeeReplacements?: ServiceCallEmployeeReplacementRequest[];
+}
+
+export interface ServiceCallEmployeeReplacementRequest {
+  workEmployeeAssignmentId: number;
+  employeeId: number;
 }
 
 export interface AssignServiceCallEmployeeRequest {
   employeeId: number;
   assignmentRole: string;
+  recommendationRunId?: number | null;
 }
 
 export interface ServiceCallCustomerOption {
@@ -65,6 +74,7 @@ export interface ServiceCallEmployeeOption {
   employeeId: number;
   fullName: string;
   primaryRole?: string | null;
+  professions?: string[] | null;
   isActive?: boolean;
   isAssignable?: boolean;
 }

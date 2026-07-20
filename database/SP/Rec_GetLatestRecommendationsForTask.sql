@@ -24,9 +24,31 @@ BEGIN
         r.RecommendationRunId,
         r.TaskId,
         wi.Title AS TaskTitle,
+        CASE WHEN EXISTS
+        (
+            SELECT 1 FROM dbo.WorkItemRequiredRoles AS requiredRole
+            WHERE requiredRole.WorkItemId = r.TaskId
+        ) THEN (
+            SELECT requiredRole.RoleName AS [Role]
+            FROM dbo.WorkItemRequiredRoles AS requiredRole
+            WHERE requiredRole.WorkItemId = r.TaskId
+            ORDER BY requiredRole.RoleName
+            FOR XML PATH(''), ROOT('Roles'), TYPE
+        ) ELSE CAST(NULL AS XML) END AS RequiredRolesXml,
         r.EmployeeId,
         e.FullName,
         e.PrimaryRole,
+        CASE WHEN EXISTS
+        (
+            SELECT 1 FROM dbo.EmployeeProfessions AS profession
+            WHERE profession.EmployeeId = r.EmployeeId
+        ) THEN (
+            SELECT profession.RoleName AS [Role]
+            FROM dbo.EmployeeProfessions AS profession
+            WHERE profession.EmployeeId = r.EmployeeId
+            ORDER BY profession.RoleName
+            FOR XML PATH(''), ROOT('Roles'), TYPE
+        ) ELSE CAST(NULL AS XML) END AS ProfessionsXml,
         r.UrgencyClass,
         r.OriginTypeUsed,
         r.RankOrder,
@@ -48,6 +70,10 @@ BEGIN
         r.WorkedAtSiteBefore,
         r.RecommendationSummary,
         r.WarningsJson,
+        r.PolicyProfileKey,
+        r.PolicyVersionNumber,
+        r.PolicyDisplayName,
+        r.PolicySnapshotJson,
         r.CreatedAt
     FROM dbo.Rec_TaskAssignmentRecommendations r
     INNER JOIN dbo.Employees e

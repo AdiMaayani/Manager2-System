@@ -19,26 +19,31 @@ BEGIN
         FROM dbo.Rec_EmployeeLocationEvents le
         INNER JOIN dbo.Employees e
             ON e.EmployeeId = le.EmployeeId
+        -- Smart Assignment ranks every active employee; IsAssignable is informational only
+        -- and must not remove an active employee from candidate geographic enrichment.
         WHERE e.IsActive = 1
-          AND e.IsAssignable = 1
           AND le.EventDate = @EventDate
     )
     SELECT
-        EmployeeLocationEventId,
-        EmployeeId,
-        WorkItemId,
-        SiteId,
-        EventType,
-        InputAddress,
-        FormattedAddress,
-        ExternalPlaceRef,
-        ZoneId,
-        EventDate,
-        EventTime,
-        Source,
-        Notes
+        LastEvents.EmployeeLocationEventId,
+        LastEvents.EmployeeId,
+        LastEvents.WorkItemId,
+        LastEvents.SiteId,
+        LastEvents.EventType,
+        LastEvents.InputAddress,
+        LastEvents.FormattedAddress,
+        LastEvents.ExternalPlaceRef,
+        LastEvents.ZoneId,
+        COALESCE(LastEvents.Latitude, locationEventSite.Latitude) AS Latitude,
+        COALESCE(LastEvents.Longitude, locationEventSite.Longitude) AS Longitude,
+        LastEvents.EventDate,
+        LastEvents.EventTime,
+        LastEvents.Source,
+        LastEvents.Notes
     FROM LastEvents
-    WHERE rn = 1
-    ORDER BY EmployeeId;
+    LEFT JOIN dbo.Rec_SiteAddressProfile AS locationEventSite
+        ON locationEventSite.SiteId = LastEvents.SiteId
+    WHERE LastEvents.rn = 1
+    ORDER BY LastEvents.EmployeeId;
 END
 GO

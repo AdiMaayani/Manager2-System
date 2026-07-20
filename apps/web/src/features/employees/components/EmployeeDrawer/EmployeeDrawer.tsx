@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { ApiError } from '@api/client';
@@ -17,6 +17,7 @@ import { DetailsField } from '@shared/components/DetailsField';
 import { DetailsSection } from '@shared/components/DetailsSection';
 import { RelatedSection } from '@shared/components/RelatedSection';
 import { Input } from '@shared/components/Input';
+import { ListSelect } from '@shared/components/ListSelect';
 import { Checkbox } from '@shared/components/Checkbox';
 import { InlineAlert } from '@shared/components/InlineAlert';
 import { ConfirmInline } from '@shared/components/ConfirmInline';
@@ -24,12 +25,19 @@ import { getUsersAsync } from '@features/users/api/usersApiClient';
 import { getWorkPlanScheduleAsync } from '@features/workplan/api/workplanApiClient';
 import { periodToUtcBounds } from '@features/workplan/lib/workPlanPeriod';
 import { useEmployeeMutations } from '../../hooks/useEmployees';
+import { useEmployeePrimaryRoles } from '../../hooks/useEmployeePrimaryRoles';
 import {
   employeeBaseAddressQueryKey,
   formatPartialAddressSaveErrorMessage,
   upsertEmployeeBaseAddressWithCacheAsync,
 } from '../../lib/employeeBaseAddressCache';
 import type { Employee, UpsertEmployeeRequest } from '../../types';
+import {
+  addRequiredProfession,
+  buildEmployeeProfessions,
+  isRequiredProfessionSelected,
+  removeRequiredProfession,
+} from '@features/workplan/lib/requiredProfessions';
 import './EmployeeDrawer.css';
 
 const MAX_RELATED_ITEMS = 5;
@@ -46,6 +54,7 @@ interface EmployeeDrawerProps {
 interface EmployeeFormState {
   fullName: string;
   primaryRole: string;
+  professions: string[];
   phone: string;
   email: string;
   dailyCapacityHours: string;
@@ -54,9 +63,11 @@ interface EmployeeFormState {
 }
 
 function buildInitialState(employee: Employee | null): EmployeeFormState {
+  const primaryRole = employee?.primaryRole ?? '';
   return {
     fullName: employee?.fullName ?? '',
-    primaryRole: employee?.primaryRole ?? '',
+    primaryRole,
+    professions: buildEmployeeProfessions(primaryRole, employee?.professions ?? []),
     phone: employee?.phone ?? '',
     email: employee?.email ?? '',
     dailyCapacityHours:
@@ -113,6 +124,18 @@ function EmployeeDrawerContent({ employee, canEdit, onClose, onSaved }: Employee
   // (create is only reachable for users with manage permission).
   const [isEditing, setIsEditing] = useState(!isExistingEmployee && canEdit);
   const [form, setForm] = useState<EmployeeFormState>(() => buildInitialState(employee));
+  const professionOptionsQuery = useEmployeePrimaryRoles(isEditing);
+  const selectedProfessions = useMemo(
+    () => buildEmployeeProfessions(form.primaryRole, form.professions),
+    [form.primaryRole, form.professions],
+  );
+  const availableProfessionOptions = useMemo(
+    () =>
+      (professionOptionsQuery.data ?? []).filter(
+        (profession) => !isRequiredProfessionSelected(selectedProfessions, profession),
+      ),
+    [professionOptionsQuery.data, selectedProfessions],
+  );
   const baseAddressQuery = useQuery({
     queryKey: employeeBaseAddressQueryKey(employee?.employeeId ?? 0),
     queryFn: () => getEmployeeBaseAddressOptionalAsync(employee!.employeeId),
@@ -135,6 +158,21 @@ function EmployeeDrawerContent({ employee, canEdit, onClose, onSaved }: Employee
 
   function setField<K extends keyof EmployeeFormState>(key: K, value: EmployeeFormState[K]) {
     setForm((current) => ({ ...current, [key]: value }));
+  }
+
+  function addProfession(value: string) {
+    setForm((current) => ({
+      ...current,
+      professions: addRequiredProfession(
+        buildEmployeeProfessions(current.primaryRole, current.professions),
+        value,
+      ),
+    }));
+  }
+
+  function removeProfession(value: string) {
+    if (isRequiredProfessionSelected([form.primaryRole], value)) return;
+    setField('professions', removeRequiredProfession(form.professions, value));
   }
 
   function handleStartEdit() {
@@ -180,6 +218,7 @@ function EmployeeDrawerContent({ employee, canEdit, onClose, onSaved }: Employee
     return {
       fullName: form.fullName.trim(),
       primaryRole: form.primaryRole.trim(),
+      professions: selectedProfessions,
       phone: trimOptionalValue(form.phone),
       email: trimOptionalValue(form.email),
       dailyCapacityHours: form.dailyCapacityHours.trim()
@@ -374,6 +413,81 @@ function EmployeeDrawerContent({ employee, canEdit, onClose, onSaved }: Employee
               />
             </div>
 
+            <div className="employeeDrawer__professionsField">
+              <ListSelect
+                label="מקצועות נוספים"
+                value=""
+                onChange={addProfession}
+                placeholder={
+                  professionOptionsQuery.isLoading
+                    ? 'טוען מקצועות…'
+                    : 'בחר מקצוע להוספה'
+                }
+                searchable
+                searchPlaceholder="חיפוש מקצוע..."
+                emptyMessage="אין מקצועות נוספים לבחירה."
+                disabled={professionOptionsQuery.isLoading || professionOptionsQuery.isError}
+                options={
+                  availableProfessionOptions.length === 0
+                    ? [
+                        {
+                          value: '__none__',
+                          label: professionOptionsQuery.isLoading
+                            ? 'טוען מקצועות…'
+                            : 'אין מקצועות נוספים לבחירה',
+                          disabled: true,
+                        },
+                      ]
+                    : availableProfessionOptions.map((profession) => ({
+                        value: profession,
+                        label: profession,
+                      }))
+                }
+              />
+              {professionOptionsQuery.isError && (
+                <InlineAlert variant="warning">
+                  <span>טעינת רשימת המקצועות נכשלה. ניתן עדיין לשמור את המקצועות הקיימים.</span>
+                  <Button
+                    type="button"
+                    variant="secondary"
+                    onClick={() => professionOptionsQuery.refetch()}
+                  >
+                    נסה שוב
+                  </Button>
+                </InlineAlert>
+              )}
+              {selectedProfessions.length > 0 && (
+                <ul className="employeeDrawer__professionChips" aria-label="מקצועות העובד">
+                  {selectedProfessions.map((profession) => {
+                    const isPrimary = isRequiredProfessionSelected(
+                      [form.primaryRole],
+                      profession,
+                    );
+                    return (
+                      <li key={profession} className="employeeDrawer__professionChip">
+                        <span>{profession}</span>
+                        {isPrimary ? (
+                          <span className="employeeDrawer__primaryProfession">ראשי</span>
+                        ) : (
+                          <button
+                            type="button"
+                            className="employeeDrawer__professionRemove"
+                            onClick={() => removeProfession(profession)}
+                            aria-label={`הסר את המקצוע ${profession}`}
+                          >
+                            הסר
+                          </button>
+                        )}
+                      </li>
+                    );
+                  })}
+                </ul>
+              )}
+              <p className="employeeDrawer__professionHint">
+                התפקיד הראשי נשמר גם לצורך תאימות ונכלל תמיד ברשימת המקצועות.
+              </p>
+            </div>
+
             <Checkbox
               label="עובד פעיל"
               checked={form.isActive}
@@ -423,7 +537,7 @@ function EmployeeDrawerContent({ employee, canEdit, onClose, onSaved }: Employee
             <ValidatedAddressField
               value={addressState}
               onChange={setAddressState}
-              helpText="כתובת הבסיס אופצionalית. בחרו הצעה מהרשימה לאימות."
+              helpText="כתובת הבסיס אופציונלית. בחרו הצעה מהרשימה לאימות."
             />
           </DetailsSection>
         </div>
@@ -508,10 +622,16 @@ function EmployeeReviewDetails({ employee, canViewLinkedUser }: EmployeeReviewDe
       <div className="employeeDrawer__primarySection">
         <DetailsSection title="פרטי עובד">
           <div className="employeeDrawer__detailsGrid">
-            <DetailsField label="שם מלא" value={employee.fullName} />
-            <DetailsField label="תפקיד ראשי" value={employee.primaryRole} />
-            <DetailsField
-              label="סטטוס"
+          <DetailsField label="שם מלא" value={employee.fullName} />
+          <DetailsField label="תפקיד ראשי" value={employee.primaryRole} />
+          <DetailsField
+            label="כל המקצועות"
+            value={
+              buildEmployeeProfessions(employee.primaryRole, employee.professions ?? []).join(' · ')
+            }
+          />
+          <DetailsField
+            label="סטטוס"
               value={
                 <Badge variant={employee.isActive ? 'success' : 'neutral'}>
                   {employee.isActive ? 'פעיל' : 'לא פעיל'}

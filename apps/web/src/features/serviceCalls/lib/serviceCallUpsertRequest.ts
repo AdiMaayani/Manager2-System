@@ -1,6 +1,7 @@
 import type { UpsertServiceCallRequest } from '../types';
 import { datetimeLocalToUtcIsoOptional } from './serviceCallDateTime';
 import type { ServiceCallFormState } from './serviceCallFormState';
+import { legacyRequiredRole } from '@features/workplan/lib/requiredProfessions';
 
 function nullableString(value: string): string | null {
   const trimmedValue = value.trim();
@@ -34,7 +35,8 @@ export function buildServiceCallUpsertRequest(
     actualStart: datetimeLocalToUtcIsoOptional(form.actualStart),
     actualEnd: datetimeLocalToUtcIsoOptional(form.actualEnd),
     actualHours: nullableNumber(form.actualHours),
-    requiredRole: nullableString(form.requiredRole),
+    requiredRole: legacyRequiredRole(form.requiredRoles),
+    requiredRoles: form.requiredRoles,
     isLocked: form.isLocked,
   };
 }

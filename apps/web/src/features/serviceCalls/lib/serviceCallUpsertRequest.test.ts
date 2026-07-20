@@ -16,7 +16,7 @@ const baseForm: ServiceCallFormState = {
   actualStart: '2026-07-19T09:45',
   actualEnd: '2026-07-19T11:15',
   actualHours: '1.5',
-  requiredRole: 'טכנאי רשת',
+  requiredRoles: ['טכנאי רשת'],
   isLocked: true,
 };
 

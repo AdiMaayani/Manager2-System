@@ -44,7 +44,7 @@ describe('buildServiceCallFormState', () => {
       actualStart: '2026-07-01T09:45',
       actualEnd: '2026-07-01T11:15',
       actualHours: '1.5',
-      requiredRole: 'טכנאי רשת',
+      requiredRoles: ['טכנאי רשת'],
       isLocked: true,
     });
   });
@@ -91,7 +91,7 @@ describe('buildServiceCallFormState', () => {
       actualStart: '',
       actualEnd: '',
       actualHours: '',
-      requiredRole: '',
+      requiredRoles: [],
       isLocked: false,
     });
   });
@@ -129,6 +129,6 @@ describe('buildServiceCallFormState', () => {
     expect(form.plannedStart).toBe('');
     expect(form.estimatedHours).toBe('');
     expect(form.actualHours).toBe('');
-    expect(form.requiredRole).toBe('');
+    expect(form.requiredRoles).toEqual([]);
   });
 });

@@ -21,5 +21,8 @@ namespace ManageR2.Infrastructure.Models.SmartAssignment
 
         // כתובת מסודרת של התחנה
         public string? FormattedAddress { get; set; }
+
+        public decimal? Latitude { get; set; }
+        public decimal? Longitude { get; set; }
     }
 }

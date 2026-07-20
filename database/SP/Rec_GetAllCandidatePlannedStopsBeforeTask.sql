@@ -23,12 +23,17 @@ BEGIN
         ps.FormattedAddress,
         ps.ExternalPlaceRef,
         ps.ZoneId,
+        COALESCE(ps.Latitude, plannedStopSite.Latitude) AS Latitude,
+        COALESCE(ps.Longitude, plannedStopSite.Longitude) AS Longitude,
         ps.StopStatus
     FROM dbo.Rec_EmployeePlannedStops ps
     INNER JOIN dbo.Employees e
         ON e.EmployeeId = ps.EmployeeId
+    LEFT JOIN dbo.Rec_SiteAddressProfile AS plannedStopSite
+        ON plannedStopSite.SiteId = ps.SiteId
+    -- Smart Assignment ranks every active employee; IsAssignable is informational only
+    -- and must not remove an active employee from candidate geographic enrichment.
     WHERE e.IsActive = 1
-      AND e.IsAssignable = 1
       AND ps.PlannedDate = @TaskDate
       AND ps.StopStatus IN (N'Planned', N'InProgress', N'Completed')
       AND ps.PlannedEndAt IS NOT NULL

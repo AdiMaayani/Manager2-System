@@ -18,6 +18,17 @@ BEGIN
         wi.EstimatedHours,
         wi.Priority,
         wi.RequiredRole,
+        CASE WHEN EXISTS
+        (
+            SELECT 1 FROM dbo.WorkItemRequiredRoles AS requiredRole
+            WHERE requiredRole.WorkItemId = wi.WorkItemId
+        ) THEN (
+            SELECT requiredRole.RoleName AS [Role]
+            FROM dbo.WorkItemRequiredRoles AS requiredRole
+            WHERE requiredRole.WorkItemId = wi.WorkItemId
+            ORDER BY requiredRole.RoleName
+            FOR XML PATH(''), ROOT('Roles'), TYPE
+        ) ELSE CAST(NULL AS XML) END AS RequiredRolesXml,
         wi.IsLocked,
         wi.SiteId,
         wi.CustomerId,

@@ -17,6 +17,9 @@ namespace ManageR2.Infrastructure.Models.SmartAssignment
         // תפקיד עיקרי (לדוגמה: טכנאי בכיר / בעלים)
         public string? PrimaryRole { get; set; }
 
+        // Primary + secondary professions, normalized independently of SQL row order.
+        public List<string> Professions { get; set; } = new();
+
         // האם העובד פעיל במערכת
         public bool IsActive { get; set; }
 
@@ -98,6 +101,11 @@ namespace ManageR2.Infrastructure.Models.SmartAssignment
         public int? MatchedSkillsCount { get; set; }
         public int? MissingSkillsCount { get; set; }
 
+        // Role-set explanation for multi-profession tasks.
+        public List<string> RequiredRoles { get; set; } = new();
+        public List<string> MatchedRoles { get; set; } = new();
+        public List<string> MissingRoles { get; set; } = new();
+
         // Travel detail used by the geographic factor, when route data exists.
         public int? TravelMinutes { get; set; }
         public decimal? DistanceKm { get; set; }
@@ -109,5 +117,15 @@ namespace ManageR2.Infrastructure.Models.SmartAssignment
         // Continuity detail used by the continuity factor and persisted for transparency.
         public bool? WorkedWithCustomerBefore { get; set; }
         public bool? WorkedAtSiteBefore { get; set; }
+
+        // Additive structured eligibility and missing-input contracts.
+        public List<RecommendationRejectionModel> RejectionReasons { get; set; } = new();
+        public List<string> MissingInputCodes { get; set; } = new();
+
+        // Exact immutable policy version used for this candidate calculation.
+        public string? PolicyProfileKey { get; set; }
+        public int? PolicyVersion { get; set; }
+        public string? PolicyDisplayName { get; set; }
+        public string? PolicySnapshotJson { get; set; }
     }
 }

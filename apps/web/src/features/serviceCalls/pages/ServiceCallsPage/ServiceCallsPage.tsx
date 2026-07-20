@@ -61,6 +61,7 @@ function buildSearchText(serviceCall: ServiceCallListItem): string {
     serviceCall.status,
     serviceCall.priority,
     serviceCall.requiredRole,
+    ...(serviceCall.requiredRoles ?? []),
   ]
     .filter(Boolean)
     .join(' ')
@@ -197,7 +198,13 @@ export function ServiceCallsPage() {
       align: 'end',
       cell: (call) => formatDate(call.plannedStart),
     },
-    { id: 'role', header: 'תפקיד', width: '140px', cell: (call) => call.requiredRole ?? '-' },
+    {
+      id: 'role',
+      header: 'מקצועות',
+      width: '140px',
+      cell: (call) =>
+        call.requiredRoles?.length ? call.requiredRoles.join(' · ') : call.requiredRole ?? '-',
+    },
   ];
 
   if (isLoading) {
