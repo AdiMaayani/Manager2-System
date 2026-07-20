@@ -1,8 +1,11 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   buildSmartAssignmentFeedbackRequest,
+  canQueryAssignmentFeedback,
+  cancelStaleAssignmentFeedbackQueries,
   getAssignmentFeedbackContext,
   isValidRecommendationRating,
+  purgeStaleAssignmentFeedbackQueries,
   smartAssignmentFeedbackQueryKey,
 } from './smartAssignmentFeedback';
 
@@ -63,5 +66,72 @@ describe('smart assignment feedback', () => {
       recommendationRunId: null,
       feedback: null,
     })).toBeNull();
+  });
+
+  it('enables feedback queries only for a confirmed current smart assignment employee', () => {
+    expect(canQueryAssignmentFeedback({
+      taskId: 42,
+      assignmentWorkItemId: 42,
+      assignmentSource: 'Task',
+      isManualAssignment: false,
+      assignedEmployeeId: 15,
+    })).toBe(true);
+
+    expect(canQueryAssignmentFeedback({
+      taskId: 42,
+      assignmentWorkItemId: 42,
+      assignmentSource: 'Task',
+      isManualAssignment: true,
+      assignedEmployeeId: 11,
+    })).toBe(false);
+
+    expect(canQueryAssignmentFeedback({
+      taskId: 42,
+      assignmentWorkItemId: 99,
+      assignmentSource: 'Project',
+      isManualAssignment: false,
+      assignedEmployeeId: 11,
+    })).toBe(false);
+  });
+
+  it('cancels previous-employee feedback before purge and does not touch the next employee early', async () => {
+    const cancelQueries = vi.fn(async () => undefined);
+    const removeQueries = vi.fn();
+    const queryClient = { cancelQueries, removeQueries };
+
+    await cancelStaleAssignmentFeedbackQueries(queryClient, {
+      workItemId: 42,
+      previousEmployeeIds: [11, null, 11],
+    });
+
+    expect(cancelQueries).toHaveBeenCalledTimes(1);
+    expect(cancelQueries).toHaveBeenCalledWith({
+      queryKey: smartAssignmentFeedbackQueryKey(42, 11),
+    });
+    expect(removeQueries).not.toHaveBeenCalled();
+
+    purgeStaleAssignmentFeedbackQueries(queryClient, {
+      workItemId: 42,
+      previousEmployeeIds: [11],
+      nextEmployeeIds: [15],
+    });
+
+    expect(removeQueries).toHaveBeenCalledTimes(1);
+    expect(removeQueries).toHaveBeenCalledWith({
+      queryKey: smartAssignmentFeedbackQueryKey(42, 11),
+    });
+  });
+
+  it('does not remove a previous employee who remains the next assignee', () => {
+    const removeQueries = vi.fn();
+    purgeStaleAssignmentFeedbackQueries(
+      { cancelQueries: vi.fn(async () => undefined), removeQueries },
+      {
+        workItemId: 42,
+        previousEmployeeIds: [11],
+        nextEmployeeIds: [11],
+      },
+    );
+    expect(removeQueries).not.toHaveBeenCalled();
   });
 });

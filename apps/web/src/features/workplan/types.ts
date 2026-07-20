@@ -227,6 +227,7 @@ export interface SmartAssignmentTaskResult {
   reasons: string[];
   factors?: RecommendationFactor[];
   bestIneligibleAlternative?: SmartAssignmentCandidate | null;
+  candidates?: SmartAssignmentCandidate[];
   policyProfileKey?: string | null;
   policyVersion?: number | null;
   policyDisplayName?: string | null;
@@ -324,6 +325,7 @@ export interface AssignEmployeeRequest {
 
 export interface ReplaceEmployeeAssignmentRequest {
   employeeId: number;
+  recommendationRunId?: number | null;
 }
 
 export interface EmployeeAssignmentReplacementRequest {

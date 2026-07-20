@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import type { DraftRecommendationCandidate, RecommendationFactor } from '../types';
+import type {
+  DraftRecommendationCandidate,
+  RecommendationFactor,
+  SmartAssignmentCandidate,
+} from '../types';
 import {
   canSelectRecommendationCandidate,
+  dedupeCandidatesByEmployeeId,
   getCandidateNotices,
   getMainRecommendationContributions,
   getProfessionMatchSummary,
@@ -11,6 +16,7 @@ import {
   getWeightedRecommendationFactors,
   hasGeoapifyTravelData,
   rankRecommendationCandidates,
+  toDraftRecommendationCandidate,
   toggleExpandedRecommendation,
 } from './smartAssignmentRecommendationPresentation';
 
@@ -230,5 +236,42 @@ describe('smart assignment recommendation presentation', () => {
       'לא הוגדרה כתובת אתר תקפה למשימה. לא בוצע חישוב מסלול והוחל ציון נסיעה ניטרלי 50.',
     );
     expect(getCandidateNotices(withoutSiteAddress)).toEqual([]);
+  });
+
+  it('de-duplicates candidates by employee id while preserving order', () => {
+    const deduped = dedupeCandidatesByEmployeeId([
+      candidate(5, true, { totalScore: 90 }),
+      candidate(6, true, { totalScore: 80 }),
+      candidate(5, true, { totalScore: 10 }),
+    ]);
+
+    expect(deduped.map((item) => item.employeeId)).toEqual([5, 6]);
+    expect(deduped[0].totalScore).toBe(90);
+  });
+
+  it('adapts a saved-run candidate (object rejection reasons) to the draft shape', () => {
+    const savedCandidate = {
+      rankOrder: 1,
+      employeeId: 12,
+      fullName: 'עובד שמור',
+      isEligible: false,
+      status: 'לא זמין לבחירה',
+      warnings: [],
+      factors: [],
+      rejectionReasons: [
+        { code: 'BusyConflict', explanation: 'busy' },
+        { code: 'ScheduleNotCovered', explanation: 'schedule' },
+      ],
+      missingInputCodes: ['RouteDataMissing'],
+      travelMinutes: 18,
+      distanceKm: 9,
+    } as unknown as SmartAssignmentCandidate;
+
+    const adapted = toDraftRecommendationCandidate(savedCandidate);
+
+    expect(adapted.rejectionReasonCodes).toEqual(['BusyConflict', 'ScheduleNotCovered']);
+    expect(adapted.missingInputCodes).toEqual(['RouteDataMissing']);
+    expect(adapted.employeeId).toBe(12);
+    expect(adapted.travelMinutes).toBe(18);
   });
 });

@@ -381,6 +381,7 @@ export function WorkPlanTaskPanel({
         task={task}
         assignments={directAssignments}
         employees={employees}
+        canEdit={canEdit && !task.isLocked}
         onClose={() => setIsEditOpen(false)}
         onSaved={() => {
           setIsEditOpen(false);

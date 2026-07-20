@@ -30,6 +30,20 @@ public class WorkItemRepositoryConnectionContractTests
             "UpdateAsync must open the connection before executing the command, not after.");
     }
 
+    [Fact]
+    public void UpdateEmployeeWorkAssignmentAsync_ForwardsOptionalRecommendationRunId()
+    {
+        var source = ReadRepositorySource();
+
+        // The optional parameter is declared on the signature.
+        Assert.Contains("int? recommendationRunId = null", source);
+
+        // The body forwards it as the @RecommendationRunId parameter.
+        var body = ExtractMethodBody(source, "public async Task<bool> UpdateEmployeeWorkAssignmentAsync(");
+        Assert.Contains("@RecommendationRunId", body);
+        Assert.Contains("recommendationRunId.HasValue ? recommendationRunId.Value : DBNull.Value", body);
+    }
+
     private static string ReadRepositorySource()
     {
         return File.ReadAllText(GetRepoRelativePath(

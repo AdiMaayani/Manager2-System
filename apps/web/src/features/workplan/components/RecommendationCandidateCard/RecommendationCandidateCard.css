@@ -1,0 +1,246 @@
+.recommendationCandidateCard {
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--color-primary-200);
+  border-radius: var(--radius-md);
+  background: var(--color-primary-50);
+}
+
+.recommendationCandidateCard__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--spacing-sm);
+  padding: var(--spacing-sm);
+}
+
+.recommendationCandidateCard__toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-md);
+  min-width: 0;
+  min-height: var(--control-height-md);
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border-radius: var(--radius-sm);
+  color: var(--color-neutral-900);
+  text-align: start;
+}
+
+.recommendationCandidateCard__toggle:hover {
+  background: rgb(255 255 255 / 65%);
+}
+
+.recommendationCandidateCard__toggle:focus-visible {
+  outline: 2px solid var(--color-primary-500);
+  outline-offset: 2px;
+}
+
+.recommendationCandidateCard__identity,
+.recommendationCandidateCard__summary {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-sm);
+  min-width: 0;
+}
+
+.recommendationCandidateCard__identity {
+  flex-wrap: wrap;
+}
+
+.recommendationCandidateCard__rank {
+  padding: 2px var(--spacing-sm);
+  border: 1px solid var(--color-primary-200);
+  border-radius: var(--radius-full);
+  background: var(--color-surface);
+  color: var(--color-primary-700);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.recommendationCandidateCard__summary {
+  flex-shrink: 0;
+}
+
+.recommendationCandidateCard__name {
+  font-size: var(--font-size-lg);
+  color: var(--color-neutral-900);
+}
+
+.recommendationCandidateCard__score {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-xs) var(--spacing-md);
+  border-radius: var(--radius-full);
+  background: var(--color-primary-600);
+  color: #fff;
+  font-weight: var(--font-weight-semibold);
+}
+
+.recommendationCandidateCard__chevron {
+  flex-shrink: 0;
+  color: var(--color-neutral-500);
+  transition: transform var(--transition-fast);
+}
+
+.recommendationCandidateCard__toggle[aria-expanded='true'] .recommendationCandidateCard__chevron {
+  transform: rotate(180deg);
+}
+
+.recommendationCandidateCard__details {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-md);
+  padding: var(--spacing-md);
+  border-top: 1px solid var(--color-primary-200);
+  background: var(--color-surface);
+}
+
+.recommendationCandidateCard__details[hidden] {
+  display: none;
+}
+
+.recommendationCandidateCard__reasons {
+  margin: 0;
+  padding-inline-start: var(--spacing-lg);
+  list-style: disc;
+  color: var(--color-neutral-700);
+  font-size: var(--font-size-sm);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.recommendationCandidateCard__warning {
+  margin: 0;
+  padding: var(--spacing-sm) var(--spacing-md);
+  border-radius: var(--radius-md);
+  background: var(--color-warning-50);
+  color: var(--color-warning-600);
+  font-size: var(--font-size-sm);
+}
+
+.recommendationCandidateCard__contributionsTitle {
+  margin: 0;
+  color: var(--color-neutral-700);
+  font-size: var(--font-size-sm);
+}
+
+.recommendationCandidateCard__factors {
+  list-style: none;
+  margin: var(--spacing-sm) 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+}
+
+.recommendationCandidateCard__factor {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--spacing-xs) var(--spacing-sm);
+  border: 1px solid var(--color-neutral-100);
+  border-radius: var(--radius-md);
+  background: var(--color-neutral-50);
+}
+
+.recommendationCandidateCard__factorHead {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+}
+
+.recommendationCandidateCard__factorLabel {
+  font-weight: var(--font-weight-semibold);
+  color: var(--color-neutral-800);
+}
+
+.recommendationCandidateCard__factorMetrics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-xs) var(--spacing-md);
+  color: var(--color-neutral-600);
+  font-size: var(--font-size-xs);
+}
+
+.recommendationCandidateCard__factorMetrics b {
+  color: var(--color-primary-700);
+  font-family: monospace;
+}
+
+.recommendationCandidateCard__factorExplain {
+  font-size: var(--font-size-sm);
+  color: var(--color-neutral-700);
+}
+
+.recommendationCandidateCard__routeEndpoints {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--spacing-sm);
+  margin-block: var(--spacing-xs);
+  padding: var(--spacing-sm);
+  border: 1px solid var(--color-primary-200);
+  border-radius: var(--radius-md);
+  background: var(--color-surface);
+}
+
+.recommendationCandidateCard__routeEndpoint {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-sm);
+  min-width: 0;
+  color: var(--color-primary-700);
+}
+
+.recommendationCandidateCard__routeEndpoint > span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.recommendationCandidateCard__routeEndpointLabel {
+  color: var(--color-neutral-600);
+  font-size: var(--font-size-xs);
+  font-weight: var(--font-weight-semibold);
+}
+
+.recommendationCandidateCard__routeEndpoint strong {
+  color: var(--color-neutral-900);
+  font-size: var(--font-size-sm);
+  overflow-wrap: anywhere;
+}
+
+.recommendationCandidateCard__ratingAction {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--spacing-sm);
+  padding-block-start: var(--spacing-xs);
+}
+
+.recommendationCandidateCard__ratingStatus {
+  color: var(--color-success-700);
+  font-size: var(--font-size-sm);
+  font-weight: var(--font-weight-semibold);
+}
+
+@media (max-width: 640px) {
+  .recommendationCandidateCard__row {
+    grid-template-columns: 1fr;
+  }
+
+  .recommendationCandidateCard__row > .button {
+    width: 100%;
+  }
+
+  .recommendationCandidateCard__routeEndpoints {
+    grid-template-columns: 1fr;
+  }
+}

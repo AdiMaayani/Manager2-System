@@ -163,7 +163,7 @@ public class WorkItemsController : ControllerBase
 
     [HttpGet("{id}")]
     // Returns one work item by id (can be project, task, milestone, or service call).
-    public async Task<ActionResult<WorkItem>> GetById(int id)
+    public async Task<ActionResult<WorkItemDetailResponseDto>> GetById(int id)
     {
         var workItem = await _workItemRepository.GetByIdAsync(id);
 
@@ -172,7 +172,8 @@ public class WorkItemsController : ControllerBase
             return NotFound($"Work item with ID {id} was not found.");
         }
 
-        return Ok(workItem);
+        // Map through the response boundary so persisted UTC timestamps serialize with a Z suffix.
+        return Ok(WorkItemDetailResponseMapper.Map(workItem));
     }
 
     [HttpGet("type/{workType}")]
@@ -915,7 +916,8 @@ public class WorkItemsController : ControllerBase
         if (workItemId <= 0
             || assignmentId <= 0
             || request == null
-            || request.EmployeeId <= 0)
+            || request.EmployeeId <= 0
+            || request.RecommendationRunId is <= 0)
         {
             return BadRequest(new
             {
@@ -923,12 +925,15 @@ public class WorkItemsController : ControllerBase
             });
         }
 
+        var isSmartReplacement = request.RecommendationRunId.HasValue;
+
         try
         {
             var updated = await _workItemRepository.UpdateEmployeeWorkAssignmentAsync(
                 workItemId,
                 assignmentId,
-                request.EmployeeId);
+                request.EmployeeId,
+                request.RecommendationRunId);
 
             if (!updated)
             {
@@ -944,8 +949,9 @@ public class WorkItemsController : ControllerBase
                 {
                     ["workEmployeeAssignmentId"] = assignmentId,
                     ["employeeId"] = request.EmployeeId,
-                    ["assignmentMethod"] = "Manual",
-                    ["smartAssignmentRecommendationCleared"] = true
+                    ["assignmentMethod"] = isSmartReplacement ? "SmartAssignment" : "Manual",
+                    ["recommendationRunId"] = request.RecommendationRunId,
+                    ["smartAssignmentRecommendationCleared"] = !isSmartReplacement
                 }));
 
             return Ok(new { message = "Employee assignment updated successfully." });

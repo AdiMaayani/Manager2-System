@@ -458,7 +458,8 @@ public class WorkItemRepository : IWorkItemRepository
     public async Task<bool> UpdateEmployeeWorkAssignmentAsync(
         int workItemId,
         int workEmployeeAssignmentId,
-        int employeeId)
+        int employeeId,
+        int? recommendationRunId = null)
     {
         try
         {
@@ -472,6 +473,8 @@ public class WorkItemRepository : IWorkItemRepository
             command.Parameters.Add("@WorkEmployeeAssignmentId", SqlDbType.Int).Value =
                 workEmployeeAssignmentId;
             command.Parameters.Add("@EmployeeId", SqlDbType.Int).Value = employeeId;
+            command.Parameters.Add("@RecommendationRunId", SqlDbType.Int).Value =
+                recommendationRunId.HasValue ? recommendationRunId.Value : DBNull.Value;
 
             await connection.OpenAsync();
             var result = await command.ExecuteScalarAsync();

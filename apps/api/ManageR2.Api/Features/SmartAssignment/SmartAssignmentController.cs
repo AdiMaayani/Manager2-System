@@ -88,7 +88,8 @@ public class SmartAssignmentController : ControllerBase
                 PolicyProfileKey = r.PolicyProfileKey,
                 PolicyVersion = r.PolicyVersion,
                 PolicyDisplayName = r.PolicyDisplayName,
-                RequiredRoles = r.RequiredRoles
+                RequiredRoles = r.RequiredRoles,
+                Candidates = r.Candidates.Select(MapCandidate).ToList()
             }).ToList(),
             EmployeeLoad = serviceResponse.EmployeeLoad.Select(l => new SmartAssignmentEmployeeLoadDto
             {

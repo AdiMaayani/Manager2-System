@@ -82,6 +82,7 @@ public sealed class SmartAssignmentBatchService : ISmartAssignmentService
                 Warnings = BuildWarnings(recommendation),
                 Reasons = BuildReasons(recommendation),
                 Factors = recommendation.Factors,
+                Candidates = candidates,
                 PolicyProfileKey = evaluation.Policy.ProfileKey.ToString(),
                 PolicyVersion = evaluation.Policy.Version,
                 PolicyDisplayName = evaluation.Policy.DisplayName,

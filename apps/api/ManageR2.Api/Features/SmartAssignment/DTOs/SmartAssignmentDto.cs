@@ -67,6 +67,10 @@ namespace ManageR2.Api.DTOs
         public int? PolicyVersion { get; set; }
         public string? PolicyDisplayName { get; set; }
         public List<string> RequiredRoles { get; set; } = new();
+
+        // Full ranked candidate list for this task, enabling a saved-task rerun to present every
+        // active employee for selection while the recommendation run remains authoritative.
+        public List<SmartAssignmentCandidateDto> Candidates { get; set; } = new List<SmartAssignmentCandidateDto>();
     }
 
     // One explainability factor (professional/availability/workload/geographic/experience).
